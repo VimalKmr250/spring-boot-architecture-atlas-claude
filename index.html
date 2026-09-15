@@ -268,13 +268,13 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 
 <main class="stage" id="stage">
 
-<!-- ============ 1 ============ -->
+<!-- deck 01 -->
 <section class="slide" data-sec="Foundations" data-title="What this atlas is">
   <h2>Enterprise architecture that has actually shipped</h2>
   <p class="lede">A working reference for Java&nbsp;+&nbsp;Spring Boot systems at enterprise scale — the layering, module boundaries, middleware, data and frontend decisions that hold up after three years and forty engineers. Every pattern here is traced through one running system, so nothing stays abstract.</p>
 
   <div class="grid3">
-    <div class="card lift"><span class="bignum">56</span><p>slides across eight sections, each with the code and the trade-off, not just the name of the pattern.</p></div>
+    <div class="card lift"><span class="bignum">68</span><p>slides across nine sections, each with the code and the trade-off, not just the name of the pattern.</p></div>
     <div class="card lift"><span class="bignum">4.1</span><p>Spring Boot 4.1 (June 2026) on Spring Framework 7 — Java 17 baseline, Java 25 recommended.</p></div>
     <div class="card lift"><span class="bignum">1</span><p>running example: an order platform for a mid-size retailer. Same domain on every slide.</p></div>
   </div>
@@ -301,7 +301,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   </div>
 </section>
 
-<!-- ============ 2 ============ -->
+<!-- deck 02 -->
 <section class="slide" data-sec="Foundations" data-title="System context (C4 L1)">
   <h2>Start at the boundary, not the beans</h2>
   <p class="dek">Before any layering decision, draw who talks to the system and what it depends on. Every integration on this diagram becomes a failure mode, a timeout budget and an on-call page later.</p>
@@ -363,7 +363,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   <div class="note tip"><span class="lbl">The move that pays for itself</span>Classify every external dependency as <b>in the request path</b> or <b>not</b> on day one. Everything not in the path goes through an event and an outbox — that single rule keeps checkout availability at 99.95% while five downstream systems average 99.5%.</div>
 </section>
 
-<!-- ============ 3 ============ -->
+<!-- deck 03 -->
 <section class="slide" data-sec="Foundations" data-title="The decision hierarchy">
   <h2>Six decisions, in this order</h2>
   <p class="dek">Most architecture arguments are people debating level 4 while disagreeing about level 1. Decide top-down; each level constrains the one below it, and reversing a level costs roughly ten times what the level below costs.</p>
@@ -388,7 +388,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   </div>
 </section>
 
-<!-- ============ 4 ============ -->
+<!-- deck 04 -->
 <section class="slide" data-sec="Foundations" data-title="Four styles, honestly compared">
   <h2>The four styles that actually ship</h2>
   <p class="dek">Everything else is a variation. The question is never "which is best" — it is which failure you would rather have: a tangled codebase, or a distributed system you cannot debug.</p>
@@ -423,7 +423,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   </div>
 </section>
 
-<!-- ============ 5 ============ -->
+<!-- deck 05 -->
 <section class="slide" data-sec="Foundations" data-title="Conway's law in practice">
   <h2>You will ship your org chart — plan for it</h2>
   <p class="dek">Conway's law is not a warning, it is a design tool. Pick the team structure you want the architecture to have, and the architecture follows within two quarters.</p>
@@ -448,7 +448,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   <div class="note"><span class="lbl">Cognitive load, not headcount</span>The useful limit on a module is how much a team can hold in their heads: one domain language, one data model, one set of external systems. When a team needs two glossaries to explain their module, split it.</div>
 </section>
 
-<!-- ============ 6 ============ -->
+<!-- deck 06 -->
 <section class="slide" data-sec="Modular monolith" data-title="What it is, precisely">
   <h2>A modular monolith is a compile-time distributed system</h2>
   <p class="dek">One process, one deployable, one transaction manager — but modules that only see each other through published interfaces and events. Every microservice discipline except the network.</p>
@@ -509,7 +509,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   </figure>
 </section>
 
-<!-- ============ 7 ============ -->
+<!-- deck 07 -->
 <section class="slide" data-sec="Modular monolith" data-title="Module anatomy">
   <h2>Three packages per module, and only one is public</h2>
   <p class="dek">Java gives you <code>public</code> (the whole world) and package-private (this one package). There is nothing in between — so a modular monolith has to invent "module-private" by convention, and then enforce it with tooling.</p>
@@ -553,7 +553,7 @@ com.retailco.shop.<span class="h">order</span>
   </div>
 </section>
 
-<!-- ============ 8 ============ -->
+<!-- deck 08 -->
 <section class="slide" data-sec="Modular monolith" data-title="api offers, spi requires">
   <h2><code>api</code> offers; <code>spi</code> requires — and both arrows point inward</h2>
   <p class="dek">This is the part that gets misread. The two packages are not "public" and "also public" — they are opposite ends of the same property: the module depends on nobody, in either direction.</p>
@@ -635,7 +635,7 @@ PlaceOrderUseCase(OrderRepository orders, TaxCalculator tax) { ... }</code></pre
   </div>
 </section>
 
-<!-- ============ 9 ============ -->
+<!-- deck 09 -->
 <section class="slide" data-sec="Modular monolith" data-title="Where the boundary leaks">
   <h2>Where the boundary leaks, and how hard you enforce it</h2>
   <p class="dek">The convention does nothing on its own — it is a naming scheme until something fails the build. These are the four leaks that appear in every codebase, and the four levels of enforcement you can choose between.</p>
@@ -672,7 +672,7 @@ PlaceOrderUseCase(OrderRepository orders, TaxCalculator tax) { ... }</code></pre
   </div>
 </section>
 
-<!-- ============ 10 ============ -->
+<!-- deck 10 -->
 <section class="slide" data-sec="Modular monolith" data-title="Enforcing it with ArchUnit">
   <h2>A boundary nobody can break by accident</h2>
   <p class="dek">Rules in a wiki decay. Rules in the test suite do not. These four tests, running in CI, are the difference between a modular monolith and a monolith with optimistic folder names.</p>
@@ -719,7 +719,7 @@ class ModuleBoundaryTest {
   </div>
 </section>
 
-<!-- ============ 11 ============ -->
+<!-- deck 11 -->
 <section class="slide" data-sec="Modular monolith" data-title="Spring Modulith">
   <h2>Spring Modulith: the boundary, documented and tested</h2>
   <p class="dek">Spring Modulith (2.x, current on Boot 4) makes the module a first-class concept: it derives the module graph from your package structure, verifies it, generates documentation, and gives per-module integration tests.</p>
@@ -782,7 +782,7 @@ class OrderModuleTests {
   </div>
 </section>
 
-<!-- ============ 12 ============ -->
+<!-- deck 12 -->
 <section class="slide" data-sec="Modular monolith" data-title="Call or publish?">
   <h2>Call an API, or publish an event?</h2>
   <p class="dek">This is the single most consequential line-level decision in the codebase. Get it wrong in one direction and modules cannot be extracted; wrong in the other and nobody can follow the flow.</p>
@@ -835,7 +835,7 @@ class OrderModuleTests {
   <div class="note tip"><span class="lbl">The decision rule</span>Ask: <b>"if this step fails, should the user's action fail?"</b> Yes → synchronous call, same transaction (taking payment). No → event (sending the confirmation email, updating the loyalty balance, reindexing search). Teams that apply only this one rule consistently end up with a system that can be pulled apart later.</div>
 </section>
 
-<!-- ============ 13 ============ -->
+<!-- deck 13 -->
 <section class="slide" data-sec="Modular monolith" data-title="Events that cannot be lost">
   <h2>The in-process event that survives a crash</h2>
   <p class="dek">A plain <code>ApplicationEventPublisher</code> event is lost if the JVM dies between commit and listener. Spring Modulith's event publication registry writes the event into <em>your</em> database inside the same transaction — the transactional outbox, without the boilerplate.</p>
@@ -882,7 +882,7 @@ class OrderPlacedListener {
   <div class="note warn"><span class="lbl">Ordering caveat</span>The registry guarantees <b>at-least-once</b>, not ordering and not exactly-once. Listeners must be idempotent — reserve inventory keyed on <code>orderId</code>, not by incrementing a counter.</div>
 </section>
 
-<!-- ============ 14 ============ -->
+<!-- deck 14 -->
 <section class="slide" data-sec="Modular monolith" data-title="Extracting a service">
   <h2>Extraction, when the evidence arrives</h2>
   <p class="dek">A module built this way is extracted in days, not a quarter, because the seam already exists. The order of operations matters more than the tooling.</p>
@@ -935,7 +935,91 @@ class OrderPlacedListener {
   <div class="note bad"><span class="lbl">The trap</span>Extracting a module whose tables are still joined from three other modules. You will end up with a "service" that shares a database — all the latency of distribution, none of the autonomy. Split the data <b>first</b>, run for a month, then split the process.</div>
 </section>
 
-<!-- ============ 15 ============ -->
+<!-- deck 15 -->
+<section class="slide" data-sec="Modular monolith" data-title="The strangler fig">
+  <h2>Strangling a legacy system, concretely</h2>
+  <p class="dek">"Strangler fig" is quoted constantly and implemented rarely. The whole pattern is one component — a router at the edge — plus the discipline to migrate by capability rather than by table.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="A facade router in front of the legacy system sends most traffic to it and a growing share to new services; a synchronisation path keeps data consistent during the transition until the legacy system is retired">
+        <rect x="14" y="70" width="128" height="52" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="78" y="94" text-anchor="middle" font-size="11.5" fill="currentColor">Clients</text>
+        <text x="78" y="110" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">unchanged throughout</text>
+
+        <rect x="190" y="64" width="140" height="64" rx="9" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="260" y="88" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Facade / router</text>
+        <text x="260" y="105" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">routes per capability,</text>
+        <text x="260" y="118" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">switchable by flag</text>
+        <line x1="144" y1="96" x2="186" y2="96" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="400" y="20" width="170" height="60" rx="8" fill="#2C7448" fill-opacity="0.10" stroke="#2C7448"></rect>
+        <text x="485" y="44" text-anchor="middle" font-size="11.5" fill="currentColor">New: order capability</text>
+        <text x="485" y="61" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">own schema, own tests</text>
+
+        <rect x="400" y="112" width="170" height="60" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="485" y="136" text-anchor="middle" font-size="11.5" fill="currentColor">Legacy system</text>
+        <text x="485" y="153" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">everything not yet moved</text>
+
+        <line x1="332" y1="86" x2="396" y2="52" stroke="#2C7448" stroke-width="1.6" marker-end="url(#arw)"></line>
+        <text x="362" y="62" text-anchor="middle" font-size="9" fill="#2C7448">15%</text>
+        <line x1="332" y1="106" x2="396" y2="138" stroke="#8A94A3" stroke-width="1.6" marker-end="url(#arw)"></line>
+        <text x="362" y="132" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">85%</text>
+
+        <path d="M486 82 C540 94 540 100 486 110" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arwB)"></path>
+        <text x="600" y="92" font-size="10" fill="#3AA79B">Sync while both are live — events or CDC.</text>
+        <text x="600" y="108" font-size="10" fill="#3AA79B">One side OWNS each field; the other</text>
+        <text x="600" y="124" font-size="10" fill="#3AA79B">is a read-only copy. Never both.</text>
+
+        <line x1="14" y1="192" x2="866" y2="192" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="212" font-size="10.5" fill="currentColor" opacity="0.8">Migrate by <tspan font-weight="600">capability</tspan>, not by table: "place an order" moves whole, with its rules and its data. Moving a table at a time leaves</text>
+        <text x="14" y="229" font-size="10.5" fill="currentColor" opacity="0.8">logic on one side and data on the other — the state most failed migrations get permanently stuck in.</text>
+        <text x="14" y="246" font-size="10.5" fill="#D26A3F">Done when the legacy box is deleted. A strangler that never finishes is just two systems, forever.</text>
+      </svg>
+    </div>
+    <figcaption>The router is the only new infrastructure. Everything else is ordinary delivery — which is why this pattern succeeds where big-bang rewrites do not: every step ships, and every step is reversible with a flag.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Pick the first capability carefully</h4><p>High enough value to justify the router, low enough risk to survive being wrong, and with data you can genuinely separate. A read-only reporting view is a common, sensible first cut.</p></div>
+    <div class="card"><h4>Branch by abstraction, inside the code</h4><p>When the seam is a class rather than an HTTP route: introduce an interface, implement it twice, switch with a flag, delete the old one. Same shape as the router, no infrastructure at all.</p></div>
+    <div class="card"><h4>Budget for the double-run</h4><p>Running both systems, reconciling them and fixing the differences is real work that appears in no estimate. Plan for it explicitly or the migration stalls at 70% and stays there.</p></div>
+  </div>
+</section>
+
+<!-- deck 16 -->
+<section class="slide" data-sec="Modular monolith" data-title="Systems you cannot change">
+  <h2>Integrating with a mainframe, an ERP, or anything you do not own</h2>
+  <p class="dek">Every enterprise has them: systems with a nightly batch window, a fixed-width file format and a change request process measured in quarters. The architecture question is how to keep their constraints out of your domain.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Mechanism</th><th>Latency</th><th>Use when</th><th>Watch for</th></tr></thead>
+      <tbody>
+        <tr><td>Batch file exchange (SFTP, fixed-width)</td><td class="num">hours</td><td>It is the only option the other side offers</td><td>Partial files, no idempotency, silent truncation. Always checksum and use a control record with a row count</td></tr>
+        <tr><td>Message queue (IBM MQ, JMS)</td><td class="num">seconds</td><td>The mainframe already speaks it — very common in banking</td><td>Ordering, poison messages, and XA transactions you probably should not use</td></tr>
+        <tr><td>Change data capture</td><td class="num">ms–s</td><td>You need their data and they will not build you an API</td><td>You are now coupled to their <b>schema</b>, which they can change without telling you</td></tr>
+        <tr><td>Direct database read</td><td class="num">ms</td><td>Almost never</td><td>The tightest possible coupling, plus load on their OLTP. Treat as a last resort with an expiry date</td></tr>
+        <tr><td>API façade you build in front of them</td><td class="num">ms</td><td>Several consumers need the same legacy capability</td><td>You now own their availability. Cache, circuit-break, and degrade deliberately</td></tr>
+        <tr><td>Screen scraping / RPA</td><td class="num">seconds</td><td>Genuinely nothing else exists</td><td>Breaks on any UI change. Time-box it and record the debt with an owner</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>The anti-corruption layer is not optional here</h3>
+      <p>Their model is thirty years old, uses <code>CUST-STAT-CD</code> with eleven values, and encodes business rules in the ordering of a COBOL copybook. Translate it at the boundary into your language, in exactly one class.</p>
+      <p>Without that layer, <code>CUST-STAT-CD</code> appears in your domain, your API, your database and your frontend — and the legacy system's model becomes your model permanently, including after it is retired.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">Design for their maintenance window</span>If the ERP is down 02:00–04:00 nightly, that is an architectural constraint, not an operational detail. Queue the work, make the queue durable, and make your UI honest ("submitted — confirmation within 2 hours") rather than pretending the call is synchronous and timing out.</div>
+      <div class="note tip"><span class="lbl">Reconciliation is a feature</span>Any integration that is not a single transaction will drift — a message dropped, a file half-processed, a record rejected silently. Build a daily reconciliation job and a report of differences <b>from the start</b>. Every team that adds it after the first incident wishes they had had it before.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 17 -->
 <section class="slide" data-sec="Backend" data-title="Layering inside a module">
   <h2>Four layers, one direction of dependency</h2>
   <p class="dek">Ports and adapters, named in Spring terms. The rule is a single arrow direction: everything points inward at the domain, and the domain points at nothing.</p>
@@ -979,7 +1063,7 @@ class OrderPlacedListener {
   </div>
 </section>
 
-<!-- ============ 16 ============ -->
+<!-- deck 18 -->
 <section class="slide" data-sec="Backend" data-title="The aggregate">
   <h2>The aggregate: where invariants actually live</h2>
   <p class="dek">An anaemic <code>Order</code> with getters and setters pushes every rule into a service, where it gets duplicated. Put the rules on the object that owns the data, and make illegal states unrepresentable.</p>
@@ -1028,7 +1112,7 @@ class OrderPlacedListener {
   </div>
 </section>
 
-<!-- ============ 17 ============ -->
+<!-- deck 19 -->
 <section class="slide" data-sec="Backend" data-title="Use case and transaction">
   <h2>The application service does four things, and no more</h2>
   <p class="dek">Load, invoke the domain, save, publish. Orchestration lives here; rules do not. When a use case grows an <code>if</code> about business meaning, that <code>if</code> belongs on the aggregate.</p>
@@ -1062,7 +1146,7 @@ class PlaceOrderUseCase implements OrderService {
   </div>
 </section>
 
-<!-- ============ 18 ============ -->
+<!-- deck 20 -->
 <section class="slide" data-sec="Backend" data-title="Port and adapter in code">
   <h2>The repository port, and the JPA adapter behind it</h2>
   <p class="dek">The domain gets an interface in its own vocabulary. Spring Data lives on the other side of it, where its magic cannot leak into business code.</p>
@@ -1113,7 +1197,7 @@ interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt; {
   </div>
 </section>
 
-<!-- ============ 19 ============ -->
+<!-- deck 21 -->
 <section class="slide" data-sec="Backend" data-title="Persistence traps">
   <h2>The five JPA failures that reach production</h2>
   <p class="dek">Every one of these passes code review and every one of them is found by a load test or an incident. Know the symptom, not just the name.</p>
@@ -1157,7 +1241,7 @@ interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt; {
   </div>
 </section>
 
-<!-- ============ 20 ============ -->
+<!-- deck 22 -->
 <section class="slide" data-sec="Backend" data-title="Transactions">
   <h2>Transactions: the four things that bite</h2>
   <p class="dek"><code>@Transactional</code> looks like a keyword and behaves like a proxy. Almost every production transaction bug is one of these four.</p>
@@ -1194,7 +1278,7 @@ class OrderService {
   <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking and lets the driver route to a replica.</div>
 </section>
 
-<!-- ============ 21 ============ -->
+<!-- deck 23 -->
 <section class="slide" data-sec="Backend" data-title="Concurrency and idempotency">
   <h2>Two customers, one last unit of stock</h2>
   <p class="dek">Concurrency bugs are invisible in test and inevitable at scale. Two mechanisms cover almost everything: optimistic locking for state you own, idempotency keys for operations you cannot afford to repeat.</p>
@@ -1243,7 +1327,7 @@ ResponseEntity&lt;OrderView&gt; place(
   </div>
 </section>
 
-<!-- ============ 22 ============ -->
+<!-- deck 24 -->
 <section class="slide" data-sec="Backend" data-title="The API layer">
   <h2>The API layer is a translation layer, nothing else</h2>
   <p class="dek">Controllers parse, validate shape, delegate, and map the result. Any line in a controller that expresses a business rule is a line in the wrong file.</p>
@@ -1293,7 +1377,7 @@ record PlaceOrderRequest(
   </div>
 </section>
 
-<!-- ============ 23 ============ -->
+<!-- deck 25 -->
 <section class="slide" data-sec="Backend" data-title="One error shape">
   <h2>One error shape for the whole system</h2>
   <p class="dek">RFC 9457 <code>ProblemDetail</code> is built into Spring since 6. Adopting it means the frontend writes one error handler instead of five, and every 4xx carries something actionable.</p>
@@ -1353,7 +1437,7 @@ class GlobalExceptionHandler {
   </div>
 </section>
 
-<!-- ============ 24 ============ -->
+<!-- deck 26 -->
 <section class="slide" data-sec="Backend" data-title="Versioning and evolution">
   <h2>Evolve the API without a v2 rewrite</h2>
   <p class="dek">Spring Framework 7 made API versioning first-class on both server and client. But the version you never have to cut is cheaper than the one you route perfectly.</p>
@@ -1397,7 +1481,7 @@ class OrderController {
   </div>
 </section>
 
-<!-- ============ 25 ============ -->
+<!-- deck 27 -->
 <section class="slide" data-sec="Middleware" data-title="What middleware means">
   <h2>"Middleware" is five distinct tiers — name which one</h2>
   <p class="dek">The word covers everything between the browser and the database, which is why architecture conversations stall on it. Here is the whole path of one checkout request, with the responsibility of each hop.</p>
@@ -1471,7 +1555,7 @@ class OrderController {
   </figure>
 </section>
 
-<!-- ============ 26 ============ -->
+<!-- deck 28 -->
 <section class="slide" data-sec="Middleware" data-title="Gateway, BFF or mesh">
   <h2>Gateway, BFF, service mesh — three different jobs</h2>
   <p class="dek">These get conflated constantly. They solve non-overlapping problems and most enterprises eventually run all three, with clear rules about what may live in each.</p>
@@ -1496,7 +1580,7 @@ class OrderController {
   </div>
 </section>
 
-<!-- ============ 27 ============ -->
+<!-- deck 29 -->
 <section class="slide" data-sec="Middleware" data-title="Gateway configuration">
   <h2>What a gateway config actually contains</h2>
   <p class="dek">Spring Cloud Gateway, doing the five things a gateway should do and nothing else. Note that resilience settings live here <em>and</em> in the application — defence in depth, different budgets.</p>
@@ -1543,7 +1627,7 @@ management:
   </div>
 </section>
 
-<!-- ============ 28 ============ -->
+<!-- deck 30 -->
 <section class="slide" data-sec="Middleware" data-title="Calling other systems">
   <h2>Outbound HTTP, declared not hand-rolled</h2>
   <p class="dek">Spring Boot 4 made HTTP interface clients properly first-class with <code>@ImportHttpServices</code>. You declare the contract as an interface; Spring builds the proxy with your timeouts, observability and interceptors already attached.</p>
@@ -1596,7 +1680,7 @@ class PaymentClientConfig {
   </div>
 </section>
 
-<!-- ============ 29 ============ -->
+<!-- deck 31 -->
 <section class="slide" data-sec="Middleware" data-title="Resilience">
   <h2>Resilience is four patterns, layered in order</h2>
   <p class="dek">Applied in the wrong order they amplify failures instead of containing them. Timeout first — without it, nothing else can work, because a call that never returns can never be retried, tripped or shed.</p>
@@ -1680,7 +1764,7 @@ class TaxAdapter implements TaxCalculator {
   </div>
 </section>
 
-<!-- ============ 30 ============ -->
+<!-- deck 32 -->
 <section class="slide" data-sec="Middleware" data-title="Event topology">
   <h2>The event backbone, drawn as it really is</h2>
   <p class="dek">"We use Kafka" says nothing. What matters is the topic list, who owns each one, what the key is, and where poisoned messages go.</p>
@@ -1745,7 +1829,7 @@ class TaxAdapter implements TaxCalculator {
   </div>
 </section>
 
-<!-- ============ 31 ============ -->
+<!-- deck 33 -->
 <section class="slide" data-sec="Middleware" data-title="Consumers done right">
   <h2>The consumer that survives a bad Tuesday</h2>
   <p class="dek">Four properties make a Kafka consumer operable: bounded retry, a dead-letter path, idempotency, and manual offset commit. Missing any one of them produces an incident that ends with "we replayed the whole topic".</p>
@@ -1796,7 +1880,7 @@ class KafkaErrorConfig {
   <div class="note tip"><span class="lbl">Consumer lag is your real SLI</span>Alert on <code>kafka_consumergroup_lag</code> and on DLT depth, not on CPU. Lag rising steadily means consumers cannot keep up — scale to the partition count, then increase partitions. Lag flat but non-zero at a fixed number usually means one stuck partition.</div>
 </section>
 
-<!-- ============ 32 ============ -->
+<!-- deck 34 -->
 <section class="slide" data-sec="Middleware" data-title="Outbox and CDC">
   <h2>The outbox: the only honest way to write and publish</h2>
   <p class="dek">You cannot atomically commit to PostgreSQL and produce to Kafka. So don't try — commit the intent to publish alongside the data, and let a separate process do the publishing.</p>
@@ -1846,7 +1930,7 @@ class KafkaErrorConfig {
   </div>
 </section>
 
-<!-- ============ 33 ============ -->
+<!-- deck 35 -->
 <section class="slide" data-sec="Middleware" data-title="Sagas">
   <h2>A saga is a transaction you cannot roll back</h2>
   <p class="dek">Checkout touches payment, inventory and fulfilment. Two-phase commit across them is unavailable, slow and locks everything. Instead: a sequence of local transactions, each with a compensating action.</p>
@@ -1900,7 +1984,7 @@ class KafkaErrorConfig {
   <div class="note warn"><span class="lbl">Non-negotiables for either style</span>Persist the saga state (<code>order_saga</code> table with a status and a step). Make every step idempotent and keyed. Put a <b>timeout</b> on every step — a saga with no timeout has orders that sit in <code>AWAITING_PAYMENT</code> for eleven days and nobody notices until finance asks.</div>
 </section>
 
-<!-- ============ 34 ============ -->
+<!-- deck 36 -->
 <section class="slide" data-sec="Middleware" data-title="Caching">
   <h2>Two cache layers, and an invalidation story</h2>
   <p class="dek">Caching is easy; knowing when the cached value is wrong is the whole engineering problem. Decide the staleness budget per use case before choosing a mechanism.</p>
@@ -1944,7 +2028,7 @@ class CatalogQueryService {
   </div>
 </section>
 
-<!-- ============ 35 ============ -->
+<!-- deck 37 -->
 <section class="slide" data-sec="Data" data-title="Data ownership">
   <h2>One schema per module, one owner per table</h2>
   <p class="dek">Code boundaries that are not matched by data boundaries are decorative. The shared table is what actually prevents extraction, and it is invisible in every architecture diagram.</p>
@@ -1982,7 +2066,7 @@ SELECT o.id, p.status
   </div>
 </section>
 
-<!-- ============ 36 ============ -->
+<!-- deck 38 -->
 <section class="slide" data-sec="Data" data-title="Zero-downtime schema change">
   <h2>Expand and contract: renaming a column with no outage</h2>
   <p class="dek">During a rolling deploy, old and new code run at the same time against one schema. Every migration must therefore be compatible with the version before it — which rules out the one-step rename entirely.</p>
@@ -2023,7 +2107,7 @@ CREATE INDEX CONCURRENTLY idx_orders_customer_placed
   </div>
 </section>
 
-<!-- ============ 37 ============ -->
+<!-- deck 39 -->
 <section class="slide" data-sec="Data" data-title="Read models">
   <h2>CQRS without the ceremony</h2>
   <p class="dek">Full CQRS with event sourcing is rarely justified. Separating the <em>read path</em> from the write path almost always is — and it costs one class, not an architecture.</p>
@@ -2063,7 +2147,108 @@ public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
   </div>
 </section>
 
-<!-- ============ 38 ============ -->
+<!-- deck 40 -->
+<section class="slide" data-sec="Data" data-title="Event sourcing: is it justified?">
+  <h2>Event sourcing: store the decisions, derive the state</h2>
+  <p class="dek">Instead of a row that holds where the order is now, an append-only log of everything that happened to it. Current state is a fold over that log. The question is never "is it elegant" — it is whether the audit trail is a requirement or a nice-to-have.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 236" role="img" aria-label="State storage keeps one mutable row where the previous status is overwritten; event sourcing appends immutable events and derives the current state by replaying them, preserving the full history">
+        <text x="14" y="18" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">STATE STORAGE — one row, updated in place</text>
+        <rect x="14" y="28" width="380" height="52" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="30" y="50" font-size="10.5" font-family="monospace" fill="currentColor">orders: id=88421  status=SHIPPED  total=4250  version=7</text>
+        <text x="30" y="70" font-size="10" fill="#A22636">the six previous states are gone — overwritten, unrecoverable</text>
+
+        <text x="14" y="112" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">EVENT SOURCING — append only, nothing is ever overwritten</text>
+        <rect x="14" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="58" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">OrderPlaced</text>
+        <text x="58" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t0</text>
+        <rect x="112" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="156" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">LineAdded</text>
+        <text x="156" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t1</text>
+        <rect x="210" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="254" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">PaymentTaken</text>
+        <text x="254" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t2</text>
+        <rect x="308" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="352" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">Shipped</text>
+        <text x="352" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t3</text>
+        <line x1="404" y1="143" x2="440" y2="143" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="422" y="135" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.6">fold</text>
+
+        <rect x="446" y="118" width="170" height="50" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="531" y="140" text-anchor="middle" font-size="11" fill="currentColor">current state</text>
+        <text x="531" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">derived, never stored as truth</text>
+
+        <text x="642" y="130" font-size="10" fill="currentColor" opacity="0.75">"What did this order look like</text>
+        <text x="642" y="145" font-size="10" fill="currentColor" opacity="0.75">on the 3rd, before the refund?"</text>
+        <text x="642" y="163" font-size="10" fill="#3AA79B">Replay to t2. Free here;</text>
+        <text x="642" y="178" font-size="10" fill="#3AA79B">impossible above.</text>
+
+        <line x1="14" y1="200" x2="866" y2="200" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="222" font-size="10.5" fill="currentColor" opacity="0.8">The events are the source of truth, so they can never be deleted or edited — which is the benefit, and also every one of the costs.</text>
+      </svg>
+    </div>
+    <figcaption>Note what this is <em>not</em>: publishing domain events from a normal state-stored aggregate (the outbox pattern) gives you integration and a useful audit log without any of the machinery on the next slide. Most teams want that, not this.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h3>Justified when</h3><ul class="tight">
+      <li>The audit trail <b>is</b> the requirement — ledgers, trading, regulated workflows where "prove what you knew and when" is a legal question.</li>
+      <li>Temporal queries are a real business need, not a hypothetical.</li>
+      <li>The domain is genuinely event-shaped and experts already talk in events.</li>
+      <li>You need to retro-actively fix a bug by replaying with corrected logic.</li>
+    </ul></div>
+    <div class="card"><h3>Not justified when</h3><ul class="tight">
+      <li>"It would be good to have history" — an audit table or a domain-event log is a tenth of the cost.</li>
+      <li>The team has not run it before and the domain is still moving.</li>
+      <li>Ad-hoc querying matters: analysts cannot query an event stream.</li>
+      <li>You mainly wanted decoupling — that is the outbox, and you can have it today.</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- deck 41 -->
+<section class="slide" data-sec="Data" data-title="Event sourcing mechanics">
+  <h2>What it actually costs to run</h2>
+  <p class="dek">Four mechanisms you must build and operate. None is hard on its own; together they are the reason this is a considered architectural commitment rather than a storage choice.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The write path — append, with a concurrency check</div>
+<pre><code class="language-java">// Load: replay the stream (from the latest snapshot onward)
+var events = store.readStream("order-88421", fromVersion: snapshot.version());
+var order  = Order.rehydrate(snapshot, events);
+
+// Decide: the aggregate returns NEW EVENTS, it does not mutate rows
+List&lt;DomainEvent&gt; produced = order.cancel(reason);
+
+// Append: expectedVersion is the optimistic lock
+store.append("order-88421", produced, expectedVersion: order.version());
+// version mismatch → someone else appended → reload and retry
+
+// event_store table:
+//  stream_id | version | type          | payload | occurred_at | metadata
+//  order-884 |       4 | OrderCancelled| {...}   | ...         | {traceId, user}
+//  UNIQUE (stream_id, version)   ← the entire concurrency control</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The four things you must build</h3>
+        <dl class="kv">
+          <dt>Snapshots</dt><dd>Replaying 40,000 events per load is not viable. Snapshot every N events and replay only the tail.</dd>
+          <dt>Projections</dt><dd>Nobody queries the event store. Every read model is built by a projector, which must be restartable, idempotent, and monitored for lag.</dd>
+          <dt>Schema evolution</dt><dd>You can never delete an event type. Version them, and keep upcasters that convert v1 payloads to v3 — <b>forever</b>.</dd>
+          <dt>Replay tooling</dt><dd>Rebuilding a projection from scratch must be a routine, tested operation, not a heroic weekend.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The mistake that ends projects</span>Putting the <b>current time</b> or a call to another service inside the aggregate's decision logic. Replay then produces different events than the original run, and the log stops being a faithful record. Decisions must be a pure function of (state, command, data carried on the command).</div>
+      <div class="note tip"><span class="lbl">The pragmatic middle</span>Normal state storage, plus a durable, immutable domain-event log written in the same transaction (the outbox). You get the audit trail, the integration events and the ability to rebuild read models — without upcasters, snapshots or a team that must think in streams. For most enterprise domains this is the right trade.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 42 -->
 <section class="slide" data-sec="Data" data-title="Search and reporting">
   <h2>Keep search and reporting off the transactional database</h2>
   <p class="dek">Two workloads destroy OLTP performance: full-text search with filters, and analysts running unbounded joins. Both have an obvious home, and both get there through events.</p>
@@ -2108,7 +2293,7 @@ public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
   <div class="note tip"><span class="lbl">Routing rule worth writing down</span>After a write, pin that user's reads to the primary for a short window (a sticky flag in the session or a Redis key keyed on user id). It is five lines of code and removes an entire category of support ticket.</div>
 </section>
 
-<!-- ============ 39 ============ -->
+<!-- deck 43 -->
 <section class="slide" data-sec="Frontend" data-title="Frontend architecture">
   <h2>The frontend is three tiers too</h2>
   <p class="dek">"SPA calls API" hides every decision that matters: where the session lives, who aggregates, what is rendered where, and how the contract stays in sync.</p>
@@ -2165,7 +2350,7 @@ public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
   </figure>
 </section>
 
-<!-- ============ 40 ============ -->
+<!-- deck 44 -->
 <section class="slide" data-sec="Frontend" data-title="Angular structure">
   <h2>An Angular structure that mirrors the backend modules</h2>
   <p class="dek">Same principle as the backend: group by feature, keep a thin shared layer, and make cross-feature imports a lint error rather than a habit.</p>
@@ -2221,7 +2406,7 @@ export class OrdersStore {
   </div>
 </section>
 
-<!-- ============ 41 ============ -->
+<!-- deck 45 -->
 <section class="slide" data-sec="Frontend" data-title="One contract, two ends">
   <h2>Generate the client; never hand-write a DTO twice</h2>
   <p class="dek">Hand-maintained TypeScript interfaces drift from the Java records within one sprint, and the drift is discovered by a customer. Make the OpenAPI document the single source and generate both sides from it.</p>
@@ -2261,7 +2446,7 @@ export class OrdersStore {
   </div>
 </section>
 
-<!-- ============ 42 ============ -->
+<!-- deck 46 -->
 <section class="slide" data-sec="Frontend" data-title="Authentication">
   <h2>Where the token lives decides your threat model</h2>
   <p class="dek">This is the frontend decision with the largest security consequence, and the one most often made by default rather than deliberately.</p>
@@ -2310,7 +2495,7 @@ export class OrdersStore {
   </figure>
 </section>
 
-<!-- ============ 43 ============ -->
+<!-- deck 47 -->
 <section class="slide" data-sec="Frontend" data-title="Micro-frontends">
   <h2>Micro-frontends: usually the wrong answer</h2>
   <p class="dek">They solve an organisational problem — independent deployment by separate teams — at a real technical cost. If you do not have that organisational problem, you are buying the cost for nothing.</p>
@@ -2352,7 +2537,7 @@ export class OrdersStore {
   <div class="note tip"><span class="lbl">The modular-monolith analogy holds</span>The frontend equivalent of the modular monolith is one app with enforced feature boundaries and lazy routes — cheap to reorganise, one deploy, one dependency tree. Split into separate deployables for the same reason you extract a backend service: a named constraint you can point at, not a feeling of size.</div>
 </section>
 
-<!-- ============ 44 ============ -->
+<!-- deck 48 -->
 <section class="slide" data-sec="Frontend" data-title="Delivery and performance">
   <h2>Delivery: the parts users actually feel</h2>
   <p class="dek">Enterprise frontends are rarely slow because of framework choice. They are slow because of bundle discipline, waterfalls and cache headers — all of which are architecture decisions, not tuning.</p>
@@ -2392,7 +2577,7 @@ export class OrdersStore {
   <div class="note warn"><span class="lbl">Accessibility is not a phase</span>In enterprise procurement it is a contractual requirement (WCAG 2.2 AA, VPAT). Retrofitting it into a finished component library costs several times what building it in does: keyboard paths, focus management on route change, labelled controls, live regions for async results, and contrast that survives your dark theme.</div>
 </section>
 
-<!-- ============ 45 ============ -->
+<!-- deck 49 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Security">
   <h2>Security: the filter chain, then the method, then the row</h2>
   <p class="dek">Three layers, each catching what the one above cannot. Authorisation at only one of them is how data leaks between customers.</p>
@@ -2441,7 +2626,7 @@ class TenantFilter implements Filter {
   </div>
 </section>
 
-<!-- ============ 46 ============ -->
+<!-- deck 50 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Config and secrets">
   <h2>Configuration: typed, externalised, never in the jar</h2>
   <p class="dek">The same artifact must run in every environment. Anything that differs between environments is configuration; anything secret is a secret, and the two get handled differently.</p>
@@ -2478,7 +2663,7 @@ public record PaymentProperties(
   </div>
 </section>
 
-<!-- ============ 47 ============ -->
+<!-- deck 51 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Observability">
   <h2>Observability: one trace id, end to end, across the async hop</h2>
   <p class="dek">Logs, metrics and traces are not three tools — they are three views joined by shared identifiers. The join is the whole value, and the place it usually breaks is the message queue.</p>
@@ -2536,7 +2721,7 @@ logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
   </div>
 </section>
 
-<!-- ============ 48 ============ -->
+<!-- deck 52 -->
 <section class="slide" data-sec="Cross-cutting" data-title="SLOs and alerting">
   <h2>Alert on what the customer feels</h2>
   <p class="dek">CPU alerts wake people for things nobody noticed; symptom alerts wake people for things everybody noticed. Define the SLO first, then derive alerts from its error budget.</p>
@@ -2562,7 +2747,7 @@ logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
   <div class="note warn"><span class="lbl">The four dashboards a team needs</span><b>Journey</b> (SLOs, customer-visible) · <b>Service</b> (RED per endpoint) · <b>Dependencies</b> (latency and error rate per downstream, circuit-breaker state) · <b>Resources</b> (USE). More than four and nobody opens any of them during an incident.</div>
 </section>
 
-<!-- ============ 49 ============ -->
+<!-- deck 53 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Testing strategy">
   <h2>A test pyramid shaped like your architecture</h2>
   <p class="dek">The mistake is uniform testing: everything through <code>@SpringBootTest</code>, or everything mocked. Match the test type to the layer, and the suite stays fast and meaningful.</p>
@@ -2608,7 +2793,7 @@ class OrderFlowIT { ... }</code></pre>
   </div>
 </section>
 
-<!-- ============ 50 ============ -->
+<!-- deck 54 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Build and delivery">
   <h2>One build, one artifact, four environments</h2>
   <p class="dek">The artifact that reaches production is the one that was tested — byte for byte. Anything rebuilt per environment reintroduces the class of bug this rule exists to eliminate.</p>
@@ -2646,7 +2831,7 @@ dependencies {
   </div>
 </section>
 
-<!-- ============ 51 ============ -->
+<!-- deck 55 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Runtime and capacity">
   <h2>Sizing the runtime with arithmetic, not vibes</h2>
   <p class="dek">Connection pools and thread pools are where capacity planning meets reality. Both are answerable with one formula, and both are almost always set by copy-paste instead.</p>
@@ -2688,7 +2873,7 @@ dependencies {
   </div>
 </section>
 
-<!-- ============ 52 ============ -->
+<!-- deck 56 -->
 <section class="slide" data-sec="Cross-cutting" data-title="Deployment topology">
   <h2>What "one deployable" looks like in production</h2>
   <p class="dek">A modular monolith is not one server. It is one artifact deployed many times — and you can already scale, isolate and protect parts of it before extracting anything.</p>
@@ -2724,7 +2909,333 @@ SPRING_PROFILES_ACTIVE: prod,worker
   </div>
 </section>
 
-<!-- ============ 53 ============ -->
+<!-- deck 57 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Multi-region">
+  <h2>Multi-region: three topologies, one hard question</h2>
+  <p class="dek">The hard question is never compute — it is <b>where writes happen</b>. Everything else follows from that answer, and picking it is one of the few decisions that is genuinely irreversible.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 258" role="img" aria-label="Three multi-region topologies: active-passive with asynchronous replication and a promotion step, read-local write-global with a single write region, and active-active with conflict resolution">
+        <text x="14" y="16" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">A · ACTIVE–PASSIVE</text>
+        <rect x="14" y="26" width="112" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="45" text-anchor="middle" font-size="10.5" fill="currentColor">EU — live</text>
+        <text x="70" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">reads + writes</text>
+        <rect x="176" y="26" width="112" height="46" rx="7" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 3"></rect>
+        <text x="232" y="45" text-anchor="middle" font-size="10.5" fill="currentColor">US — standby</text>
+        <text x="232" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">idle, warm</text>
+        <line x1="128" y1="49" x2="172" y2="49" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="150" y="42" text-anchor="middle" font-size="8" fill="#3AA79B">async</text>
+        <text x="306" y="42" font-size="10" fill="currentColor" opacity="0.75">Simplest. RPO = replication lag (seconds of writes lost).</text>
+        <text x="306" y="58" font-size="10" fill="currentColor" opacity="0.75">RTO = however long promotion takes — and if you have never</text>
+        <text x="306" y="74" font-size="10" fill="#A22636">rehearsed it, the honest RTO is "unknown".</text>
+
+        <line x1="14" y1="90" x2="866" y2="90" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <text x="14" y="110" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">B · READ-LOCAL, WRITE-GLOBAL</text>
+        <rect x="14" y="120" width="112" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="139" text-anchor="middle" font-size="10.5" fill="currentColor">EU — writes</text>
+        <text x="70" y="155" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">the single writer</text>
+        <rect x="176" y="120" width="112" height="46" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="232" y="139" text-anchor="middle" font-size="10.5" fill="currentColor">US — reads</text>
+        <text x="232" y="155" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">local replica</text>
+        <line x1="128" y1="143" x2="172" y2="143" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="306" y="136" font-size="10" fill="currentColor" opacity="0.75">Fast local reads, one consistent write path. Writes from the US</text>
+        <text x="306" y="152" font-size="10" fill="currentColor" opacity="0.75">cross the ocean (~80 ms), and read-your-own-writes needs</text>
+        <text x="306" y="168" font-size="10" fill="currentColor" opacity="0.75">sticky routing. <tspan font-weight="600">The usual right answer.</tspan></text>
+
+        <line x1="14" y1="182" x2="866" y2="182" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <text x="14" y="202" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">C · ACTIVE–ACTIVE</text>
+        <rect x="14" y="210" width="112" height="34" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">EU — writes</text>
+        <rect x="176" y="210" width="112" height="34" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="232" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">US — writes</text>
+        <line x1="128" y1="227" x2="172" y2="227" stroke="#A22636" stroke-width="1.4" marker-end="url(#arw)" marker-start="url(#arw)"></line>
+        <text x="306" y="220" font-size="10" fill="currentColor" opacity="0.75">Both regions accept writes, so conflicts are now a domain problem:</text>
+        <text x="306" y="236" font-size="10" fill="#A22636">who wins when the same order is cancelled in both? Needs partitioned</text>
+        <text x="306" y="248" font-size="10" fill="#A22636">ownership, CRDTs, or a business rule. Do not choose this by default.</text>
+      </svg>
+    </div>
+    <figcaption>A useful reframing in a design interview: multi-region is usually bought for <em>disaster recovery</em>, not latency. If latency is the goal, a CDN and read replicas get you most of the way for a fraction of the complexity.</figcaption>
+  </figure>
+
+  <div class="note warn"><span class="lbl">Things that quietly break when you go multi-region</span>Auto-increment ids collide — switch to UUIDv7 or region-prefixed sequences. Kafka does not replicate itself; you need MirrorMaker and a consumer-offset story. Caches are per-region and diverge. Scheduled jobs fire twice. Every one of these is discovered after the decision, so raise them during it.</div>
+</section>
+
+<!-- deck 58 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Disaster recovery">
+  <h2>DR: two numbers the business owns, one drill you must run</h2>
+  <p class="dek">RTO and RPO are business decisions with engineering price tags. The engineering failure is not choosing wrong numbers — it is having numbers nobody has ever tested.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Tier</th><th>RPO — data you can lose</th><th>RTO — time to recover</th><th>What it takes</th><th>Relative cost</th></tr></thead>
+      <tbody>
+        <tr><td>Backup only</td><td class="num">up to 24 h</td><td class="num">hours–days</td><td>Nightly backup, restore procedure, somewhere to restore to</td><td class="num">1×</td></tr>
+        <tr><td>Warm standby</td><td class="num">seconds–minutes</td><td class="num">15–60 min</td><td>Async replication, scaled-down standby, manual promotion</td><td class="num">1.3×</td></tr>
+        <tr><td>Hot standby</td><td class="num">seconds</td><td class="num">&lt; 5 min</td><td>Full-size standby, automated failover, regular drills</td><td class="num">2×</td></tr>
+        <tr><td>Active–active</td><td class="num">~0</td><td class="num">seconds</td><td>Synchronous or conflict-resolved replication, global routing</td><td class="num">2–3× plus design cost</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>The conversation to have with the business</h3>
+      <p>Not "what RTO do you want" — the answer is always zero. Instead: <b>"one hour of downtime costs roughly £X in lost orders and £Y in remediation. Going from a 4-hour RTO to a 15-minute RTO costs £Z a year. Which do you want?"</b></p>
+      <p>That question gets a real answer, gets it signed off, and gives you something to point at when the budget is reviewed. It is also exactly the reasoning an interviewer is listening for.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Untested is untrue</span>A DR plan that has never been executed is a document, not a capability. The common discoveries on a first real drill: the restore takes nine hours, not one; a schema was never being backed up; the runbook references a person who left; the standby's credentials expired six months ago.</div>
+      <div class="note good"><span class="lbl">Make it routine</span>Quarterly, in business hours, with a rollback plan: fail over to the standby, run for an hour, fail back. Publish the measured RTO. Teams that do this have a boring DR story; teams that do not have an exciting one exactly once.</div>
+      <div class="note tip"><span class="lbl">Do not forget the dependencies</span>Your service failing over is pointless if the identity provider, the secret store or the payment gateway is single-region. DR is a property of the whole path, and the weakest link sets the real RTO.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 59 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Capacity and cost">
+  <h2>Cost is an architectural constraint, not a finance problem</h2>
+  <p class="dek">Architecture decisions set the cost curve years before anyone looks at the bill. Being able to express a design in cost per unit of business value is one of the clearest seniority signals there is.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Worked example: cost per 1,000 orders</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Volume</dt><dd>1.2M orders/month, peak 40× on sale days</dd>
+        <dt>Compute</dt><dd>12 web + 6 worker pods, 2 vCPU / 4 GiB each</dd>
+        <dt>Database</dt><dd>primary + replica, provisioned for peak</dd>
+        <dt>Kafka</dt><dd>3 brokers, 7-day retention</dd>
+        <dt>Egress</dt><dd>the line everyone forgets until the invoice</dd>
+      </dl>
+      <p style="margin-top:12px;font-size:13.5px;color:var(--text-2)">Divide the monthly total by 1,200 and you have <b>cost per 1,000 orders</b>. Now every proposal has a comparable number: does this cache pay for itself? Does that extra service? Does multi-region?</p>
+      <p style="margin-top:8px;font-size:13.5px;color:var(--text-3)">It also exposes the real bill-driver, which in most enterprise systems is the database provisioned for peak and idle the rest of the month — not the application tier everyone spends time tuning.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Decisions with long cost tails</h3>
+        <ul class="tight">
+          <li><b>Provisioning for peak.</b> A 40× sale peak sized statically means paying 40× all year. Autoscaling, queueing and load shedding are cost decisions as much as resilience ones.</li>
+          <li><b>Chatty synchronous calls.</b> Each internal hop costs compute, network and latency budget on every request, forever.</li>
+          <li><b>Retention.</b> Seven days of Kafka versus thirty is a straight multiple. So is log retention, which is frequently the largest observability line.</li>
+          <li><b>Cross-AZ and cross-region traffic.</b> Priced per gigabyte, invisible in design reviews, and often the biggest surprise on a first multi-region bill.</li>
+          <li><b>One service per team, by policy.</b> Each one carries a fixed floor of compute, monitoring and pipeline cost regardless of its traffic.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">Capacity planning, minimally</span>Current peak throughput × expected growth × a safety factor, checked against the measured limit from a load test. Re-run quarterly. That is enough to avoid both the surprise outage and the 60%-idle cluster.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 60 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Privacy by design">
+  <h2>Data residency, PII and retention as architecture</h2>
+  <p class="dek">In a regulated enterprise these constraints arrive as requirements, not preferences, and each one is far cheaper designed in than retrofitted. All four below are architectural, not operational.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Know where personal data is</h3>
+      <p>A data inventory per module: which fields are personal, what the lawful basis is, how long it is kept, who it is shared with. Without it you cannot answer a regulator, a deletion request, or "does this new report leak anything".</p>
+      <p style="color:var(--text-3)">Practical version: annotate the fields. <code>@Pii(category = CONTACT)</code> on the entity, and a test that fails if a <code>@Pii</code> field appears in a log format or an unencrypted export.</p>
+    </div>
+    <div class="card">
+      <h3>Residency shapes the topology</h3>
+      <p>"EU customer data stays in the EU" decides your region strategy, your backup locations, your analytics pipeline and which SaaS vendors you may use. It also rules out a single global database — which is exactly the kind of constraint that must land in level 1 of the decision hierarchy, not level 6.</p>
+    </div>
+    <div class="card">
+      <h3>Deletion must be designed</h3>
+      <p>A deletion request has to reach: the OLTP row, every read model, the search index, the cache, the warehouse, the backups, and the event log. The last two are the hard ones — <b>an immutable event log and a right to erasure are in direct tension</b>.</p>
+      <p style="color:var(--text-3)">The usual resolution is crypto-shredding: store personal fields encrypted with a per-subject key, and delete the key. The events remain; their personal content becomes unreadable.</p>
+    </div>
+    <div class="card">
+      <h3>Minimise, then separate</h3>
+      <ul class="tight">
+        <li>Do not collect what you do not need; do not copy it into three services because it was convenient.</li>
+        <li>Pseudonymise in analytics — the warehouse rarely needs a real name.</li>
+        <li>Keep the PCI or PII surface in as few components as possible; that is one of the four legitimate reasons to extract a service.</li>
+        <li>Retention policies enforced by a job, not by a wiki page.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The one that catches everybody</span>Logs and heap dumps. A team designs beautiful field-level encryption, then logs the whole request body at DEBUG during an incident, and ships a copy to a log aggregator in another jurisdiction with 90-day retention. Privacy controls must cover the diagnostic path, because that is the path people use under pressure.</div>
+</section>
+
+
+<!-- deck 61 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="The C4 model">
+  <h2>C4: four zoom levels, and only two of them are for everyone</h2>
+  <p class="dek">Most architecture diagrams fail because they mix levels — a box labelled "Customers" next to a box labelled <code>OrderRepositoryAdapter</code>. C4's whole contribution is insisting you pick one altitude per picture.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 236" role="img" aria-label="The four C4 levels — context, container, component and code — shown as increasing zoom with the audience and update frequency for each">
+        <rect x="14" y="30" width="200" height="86" rx="9" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="114" y="54" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">1 · Context</text>
+        <text x="114" y="74" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">the system, its users,</text>
+        <text x="114" y="88" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">the systems it talks to</text>
+        <text x="114" y="106" text-anchor="middle" font-size="9" fill="#D26A3F">everyone, including non-technical</text>
+
+        <rect x="234" y="30" width="200" height="86" rx="9" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="334" y="54" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">2 · Container</text>
+        <text x="334" y="74" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">deployable things: the app,</text>
+        <text x="334" y="88" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">the SPA, the database, Kafka</text>
+        <text x="334" y="106" text-anchor="middle" font-size="9" fill="#D26A3F">every engineer and ops person</text>
+
+        <rect x="454" y="30" width="200" height="86" rx="9" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="554" y="54" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">3 · Component</text>
+        <text x="554" y="74" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">modules inside one container</text>
+        <text x="554" y="88" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">and how they depend</text>
+        <text x="554" y="106" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">the team that owns it — generate it</text>
+
+        <rect x="674" y="30" width="192" height="86" rx="9" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="4 3"></rect>
+        <text x="770" y="54" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">4 · Code</text>
+        <text x="770" y="74" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">classes and relationships</text>
+        <text x="770" y="94" text-anchor="middle" font-size="9" fill="#A22636">almost never worth drawing —</text>
+        <text x="770" y="108" text-anchor="middle" font-size="9" fill="#A22636">the IDE does it, and it is stale in a week</text>
+
+        <line x1="220" y1="73" x2="230" y2="73" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="440" y1="73" x2="450" y2="73" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="660" y1="73" x2="670" y2="73" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+
+        <line x1="14" y1="140" x2="866" y2="140" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="162" font-size="10.5" fill="currentColor" opacity="0.8">Levels 1 and 2 are the ones that earn their keep: they change slowly, they are read constantly, and they are what a new</text>
+        <text x="14" y="179" font-size="10.5" fill="currentColor" opacity="0.8">joiner or an auditor actually needs. Level 3 should be <tspan font-weight="600">generated</tspan> — Spring Modulith's Documenter writes it from the code.</text>
+        <text x="14" y="202" font-size="10.5" fill="#D26A3F">Every element gets a name, a technology and a one-line responsibility. Every arrow gets a verb and a protocol.</text>
+        <text x="14" y="224" font-size="10.5" fill="currentColor" opacity="0.7">An unlabelled arrow means "related somehow", which is the same as no arrow at all.</text>
+      </svg>
+    </div>
+    <figcaption>The system-context diagram on slide 2 of this deck is level 1; the reference architecture near the end is level 2. That is the whole vocabulary you need to say which picture someone is asking for.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The test for a good diagram</span>Hand it to someone who has never seen the system and ask them to explain it back. If they cannot say what each box does, which arrow carries the user's request, or where data is stored, the diagram is decoration. Adding a legend is usually a sign the encoding is doing too much work.</div>
+</section>
+
+<!-- deck 62 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Documentation that stays true">
+  <h2>Documentation that is still true in a year</h2>
+  <p class="dek">Every architecture document decays. The only ones that do not are the ones generated from the system, or the ones that record a decision rather than a state.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Artefact</th><th>Answers</th><th>Stays true because</th><th>Where it lives</th></tr></thead>
+      <tbody>
+        <tr><td>System context (C4 L1)</td><td>What is this, who uses it, what does it depend on</td><td>It changes about twice a year</td><td>Repo, as diagram source</td></tr>
+        <tr><td>Container diagram (C4 L2)</td><td>What gets deployed and how the pieces talk</td><td>Reviewed whenever a deployable is added</td><td>Repo, as diagram source</td></tr>
+        <tr><td>Component diagram (C4 L3)</td><td>Modules and their dependencies</td><td><b>Generated</b> from the code by Spring Modulith</td><td>Build output</td></tr>
+        <tr><td>ADRs</td><td>Why is it like this</td><td>A decision record is history; it is never "out of date"</td><td><code>docs/adr/</code>, in the PR that implements it</td></tr>
+        <tr><td>Module canvas</td><td>What this module exposes, publishes and depends on</td><td>Generated by Modulith's <code>Documenter</code></td><td>Build output</td></tr>
+        <tr><td>OpenAPI spec</td><td>The HTTP contract</td><td>Generated from controllers; a CI gate diffs it</td><td>Build output, committed for diffing</td></tr>
+        <tr><td>Runbooks</td><td>What to do when this alert fires</td><td>Exercised every time the alert fires</td><td>Linked from the alert itself</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Diagrams as code — reviewed in the PR, diffed like anything else</div>
+<pre><code class="language-yaml"># docs/architecture/container.puml — C4-PlantUML, rendered in CI
+@startuml
+!include &lt;C4/C4_Container&gt;
+Person(customer, "Customer")
+System_Boundary(shop, "Order Platform") {
+  Container(spa,  "Storefront",     "Angular",      "Browse and checkout")
+  Container(app,  "Order Platform", "Spring Boot",  "8 modules, one deployable")
+  ContainerDb(db, "PostgreSQL",     "17",           "Schema per module")
+}
+System_Ext(gw, "Payment Gateway")
+Rel(customer, spa, "Uses", "HTTPS")
+Rel(spa, app, "Calls", "JSON/HTTPS")
+Rel(app, db, "Reads/writes", "JDBC")
+Rel(app, gw, "Authorises", "HTTPS, in the checkout path")
+@enduml</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note good"><span class="lbl">Why source beats a drawing tool</span>It lives beside the code, changes in the same pull request, diffs in review, and renders in CI. A diagram in a slide deck on a shared drive is accurate on the day it was exported and never again — and nobody can tell which day that was.</div>
+      <div class="note warn"><span class="lbl">Write down what is deliberately absent</span>The most valuable and least written documentation is the list of things you chose <em>not</em> to do, and why: no service mesh yet, no multi-region, no event sourcing. Without it, every new joiner proposes all three in their first month, and the team re-litigates the same decisions annually.</div>
+      <div class="note tip"><span class="lbl">One page per service</span>Name, owning team, what it does in a sentence, its SLO, its dependencies, its runbook links, how to run it locally. Generated where possible. This is the page people open at 2am, and it is worth more than any architecture deck.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 63 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Fitness functions">
+  <h2>Evolutionary architecture: make the rules executable</h2>
+  <p class="dek">A fitness function is any automated check that an architectural property still holds. It is the difference between architecture as a decision and architecture as a description of what the code happened to become.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Property you care about</th><th>Fitness function</th><th>Runs</th></tr></thead>
+      <tbody>
+        <tr><td>Modules do not reach into each other's internals</td><td>ArchUnit slice rules + <code>ApplicationModules.verify()</code></td><td>Every build</td></tr>
+        <tr><td>The domain stays framework-free</td><td>ArchUnit: no Spring or JPA imports under <code>..domain..</code></td><td>Every build</td></tr>
+        <tr><td>No module reads another's tables</td><td>A database role per module, granted only its own schema</td><td>Every integration test</td></tr>
+        <tr><td>The API does not break consumers</td><td><code>oasdiff</code> against main; schema-registry BACKWARD compatibility</td><td>Every PR</td></tr>
+        <tr><td>Hot endpoints stay free of N+1</td><td>Query-count assertions on the top three endpoints</td><td>Every build</td></tr>
+        <tr><td>Checkout stays within its latency budget</td><td>A performance test with a p95 threshold that fails the pipeline</td><td>Nightly</td></tr>
+        <tr><td>No known-vulnerable dependencies ship</td><td>CVE scan with a severity gate</td><td>Every build</td></tr>
+        <tr><td>Startup stays fast enough to roll back quickly</td><td>Assert boot time under a threshold in an integration test</td><td>Nightly</td></tr>
+        <tr><td>Nothing writes personal data to logs</td><td>A test scanning log output for <code>@Pii</code>-annotated field values</td><td>Every build</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>How to introduce them into an existing codebase</h3>
+      <ol class="tight">
+        <li><b>Baseline, do not block.</b> Record today's violations in a file; fail the build only on <em>new</em> ones.</li>
+        <li><b>Ratchet.</b> Every sprint, remove a few from the baseline. The number only ever goes down.</li>
+        <li><b>Add one per repeated review comment.</b> If a reviewer catches the same mistake twice, that is a missing fitness function, not a missing reviewer.</li>
+      </ol>
+      <p style="margin-top:4px">A big-bang "turn on all the rules" attempt produces 400 failures on day one and gets disabled by day three.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note good"><span class="lbl">The reframing worth carrying</span>Architecture is not the diagram — it is the set of properties you are defending. A property nobody measures is a preference. A property with a failing build behind it is a constraint, and constraints are what actually survive delivery pressure.</div>
+      <div class="note tip"><span class="lbl">Good interview material</span>"How do you stop a modular monolith degrading?" answered with three named, executable checks and a ratcheting strategy is a much stronger answer than "code reviews and discipline" — because the interviewer has watched discipline lose to a deadline before.</div>
+    </div>
+  </div>
+</section>
+
+<!-- deck 64 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Governance without bottlenecks">
+  <h2>Governance that speeds teams up</h2>
+  <p class="dek">Enterprise architecture functions fail in one of two ways: a review board everyone routes around, or no standards at all and forty incompatible services. The way out is to make the compliant path the easy path.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="tag b">The bottleneck model</span></h3>
+      <ul class="tight">
+        <li>Every design goes to a weekly board; the queue is three weeks.</li>
+        <li>Standards are a 90-page document nobody has read.</li>
+        <li>Compliance is checked by a human, late, at a gate.</li>
+        <li>Architects are separate from delivery and have not run anything in production for years.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">Result: teams either wait and resent it, or ship first and seek forgiveness. Both damage the architecture, and the board sees neither.</p>
+    </div>
+    <div class="card accent">
+      <h3><span class="tag g">The paved road model</span></h3>
+      <ul class="tight">
+        <li>A <b>service template</b> that already has observability, security, CI, health checks and the error model wired in — a new service starts compliant.</li>
+        <li><b>Shared starters</b> the platform team owns, so a change to the logging standard is a version bump.</li>
+        <li><b>Fitness functions</b> enforce the rules in the pipeline, not in a meeting.</li>
+        <li><b>ADRs</b> for anything off the road, reviewed asynchronously in the PR.</li>
+        <li><b>Architects embedded</b> in delivery, writing some of the code.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">Leaving the paved road stays possible — it just requires writing down why.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="note tip"><span class="lbl">What a review is actually for</span>Not approving designs — catching the level 1–4 decisions from the hierarchy slide, and spotting the same problem being solved separately by three teams. Review the decisions that are expensive to reverse; let teams own the rest. A board that debates library choices has no time left for the boundary that will cost a quarter.</div>
+      <div class="note good"><span class="lbl">Measure the function, not the artefacts</span>Lead time for a new service to reach production. Number of teams on the current template version. Percentage of services meeting the observability baseline. Those tell you whether governance is working. "Number of designs reviewed" tells you only how busy the board was.</div>
+  </div>
+
+  <div class="note"><span class="lbl">Where this leaves the atlas</span>Everything in this deck is one of three things: a <b>decision</b> (recorded in an ADR), a <b>property</b> (defended by a fitness function), or a <b>default</b> (encoded in the template). Anything that is none of the three is an opinion, and opinions do not survive contact with a delivery deadline.</div>
+</section>
+
+<!-- deck 65 -->
 <section class="slide" data-sec="Wrap-up" data-title="Anti-patterns">
   <h2>Twelve anti-patterns, and what each one actually costs</h2>
   <p class="dek">Every one of these is common, defensible in the moment, and expensive later. Recognising them by their symptom is more useful than knowing their names.</p>
@@ -2752,7 +3263,7 @@ SPRING_PROFILES_ACTIVE: prod,worker
   <div class="note tip"><span class="lbl">The pattern behind the patterns</span>Nine of these twelve are failures to <b>make the rule executable</b>. Whenever you write down an architectural rule, ask in the same breath: what test, lint, database grant or CI gate makes it true tomorrow?</div>
 </section>
 
-<!-- ============ 54 ============ -->
+<!-- deck 66 -->
 <section class="slide" data-sec="Wrap-up" data-title="Decision records">
   <h2>Write the decision down while you still remember why</h2>
   <p class="dek">An ADR takes twenty minutes and answers the question every new engineer asks in month two: "why is it like this?" — which is otherwise answered by guessing, and then by an unnecessary rewrite.</p>
@@ -2784,7 +3295,7 @@ SPRING_PROFILES_ACTIVE: prod,worker
   </div>
 </section>
 
-<!-- ============ 55 ============ -->
+<!-- deck 67 -->
 <section class="slide" data-sec="Wrap-up" data-title="The whole picture">
   <h2>The reference architecture, on one page</h2>
   <p class="dek">Everything in this deck, assembled. Copper is the synchronous request path with a latency budget; teal is asynchronous and allowed to lag.</p>
@@ -2872,7 +3383,7 @@ SPRING_PROFILES_ACTIVE: prod,worker
   </figure>
 </section>
 
-<!-- ============ 56 ============ -->
+<!-- deck 68 -->
 <section class="slide" data-sec="Wrap-up" data-title="First 90 days">
   <h2>If you are starting on Monday</h2>
   <p class="dek">Order of work for a greenfield enterprise service, or for bringing an existing one under control. Roughly a quarter, and each step makes the next one cheaper.</p>
@@ -2923,20 +3434,20 @@ SPRING_PROFILES_ACTIVE: prod,worker
 
 <main class="stage" id="stage-sb" hidden>
 
-<!-- SB 1 -->
+<!-- springboot 01 -->
 <section class="slide" data-sec="Architecture" data-title="What this tab covers">
   <h2>Spring Boot, from the container up</h2>
-  <p class="lede">Six topics, in the order they build on each other: how Boot is put together, what happens between <code>main()</code> and your first request, the starters an enterprise actually pulls in, and three annotation catalogues — core, JPA and security — covering the ones you meet in real code, each with the failure it causes when used wrongly.</p>
+  <p class="lede">Eight topics, in the order they build on each other: how Boot is put together, what happens between <code>main()</code> and your first request, the starters an enterprise actually pulls in, and three annotation catalogues — core, JPA and security — covering the ones you meet in real code, each with the failure it causes when used wrongly.</p>
 
   <div class="grid3">
     <div class="card lift"><span class="bignum">3.x</span><p>Code targets Spring Boot 3.4/3.5 — Jakarta EE, Spring Security 6, Hibernate 6. What enterprise codebases actually run.</p></div>
     <div class="card lift"><span class="bignum">4.0</span><p>Boxes marked <span class="tag a">Boot 4</span> flag what changed in Spring Boot 4 / Framework 7, so you can speak to both.</p></div>
-    <div class="card lift"><span class="bignum">32</span><p>slides. Same e-commerce order domain as the architecture deck, so the examples line up.</p></div>
+    <div class="card lift"><span class="bignum">56</span><p>slides. Same e-commerce order domain as the architecture deck, so the examples line up.</p></div>
   </div>
 
   <div class="split">
     <div class="panel">
-      <h3>The six sections</h3>
+      <h3>The eight sections</h3>
       <dl class="kv" style="margin-top:10px">
         <dt>Architecture</dt><dd>the layer cake, auto-configuration, the <code>@Conditional</code> family, how to override it</dd>
         <dt>Lifecycle</dt><dd>application startup · bean · HTTP request · transaction and persistence context</dd>
@@ -2944,13 +3455,15 @@ SPRING_PROFILES_ACTIVE: prod,worker
         <dt>Core annotations</dt><dd>stereotypes, wiring, config, web, validation, async, testing</dd>
         <dt>JPA</dt><dd>entities, keys, relationships, fetching, inheritance, auditing, queries</dd>
         <dt>Security</dt><dd>filter chain, method security, OAuth2, enterprise SSO, mTLS, tenancy</dd>
+        <dt>Internals</dt><dd>AOP, transaction propagation and isolation, Jackson, Spring Data patterns, SpEL</dd>
+        <dt>Production</dt><dd>Actuator, metrics, logging, JVM memory, GC, profiling, leaks, load tests</dd>
       </dl>
     </div>
     <div class="note tip"><span class="lbl">How the annotation slides are written</span>Every entry gets three things: <b>what it does</b>, <b>a real line of code</b>, and <b>the failure it causes when it is wrong</b>. The third one is the reason to read a reference rather than the Javadoc — the Javadoc tells you what an attribute means, not what happens at 2am when you set it badly.</div>
   </div>
 </section>
 
-<!-- SB 2 -->
+<!-- springboot 02 -->
 <section class="slide" data-sec="Architecture" data-title="The layer cake">
   <h2>What Spring Boot actually is</h2>
   <p class="dek">Boot is not a framework. It is three things layered on top of Spring Framework: an opinionated dependency set, a conditional configuration engine, and an embedded runtime. Knowing which layer a behaviour comes from is what makes problems diagnosable.</p>
@@ -2998,7 +3511,7 @@ SPRING_PROFILES_ACTIVE: prod,worker
   </div>
 </section>
 
-<!-- SB 3 -->
+<!-- springboot 03 -->
 <section class="slide" data-sec="Architecture" data-title="Auto-configuration">
   <h2>Auto-configuration, mechanically</h2>
   <p class="dek">Three annotations, one file of class names, and a pile of conditions. No reflection tricks, nothing hidden — you can read the whole chain yourself, and you should once.</p>
@@ -3048,7 +3561,7 @@ public class DataSourceAutoConfiguration {
   </div>
 </section>
 
-<!-- SB 4 -->
+<!-- springboot 04 -->
 <section class="slide" data-sec="Architecture" data-title="The @Conditional family">
   <h2>The conditions that decide what exists</h2>
   <p class="dek">These are the whole of Boot's "opinion". Nine annotations; you will write three of them yourself the first time you build an internal starter.</p>
@@ -3094,7 +3607,7 @@ debug: true
   </div>
 </section>
 
-<!-- SB 5 -->
+<!-- springboot 05 -->
 <section class="slide" data-sec="Architecture" data-title="Overriding auto-config">
   <h2>Four ways to take control back</h2>
   <p class="dek">In escalating order of force. Reach for the weakest one that works — each step up moves you further from the defaults that Boot upgrades will keep maintaining for you.</p>
@@ -3131,7 +3644,7 @@ Jackson2ObjectMapperBuilderCustomizer dates() {
   <div class="note tip"><span class="lbl">Writing your own starter</span>An internal starter is a jar with an <code>@AutoConfiguration</code> class, an entry in <code>AutoConfiguration.imports</code>, and a <code>@ConfigurationProperties</code> record. Name it <code>acme-spring-boot-starter</code> — the <code>spring-boot-starter-*</code> prefix is reserved for the Spring team. Add <code>spring-boot-configuration-processor</code> so your properties get IDE autocomplete; teams notice that immediately.</div>
 </section>
 
-<!-- SB 6 -->
+<!-- springboot 06 -->
 <section class="slide" data-sec="Lifecycle" data-title="Application startup">
   <h2>From <code>main()</code> to "Started ShopApplication in 4.2s"</h2>
   <p class="dek">Ten phases. Knowing which one you are in tells you where a startup failure can be caught, where a property is readable, and why your <code>@PostConstruct</code> ran before the web server was listening.</p>
@@ -3186,7 +3699,7 @@ Jackson2ObjectMapperBuilderCustomizer dates() {
   <div class="note tip"><span class="lbl">Which hook to use</span><code>ApplicationReadyEvent</code> for anything that must not run until the app is genuinely serving (warm caches, register with a discovery service). <code>ApplicationRunner</code> for one-off startup work. <code>@PostConstruct</code> only for initialising <em>that bean</em> — never for work that assumes other beans are ready, because ordering is not guaranteed.</div>
 </section>
 
-<!-- SB 7 -->
+<!-- springboot 07 -->
 <section class="slide" data-sec="Lifecycle" data-title="Startup hooks and shutdown">
   <h2>Startup hooks, failure analysis, and dying gracefully</h2>
   <p class="dek">Shutdown gets far less attention than startup and causes more customer-visible errors — every rolling deploy exercises it, several times an hour.</p>
@@ -3236,7 +3749,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 8 -->
+<!-- springboot 08 -->
 <section class="slide" data-sec="Lifecycle" data-title="Bean lifecycle">
   <h2>The bean lifecycle, and where your proxy appears</h2>
   <p class="dek">Nine steps between "definition" and "usable bean". The one worth memorising is step 7 — it is where <code>@Transactional</code>, <code>@Cacheable</code>, <code>@Async</code> and <code>@PreAuthorize</code> all physically come into existence.</p>
@@ -3302,7 +3815,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 9 -->
+<!-- springboot 09 -->
 <section class="slide" data-sec="Lifecycle" data-title="HTTP request lifecycle">
   <h2>One HTTP request, hop by hop</h2>
   <p class="dek">Where your code can intervene, and — more usefully — which stage an exception was thrown in, because that determines whether your <code>@ControllerAdvice</code> will ever see it.</p>
@@ -3380,7 +3893,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   <div class="note tip"><span class="lbl">Customising the security error body</span>Because the security chain sits outside the advice, you shape its responses with <code>authenticationEntryPoint</code> (401) and <code>accessDeniedHandler</code> (403) on the filter chain itself. Doing that is what makes every error in your API one consistent shape — see the <code>ProblemDetail</code> slide in the architecture deck.</div>
 </section>
 
-<!-- SB 10 -->
+<!-- springboot 10 -->
 <section class="slide" data-sec="Lifecycle" data-title="Transaction & persistence context">
   <h2>The persistence context: open, dirty, flush, commit</h2>
   <p class="dek">Most JPA surprises — "I never called save() and it updated anyway", "my change vanished", "LazyInitializationException" — are this lifecycle, not a mapping problem.</p>
@@ -3432,7 +3945,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 11 -->
+<!-- springboot 11 -->
 <section class="slide" data-sec="Starters" data-title="What a starter is">
   <h2>A starter is a POM with no code in it</h2>
   <p class="dek">That is the entire trick. <code>spring-boot-starter-data-jpa</code> contains zero classes — it is a dependency list plus a curated set of versions. The behaviour comes from the auto-configuration in the jars it drags in.</p>
@@ -3474,7 +3987,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 12 -->
+<!-- springboot 12 -->
 <section class="slide" data-sec="Starters" data-title="The core six">
   <h2>The six on almost every enterprise service</h2>
   <p class="dek">What each one brings, and the first property you will want to change after adding it.</p>
@@ -3500,7 +4013,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 13 -->
+<!-- springboot 13 -->
 <section class="slide" data-sec="Starters" data-title="Messaging & integration">
   <h2>Messaging and integration starters</h2>
   <p class="dek">The middleware half of an enterprise stack. Each one auto-configures a template, a listener container, and a set of health indicators you should be alerting on.</p>
@@ -3541,7 +4054,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   </div>
 </section>
 
-<!-- SB 14 -->
+<!-- springboot 14 -->
 <section class="slide" data-sec="Starters" data-title="Batch, scheduling, cloud & ops">
   <h2>Batch, scheduling, and the cloud/ops set</h2>
   <p class="dek">Batch is the half of enterprise Java that architecture decks usually ignore and that runs the business overnight.</p>
@@ -3590,7 +4103,7 @@ Step reconcilePayments(JobRepository repo, PlatformTransactionManager tx,
   </div>
 </section>
 
-<!-- SB 15 -->
+<!-- springboot 15 -->
 <section class="slide" data-sec="Core annotations" data-title="Stereotypes & configuration">
   <h2>Stereotypes and configuration</h2>
   <p class="dek">All the stereotypes are <code>@Component</code> underneath. The differences that actually matter are exception translation on <code>@Repository</code> and proxying on <code>@Configuration</code>.</p>
@@ -3633,7 +4146,7 @@ class OrderConfig {
   </div>
 </section>
 
-<!-- SB 16 -->
+<!-- springboot 16 -->
 <section class="slide" data-sec="Core annotations" data-title="Injection & configuration">
   <h2>Wiring and externalised configuration</h2>
   <p class="dek">Constructor injection is the only form worth using. Everything else on this slide exists to disambiguate, defer or configure it.</p>
@@ -3687,7 +4200,7 @@ public record OrderProperties(
   </div>
 </section>
 
-<!-- SB 17 -->
+<!-- springboot 17 -->
 <section class="slide" data-sec="Core annotations" data-title="Web MVC annotations">
   <h2>Web MVC: mapping, binding, responding</h2>
   <p class="dek">The full set you use on a real controller, plus the two response-shaping annotations that most teams only discover after their error format has already gone inconsistent.</p>
@@ -3737,7 +4250,7 @@ class OrderController {
   <div class="note tip"><span class="lbl">Return type: DTO or <code>ResponseEntity</code>?</span>Return the DTO directly when the status is always the same — it is cleaner and reads better. Reach for <code>ResponseEntity</code> only when the status, headers or presence of a body genuinely vary at runtime (<code>Location</code> on create, <code>ETag</code>, conditional 304). Mixing both in one controller is fine and normal.</div>
 </section>
 
-<!-- SB 18 -->
+<!-- springboot 18 -->
 <section class="slide" data-sec="Core annotations" data-title="Validation">
   <h2>Validation: shape at the edge, rules in the domain</h2>
   <p class="dek">Bean Validation is excellent at "is this well-formed". It is a poor place for business rules, and the boundary between the two is worth being deliberate about.</p>
@@ -3785,7 +4298,7 @@ class SkuValidator implements ConstraintValidator&lt;ValidSku, String&gt; {
   </div>
 </section>
 
-<!-- SB 19 -->
+<!-- springboot 19 -->
 <section class="slide" data-sec="Core annotations" data-title="Async, scheduling, caching, testing">
   <h2>The proxy-driven annotations, and the test set</h2>
   <p class="dek">Everything in the left column works by the proxy from the bean-lifecycle slide — which means every one of them silently does nothing on a self-invocation, on a <code>private</code> method, or on a <code>final</code> class.</p>
@@ -3840,7 +4353,7 @@ void on(OrderPlaced event) { ... }
   </div>
 </section>
 
-<!-- SB 20 -->
+<!-- springboot 20 -->
 <section class="slide" data-sec="JPA" data-title="Entity basics">
   <h2>Entity and column mapping</h2>
   <p class="dek">The annotations on nearly every entity, with the defaults that are wrong often enough to be worth overriding deliberately.</p>
@@ -3898,7 +4411,7 @@ public class OrderJpaEntity {
   <div class="note warn"><span class="lbl">The mapping entity is not the domain model</span>In the architecture deck's layering, <code>Order</code> (domain, no annotations) and <code>OrderJpaEntity</code> (this class) are different types with a mapper between them. For a CRUD-shaped module that separation is overhead worth skipping; for the module where the rules live, it is what keeps Hibernate out of your business logic.</div>
 </section>
 
-<!-- SB 21 -->
+<!-- springboot 21 -->
 <section class="slide" data-sec="JPA" data-title="Keys">
   <h2>Identifiers: the choice that affects insert throughput</h2>
   <p class="dek">Four generation strategies with materially different behaviour under batch inserts, plus the two ways to model a composite key.</p>
@@ -3952,7 +4465,7 @@ class OrderLineEntity {
   </div>
 </section>
 
-<!-- SB 22 -->
+<!-- springboot 22 -->
 <section class="slide" data-sec="JPA" data-title="Relationships">
   <h2>Relationships: owning side, cascade, orphans</h2>
   <p class="dek">Four annotations, and about six ways each to get it subtly wrong. The owning side is the concept everything else hangs off: <b>the side without <code>mappedBy</code> owns the foreign key</b>, and only changes to the owning side are written.</p>
@@ -4001,7 +4514,7 @@ class OrderJpaEntity {
   </div>
 </section>
 
-<!-- SB 23 -->
+<!-- springboot 23 -->
 <section class="slide" data-sec="JPA" data-title="Fetching">
   <h2>Fetching: where the performance actually is</h2>
   <p class="dek">Fetch type is a <em>default</em>, not a plan. The plan is set per query — which is the distinction that separates people who have tuned Hibernate from people who have configured it.</p>
@@ -4041,7 +4554,7 @@ List&lt;OrderSummary&gt; summariesFor(@Param("c") UUID customerId);</code></pre>
   </div>
 </section>
 
-<!-- SB 24 -->
+<!-- springboot 24 -->
 <section class="slide" data-sec="JPA" data-title="Inheritance">
   <h2>Inheritance: three strategies, three different tables</h2>
   <p class="dek">Payment types — card, bank transfer, store credit — are the canonical case. The choice is a schema decision you will not casually reverse, so make it on the query pattern.</p>
@@ -4100,7 +4613,7 @@ public abstract class Auditable {
   </div>
 </section>
 
-<!-- SB 25 -->
+<!-- springboot 25 -->
 <section class="slide" data-sec="JPA" data-title="Auditing, converters, locking">
   <h2>Auditing, converters, soft delete, locking</h2>
   <p class="dek">The four cross-cutting concerns every enterprise entity eventually grows, each with a proper JPA mechanism and a common hand-rolled version that is worse.</p>
@@ -4156,7 +4669,7 @@ Optional&lt;InventoryItemEntity&gt; findForUpdate(@Param("sku") String sku);
   </div>
 </section>
 
-<!-- SB 26 -->
+<!-- springboot 26 -->
 <section class="slide" data-sec="JPA" data-title="Queries & projections">
   <h2>Queries: derived, JPQL, native, dynamic — and when to leave JPA</h2>
   <p class="dek">Four query mechanisms in Spring Data, in increasing order of power and decreasing order of readability. Knowing when to stop using JPA entirely is part of using it well.</p>
@@ -4217,7 +4730,7 @@ jdbc.sql("select id, placed_at, total_minor from order_mgmt.orders where custome
   </div>
 </section>
 
-<!-- SB 27 -->
+<!-- springboot 27 -->
 <section class="slide" data-sec="Security" data-title="The filter chain">
   <h2>Spring Security is a filter chain, and order is everything</h2>
   <p class="dek">There is no magic here either: an ordered list of servlet filters, each with one job, running before your <code>DispatcherServlet</code> ever sees the request.</p>
@@ -4299,7 +4812,7 @@ SecurityFilterChain apiChain(HttpSecurity http) throws Exception {
   </div>
 </section>
 
-<!-- SB 28 -->
+<!-- springboot 28 -->
 <section class="slide" data-sec="Security" data-title="Method security">
   <h2>Method security annotations, in full</h2>
   <p class="dek">The layer where authorisation becomes about <em>data</em> rather than paths. All of it runs on the same AOP proxy from the bean-lifecycle slide — with all the same limitations.</p>
@@ -4360,7 +4873,7 @@ void audit(@CurrentSecurityContext(expression = "authentication.name") String us
   </div>
 </section>
 
-<!-- SB 29 -->
+<!-- springboot 29 -->
 <section class="slide" data-sec="Security" data-title="OAuth2 & JWT">
   <h2>Resource server, client, and what JWT validation really does</h2>
   <p class="dek">Two starters that sound similar and do opposite things: one <em>accepts</em> tokens, the other <em>obtains</em> them. Enterprise services usually need both.</p>
@@ -4411,7 +4924,7 @@ void audit(@CurrentSecurityContext(expression = "authentication.name") String us
   </div>
 </section>
 
-<!-- SB 30 -->
+<!-- springboot 30 -->
 <section class="slide" data-sec="Security" data-title="Enterprise SSO & mTLS">
   <h2>Enterprise SSO, token relay and service-to-service trust</h2>
   <p class="dek">Where the corporate identity estate meets your service. Usually one central IdP — Entra ID, Ping, Okta, Keycloak — fronting an older directory, and two hard questions: how identity reaches you, and how it propagates onward.</p>
@@ -4465,7 +4978,7 @@ void audit(@CurrentSecurityContext(expression = "authentication.name") String us
   </div>
 </section>
 
-<!-- SB 31 -->
+<!-- springboot 31 -->
 <section class="slide" data-sec="Security" data-title="Tenancy & testing">
   <h2>Row-level scoping, multi-tenancy, and testing all of it</h2>
   <p class="dek">The third authorisation layer, and the annotations that let you prove any of it works. A security rule with no test is a security rule that will be deleted by a refactor.</p>
@@ -4521,7 +5034,1132 @@ class OrderControllerSecurityTest {
   </div>
 </section>
 
-<!-- SB 32 -->
+<!-- springboot 32 -->
+<section class="slide" data-sec="Internals" data-title="Writing an aspect">
+  <h2>AOP: the mechanism behind every annotation that "just works"</h2>
+  <p class="dek"><code>@Transactional</code>, <code>@Cacheable</code>, <code>@PreAuthorize</code> are all aspects Spring ships. Writing one yourself is the fastest way to stop treating them as magic — and occasionally the right answer for a genuine cross-cutting concern.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">An audit aspect — one concern, applied everywhere, defined once</div>
+<pre><code class="language-java">@Aspect
+@Component
+@Order(20)                                   // lower runs first; @Transactional is Ordered.LOWEST
+class AuditAspect {
+
+    // A named pointcut — reusable, and the place to put the expression
+    @Pointcut("@annotation(com.retailco.shop.shared.Audited)")
+    void audited() { }
+
+    @Pointcut("within(com.retailco.shop..internal.app..*)")
+    void inApplicationLayer() { }
+
+    @Around("audited() &amp;&amp; inApplicationLayer()")
+    Object record(ProceedingJoinPoint pjp) throws Throwable {
+        var sig  = (MethodSignature) pjp.getSignature();
+        var user = SecurityContextHolder.getContext().getAuthentication().getName();
+        long t0  = System.nanoTime();
+        try {
+            Object result = pjp.proceed();                       // ← call the real method
+            audit.success(sig.getName(), user, pjp.getArgs(), Duration.ofNanos(System.nanoTime() - t0));
+            return result;
+        } catch (Throwable ex) {
+            audit.failure(sig.getName(), user, ex);
+            throw ex;                                            // NEVER swallow
+        }
+    }
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">The five advice types</div>
+<pre><code class="language-java">@Before          // runs first; cannot change args or prevent the call
+@AfterReturning  // on success; can read (not replace) the return value
+@AfterThrowing   // on exception; for logging, not for handling
+@After           // finally — always runs
+@Around          // the only one that can skip the call, retry it, or change the result</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Pointcut designators worth knowing</h3>
+        <dl class="kv">
+          <dt><code>execution(..)</code></dt><dd>method signature match — the most precise, and the most brittle</dd>
+          <dt><code>within(..)</code></dt><dd>any method in a type or package. Good for layer-wide rules</dd>
+          <dt><code>@annotation(X)</code></dt><dd>methods carrying an annotation. <b>The one to prefer</b> — explicit at the call site</dd>
+          <dt><code>@within(X)</code></dt><dd>any method of a class carrying an annotation</dd>
+          <dt><code>bean(orderService)</code></dt><dd>by bean name, with wildcards — Spring-specific</dd>
+          <dt><code>args(..)</code>, <code>this(..)</code>, <code>target(..)</code></dt><dd>match on argument or proxy/target type, and bind them as parameters</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">Prefer an annotation over a wildcard</span><code>execution(* com.retailco..*Service.*(..))</code> silently stops matching the day someone renames a class or moves a package — and nothing fails, the aspect just stops running. <code>@Audited</code> on the method is visible in the code, greppable, and survives refactoring.</div>
+      <div class="note tip"><span class="lbl">Where AOP earns its place</span>Audit trails, timing and metrics on a whole layer, tenant context propagation, feature-flag gating. <b>Not</b> business rules — an aspect that changes what an order costs is logic nobody reading <code>PlaceOrderUseCase</code> can see.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 33 -->
+<section class="slide" data-sec="Internals" data-title="AOP limits">
+  <h2>Why your aspect silently didn't run</h2>
+  <p class="dek">Every one of these applies equally to Spring's own annotations. Learn them once here and you have debugged four different "annotation does nothing" bugs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Situation</th><th>What happens</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Self-invocation — <code>this.method()</code></td><td>Advice never runs. <b>No error, no warning</b> (Spring 7 now warns for <code>@Transactional</code>)</td><td>Move the method to another bean, or inject <code>self</code> via <code>@Lazy</code>, or use the template API directly</td></tr>
+        <tr><td><code>private</code> or <code>final</code> method</td><td>CGLIB cannot override it — advice skipped</td><td>Make it <code>public</code> (or at least non-final) on the proxied bean</td></tr>
+        <tr><td><code>final</code> class</td><td>CGLIB cannot subclass — bean creation fails, or proxying is skipped</td><td>Remove <code>final</code>, or implement an interface so a JDK proxy can be used</td></tr>
+        <tr><td>Object created with <code>new</code></td><td>Not a bean, so no proxy exists at all</td><td>Let Spring create it</td></tr>
+        <tr><td>Called from a different thread</td><td>Advice runs, but <code>SecurityContext</code> / transaction / MDC are thread-bound and empty</td><td><code>DelegatingSecurityContextExecutor</code>, or pass context explicitly</td></tr>
+        <tr><td>Two aspects, wrong order</td><td>e.g. audit sees the pre-transaction state, or a retry re-runs inside a doomed transaction</td><td><code>@Order</code> on each aspect — and think about which must be outermost</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note bad"><span class="lbl">The ordering bug worth internalising</span>Retry <b>outside</b> transaction: each attempt gets a fresh transaction — correct. Retry <b>inside</b> transaction: the first failure already marked it rollback-only, so every retry runs in a transaction that can never commit, and you get <code>UnexpectedRollbackException</code> after wasting three attempts.
+    <p style="margin-top:8px">Put <code>@Retryable</code> on the <em>caller</em> of the transactional method, not on the transactional method itself.</p></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Proving a proxy exists, in two lines</div>
+<pre><code class="language-java">System.out.println(AopUtils.isAopProxy(orderService));        // true?
+System.out.println(AopUtils.isCglibProxy(orderService));      // which kind?
+System.out.println(AopProxyUtils.ultimateTargetClass(orderService));</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Kotlin and Lombok users</span>Kotlin classes are <code>final</code> by default — the <code>kotlin-spring</code> compiler plugin opens the annotated ones for you. Lombok's <code>@Value</code> makes a class <code>final</code>, which quietly breaks proxying on any bean using it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 34 -->
+<section class="slide" data-sec="Internals" data-title="Transaction propagation">
+  <h2>All seven propagation modes, and the two you should use</h2>
+  <p class="dek">Propagation answers one question: when a transactional method is called from inside an existing transaction, what happens? Most teams only ever need <code>REQUIRED</code> and <code>REQUIRES_NEW</code> — but the others appear in interviews and in inherited code.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Propagation</th><th>Called with no transaction</th><th>Called inside one</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td><code>REQUIRED</code> <span class="tag g">default</span></td><td>Starts one</td><td>Joins it</td><td>Almost everything. One transaction per use case</td></tr>
+        <tr><td><code>REQUIRES_NEW</code></td><td>Starts one</td><td><b>Suspends</b> the outer, starts an independent one on a <b>second connection</b></td><td>Audit rows that must survive the caller's rollback; post-commit listeners</td></tr>
+        <tr><td><code>SUPPORTS</code></td><td>Runs without one</td><td>Joins it</td><td>Reads that are fine either way. Rarely worth specifying</td></tr>
+        <tr><td><code>NOT_SUPPORTED</code></td><td>Runs without one</td><td>Suspends it, runs without</td><td>A long report inside a transactional flow, to release the connection early</td></tr>
+        <tr><td><code>MANDATORY</code></td><td><b>Throws</b></td><td>Joins it</td><td>Enforcing "this may only be called as part of a larger unit of work"</td></tr>
+        <tr><td><code>NEVER</code></td><td>Runs</td><td><b>Throws</b></td><td>Guarding a method that must not hold a transaction</td></tr>
+        <tr><td><code>NESTED</code></td><td>Starts one</td><td>Savepoint inside the outer — rolls back to the savepoint only</td><td>Partial rollback. JDBC only, not supported by all setups. Rare</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The audit case — the one real use of REQUIRES_NEW</div>
+<pre><code class="language-java">@Service
+class OrderService {
+    @Transactional                                   // REQUIRED
+    void place(PlaceOrderCommand cmd) {
+        audit.record("place attempted", cmd);        // must survive a rollback
+        var order = Order.place(...);                // may throw → outer rolls back
+        orders.save(order);
+    }
+}
+
+@Service
+class AuditService {
+    @Transactional(propagation = REQUIRES_NEW)       // its own connection, its own commit
+    void record(String what, Object payload) { ... }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">REQUIRES_NEW in a loop is a self-inflicted deadlock</span>It takes a <b>second connection while holding the first</b>. A pool of 20 with a loop calling a <code>REQUIRES_NEW</code> method exhausts itself at 20 concurrent callers, each holding one connection and waiting for another that will never come free. The symptom is a hang, not an error.</div>
+      <div class="note warn"><span class="lbl">rollback-only is contagious</span>If an inner <code>REQUIRED</code> method throws and you catch the exception in the caller, the transaction is already marked rollback-only. Your caller finishes happily, then commit throws <code>UnexpectedRollbackException</code> — which looks like it came from nowhere. If you intend to recover from an inner failure, that inner call needs <code>REQUIRES_NEW</code>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 35 -->
+<section class="slide" data-sec="Internals" data-title="Isolation levels">
+  <h2>Isolation: three anomalies, four levels, and what your database really does</h2>
+  <p class="dek">The JPA/JDBC constants are a portable abstraction over engines that behave quite differently. Knowing your engine's actual behaviour matters more than knowing the constant names.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Level</th><th>Dirty read</th><th>Non-repeatable</th><th>Phantom</th></tr></thead>
+        <tbody>
+          <tr><td><code>READ_UNCOMMITTED</code></td><td>possible</td><td>possible</td><td>possible</td></tr>
+          <tr><td><code>READ_COMMITTED</code></td><td>no</td><td>possible</td><td>possible</td></tr>
+          <tr><td><code>REPEATABLE_READ</code></td><td>no</td><td>no</td><td>possible*</td></tr>
+          <tr><td><code>SERIALIZABLE</code></td><td>no</td><td>no</td><td>no</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12.5px;color:var(--text-3);padding:10px 13px">* PostgreSQL's REPEATABLE READ is snapshot isolation and does prevent phantoms; MySQL InnoDB prevents them with gap locks. The standard permits them — the engines exceed it.</p>
+    </div>
+    <div class="card">
+      <h3>The three anomalies, in one sentence each</h3>
+      <dl class="kv" style="margin-top:8px">
+        <dt>Dirty read</dt><dd>You read a row another transaction wrote but has not committed — and it then rolls back. You acted on data that never existed.</dd>
+        <dt>Non-repeatable read</dt><dd>You read the same row twice in one transaction and get different values, because someone committed between them.</dd>
+        <dt>Phantom read</dt><dd>You run the same <code>WHERE</code> twice and get a different <em>set</em> of rows, because someone inserted one that matches.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Setting it, on the rare occasion you need to</div>
+<pre><code class="language-java">@Transactional(isolation = Isolation.REPEATABLE_READ, timeout = 5)
+BalanceReport reconcile(AccountId id) { ... }
+// timeout is in SECONDS and is worth setting on anything long-running —
+// it bounds how long a transaction can hold its locks and its connection.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note good"><span class="lbl">Practical guidance</span>Stay on the database default — <code>READ_COMMITTED</code> on PostgreSQL and Oracle, <code>REPEATABLE_READ</code> on MySQL — and handle concurrency with <b>optimistic locking</b> instead. It is cheaper, it scales, and it fails loudly rather than blocking.</div>
+        <div class="note warn"><span class="lbl">SERIALIZABLE is not free correctness</span>On PostgreSQL it uses predicate locking and will abort transactions with a serialization failure under contention — so your code must be prepared to retry the whole unit of work. Turning it on without a retry strategy converts a correctness problem into an availability problem.</div>
+      <div class="note tip"><span class="lbl">The interview follow-up</span>"How would you prevent two customers buying the last item?" — the strong answer is not an isolation level. It is <code>@Version</code> optimistic locking with a bounded retry, plus a reservation with a TTL, as on the concurrency slide of the architecture deck.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 36 -->
+<section class="slide" data-sec="Internals" data-title="Jackson essentials">
+  <h2>Jackson: the annotations that shape your API's JSON</h2>
+  <p class="dek">Your wire contract is decided here. Every one of these is a public-API decision, so they belong on DTOs — never on entities, where they couple your database schema to your consumers.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The set you actually use</div>
+<pre><code class="language-java">@JsonInclude(JsonInclude.Include.NON_NULL)          // omit nulls — class or field level
+record OrderView(
+
+    @JsonProperty("order_id")                       // rename on the wire
+    UUID id,
+
+    @JsonFormat(shape = STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    Instant placedAt,
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING)    // BigDecimal as a string —
+    BigDecimal total,                               // stops JS clients losing precision
+
+    @JsonAlias({ "customerId", "customer_id" })     // accept both on the way IN
+    UUID customerId,
+
+    @JsonIgnore                                     // never serialised
+    String internalNote,
+
+    @JsonProperty(access = READ_ONLY)               // serialised out, ignored on input
+    OrderStatus status,
+
+    @JsonProperty(access = WRITE_ONLY)              // accepted in, never echoed back
+    String idempotencyKey,
+
+    @JsonUnwrapped                                  // flatten a nested object into the parent
+    Money amount
+) { }
+
+// Deserialisation entry points
+@JsonCreator                                        // explicit constructor for non-records
+@JsonAnySetter                                      // catch-all for unmapped fields
+@JsonNaming(SnakeCaseStrategy.class)                // rename the whole class at once</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>@JsonIgnore</code> is not security</h4><p>It stops a field being serialised — it does not stop it being <em>deserialised</em> unless you also block that. A client can still POST <code>{"role":"ADMIN"}</code> into a field you thought was hidden. Use <code>access = READ_ONLY</code>, or better, a separate request DTO that simply has no such field.</p></div>
+    <div class="card"><h4>Money as a string</h4><p>JSON numbers become IEEE doubles in JavaScript. <code>99999999.99</code> survives; a long enough decimal does not. Serialise money as a string, or as minor units in a <code>long</code>. Financial clients will ask you for this eventually — ship it first.</p></div>
+    <div class="card"><h4>Be a tolerant reader</h4><p><code>FAIL_ON_UNKNOWN_PROPERTIES=false</code> (Boot's default) is what lets a producer add a field without breaking you. Turning it on to "catch typos" makes every additive upstream change a production incident.</p></div>
+  </div>
+</section>
+
+<!-- springboot 37 -->
+<section class="slide" data-sec="Internals" data-title="Jackson advanced">
+  <h2>Polymorphism, views, and the customisations that are safe</h2>
+  <p class="dek">Two features worth knowing, one security warning, and the right way to change global behaviour without losing Boot's defaults.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Polymorphic payloads — events and payment types</div>
+<pre><code class="language-java">@JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "type")
+@JsonSubTypes({
+    @Type(value = CardPayment.class,     name = "CARD"),
+    @Type(value = BankTransfer.class,    name = "TRANSFER"),
+    @Type(value = StoreCredit.class,     name = "CREDIT")
+})
+sealed interface PaymentMethod permits CardPayment, BankTransfer, StoreCredit { }
+
+// {"type":"CARD","last4":"4242"} → CardPayment
+// `sealed` + an explicit @JsonSubTypes list is the safe pattern:
+// the set of permitted types is closed and visible.</code></pre>
+      <div class="codelabel" style="margin-top:14px">Views — one model, two audiences</div>
+<pre><code class="language-java">class Views { interface Public {} interface Internal extends Public {} }
+
+record OrderView(@JsonView(Views.Public.class)   UUID id,
+                 @JsonView(Views.Public.class)   OrderStatus status,
+                 @JsonView(Views.Internal.class) String riskScore) { }
+
+@GetMapping("/{id}") @JsonView(Views.Public.class)
+OrderView get(@PathVariable UUID id) { ... }         // riskScore omitted</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Never enable default typing</span><code>activateDefaultTyping()</code> / <code>@JsonTypeInfo(use = Id.CLASS)</code> lets the payload name any class on your classpath, which is a well-known remote-code-execution path. Always use <code>Id.NAME</code> with an explicit <code>@JsonSubTypes</code> allowlist. This one shows up in security reviews.</div>
+      <div class="codewrap">
+        <div class="codelabel">Customise globally — without replacing the ObjectMapper</div>
+<pre><code class="language-java">@Bean
+Jackson2ObjectMapperBuilderCustomizer jackson() {
+    return b -&gt; b
+        .serializationInclusion(NON_NULL)
+        .featuresToDisable(WRITE_DATES_AS_TIMESTAMPS)
+        .serializerByType(Money.class, new MoneySerializer());
+}
+// Declaring your own @Bean ObjectMapper instead means you silently lose
+// every module Boot had registered — java.time support most painfully.</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Views vs separate DTOs</span>Views avoid duplicate classes but hide the contract inside annotations, and they do not compose well once you have three audiences. Past two views, separate records per audience are clearer and let each one evolve independently. <span class="tag a">Boot 4</span> Jackson 3 changes defaults — ISO-8601 dates out of the box and unchecked exceptions.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 38 -->
+<section class="slide" data-sec="Internals" data-title="Derived queries">
+  <h2>Spring Data derived queries: the keyword reference</h2>
+  <p class="dek">The method-name parser is genuinely useful up to about three conditions. Past that it produces names nobody can read, and a <code>@Query</code> is both shorter and clearer.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Keyword</th><th>Generated predicate</th></tr></thead>
+        <tbody>
+          <tr><td><code>findBy</code> / <code>readBy</code> / <code>getBy</code></td><td>identical — pick one and be consistent</td></tr>
+          <tr><td><code>And</code> / <code>Or</code></td><td><code>a = ? and b = ?</code></td></tr>
+          <tr><td><code>Between</code></td><td><code>x between ? and ?</code></td></tr>
+          <tr><td><code>LessThan</code> / <code>GreaterThanEqual</code></td><td><code>x &lt; ?</code> / <code>x &gt;= ?</code></td></tr>
+          <tr><td><code>After</code> / <code>Before</code></td><td>date comparison</td></tr>
+          <tr><td><code>IsNull</code> / <code>IsNotNull</code></td><td><code>x is null</code></td></tr>
+          <tr><td><code>Like</code> / <code>Containing</code></td><td><code>like ?</code> / <code>like %?%</code></td></tr>
+          <tr><td><code>StartingWith</code> / <code>EndingWith</code></td><td><code>like ?%</code> / <code>like %?</code></td></tr>
+          <tr><td><code>IgnoreCase</code></td><td><code>upper(x) = upper(?)</code></td></tr>
+          <tr><td><code>In</code> / <code>NotIn</code></td><td><code>x in (?)</code></td></tr>
+          <tr><td><code>True</code> / <code>False</code></td><td><code>x = true</code></td></tr>
+          <tr><td><code>OrderBy…Desc</code></td><td><code>order by x desc</code></td></tr>
+          <tr><td><code>First10</code> / <code>Top5</code> / <code>Distinct</code></td><td><code>limit</code> / <code>distinct</code></td></tr>
+          <tr><td><code>countBy</code> / <code>existsBy</code> / <code>deleteBy</code></td><td>count / exists / delete</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Readable, and the point where it stops being readable</div>
+<pre><code class="language-java">// Fine
+Optional&lt;OrderJpaEntity&gt; findByIdempotencyKey(String key);
+List&lt;OrderJpaEntity&gt; findTop10ByStatusOrderByPlacedAtDesc(OrderStatus s);
+boolean existsByCustomerIdAndStatus(UUID customerId, OrderStatus status);
+long countByPlacedAtAfter(Instant since);
+
+// Not fine — write a @Query
+List&lt;OrderJpaEntity&gt;
+  findByCustomerIdAndStatusInAndPlacedAtBetweenAndTotalMinorGreaterThanOrderByPlacedAtDesc(
+      UUID customerId, Collection&lt;OrderStatus&gt; statuses,
+      Instant from, Instant to, long min);</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl"><code>deleteBy…</code> is a loop, not a DELETE</span>Spring Data <b>loads every matching entity</b> and deletes them one by one, so lifecycle callbacks and cascades fire. That is sometimes what you want; on 200,000 rows it is an outage. For a bulk delete use <code>@Modifying @Query("delete from …")</code> and accept that callbacks will not run.</div>
+      <div class="note warn"><span class="lbl">Ambiguous property names</span><code>findByCustomerAddressCity</code> could mean <code>customer.address.city</code> or a property called <code>customerAddress</code>. Disambiguate with underscores — <code>findByCustomer_Address_City</code> — rather than hoping the resolver guesses right, because it fails at startup with a message that does not name the real problem.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 39 -->
+<section class="slide" data-sec="Internals" data-title="Repository patterns">
+  <h2>Custom repository behaviour, without abandoning Spring Data</h2>
+  <p class="dek">Three extension points, in the order you should reach for them. Most teams jump straight to injecting <code>EntityManager</code> into a service, which puts persistence code in the application layer.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">1 · A fragment — custom code on one repository</div>
+<pre><code class="language-java">interface OrderRepositoryCustom {
+    List&lt;OrderJpaEntity&gt; search(OrderSearch filter, Pageable page);
+}
+
+class OrderRepositoryCustomImpl implements OrderRepositoryCustom {   // "Impl" suffix is required
+    @PersistenceContext private EntityManager em;
+
+    public List&lt;OrderJpaEntity&gt; search(OrderSearch f, Pageable page) {
+        var cb = em.getCriteriaBuilder();
+        var q  = cb.createQuery(OrderJpaEntity.class);
+        var root = q.from(OrderJpaEntity.class);
+        var predicates = new ArrayList&lt;Predicate&gt;();
+        if (f.status() != null)     predicates.add(cb.equal(root.get("status"), f.status()));
+        if (f.customerId() != null) predicates.add(cb.equal(root.get("customerId"), f.customerId()));
+        q.where(cb.and(predicates.toArray(Predicate[]::new)));
+        return em.createQuery(q)
+                 .setFirstResult((int) page.getOffset())
+                 .setMaxResults(page.getPageSize())
+                 .getResultList();
+    }
+}
+
+interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt;,
+                                     OrderRepositoryCustom { }   // ← composed in</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">2 · Specifications — composable, for filter-heavy screens</div>
+<pre><code class="language-java">class OrderSpecs {
+    static Specification&lt;OrderJpaEntity&gt; hasStatus(OrderStatus s) {
+        return (root, q, cb) -&gt; s == null ? null : cb.equal(root.get("status"), s);
+    }
+    static Specification&lt;OrderJpaEntity&gt; placedAfter(Instant t) {
+        return (root, q, cb) -&gt; t == null ? null : cb.greaterThan(root.get("placedAt"), t);
+    }
+}
+// null predicates are ignored, so optional filters compose cleanly:
+repo.findAll(where(hasStatus(f.status())).and(placedAfter(f.since())), page);</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">3 · A base repository — behaviour for EVERY repository</div>
+<pre><code class="language-java">@EnableJpaRepositories(repositoryBaseClass = SoftDeleteRepositoryImpl.class)
+// e.g. make every findAll() exclude soft-deleted rows, or add a
+// findByIdOrThrow(). Powerful, and correspondingly easy to surprise
+// people with — document it where new joiners will see it.</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Which to reach for</span>One awkward query → <b>fragment</b>. A search screen with many optional filters → <b>Specifications</b>. A rule that must hold for every entity → <b>base repository</b>. And if the query is genuinely complex SQL, stop fighting the abstraction: <code>JdbcClient</code> or jOOQ in a fragment is clearer than a 40-line Criteria tree.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 40 -->
+<section class="slide" data-sec="Internals" data-title="Validation groups">
+  <h2>Validation groups and cross-field rules</h2>
+  <p class="dek">Two things plain constraints cannot express: "this field is required only when creating, not updating", and "the end date must be after the start date".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Groups — different rules for different operations</div>
+<pre><code class="language-java">interface OnCreate { }
+interface OnUpdate { }
+
+record OrderPayload(
+    @Null(groups = OnCreate.class)        // must be absent when creating
+    @NotNull(groups = OnUpdate.class)     // must be present when updating
+    UUID id,
+
+    @NotEmpty(groups = { OnCreate.class, OnUpdate.class })
+    List&lt;LineRequest&gt; lines,
+
+    @NotBlank(groups = OnCreate.class)    // set once, never changed
+    String currency
+) { }
+
+@PostMapping
+OrderView create(@Validated(OnCreate.class) @RequestBody OrderPayload body) { ... }
+
+@PutMapping("/{id}")
+OrderView update(@Validated(OnUpdate.class) @RequestBody OrderPayload body) { ... }
+// NOTE: @Valid cannot carry groups — only Spring's @Validated can.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Cross-field — the constraint goes on the class</div>
+<pre><code class="language-java">@Target(TYPE) @Retention(RUNTIME)
+@Constraint(validatedBy = DateRangeValidator.class)
+public @interface ValidDateRange {
+    String message() default "deliverBy must be after placedAt";
+    Class&lt;?&gt;[] groups() default {};
+    Class&lt;? extends Payload&gt;[] payload() default {};
+}
+
+class DateRangeValidator implements ConstraintValidator&lt;ValidDateRange, OrderPayload&gt; {
+    public boolean isValid(OrderPayload p, ConstraintValidatorContext ctx) {
+        if (p.placedAt() == null || p.deliverBy() == null) return true;   // let @NotNull say it
+        boolean ok = p.deliverBy().isAfter(p.placedAt());
+        if (!ok) {
+            ctx.disableDefaultConstraintViolation();
+            ctx.buildConstraintViolationWithTemplate(ctx.getDefaultConstraintMessageTemplate())
+               .addPropertyNode("deliverBy")        // attach the error to a FIELD,
+               .addConstraintViolation();           // so the UI can highlight it
+        }
+        return ok;
+    }
+}</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Two details worth copying</span><b>Return true on null</b> and let <code>@NotNull</code> report it — otherwise one missing field produces two confusing errors. <b>Attach the violation to a property node</b>, or the frontend gets a class-level error it cannot map to an input.</div>
+      <div class="note warn"><span class="lbl">Where groups stop being the answer</span>Three or more groups on one record means you are modelling several operations in one type. Separate <code>CreateOrderRequest</code> and <code>UpdateOrderRequest</code> records are simpler, and each documents exactly one operation's contract.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 41 -->
+<section class="slide" data-sec="Internals" data-title="Conversion & formatting">
+  <h2>Binding: converters, formatters and the enterprise date problem</h2>
+  <p class="dek">Request parameters arrive as strings. How they become a <code>LocalDate</code>, an <code>OrderId</code> or an enum is a small, well-defined extension point that saves a great deal of parsing code.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Per-field formatting</div>
+<pre><code class="language-java">@GetMapping("/report")
+Report report(@RequestParam @DateTimeFormat(iso = ISO.DATE) LocalDate from,
+              @RequestParam @DateTimeFormat(pattern = "dd/MM/yyyy") LocalDate to,
+              @RequestParam @NumberFormat(style = CURRENCY) BigDecimal threshold) { ... }</code></pre>
+      <div class="codelabel" style="margin-top:14px">Application-wide: a Converter for your own value types</div>
+<pre><code class="language-java">@Component
+class StringToOrderIdConverter implements Converter&lt;String, OrderId&gt; {
+    public OrderId convert(String source) { return OrderId.of(UUID.fromString(source)); }
+}
+
+// Now this works, with no parsing in the controller and a typed signature:
+@GetMapping("/{id}")
+OrderView get(@PathVariable OrderId id) { ... }
+
+// Register a Formatter (parse + print) the same way:
+@Configuration
+class WebConfig implements WebMvcConfigurer {
+    @Override public void addFormatters(FormatterRegistry registry) {
+        registry.addConverter(new StringToOrderIdConverter());
+        registry.addFormatter(new MoneyFormatter());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The date and time rules that avoid incidents</h3>
+        <ul class="tight">
+          <li><b>Store and transmit instants in UTC.</b> <code>Instant</code> or <code>timestamptz</code>, never a naive local timestamp.</li>
+          <li><b>Convert to a zone only for display</b>, and carry the user's zone explicitly rather than relying on the server's default.</li>
+          <li><b><code>LocalDate</code> for business dates</b> — an invoice due date is a date, not an instant, and forcing it to one shifts it by a day for half your users.</li>
+          <li><b>Never <code>Date</code> or <code>Calendar</code></b> in new code; both are mutable and carry a hidden zone.</li>
+          <li><b>Set the JVM zone explicitly</b> (<code>-Duser.timezone=UTC</code>) so behaviour does not change between your laptop and the cluster.</li>
+        </ul>
+      </div>
+      <div class="note warn"><span class="lbl">The enum parameter trap</span>An unknown enum value in a request parameter produces a 400 whose message names your Java class and its constants — an internal detail leaking to the client. Register a converter that maps unknown values to a domain exception and returns a <code>ProblemDetail</code> listing the accepted values instead.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 42 -->
+<section class="slide" data-sec="Internals" data-title="Application events">
+  <h2>In-process events: the decoupling that costs nothing</h2>
+  <p class="dek">Spring's event publisher is the cheapest way to keep modules from importing each other. The subtleties are all about <em>when</em> the listener runs relative to your transaction.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Publishing and listening</div>
+<pre><code class="language-java">@Service
+class PlaceOrderUseCase {
+    private final ApplicationEventPublisher events;
+
+    @Transactional
+    void place(PlaceOrderCommand cmd) {
+        var order = Order.place(...);
+        orders.save(order);
+        events.publishEvent(new OrderPlaced(order.id(), order.total()));
+    }
+}
+
+@Component
+class Listeners {
+
+    @EventListener                       // SYNCHRONOUS, same thread, same transaction.
+    void immediate(OrderPlaced e) { }    // a throw here rolls back the publisher!
+
+    @TransactionalEventListener(phase = AFTER_COMMIT)   // the one you almost always want
+    void afterCommit(OrderPlaced e) { search.index(e); }
+
+    @TransactionalEventListener(phase = AFTER_ROLLBACK)
+    void afterRollback(OrderPlaced e) { metrics.counter("order.failed").increment(); }
+
+    @EventListener(condition = "#event.total.amount &gt; 1000")   // SpEL filter
+    @Async("eventExecutor")                                    // own thread + own tx
+    void highValue(OrderPlaced event) { fraud.review(event); }
+
+    @EventListener @Order(1)             // ordering between listeners of the same event
+    void first(OrderPlaced e) { }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">The AFTER_COMMIT trap</span>By default an <code>AFTER_COMMIT</code> listener runs <b>outside</b> any transaction — so a <code>save()</code> inside it silently does nothing on some setups, or fails with "no transaction in progress". If the listener writes, it needs <code>@Transactional(propagation = REQUIRES_NEW)</code>, which is exactly what Spring Modulith's <code>@ApplicationModuleListener</code> bundles for you.</div>
+      <div class="note warn"><span class="lbl">Plain events are not durable</span>A JVM crash between commit and listener loses the event with no trace. For anything that must not be lost — an outbound integration, a customer email, a ledger entry — use the event publication registry or a transactional outbox, as on the architecture deck's events slide.</div>
+      <div class="note tip"><span class="lbl">Generic events</span><code>@EventListener void on(Created&lt;Order&gt; e)</code> works, but type erasure means Spring needs help: have the event implement <code>ResolvableTypeProvider</code>, or use distinct event types. Distinct types are usually clearer anyway.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 43 -->
+<section class="slide" data-sec="Internals" data-title="SpEL">
+  <h2>SpEL: where it appears, and where it should not</h2>
+  <p class="dek">The same expression language powers cache keys, security rules, event conditions and property defaults. It is convenient, unit-testable nowhere, and fails at runtime — so keep expressions short.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The five places you will meet it</div>
+<pre><code class="language-java">// 1. Cache keys — composite keys and conditions
+@Cacheable(cacheNames = "orders", key = "#customerId + ':' + #status",
+           condition = "#status != null", unless = "#result.isEmpty()")
+List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
+
+// 2. Security rules
+@PreAuthorize("hasRole('OPS') or #cmd.customerId == authentication.name")
+@PreAuthorize("@orderAccess.canView(#id, authentication)")   // call a bean — preferred
+
+// 3. Event conditions
+@EventListener(condition = "#event.total.amount &gt; 1000")
+
+// 4. Property values with defaults and SpEL
+@Value("${shop.retries:3}")
+@Value("#{systemProperties['user.timezone'] ?: 'UTC'}")
+@Value("#{'${shop.regions}'.split(',')}")
+
+// 5. Conditional bean registration
+@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active}'.contains('test')")</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Syntax worth remembering</h3>
+        <dl class="kv">
+          <dt><code>#name</code></dt><dd>a method argument (needs <code>-parameters</code> at compile time)</dd>
+          <dt><code>#result</code></dt><dd>the return value, in <code>unless</code></dd>
+          <dt><code>#root.method</code></dt><dd>the method name, for generic keys</dd>
+          <dt><code>@beanName</code></dt><dd>reference a bean and call it</dd>
+          <dt><code>?.</code></dt><dd>safe navigation — returns null instead of throwing</dd>
+          <dt><code>?:</code></dt><dd>Elvis, for defaults</dd>
+          <dt><code>?[..]</code> <code>![..]</code></dt><dd>collection filter and projection</dd>
+          <dt><code>${..}</code> vs <code>#{..}</code></dt><dd>property placeholder vs SpEL expression — different things</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">Never evaluate user input as SpEL</span>Passing a request parameter into <code>parser.parseExpression(input)</code> is remote code execution — SpEL can reach <code>T(java.lang.Runtime)</code>. It appears in real CVEs. If you need user-supplied filtering, parse it yourself into a closed set of allowed operations.</div>
+      <div class="note tip"><span class="lbl">The refactoring rule</span>Once an expression contains both <code>and</code> and <code>or</code>, or exceeds about 60 characters, move it into a bean method and call that (<code>@orderAccess.canView(...)</code>). You get a compiler, a debugger and a unit test — none of which SpEL gives you.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 44 -->
+<section class="slide" data-sec="Production" data-title="Actuator">
+  <h2>Actuator: the endpoints worth having, and the ones to lock down</h2>
+  <p class="dek">Actuator is the difference between a service you can operate and one you restart and hope. It is also the fastest way to leak your entire configuration if exposure is left open.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Endpoint</th><th>Answers</th><th>Exposure</th></tr></thead>
+      <tbody>
+        <tr><td><code>/health</code></td><td>Should traffic come here? Should I be restarted?</td><td>Public path is fine; keep <code>show-details</code> authorised</td></tr>
+        <tr><td><code>/prometheus</code></td><td>Every metric, for scraping</td><td>Internal only — it reveals traffic shape and errors</td></tr>
+        <tr><td><code>/info</code></td><td>Build version, git commit — <b>invaluable</b> in an incident</td><td>Internal</td></tr>
+        <tr><td><code>/conditions</code></td><td>Why does this bean exist (or not)</td><td>Internal</td></tr>
+        <tr><td><code>/configprops</code>, <code>/env</code></td><td>Effective configuration</td><td><b>Never public.</b> Sanitised, but assume it leaks secrets</td></tr>
+        <tr><td><code>/loggers</code></td><td>Change a log level at runtime, no restart</td><td>Internal, write-protected — the best debugging tool Actuator has</td></tr>
+        <tr><td><code>/threaddump</code>, <code>/heapdump</code></td><td>What is every thread doing; full heap</td><td>Internal. A heap dump contains customer data</td></tr>
+        <tr><td><code>/mappings</code>, <code>/beans</code></td><td>Routes and the bean graph</td><td>Internal</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The configuration to standardise across every service</div>
+<pre><code class="language-yaml">management:
+  server.port: 8081                      # separate port — no gateway rule can expose it
+  endpoints.web.exposure.include: health,info,prometheus,loggers,conditions,metrics
+  endpoint:
+    health:
+      probes.enabled: true               # /health/liveness and /health/readiness
+      show-details: when_authorized
+      group.readiness.include: db,redis,kafka
+      group.liveness.include: livenessState     # deliberately NOT db — see the warning
+  info.env.enabled: true
+  metrics.tags.application: ${spring.application.name}
+
+info.app:                                # surfaces at /info
+  version: @project.version@
+  commit: ${GIT_COMMIT:unknown}</code></pre>
+    </div>
+    <div class="note bad"><span class="lbl">The outage pattern to avoid</span>Putting the database in the <b>liveness</b> group means a brief database blip fails liveness on every pod at once, Kubernetes restarts the entire fleet, and the restart storm turns a 30-second blip into a 10-minute outage. Liveness answers "is this JVM wedged"; <b>readiness</b> answers "can it serve right now". Dependencies belong in readiness only.</div>
+  </div>
+</section>
+
+<!-- springboot 45 -->
+<section class="slide" data-sec="Production" data-title="Health indicators">
+  <h2>Health checks that mean something</h2>
+  <p class="dek">Boot auto-registers indicators for every datasource, Redis, Kafka and disk. The ones you write yourself are for dependencies Boot cannot know about — and they need timeouts, or the health check becomes the outage.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A custom indicator — with the two things people forget</div>
+<pre><code class="language-java">@Component("paymentGateway")
+class PaymentGatewayHealth implements HealthIndicator {
+
+    private final PaymentGatewayClient client;
+    private final CircuitBreaker breaker;
+
+    @Override public Health health() {
+        if (breaker.getState() == OPEN) {
+            return Health.status("DEGRADED")            // custom status, not DOWN
+                    .withDetail("reason", "circuit open")
+                    .build();
+        }
+        try {
+            var latency = client.ping(Duration.ofMillis(500));   // 1. ALWAYS bound it
+            return Health.up().withDetail("latencyMs", latency.toMillis()).build();
+        } catch (Exception ex) {
+            return Health.down().withDetail("error", ex.getClass().getSimpleName()).build();
+            //                                       2. class name, not the message —
+            //                                          messages leak hostnames and SQL
+        }
+    }
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">Map a custom status to an HTTP code</div>
+<pre><code class="language-yaml">management.endpoint.health.status:
+  order: DOWN,OUT_OF_SERVICE,DEGRADED,UP,UNKNOWN
+  http-mapping:
+    DEGRADED: 200       # degraded still serves traffic — do NOT fail readiness</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The question every indicator must answer</h3>
+        <p><b>"If this is DOWN, should Kubernetes stop sending traffic to this pod?"</b></p>
+        <p>For the primary database: yes. For the payment gateway: <em>no</em> — every pod would fail readiness simultaneously, the whole service would leave the load balancer, and customers would get a connection error instead of "payments are temporarily unavailable, your basket is saved".</p>
+        <p>Third-party dependencies belong on a dashboard and in an alert, not in readiness.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Health checks are called constantly</span>Every few seconds, by every pod, plus your load balancer and your monitoring. An unbounded query or an unauthenticated call to a partner API inside <code>health()</code> is a self-inflicted load test on that partner. Cache the result for a few seconds if the check is expensive.</div>
+      <div class="note tip"><span class="lbl">Startup probe</span>For an app with a slow cold start, a Kubernetes <code>startupProbe</code> against <code>/health/liveness</code> with a generous <code>failureThreshold</code> lets you keep liveness aggressive afterwards without killing pods mid-boot.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 46 -->
+<section class="slide" data-sec="Production" data-title="Metrics">
+  <h2>Micrometer: four instrument types, one cardinality rule</h2>
+  <p class="dek">Boot instruments HTTP, JDBC, Hikari, Kafka and the JVM automatically. What you add is business measurement — and the failure mode of adding it carelessly is taking down your monitoring stack.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The instruments, and when each is right</div>
+<pre><code class="language-java">@Service
+class OrderMetrics {
+    private final Counter placed;
+    private final Timer   checkout;
+    private final DistributionSummary basketSize;
+
+    OrderMetrics(MeterRegistry registry, OrderRepository orders) {
+        // COUNTER — monotonically increasing events
+        placed = Counter.builder("orders.placed")
+                .description("Orders successfully placed")
+                .tag("channel", "web")
+                .register(registry);
+
+        // TIMER — duration + count + percentiles
+        checkout = Timer.builder("orders.checkout.duration")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()      // enables server-side aggregation
+                .register(registry);
+
+        // GAUGE — a value sampled now. Holds a weak reference: keep the object alive.
+        Gauge.builder("orders.pending", orders, OrderRepository::countPending)
+                .register(registry);
+
+        // DISTRIBUTION SUMMARY — non-time distributions
+        basketSize = DistributionSummary.builder("orders.basket.lines").register(registry);
+    }
+
+    void recordPlaced(Order o, Duration took) {
+        placed.increment();
+        checkout.record(took);
+        basketSize.record(o.lines().size());
+    }
+}
+
+@Timed(value = "tax.calculate", percentiles = { 0.95, 0.99 })   // annotation form
+Tax calculate(Basket b) { ... }</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Cardinality is the way monitoring dies</span>Every distinct combination of tag values is a separate time series. A tag of <code>orderId</code> on a service doing 1.2M orders a month creates 1.2M series a month — Prometheus falls over, and the bill if you are on a hosted product is memorable. <b>Tags must be bounded and small</b>: status, endpoint, channel, outcome, module. Ten values, not ten thousand.</div>
+      <div class="note warn"><span class="lbl">URI templating</span>Boot tags HTTP metrics with the <em>template</em> (<code>/api/orders/{id}</code>), not the actual path — deliberately. If you build metric names by hand from request paths, you reintroduce exactly the cardinality problem Boot avoided.</div>
+      <div class="note good"><span class="lbl">What to measure</span>RED per endpoint (rate, errors, duration) comes free. Add the handful of <b>business</b> counters that tell you the product is working: orders placed, payments authorised, events consumed. Those are the ones that page you when a deploy silently breaks a flow that still returns 200.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 47 -->
+<section class="slide" data-sec="Production" data-title="Structured logging">
+  <h2>Logs a machine can query</h2>
+  <p class="dek">A line of prose is readable by one person on one server. A JSON object with a trace id is queryable across four hundred pods — which is the only mode that works once you are past one instance.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Boot 3.4+ ships structured logging — no Logback XML needed</div>
+<pre><code class="language-yaml">logging:
+  structured.format.console: ecs        # or gelf, logstash
+  level:
+    root: INFO
+    com.retailco.shop: DEBUG
+    org.hibernate.SQL: DEBUG            # local only
+  pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
+      <div class="codelabel" style="margin-top:14px">MDC — context that attaches to every line automatically</div>
+<pre><code class="language-java">@Component
+class MdcFilter extends OncePerRequestFilter {
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
+                                    FilterChain chain) throws IOException, ServletException {
+        MDC.put("tenantId", TenantContext.current());
+        MDC.put("channel", req.getHeader("X-Channel"));
+        try {
+            chain.doFilter(req, res);
+        } finally {
+            MDC.clear();            // ALWAYS — pooled threads carry it to the next request
+        }
+    }
+}
+
+// Per-statement structured fields, without string concatenation:
+log.atInfo()
+   .setMessage("order placed")
+   .addKeyValue("orderId", order.id())
+   .addKeyValue("totalMinor", order.totalMinor())
+   .addKeyValue("lines", order.lines().size())
+   .log();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Forgetting <code>MDC.clear()</code></span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always clear in a <code>finally</code>.</div>
+      <div class="note warn"><span class="lbl">MDC does not cross threads</span><code>@Async</code>, <code>CompletableFuture</code>, Kafka listeners and scheduled jobs all start with an empty MDC. Propagate explicitly — a <code>TaskDecorator</code> on your executor that copies the map is the standard fix, and it is about ten lines.</div>
+      <div class="note tip"><span class="lbl">Runtime log levels</span><code>POST /actuator/loggers/com.retailco.shop.payment {"configuredLevel":"DEBUG"}</code> turns on debug for one package on one pod, with no restart and no deploy. Then turn it off. This is the single most useful production debugging capability Boot gives you, and most teams never enable the endpoint.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 48 -->
+<section class="slide" data-sec="Production" data-title="What to log">
+  <h2>What to log, what never to log</h2>
+  <p class="dek">Logging discipline is a security control as much as an operational one. In a regulated environment the second column below is audit findings, not style preferences.</p>
+
+  <div class="split">
+    <div class="card">
+      <h3>Log this</h3>
+      <ul class="checks tight">
+        <li><b>Every inbound request</b> once: method, templated path, status, duration, trace id.</li>
+        <li><b>Every outbound call</b>: target, status, duration, retry count.</li>
+        <li><b>State transitions</b>: order PLACED → PAID, with the ids involved.</li>
+        <li><b>Every decision a human may later query</b>: why a payment was declined, why a rule rejected an order.</li>
+        <li><b>Errors, once</b>, at the boundary that handles them — with the stack trace.</li>
+        <li><b>Startup config summary</b>: which profile, which endpoints, which feature flags.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Never log this</h3>
+      <ul class="checks tight">
+        <li>Passwords, tokens, API keys, <code>Authorization</code> headers — including in a "full request dump".</li>
+        <li>Full card numbers (PCI), CVV ever, full bank account numbers.</li>
+        <li>Personal data beyond what the purpose needs — names, addresses, emails in bulk.</li>
+        <li>Whole request or response bodies in production. Log field names, not values.</li>
+        <li>Anything at <code>DEBUG</code> that you would not accept at <code>INFO</code> — someone will raise the level during an incident.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Make the safe thing the easy thing</div>
+<pre><code class="language-java">// A toString() that cannot leak, on the type itself
+record Card(String pan, String cvv) {
+    @Override public String toString() {
+        return "Card[**** " + pan.substring(pan.length() - 4) + "]";
+    }
+}
+
+// Guard expensive messages — but prefer placeholders, which are already lazy
+if (log.isDebugEnabled()) log.debug("basket dump: {}", expensiveRender(basket));
+log.debug("order {} priced at {}", orderId, total);   // no concatenation, no cost if off
+</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">Errors get logged three times</span>The repository logs and rethrows, the service logs and rethrows, the advice logs again. Three stack traces for one failure, and an error rate that looks 3× worse than it is. <b>Rule: log where you handle, rethrow where you do not.</b></div>
+      <div class="note tip"><span class="lbl">Levels, defined</span><code>ERROR</code> — a human must look. <code>WARN</code> — degraded but handled; worth a dashboard. <code>INFO</code> — business events and lifecycle. <code>DEBUG</code> — developer detail, off in production, switchable at runtime. <code>TRACE</code> — local only. If everything is ERROR, nothing is.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 49 -->
+<section class="slide" data-sec="Production" data-title="JVM memory">
+  <h2>JVM memory in a container: heap is not the whole story</h2>
+  <p class="dek">The most common container OOM kill is not a heap problem — the heap is fine, and the process is killed for memory the JVM never counted as heap.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 210" role="img" aria-label="Container memory limit broken down into heap, metaspace, thread stacks, code cache, direct byte buffers, GC structures and native library allocations, showing that non-heap memory is a substantial fraction">
+        <rect x="14" y="30" width="852" height="60" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5"></rect>
+        <text x="14" y="22" font-size="11" font-weight="600" fill="currentColor">Container memory limit — 2 GiB</text>
+
+        <rect x="18" y="34" width="512" height="52" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect>
+        <text x="274" y="56" text-anchor="middle" font-size="12" fill="currentColor">Heap — 1.5 GiB (MaxRAMPercentage=75)</text>
+        <text x="274" y="74" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">objects · what -Xmx and most dashboards show you</text>
+
+        <rect x="534" y="34" width="86" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="577" y="56" text-anchor="middle" font-size="10" fill="currentColor">Metaspace</text>
+        <text x="577" y="72" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">~100 MB</text>
+
+        <rect x="624" y="34" width="86" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="667" y="52" text-anchor="middle" font-size="10" fill="currentColor">Thread</text>
+        <text x="667" y="66" text-anchor="middle" font-size="10" fill="currentColor">stacks</text>
+        <text x="667" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">1 MB each!</text>
+
+        <rect x="714" y="34" width="70" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="749" y="52" text-anchor="middle" font-size="10" fill="currentColor">Code</text>
+        <text x="749" y="66" text-anchor="middle" font-size="10" fill="currentColor">cache</text>
+        <text x="749" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">~50 MB</text>
+
+        <rect x="788" y="34" width="74" height="52" rx="5" fill="#A22636" fill-opacity="0.10" stroke="#A22636"></rect>
+        <text x="825" y="52" text-anchor="middle" font-size="10" fill="currentColor">Direct</text>
+        <text x="825" y="66" text-anchor="middle" font-size="10" fill="currentColor">buffers</text>
+        <text x="825" y="80" text-anchor="middle" font-size="8.5" fill="#A22636">unbounded</text>
+
+        <line x1="14" y1="112" x2="866" y2="112" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="134" font-size="10.5" fill="currentColor" opacity="0.8">Direct ByteBuffers — used by Netty, Kafka clients and NIO — live OUTSIDE the heap and are not bounded by -Xmx. A Kafka</text>
+        <text x="14" y="151" font-size="10.5" fill="currentColor" opacity="0.8">consumer with large fetch buffers, or 400 threads at 1 MB of stack each, quietly eats the headroom you left.</text>
+        <text x="14" y="174" font-size="10.5" fill="#D26A3F">Symptom: the pod is OOMKilled (exit 137) with NO OutOfMemoryError in the logs and a heap graph that looks healthy.</text>
+        <text x="14" y="196" font-size="10.5" fill="currentColor" opacity="0.8">Diagnose with Native Memory Tracking: -XX:NativeMemoryTracking=summary, then jcmd &lt;pid&gt; VM.native_memory summary</text>
+      </svg>
+    </div>
+    <figcaption>An <code>OutOfMemoryError</code> in the logs is a heap problem. Exit code 137 with no Java error is a native-memory or headroom problem, and raising <code>-Xmx</code> makes it worse.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Set the percentage, not the megabytes</h4><p><code>-XX:MaxRAMPercentage=75</code> adapts when someone changes the container limit. A hardcoded <code>-Xmx1500m</code> in a container later resized to 1 GiB is an instant crash loop.</p></div>
+    <div class="card"><h4>Leave real headroom</h4><p>25% of the limit for non-heap is a reasonable starting point; services with heavy Netty or Kafka use need more. Set container <code>requests == limits</code> for predictable scheduling.</p></div>
+    <div class="card"><h4>Virtual threads change the maths</h4><p>Platform threads cost ~1 MB of stack each, so 400 of them is 400 MB. Virtual threads are heap-allocated and tiny — which removes this particular ceiling but moves the pressure onto the heap.</p></div>
+  </div>
+</section>
+
+<!-- springboot 50 -->
+<section class="slide" data-sec="Production" data-title="Garbage collection">
+  <h2>Choosing and reading a garbage collector</h2>
+  <p class="dek">Modern collectors are good enough that tuning flags is rarely the answer — choosing the right one and then fixing allocation almost always is.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Collector</th><th>Pause times</th><th>Throughput</th><th>Use when</th></tr></thead>
+      <tbody>
+        <tr><td><b>G1</b> <span class="tag g">default</span></td><td>Tens of ms, target-driven</td><td>Very good</td><td>Almost every enterprise service. Start here and stay unless you measure a reason</td></tr>
+        <tr><td><b>ZGC</b> (generational, JDK 21+)</td><td>Sub-millisecond, independent of heap size</td><td>Slightly lower</td><td>Large heaps (&gt; 16 GB) or a hard p99 latency requirement</td></tr>
+        <tr><td><b>Parallel</b></td><td>Long, stop-the-world</td><td>Highest</td><td>Batch jobs where total throughput matters and pauses do not</td></tr>
+        <tr><td><b>Serial</b></td><td>Long</td><td>Low, tiny footprint</td><td>Small containers, one core — often chosen automatically, usually wrong for a web service</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Flags worth setting, and the logging that makes tuning possible</div>
+<pre><code class="language-yaml">JAVA_TOOL_OPTIONS: &gt;-
+  -XX:MaxRAMPercentage=75
+  -XX:+UseG1GC
+  -XX:MaxGCPauseMillis=200            # a TARGET, not a guarantee
+  -XX:+HeapDumpOnOutOfMemoryError
+  -XX:HeapDumpPath=/dumps
+  -Xlog:gc*:file=/logs/gc.log:time,uptime:filecount=5,filesize=20M
+  -XX:+ExitOnOutOfMemoryError         # die fast, let the orchestrator replace you
+  -Duser.timezone=UTC</code></pre>
+      <div class="note warn" style="margin-top:12px"><span class="lbl">The container CPU trap</span>The JVM picks its collector and thread-pool sizes from available processors. A limit of <code>500m</code> CPU makes <code>availableProcessors()</code> report <b>1</b>, which selects SerialGC and sizes the common ForkJoinPool to one thread. Give the container at least 2 full cores, or set <code>-XX:ActiveProcessorCount</code> explicitly.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Read the symptom before touching a flag</h3>
+        <dl class="kv">
+          <dt>Frequent young GCs</dt><dd>Normal and cheap. High allocation rate — look only if pauses hurt.</dd>
+          <dt>Old gen grows after full GC</dt><dd>A leak. Heap dump, not a flag.</dd>
+          <dt>Long full GCs</dt><dd>Heap too small for the live set, or a leak. Raising <code>-Xmx</code> buys time, not a fix.</dd>
+          <dt>Humongous allocations (G1)</dt><dd>Objects &gt; half a region — usually a huge list or byte array. Page the query instead.</dd>
+          <dt>GC fine, latency bad</dt><dd>Not a GC problem. Go to the profiling slide.</dd>
+        </dl>
+      </div>
+      <div class="note good"><span class="lbl">The fix is usually allocation, not the collector</span>An endpoint loading 50,000 entities to return 20 rows is a GC problem caused by a query problem. Paginate, project, stream — and the GC graph flattens without a single flag. Change collectors only once the allocation rate is defensible.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 51 -->
+<section class="slide" data-sec="Production" data-title="Profiling">
+  <h2>"The endpoint is slow" — the ordered method</h2>
+  <p class="dek">Six steps, cheapest first. Most incidents are solved by step 2 or 3; starting at step 1 rather than guessing is what separates a 20-minute diagnosis from a two-day one.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Step</th><th>Tool</th><th>What it rules in or out</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Slow for everyone, or at p99 only?</td><td>The RED dashboard</td><td>A fat tail means contention, GC or one bad tenant — not the code path itself</td></tr>
+        <tr><td>2</td><td>Where does the time go across services?</td><td>A trace of one slow request</td><td>Points at the hop. Usually a downstream call or the database</td></tr>
+        <tr><td>3</td><td>How many queries, and how long?</td><td>Trace spans, <code>datasource-proxy</code>, <code>pg_stat_statements</code></td><td>N+1, a missing index, or far too many rows returned</td></tr>
+        <tr><td>4</td><td>Is it waiting on a pool?</td><td>Hikari metrics: <code>pending</code>, <code>usage</code>, <code>acquire</code></td><td>Connection starvation — the time is queueing, not working</td></tr>
+        <tr><td>5</td><td>What are the threads doing right now?</td><td><code>/actuator/threaddump</code>, three snapshots 10 s apart</td><td>A lock, a blocking call, or a fully occupied thread pool</td></tr>
+        <tr><td>6</td><td>Where is CPU actually spent?</td><td>async-profiler / JFR flame graph</td><td>The genuinely CPU-bound case — the rarest outcome in enterprise services</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Java Flight Recorder — safe to run in production</div>
+<pre><code class="language-yaml"># Start a recording on a running pod, ~1% overhead
+jcmd &lt;pid&gt; JFR.start name=slow duration=120s filename=/dumps/slow.jfr settings=profile
+jcmd &lt;pid&gt; JFR.dump  name=slow filename=/dumps/slow.jfr
+# Open in JDK Mission Control: hot methods, allocation, locks, JDBC, GC.
+
+# Or always-on, so the evidence already exists when the incident starts:
+-XX:StartFlightRecording=disk=true,maxsize=200M,maxage=6h,dumponexit=true</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">The three-thread-dump trick</span>Take three dumps ten seconds apart. Threads stuck on the <b>same stack frame</b> in all three are your problem — a lock, a socket read with no timeout, or a pool wait. Costs nothing, needs no extra tooling, and solves a surprising share of production hangs.</div>
+      <div class="note warn"><span class="lbl">Measure before and after, the same way</span>"It feels faster" is not a result. Capture p50/p95/p99 and throughput from the same dashboard under comparable load. Optimisations that help p50 and hurt p99 are common — caching often does exactly that.</div>
+      <div class="note good"><span class="lbl">Where the time usually is</span>In rough order: N+1 queries · a missing index · an unbounded result set · a downstream call with no timeout · connection-pool starvation · serialising a huge response. CPU-bound application code is near the bottom of that list.</div>
+    </div>
+  </div>
+</section>
+
+<!-- springboot 52 -->
+<section class="slide" data-sec="Production" data-title="Memory leaks">
+  <h2>Finding a leak from a heap dump</h2>
+  <p class="dek">A leak in Java is an object still reachable but no longer needed. The heap dump tells you which one; the reference chain tells you why.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Capture, then analyse offline</div>
+<pre><code class="language-yaml"># Live histogram first — often enough on its own
+jcmd &lt;pid&gt; GC.class_histogram | head -30
+
+# Full dump (pauses the JVM; take it from a pod already out of rotation)
+jcmd &lt;pid&gt; GC.heap_dump /dumps/heap.hprof
+# or let it happen automatically:
+-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps
+
+# Eclipse MAT: Leak Suspects -&gt; dominator tree -&gt;
+# "path to GC roots, excluding weak/soft references" — that path IS the bug.</code></pre>
+      <div class="note warn" style="margin-top:12px"><span class="lbl">A heap dump is customer data</span>It contains every string in memory: names, addresses, tokens, possibly card data. Treat it as production data — restricted storage, access logged, deleted afterwards. Copying one to a laptop is a data-handling incident in most banks.</div>
+    </div>
+    <div class="card">
+      <h3>The leaks that actually happen in Spring apps</h3>
+      <dl class="kv" style="margin-top:8px">
+        <dt>Unbounded cache</dt><dd>A <code>ConcurrentHashMap</code> used as a cache with no eviction. Use Caffeine with a <code>maximumSize</code> — always.</dd>
+        <dt>ThreadLocal on a pooled thread</dt><dd>Set and never removed. The thread lives forever, so the value does too. Always <code>remove()</code> in a <code>finally</code>.</dd>
+        <dt>Listeners never unregistered</dt><dd>Anything registering itself at startup that outlives its owner.</dd>
+        <dt>Session-scoped state</dt><dd>Large objects in an HTTP session with a long timeout, times concurrent users.</dd>
+        <dt>Accumulating collections</dt><dd>A <code>List</code> field on a singleton that only ever grows — an audit buffer, a "recent items" list.</dd>
+        <dt>Not a leak</dt><dd>A rising heap that drops after a full GC is just G1 being lazy. Only growth <em>after</em> a full GC counts.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The graph that identifies a leak with no tooling at all</span>Plot <code>jvm_memory_used_bytes{area="heap"}</code> over a week with deploys marked. A healthy service shows a sawtooth with a flat baseline. A leak shows a sawtooth whose <b>troughs rise steadily</b> until the pod restarts — and a restart cadence matching your deploy frequency is how leaks stay hidden for years.</div>
+</section>
+
+<!-- springboot 53 -->
+<section class="slide" data-sec="Production" data-title="Startup time">
+  <h2>Startup: what each technique actually buys</h2>
+  <p class="dek">Startup matters for rolling deploys, autoscaling responsiveness and how quickly you can roll back — not usually for cost. Measure before choosing, because the expensive options buy the least in most enterprise services.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Technique</th><th>Typical effect</th><th>Cost</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline large Boot app</td><td class="num">4–8 s</td><td>—</td><td>Where most services sit</td></tr>
+        <tr><td>Trim the classpath</td><td class="num">−0.5–2 s</td><td>An afternoon of dependency review</td><td><b>Do this first.</b> Free, and it shrinks the CVE surface too</td></tr>
+        <tr><td><code>spring.main.lazy-initialization</code></td><td class="num">−30–50%</td><td>Startup failures move to first request</td><td>Dev only. Never in production — you lose fail-fast</td></tr>
+        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>None; on by default</td><td>Free win on upgrade</td></tr>
+        <tr><td>AppCDS / AOT cache</td><td class="num">−20–40%</td><td>A training run in the build</td><td>Excellent value; no code change</td></tr>
+        <tr><td>Checkpoint/restore (CRaC)</td><td class="num">to ~50 ms</td><td>Beans must handle checkpoint/restore; connections reopen</td><td>Niche but powerful where supported</td></tr>
+        <tr><td>GraalVM native image</td><td class="num">to ~50 ms, low RSS</td><td>Long builds, reflection config, harder debugging, some libraries unsupported</td><td>Only for scale-to-zero or per-request billing</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Find out where the time goes before optimising anything</div>
+<pre><code class="language-java">public static void main(String[] args) {
+    var app = new SpringApplication(ShopApplication.class);
+    app.setApplicationStartup(new BufferingApplicationStartup(4096));
+    app.run(args);
+}
+// then GET /actuator/startup — every step, with durations, worst first.
+// Usually one auto-configuration, one slow @PostConstruct, or a classpath scan.</code></pre>
+    </div>
+    <div class="note good"><span class="lbl">Honest framing for an interview</span>"For a long-running service, 5 seconds of startup costs nothing at steady state. It matters for rolling deploys and for how fast we can roll back. I would trim the classpath, enable CDS, measure, and consider native only if we needed scale-to-zero." That shows judgement; "we'd go native for performance" shows the opposite, since native is usually <em>slower</em> at peak throughput than a warmed-up JIT.</div>
+  </div>
+</section>
+
+<!-- springboot 54 -->
+<section class="slide" data-sec="Production" data-title="Load testing">
+  <h2>A load test that tells you something true</h2>
+  <p class="dek">Most load tests measure the test harness, or a cold JVM, or a database with no data in it. Four things separate a number you can plan with from one you cannot.</p>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>The four that matter</h3>
+      <ol class="tight">
+        <li><b>Realistic data volume.</b> A query against 1,000 rows tells you nothing about 40 million. Seed production-shaped data — same distribution, same skew, same index sizes.</li>
+        <li><b>Realistic mix.</b> Hammering one endpoint measures that endpoint. Real traffic is ~80% reads, ~15% writes, and one nightly batch competing for the same connections.</li>
+        <li><b>Warm up, then measure.</b> The first 30–60 seconds are JIT compilation and cold caches. Discard them or you are benchmarking the interpreter.</li>
+        <li><b>Model think time.</b> A closed-loop test with zero delay creates a pattern no user produces and hides queueing effects. Use an open model with an arrival rate.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Four tests, four questions</h3>
+        <dl class="kv">
+          <dt>Load</dt><dd>Does it meet the SLO at expected peak?</dd>
+          <dt>Stress</dt><dd>Where does it break, and <em>how</em> — shedding load gracefully, or falling over?</dd>
+          <dt>Soak</dt><dd>8–24 hours. Leaks, connection exhaustion and log-disk growth only appear here.</dd>
+          <dt>Spike</dt><dd>0 → peak in 30 seconds. Does autoscaling react in time, or does the cold pool starve?</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">Watch the dependencies, not just your service</span>The bottleneck is almost never your application tier. Instrument the database (connections, slow queries, lock waits, CPU), cache hit ratio, and consumer lag during the run. A test that only reports response times tells you "it got slow" and nothing about why.</div>
+      <div class="note tip"><span class="lbl">One number worth deriving</span>State the <b>cost per 1,000 orders</b> at the achieved throughput. It converts a technical result into the language the people funding capacity use, and it is the number that justifies a caching project.</div>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">Where it belongs</span>A nightly load test on a scaled-down environment, tracked over time, catches a regression the week it is introduced. A one-off test two weeks before go-live describes a system that no longer exists by launch.</div>
+</section>
+
+<!-- springboot 55 -->
+<section class="slide" data-sec="Production" data-title="Readiness checklist">
+  <h2>Production readiness, as a checklist</h2>
+  <p class="dek">What a Spring Boot service should have before it takes customer traffic. Useful as a go-live gate, and as the outline of an answer when an interviewer asks what "production ready" means to you.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="tag a">Config &amp; build</span></h3>
+      <ul class="checks tight">
+        <li>One artifact promoted across environments; no rebuild per environment.</li>
+        <li>No secrets in the image, the repo or <code>application.yaml</code>.</li>
+        <li><code>@ConfigurationProperties</code> with validation — bad config fails the boot.</li>
+        <li>Dependency, image and license scans in the pipeline.</li>
+        <li>Version and git commit exposed at <code>/info</code>.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Runtime</span></h3>
+      <ul class="checks tight">
+        <li><code>MaxRAMPercentage</code> set; requests == limits; at least 2 CPUs.</li>
+        <li>Graceful shutdown plus a <code>preStop</code> delay.</li>
+        <li>Liveness and readiness distinct; no third-party dependency in liveness.</li>
+        <li>Connection pool sized from throughput × hold time, checked against the cluster total.</li>
+        <li>Timeouts on <b>every</b> outbound client. No exceptions.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Observability</span></h3>
+      <ul class="checks tight">
+        <li>Trace id end to end, including across Kafka.</li>
+        <li>Structured JSON logs; MDC cleared on every thread.</li>
+        <li>RED metrics per endpoint plus the handful of business counters.</li>
+        <li>SLOs with burn-rate alerts; a runbook per alert.</li>
+        <li>Alerts on consumer lag and dead-letter depth.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Resilience &amp; data</span></h3>
+      <ul class="checks tight">
+        <li>Idempotency keys on every mutating public endpoint.</li>
+        <li>Retries only where idempotent; breakers with a defined fallback.</li>
+        <li>Outbox for events that must not be lost; consumers idempotent with a DLT.</li>
+        <li>Expand/contract migrations; a rollback rehearsed, not assumed.</li>
+        <li>Backups <b>restored</b> at least once — an untested backup is a hope.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The two nobody does until it hurts</span><b>Restore a backup.</b> Most teams have never tried, and discover at the worst moment that the restore takes nine hours or silently omits a schema. <b>Kill a pod in production, deliberately, during business hours.</b> If that is frightening, the graceful-shutdown and retry story is not real yet — and you would rather find out on a Tuesday afternoon than at 2am.</div>
+</section>
+
+<!-- springboot 56 -->
 <section class="slide" data-sec="Reference" data-title="3.x → 4.x changes">
   <h2>What moved between Spring Boot 3 and 4</h2>
   <p class="dek">The changes worth being able to name — in an upgrade discussion or an interview. Everything in this tab is written against 3.x; this is the delta.</p>
