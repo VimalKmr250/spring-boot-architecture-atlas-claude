@@ -98,6 +98,8 @@ a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
 
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(288px,1fr));gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:14px}
+.grid2x2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.grid2x2{grid-template-columns:minmax(0,1fr)}}
 .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start}
 
 .card{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:16px 17px;display:flex;flex-direction:column;gap:9px}
@@ -295,7 +297,8 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
       <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
         <li><b>Arrow keys</b> or the buttons move through slides; <b>C</b> opens contents.</li>
         <li>Copper marks the path or hop under discussion; <span style="color:var(--async);font-weight:600">teal</span> always means an asynchronous channel.</li>
-        <li>Code is real Spring Boot 4 / Java 21+, trimmed to the line that matters.</li>
+        <li>Code is real Spring Boot 4 / Framework 7 on Java 21, trimmed to the line that matters.</li>
+        <li><b>Versions differ by tab, on purpose.</b> This deck is written against Boot 4.1; the <b>Spring Boot</b> tab targets 3.4/3.5 because that is what most enterprise codebases run today, with <span class="tag a">Boot 4</span> boxes marking the delta; the <b>Event-driven</b> tab is Boot 3.5 code with Boot 4 notes. Build snippets are Gradle unless the slide says Maven.</li>
         <li>The <b>Interview prep</b> tab is a separate page: the same material rearranged as questions, scripts and numbers.</li>
       </ul>
     </div>
@@ -761,9 +764,13 @@ package com.retailco.shop.order.api;</code></pre>
   <div class="grid2">
     <div class="card accent">
       <h3>Slice tests you can actually run</h3>
-      <p><code>@ApplicationModuleTest</code> boots one module and stubs the rest, so the order module's tests start in ~2 s instead of booting eight modules and Kafka.</p>
-<pre style="margin-top:8px"><code class="language-java">@ApplicationModuleTest(mode = BOOTSTRAP_DEPENDENCIES)
+      <p><code>@ApplicationModuleTest</code> boots <b>one module</b>, so the order module's tests start in ~2 s instead of booting eight modules and Kafka. It does <b>not</b> stub the others for you — an unmocked bean reference across a module boundary fails the bootstrap, and you supply the mock yourself.</p>
+<pre style="margin-top:8px"><code class="language-java">// modes: STANDALONE (default) · DIRECT_DEPENDENCIES · ALL_DEPENDENCIES
+@ApplicationModuleTest                      // = STANDALONE: this module only
 class OrderModuleTests {
+
+    @MockitoBean PaymentService payments;   // YOU stub the neighbours
+
     @Test void placesOrder(Scenario scenario) {
         scenario.stimulate(() -&gt; orders.place(cmd))
                 .andWaitForEventOfType(OrderPlaced.class)
@@ -867,7 +874,9 @@ class OrderPlacedListener {
     void on(OrderPlaced event) {
         inventory.reserve(event.orderId(), event.lines());
     }
-    // success  → row deleted from event_publication
+    // success  → completion_date is SET on the event_publication row
+    //            (default completion-mode = UPDATE; the row stays for
+    //             inspection. DELETE or ARCHIVE if you want it purged)
     // throws   → row keeps completion_date = null
     //            and is retried on restart / by the republish job
 }</code></pre>
@@ -876,7 +885,7 @@ class OrderPlacedListener {
 
   <div class="grid3">
     <div class="card"><h4><code>@ApplicationModuleListener</code></h4><p>Is just <code>@Async</code> + <code>@Transactional(REQUIRES_NEW)</code> + <code>@TransactionalEventListener(AFTER_COMMIT)</code> in one annotation — the three you would otherwise forget one of.</p></div>
-    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.republish-outstanding-events-on-restart=true</code> replays anything stuck. Alert on the age of the oldest incomplete row — it is your best early-warning metric.</p></div>
+    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.republish-outstanding-events-on-restart=true</code> replays anything stuck. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
     <div class="card"><h4>Externalising later</h4><p>Add <code>@Externalized("order.placed::#{#this.orderId}")</code> and the same event goes to Kafka with the key you name. Nothing in the producing code changes.</p></div>
   </div>
 
@@ -1257,7 +1266,7 @@ class OrderService {
     }
     @Transactional public void importOne(Row r) { ... }  // NOT transactional here
 }</code></pre>
-      <p>Fix: move <code>importOne</code> to another bean, or inject <code>TransactionTemplate</code>. Spring 7 logs a warning for this case; older versions failed silently for years.</p>
+      <p>Fix: move <code>importOne</code> to another bean, or inject <code>TransactionTemplate</code>. Spring does <b>not</b> warn you — the reference manual's own words are that the annotation "may be silently ignored", and your code appears to work until you test a rollback. AspectJ weaving is the only mode that advises self-invocation; an IDE inspection is the cheap defence.</p>
     </div>
     <div class="card">
       <h3>2 · Rollback rules surprise people</h3>
@@ -1294,8 +1303,11 @@ class InventoryItemEntity {
     @Version long version;          // Hibernate adds ... WHERE version = ?
 }
 
+// Spring Framework 7 core retry — no extra library.
+// Needs @EnableResilientMethods on a @Configuration class.
+// NOTE: maxRetries, not maxAttempts — 2 retries = 3 total attempts.
 @Retryable(includes = OptimisticLockingFailureException.class,
-           maxAttempts = 3, delay = 25, multiplier = 2.0)   // Spring Framework 7, no extra library
+           maxRetries = 2, delay = 25, multiplier = 2.0, jitter = 10)
 @Transactional
 public void reserve(Sku sku, int qty) {
     var item = items.findById(sku).orElseThrow();
@@ -1389,10 +1401,17 @@ record PlaceOrderRequest(
 <pre><code class="language-java">@RestControllerAdvice
 class GlobalExceptionHandler {
 
+    /** Every problem goes through here, so traceId is never forgotten. */
+    private ProblemDetail problem(HttpStatus status, String detail, String slug) {
+        var p = ProblemDetail.forStatusAndDetail(status, detail);
+        p.setType(URI.create("https://errors.retailco.com/" + slug));
+        p.setProperty("traceId", currentTraceId());   // the one thing support needs
+        return p;
+    }
+
     @ExceptionHandler(OrderNotFound.class)
     ProblemDetail notFound(OrderNotFound ex) {
-        var p = ProblemDetail.forStatusAndDetail(NOT_FOUND, ex.getMessage());
-        p.setType(URI.create("https://errors.retailco.com/order-not-found"));
+        var p = problem(NOT_FOUND, ex.getMessage(), "order-not-found");
         p.setTitle("Order not found");
         p.setProperty("orderId", ex.id());
         return p;
@@ -1400,9 +1419,9 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientStock.class)
     ProblemDetail stock(InsufficientStock ex) {
-        var p = ProblemDetail.forStatusAndDetail(CONFLICT,
-                "Only %d left of %s".formatted(ex.available(), ex.sku()));
-        p.setType(URI.create("https://errors.retailco.com/insufficient-stock"));
+        var p = problem(CONFLICT,
+                "Only %d left of %s".formatted(ex.available(), ex.sku()),
+                "insufficient-stock");
         p.setProperty("sku", ex.sku());
         p.setProperty("available", ex.available());   // the UI can render a real message
         return p;
@@ -1411,10 +1430,8 @@ class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     ProblemDetail unexpected(Exception ex) {
         log.error("unhandled", ex);                   // stack trace to logs, never to the client
-        var p = ProblemDetail.forStatus(INTERNAL_SERVER_ERROR);
-        p.setDetail("Something went wrong on our side.");
-        p.setProperty("traceId", currentTraceId());   // the one thing support needs
-        return p;
+        return problem(INTERNAL_SERVER_ERROR,
+                "Something went wrong on our side.", "internal");
     }
 }</code></pre>
     </div>
@@ -1652,11 +1669,16 @@ class PaymentClientConfig {
 
     @Bean RestClientHttpServiceGroupConfigurer paymentsConfigurer(
             ObservationRegistry observations) {
+        // requestFactory() takes a ClientHttpRequestFactory — build one
+        // from HttpClientSettings; it will NOT accept the settings object.
+        var factory = ClientHttpRequestFactoryBuilder.detect()
+                .build(HttpClientSettings.defaults()
+                        .withConnectTimeout(Duration.ofMillis(500))
+                        .withReadTimeout(Duration.ofSeconds(2)));   // never unbounded
+
         return groups -&gt; groups.filterByName("payments").forEachClient((g, builder) -&gt;
             builder.baseUrl("https://api.gateway.example")
-                   .requestFactory(ClientHttpRequestFactorySettings.defaults()
-                        .withConnectTimeout(Duration.ofMillis(500))
-                        .withReadTimeout(Duration.ofSeconds(2)))    // never unbounded
+                   .requestFactory(factory)
                    .observationRegistry(observations)               // traces + metrics, free
                    .defaultStatusHandler(new PaymentErrorHandler()));
     }
@@ -1677,6 +1699,7 @@ class PaymentClientConfig {
         </dl>
       </div>
       <div class="note warn"><span class="lbl">Non-negotiable</span>A connect timeout and a read timeout on <b>every</b> outbound client. The single most common cause of a thread-pool-exhaustion outage is one dependency that stopped answering but never closed the socket.</div>
+      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> set the floor globally</span>Per-client code is for the exceptions. Boot 4 gives every auto-configured client a default: <code>spring.http.clients.connect-timeout: 2s</code> and <code>spring.http.clients.read-timeout: 5s</code>. Put that in the service template so a client nobody configured is still bounded.</div>
     </div>
   </div>
 </section>
@@ -1745,23 +1768,37 @@ class PaymentClientConfig {
   <div class="split">
     <div class="codewrap">
       <div class="codelabel">Spring Framework 7 core resilience — no extra dependency</div>
-<pre><code class="language-java">@Service
+<pre><code class="language-java">@Configuration
+@EnableResilientMethods          // ← without this, BOTH annotations do nothing
+class ResilienceConfig { }
+
+@Service
 class TaxAdapter implements TaxCalculator {
 
+    // maxRetries = 2 → 3 attempts total (1 initial + 2 retries)
     @Retryable(includes = TransientTaxException.class,
-               maxAttempts = 3, delay = 100, multiplier = 2.0, jitter = 50)
+               maxRetries = 2, delay = 100, multiplier = 2.0,
+               jitter = 50, maxDelay = 2000)
     @ConcurrencyLimit(20)              // bulkhead: at most 20 in flight
     public Tax calculate(Basket b) { return client.calc(b); }
+}
 
-    @Recover
-    Tax fallback(TransientTaxException e, Basket b) {
-        meterRegistry.counter("tax.fallback").increment();
-        return Tax.estimatedFrom(b);    // degrade, do not fail checkout
+// Core retry has NO @Recover. When every attempt fails, the last
+// exception propagates — so the fallback lives in the caller:
+class PricingService {
+    Money quote(Basket b) {
+        try {
+            return tax.calculate(b).appliedTo(b);
+        } catch (TransientTaxException e) {
+            meters.counter("tax.fallback").increment();
+            return Tax.estimatedFrom(b).appliedTo(b);  // degrade, don't fail checkout
+        }
     }
 }</code></pre>
     </div>
     <div class="note tip"><span class="lbl">Jitter is not optional</span>Without it, every client that failed at T retries at exactly T+100ms, then T+300ms — a synchronised thundering herd that keeps the recovering dependency down. Randomising the delay spreads the load and is a one-word change.
-    <p style="margin-top:10px">Use Resilience4j when you need bulkheads with queueing, rate limiters, or a metrics-rich breaker with Actuator endpoints; the built-in annotations cover the common 80%.</p></div>
+    <p style="margin-top:10px"><b>Three things people get wrong on the 3.x→4.x move:</b> the attribute is <code>maxRetries</code>, not <code>maxAttempts</code>, and it counts <em>retries</em> not attempts; there is no <code>@Recover</code> in core — that stays a Spring Retry feature; and nothing is advised until <code>@EnableResilientMethods</code> is present, which fails silently exactly like every other missing <code>@Enable*</code>.</p>
+    <p style="margin-top:10px">Use Resilience4j when you need bulkheads with queueing, rate limiters, or a metrics-rich breaker with Actuator endpoints; keep Spring Retry if you depend on <code>@Recover</code>. The built-in annotations cover the common 80%.</p></div>
   </div>
 </section>
 
@@ -1860,8 +1897,10 @@ class OrderPlacedConsumer {
 @Configuration
 class KafkaErrorConfig {
     @Bean DefaultErrorHandler errorHandler(KafkaTemplate&lt;?, ?&gt; template) {
+        // partition -1 lets Kafka choose: the DLT may have fewer partitions
+        // than the source topic, and pinning record.partition() then throws.
         var recoverer = new DeadLetterPublishingRecoverer(template,
-                (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", record.partition()));
+                (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
         var handler = new DefaultErrorHandler(recoverer,
                 new ExponentialBackOffWithMaxRetries(3));   // 3 tries, then DLT — never infinite
@@ -1874,7 +1913,7 @@ class KafkaErrorConfig {
   </div>
 
   <div class="grid2">
-    <div class="note warn"><span class="lbl">The silent killer</span>Default <code>enable.auto.commit=true</code> commits offsets on a timer, regardless of whether your handler succeeded. A crash mid-batch loses messages that Kafka believes were processed. Set <code>ack-mode: MANUAL_IMMEDIATE</code> and commit yourself.</div>
+    <div class="note warn"><span class="lbl">Know which default you have</span>The <b>raw Kafka client</b> defaults to <code>enable.auto.commit=true</code>, which commits on a timer regardless of whether your handler succeeded. Spring's listener container overrides it to <code>false</code> (since 2.3) and uses <code>AckMode.BATCH</code> — offsets commit after the whole poll is processed. So the risk is not the framework default; it is someone putting <code>enable-auto-commit: true</code> back in the YAML, or a batch where record 3 of 500 fails. Set <code>ack-mode: MANUAL_IMMEDIATE</code> and commit per record when each record's work must be durable before its offset moves.</div>
     <div class="note bad"><span class="lbl">Infinite retry = stopped partition</span>A message that can never succeed, retried forever, blocks its partition and every message behind it. Bound the retries, publish to the DLT, alert, move on. Ordering is preserved for everything that <em>can</em> proceed.</div>
   </div>
 
@@ -1926,7 +1965,7 @@ class KafkaErrorConfig {
   </figure>
 
   <div class="grid2">
-    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 100</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). <b>Spring Modulith's registry is exactly this.</b></p></div>
+    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). <b>Spring Modulith's registry is exactly this.</b></p></div>
     <div class="card"><h3>CDC (Debezium)</h3><p>Reads the write-ahead log, so no polling, no load on the table, ordering guaranteed by the log, latency in milliseconds. Costs a Kafka Connect cluster and replication-slot operations. Worth it above roughly a few thousand events/sec.</p></div>
   </div>
 </section>
@@ -2006,7 +2045,11 @@ class CatalogQueryService {
         redis.convertAndSend("cache.evict", e.sku());    // tell the other 11 instances
     }
 }</code></pre>
-<pre style="margin-top:12px"><code class="language-yaml">spring.cache.caffeine.spec: maximumSize=10000,expireAfterWrite=60s
+<pre style="margin-top:12px"><code class="language-yaml"># "twoLevel" is YOUR CacheManager bean (Caffeine in front of Redis).
+# spring.cache.caffeine.spec configures Boot's AUTO-CONFIGURED manager,
+# so a custom manager must read the spec itself — or keep the L1 spec
+# in your own @ConfigurationProperties. They are not wired together.
+shop.cache.l1.spec: maximumSize=10000,expireAfterWrite=60s
 # L1 Caffeine: ~100 ns, per instance, may be 60 s stale
 # L2 Redis:    ~1 ms, shared, TTL 10 min, invalidated by event</code></pre>
     </div>
@@ -2090,18 +2133,22 @@ SELECT o.id, p.status
       <ul class="tight">
         <li>Migrations are <b>append-only</b> and immutable once merged — <code>validate-on-migrate</code> on, always.</li>
         <li>Never <code>DROP</code> in the same release that stops using something.</li>
-        <li><code>CREATE INDEX CONCURRENTLY</code> on any table above a million rows, outside a transaction.</li>
+        <li><code>CREATE INDEX CONCURRENTLY</code> on any table above a million rows — and it needs its <b>own</b> migration file with <code>-- flyway:executeInTransaction=false</code>, because Flyway wraps a migration in a transaction and Postgres refuses <code>CONCURRENTLY</code> inside one.</li>
         <li>Adding a <code>NOT NULL</code> column with a default rewrites the table on old engines — add nullable, backfill, then constrain.</li>
         <li>Set <code>lock_timeout</code> and <code>statement_timeout</code> on the migration role so a blocked DDL fails in seconds instead of queueing every query behind it.</li>
       </ul>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="codewrap">
-        <div class="codelabel">db/migration/order/V2026_09_03__add_total_minor.sql</div>
+        <div class="codelabel">V2026_09_03__add_total_minor.sql — transactional, as normal</div>
 <pre><code class="language-sql">SET lock_timeout = '3s';
-ALTER TABLE order_mgmt.orders ADD COLUMN total_minor bigint;
+ALTER TABLE order_mgmt.orders ADD COLUMN total_minor bigint;</code></pre>
+        <div class="codelabel" style="margin-top:10px">V2026_09_04__index_orders_customer.sql — must NOT be in a transaction</div>
+<pre><code class="language-sql">-- flyway:executeInTransaction=false
 CREATE INDEX CONCURRENTLY idx_orders_customer_placed
-    ON order_mgmt.orders (customer_id, placed_at DESC);</code></pre>
+    ON order_mgmt.orders (customer_id, placed_at DESC);
+-- CONCURRENTLY can leave an INVALID index if it fails; check
+-- pg_index.indisvalid afterwards and DROP/recreate if needed.</code></pre>
       </div>
       <div class="note warn"><span class="lbl">The rollback question</span>Interviewers and incident reviews both ask it: you do not roll a migration back, you roll <b>forward</b>. Which is why expand/contract matters — at every intermediate point, the previous application version still works, so the <em>deployment</em> can be rolled back even though the schema cannot.</div>
     </div>
@@ -2120,7 +2167,7 @@ CREATE INDEX CONCURRENTLY idx_orders_customer_placed
 public OrderId place(PlaceOrderCommand cmd) { /* slide 15 */ }</code></pre>
       <div class="codelabel" style="margin-top:14px">The read path: no entities, no mapping, one query</div>
 <pre><code class="language-java">@Transactional(readOnly = true)
-public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
+public List&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
     return jdbc.sql("""
             SELECT o.id, o.placed_at, o.status, o.total_minor, o.currency,
                    o.line_count, o.customer_display_name
@@ -2133,8 +2180,15 @@ public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
         .param("customer", f.customerId()).param("status", f.status())
         .param("limit", page.getPageSize()).param("offset", page.getOffset())
         .query(OrderSummary.class)     // record, mapped by column name
-        .list();
-}</code></pre>
+        .list();                       // → List, not Page
+}
+
+// A Page needs a total, which is a SECOND query — so only ask for one
+// when the UI actually renders "page 4 of 87":
+public Page&lt;OrderSummary&gt; searchPaged(OrderSearch f, Pageable page) {
+    var rows = search(f, page);
+    return PageableExecutionUtils.getPage(rows, page, () -&gt; countMatching(f));
+}   // the supplier is skipped when the result obviously fits one page</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card accent">
@@ -2218,14 +2272,15 @@ public Page&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
     <div class="codewrap">
       <div class="codelabel">The write path — append, with a concurrency check</div>
 <pre><code class="language-java">// Load: replay the stream (from the latest snapshot onward)
-var events = store.readStream("order-88421", fromVersion: snapshot.version());
-var order  = Order.rehydrate(snapshot, events);
+var snapshot = store.latestSnapshot("order-88421");
+var events   = store.readStreamFrom("order-88421", snapshot.version());
+var order    = Order.rehydrate(snapshot, events);
 
 // Decide: the aggregate returns NEW EVENTS, it does not mutate rows
 List&lt;DomainEvent&gt; produced = order.cancel(reason);
 
-// Append: expectedVersion is the optimistic lock
-store.append("order-88421", produced, expectedVersion: order.version());
+// Append: the second argument is the expected version — the optimistic lock
+store.append("order-88421", order.version(), produced);
 // version mismatch → someone else appended → reload and retry
 
 // event_store table:
@@ -2602,22 +2657,38 @@ SecurityFilterChain api(HttpSecurity http) throws Exception {
         .build();
 }</code></pre>
       <div class="codelabel" style="margin-top:14px">Layer 2 · method security — may you do this to this thing</div>
-<pre><code class="language-java">@PreAuthorize("hasRole('OPS') or #command.customerId == authentication.name")
+<pre><code class="language-java">// CustomerId is a value type, so unwrap it — comparing the record
+// itself to a String is always false, and fails OPEN-looking (denies
+// everyone but the OPS role, so nobody notices until a customer calls).
+@PreAuthorize("hasRole('OPS') or #command.customerId.value() == authentication.name")
 public void cancel(CancelOrderCommand command) { ... }
 
-@PostAuthorize("returnObject.customerId == authentication.name")
-public OrderView find(OrderId id) { ... }</code></pre>
+@PostAuthorize("returnObject.customerId.value() == authentication.name")
+public OrderView find(OrderId id) { ... }
+
+// Past one `or`, move it into a bean you can unit-test:
+@PreAuthorize("@orderAccess.mayCancel(#command, authentication)")
+public void cancel(CancelOrderCommand command) { ... }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card accent">
         <h3>Layer 3 · the row</h3>
         <p>The layer most teams skip. A bug in a repository method that forgets <code>WHERE customer_id = ?</code> returns other customers' orders with a perfectly valid token.</p>
 <pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query
+@Entity
+@FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
+@Filter(name = "tenant", condition = "tenant_id = :tenantId")
+class OrderJpaEntity { ... }
+
 @Component
-class TenantFilter implements Filter {
-    // Hibernate filter enabled for every session in the request
-    session.enableFilter("tenant")
-           .setParameter("tenantId", TenantContext.current());
+class TenantFilterActivator {
+    @PersistenceContext EntityManager em;
+
+    void activate() {   // called once per request, from an interceptor
+        em.unwrap(Session.class)
+          .enableFilter("tenant")
+          .setParameter("tenantId", TenantContext.current());
+    }
 }</code></pre>
         <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed.</p>
       </div>
@@ -2771,15 +2842,23 @@ logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
   <div class="split">
     <div class="codewrap">
       <div class="codelabel">Testcontainers, shared and fast — Boot 4 service connections</div>
-<pre><code class="language-java">@TestConfiguration(proxyBeanMethods = false)
+<pre><code class="language-java">import org.testcontainers.kafka.KafkaContainer;  // NOT ...containers.KafkaContainer
+
+@TestConfiguration(proxyBeanMethods = false)
 class ContainersConfig {
     @Bean @ServiceConnection            // wires spring.datasource.* automatically
     PostgreSQLContainer&lt;?&gt; postgres() {
         return new PostgreSQLContainer&lt;&gt;("postgres:17-alpine").withReuse(true);
     }
     @Bean @ServiceConnection
-    KafkaContainer kafka() { return new KafkaContainer("apache/kafka:3.9.0"); }
+    KafkaContainer kafka() {
+        return new KafkaContainer("apache/kafka:4.0.0").withReuse(true);
+    }
 }
+// Two classes share the simple name KafkaContainer:
+//   org.testcontainers.kafka.KafkaContainer      → apache/kafka (KRaft)
+//   org.testcontainers.containers.KafkaContainer → confluentinc/cp-kafka
+// Pair the wrong one with your image and startup hangs until it times out.
 
 // src/test: one container per build, reused across every test class
 @SpringBootTest
@@ -3448,7 +3527,7 @@ Rel(app, gw, "Authorises", "HTTPS, in the checkout path")
 
   <div class="split">
     <div class="panel">
-      <h3>The eight sections</h3>
+      <h3>The nine sections</h3>
       <dl class="kv" style="margin-top:10px">
         <dt>Architecture</dt><dd>the layer cake, auto-configuration, the <code>@Conditional</code> family, how to override it</dd>
         <dt>Lifecycle</dt><dd>application startup · bean · HTTP request · transaction and persistence context</dd>
@@ -3458,6 +3537,7 @@ Rel(app, gw, "Authorises", "HTTPS, in the checkout path")
         <dt>Security</dt><dd>filter chain, method security, OAuth2, enterprise SSO, mTLS, tenancy</dd>
         <dt>Internals</dt><dd>AOP, transaction propagation and isolation, Jackson, Spring Data patterns, SpEL</dd>
         <dt>Production</dt><dd>Actuator, metrics, logging, JVM memory, GC, profiling, leaks, load tests</dd>
+        <dt>Reference</dt><dd>the Spring Boot 3 → 4 delta, as one table you can answer questions from</dd>
       </dl>
     </div>
     <div class="note tip"><span class="lbl">How the annotation slides are written</span>Every entry gets three things: <b>what it does</b>, <b>a real line of code</b>, and <b>the failure it causes when it is wrong</b>. The third one is the reason to read a reference rather than the Javadoc — the Javadoc tells you what an attribute means, not what happens at 2am when you set it badly.</div>
@@ -3557,7 +3637,7 @@ public class DataSourceAutoConfiguration {
 }</code></pre>
       </div>
       <div class="note tip"><span class="lbl">The order of events</span><b>1.</b> <code>@EnableAutoConfiguration</code> reads every <code>AutoConfiguration.imports</code> on the classpath. <b>2.</b> Each class's conditions are evaluated. <b>3.</b> Surviving classes are ordered by <code>before</code>/<code>after</code>. <b>4.</b> Their <code>@Bean</code> methods run — but only after your own <code>@Configuration</code> classes are registered, which is why <code>@ConditionalOnMissingBean</code> can see your beans.</div>
-      <div class="note warn"><span class="lbl">Legacy detail worth knowing</span>Before Boot 2.7 this list lived in <code>META-INF/spring.factories</code> under an <code>EnableAutoConfiguration</code> key. Boot 3 still reads it with a deprecation warning; <span class="tag a">Boot 4</span> removed support entirely. An old in-house starter that never migrated will silently contribute nothing.</div>
+      <div class="note warn"><span class="lbl">Legacy detail worth knowing</span>Before Boot 2.7 this list lived in <code>META-INF/spring.factories</code> under an <code>EnableAutoConfiguration</code> key. Boot 2.7 introduced the <code>.imports</code> file and read both; <b>Boot 3.0 removed the <code>spring.factories</code> route entirely</b>. An old in-house starter that never migrated contributes nothing — with no error, because other <code>spring.factories</code> keys still work, so the file looks fine. If a starter mysteriously stopped applying on the 2.x→3.x upgrade, this is why.</div>
     </div>
   </div>
 </section>
@@ -3962,7 +4042,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   &lt;dependency&gt;spring-aspects&lt;/dependency&gt;
 &lt;/dependencies&gt;
 &lt;!-- no src/main/java at all --&gt;</code></pre>
-      <div class="codelabel" style="margin-top:14px">The BOM is the other half — and the more valuable one</div>
+      <div class="codelabel" style="margin-top:14px">The BOM is the other half — and the more valuable one (Maven)</div>
 <pre><code class="language-xml">&lt;parent&gt;
   &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
   &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;
@@ -3972,6 +4052,15 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
      Boot has tested this exact combination of ~400 library versions
      against each other. Overriding one is how you find out which
      three others it was holding hands with. --&gt;</code></pre>
+      <div class="codelabel" style="margin-top:10px">The same thing in Gradle — what the rest of this atlas assumes</div>
+<pre><code class="language-java">plugins {
+    id("org.springframework.boot") version "3.5.0"
+    id("io.spring.dependency-management") version "1.1.7"  // applies the BOM
+}
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")  // no version
+}
+ext["kafka.version"] = "3.9.1"   // the ONLY safe way to move one library</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card accent">
@@ -4023,7 +4112,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
     <table class="tbl">
       <thead><tr><th>Starter / dependency</th><th>Auto-configures</th><th>Use it for</th><th>Watch out for</th></tr></thead>
       <tbody>
-        <tr><td><code>spring-kafka</code></td><td><code>KafkaTemplate</code>, <code>@KafkaListener</code> containers, <code>DefaultErrorHandler</code></td><td>Event backbone, high throughput, replay</td><td>Auto-commit is on by default — set <code>ack-mode: MANUAL_IMMEDIATE</code></td></tr>
+        <tr><td><code>spring-kafka</code></td><td><code>KafkaTemplate</code>, <code>@KafkaListener</code> containers, <code>DefaultErrorHandler</code></td><td>Event backbone, high throughput, replay</td><td>The container disables auto-commit for you and acks per <em>poll</em> (<code>AckMode.BATCH</code>) — use <code>ack-mode: MANUAL_IMMEDIATE</code> when each record must be durable before its offset moves</td></tr>
         <tr><td><code>-activemq</code> / <code>-artemis</code> / IBM MQ starter</td><td><code>JmsTemplate</code>, <code>@JmsListener</code>, <code>ConnectionFactory</code></td><td>Classic enterprise queues, XA, request/reply</td><td>JMS transactions are not your JPA transaction unless you configure XA — usually you should not</td></tr>
         <tr><td><code>-amqp</code></td><td><code>RabbitTemplate</code>, <code>@RabbitListener</code>, admin</td><td>Routing-heavy workloads, work queues</td><td>Dead-letter exchange must be declared explicitly — it is not automatic</td></tr>
         <tr><td><code>spring-integration</code></td><td>Channels, adapters, <code>IntegrationFlow</code> DSL</td><td>File pickup, SFTP, protocol bridging, EIP patterns</td><td>Easy to build an unreadable flow; keep business logic out of it</td></tr>
@@ -4039,19 +4128,18 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
 <pre><code class="language-yaml">spring.kafka:
   bootstrap-servers: ${KAFKA_BROKERS}
   producer:
-    acks: all                       # default is 1 — you can lose writes on leader failover
-    properties.enable.idempotence: true
-    retries: 2147483647
+    acks: all                       # client default since Kafka 3.0 — pin it anyway,
+    properties.enable.idempotence: true   # so an inherited config cannot weaken it
   consumer:
     group-id: inventory
-    auto-offset-reset: earliest     # default 'latest' silently skips a backlog
-    enable-auto-commit: false
+    auto-offset-reset: earliest     # default 'latest' SILENTLY skips a backlog
+    enable-auto-commit: false       # the container already does this; be explicit
     isolation-level: read_committed
   listener:
-    ack-mode: MANUAL_IMMEDIATE
+    ack-mode: MANUAL_IMMEDIATE      # container default is BATCH (per poll)
     observation-enabled: true       # propagates the trace across the async hop</code></pre>
     </div>
-    <div class="note warn"><span class="lbl">The two defaults that cause real incidents</span><b><code>acks: 1</code></b> means the producer is told "written" once the leader has it — a leader failover before replication loses the message silently. <b><code>auto-offset-reset: latest</code></b> means a brand-new consumer group skips everything already on the topic, so a new service quietly starts from now and nobody notices until reconciliation.</div>
+    <div class="note warn"><span class="lbl">The default that still causes real incidents</span><b><code>auto-offset-reset: latest</code></b> means a brand-new consumer group skips everything already on the topic, so a new service quietly starts from "now" and nobody notices until reconciliation. <b>What is <em>no longer</em> true:</b> <code>acks</code> defaulted to <code>1</code> only before Kafka 3.0 — since then the client defaults to <code>acks=all</code> with <code>enable.idempotence=true</code>. Set both explicitly regardless, because the failure mode is someone weakening them for throughput and nobody noticing until a leader election.</div>
   </div>
 </section>
 
@@ -4327,6 +4415,7 @@ ProductView byKey(String sku) { ... }
 @TransactionalEventListener(phase = AFTER_COMMIT) // fires only if the tx committed
 void on(OrderPlaced event) { ... }
 
+// Spring Retry (3.x). @EnableRetry on a @Configuration.
 @Retryable(retryFor = TransientException.class, maxAttempts = 3,
            backoff = @Backoff(delay = 100, multiplier = 2, random = true))
 @Recover Tax fallback(TransientException e, Basket b) { ... }</code></pre>
@@ -4349,7 +4438,7 @@ void on(OrderPlaced event) { ... }
 @Transactional                  // on a test = rollback after each method</code></pre>
       </div>
       <div class="note warn"><span class="lbl">Three traps in one slide</span><b><code>@Async</code> without an executor</b> uses a <code>SimpleAsyncTaskExecutor</code> that creates an unbounded number of threads — define your own <code>ThreadPoolTaskExecutor</code> with a bounded queue and a rejection policy. <b><code>fixedRate</code></b> can overlap runs if one takes longer than the interval; <code>fixedDelay</code> cannot. <b><code>@Transactional</code> on a test</b> rolls back — which means it also hides the constraint violations that only fire at commit.</div>
-      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span></span><code>@Retryable</code> moves into Spring Framework core (attributes become <code>includes</code>/<code>excludes</code>, with <code>jitter</code> as a first-class attribute) and <code>@ConcurrencyLimit</code> arrives for bulkheads — no Spring Retry or Resilience4j needed for the common cases.</div>
+      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> the retry annotation you know is not the one you get</span>Framework 7 ships its own <code>@Retryable</code> in <code>org.springframework.core.retry</code>, and it is <b>not</b> a drop-in rename. <code>retryFor</code>/<code>noRetryFor</code> become <code>includes</code>/<code>excludes</code>; the nested <code>@Backoff</code> flattens into <code>delay</code>/<code>multiplier</code>/<code>jitter</code>/<code>maxDelay</code>; <code>maxAttempts = 3</code> becomes <code>maxRetries = 2</code> — it counts <em>retries</em>, not attempts, so a straight copy silently gives you one extra call; there is <b>no <code>@Recover</code></b>, so recovery moves to a <code>catch</code> in the caller; and nothing is advised at all without <code>@EnableResilientMethods</code>. <code>@ConcurrencyLimit</code> arrives alongside it for bulkheads. Keep Spring Retry on the classpath if you rely on <code>@Recover</code>.</div>
     </div>
   </div>
 </section>
@@ -4390,8 +4479,8 @@ public class OrderJpaEntity {
     @Embedded                                   // flattens into the same table
     private AddressEmbeddable shipTo;
 
-    @Lob @Column(name = "raw_payload")
-    private String rawPayload;                  // large text; lazy by default on some providers
+    @Column(name = "raw_payload", columnDefinition = "text")
+    private String rawPayload;                  // NOT @Lob — see the warning below
 
     @Transient                                  // never persisted
     private transient boolean recalculated;
@@ -4408,6 +4497,8 @@ public class OrderJpaEntity {
     <div class="card"><h4><code>@Column</code> defaults you should set</h4><p><code>nullable</code> is <code>true</code> by default and only affects schema generation — the real constraint must be in your Flyway migration. <code>updatable = false</code> on immutable columns is genuinely enforced by Hibernate and catches bugs.</p></div>
     <div class="card"><h4><code>equals</code>/<code>hashCode</code></h4><p>Do not use Lombok's <code>@Data</code> on an entity — it generates them over all fields including lazy associations, which triggers loads and breaks <code>Set</code> semantics before the id is assigned. Use the business key, or the id with a stable hashCode.</p></div>
   </div>
+
+  <div class="note bad"><span class="lbl"><code>@Lob</code> on a String, on PostgreSQL</span>Everywhere else <code>@Lob String</code> means "a big text column". On PostgreSQL the JDBC driver maps it to a <b>large object</b>: the column stores an <code>oid</code> and the bytes live in <code>pg_largeobject</code>. The consequences are all unpleasant — <code>SELECT raw_payload</code> in psql returns a number, a plain <code>DELETE</code> orphans the object so the table never shrinks until you run <code>vacuumlo</code>, and reads need an open transaction so you get "Large Objects may not be used in auto-commit mode". Use <code>columnDefinition = "text"</code> (or <code>@JdbcTypeCode(SqlTypes.LONGVARCHAR)</code>) and let Postgres TOAST it, which it does automatically past ~2 kB. Reserve real LOBs for genuine streaming of hundreds of megabytes.</div>
 
   <div class="note warn"><span class="lbl">The mapping entity is not the domain model</span>In the architecture deck's layering, <code>Order</code> (domain, no annotations) and <code>OrderJpaEntity</code> (this class) are different types with a mapper between them. For a CRUD-shaped module that separation is overhead worth skipping; for the module where the rules live, it is what keeps Hibernate out of your business logic.</div>
 </section>
@@ -4458,7 +4549,11 @@ class OrderLineEntity {
       <div class="card">
         <h3>UUID: the version matters</h3>
         <p>Random UUIDv4 primary keys fragment a B-tree index, because every insert lands in a random leaf page. On a large, insert-heavy table that costs real write throughput and index bloat.</p>
-        <p>Time-ordered UUIDs (v7) insert sequentially and largely remove the problem while keeping client-side generation. Hibernate 6.2+ supports them via <code>@UuidGenerator(style = TIME)</code>.</p>
+        <p>Time-ordered UUIDs (v7) insert near-sequentially and largely remove the problem while keeping client-side generation.</p>
+<pre style="margin-top:8px"><code class="language-java">// RFC 9562 version 7 — Hibernate ORM 7.0+ only
+@Id @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+private UUID id;</code></pre>
+        <p style="margin-top:8px"><b>Do not reach for <code>style = TIME</code> expecting v7.</b> Hibernate's <code>TIME</code> style is a custom <em>version&nbsp;1</em> layout — timestamp plus the host IP, not the Unix-epoch prefix v7 specifies. It is still index-friendly, but it is not the thing your DBA or your Postgres <code>uuidv7()</code> function means, and mixing the two in one column defeats the ordering you wanted. <code>Style.VERSION_7</code> arrived in Hibernate ORM 7.0 — on 6.6 and earlier the enum has only <code>AUTO</code>, <code>RANDOM</code> and <code>TIME</code>, so generate v7 in the application and assign it yourself.</p>
       </div>
       <div class="note warn"><span class="lbl"><code>@IdClass</code> vs <code>@EmbeddedId</code></span><code>@IdClass</code> repeats every key field on the entity <em>and</em> in a separate class, so the two drift. <code>@EmbeddedId</code> keeps one definition and gives you a type you can pass around. Use <code>@IdClass</code> only when mapping a legacy schema whose queries you cannot change.</div>
       <div class="note tip"><span class="lbl">Natural vs surrogate</span>Use a surrogate key even when a natural one exists. Order numbers get reformatted, customer references get reissued, and "this will never change" is a statement about the current business process, not about the data.</div>
@@ -4830,12 +4925,14 @@ class MethodSecurityConfig { }
 @Service
 class OrderService {
 
-    // Evaluated BEFORE the method runs — the one you want in almost every case
-    @PreAuthorize("hasRole('OPS') or #cmd.customerId == authentication.name")
+    // Evaluated BEFORE the method runs — the one you want in almost every case.
+    // .value() unwraps the CustomerId value type: comparing the record itself
+    // to a String is always false, and SpEL reports no error for that.
+    @PreAuthorize("hasRole('OPS') or #cmd.customerId.value() == authentication.name")
     void cancel(CancelOrderCommand cmd) { ... }
 
     // Evaluated AFTER — the method already ran, so only use it for reads
-    @PostAuthorize("returnObject.customerId == authentication.name")
+    @PostAuthorize("returnObject.customerId.value() == authentication.name")
     OrderView find(OrderId id) { ... }
 
     // Filters the INPUT collection before the call
@@ -5104,7 +5201,7 @@ class AuditAspect {
     <table class="tbl">
       <thead><tr><th>Situation</th><th>What happens</th><th>Fix</th></tr></thead>
       <tbody>
-        <tr><td>Self-invocation — <code>this.method()</code></td><td>Advice never runs. <b>No error, no warning</b> (Spring 7 now warns for <code>@Transactional</code>)</td><td>Move the method to another bean, or inject <code>self</code> via <code>@Lazy</code>, or use the template API directly</td></tr>
+        <tr><td>Self-invocation — <code>this.method()</code></td><td>Advice never runs. <b>No error, no warning, in every Spring version</b> — the reference manual's own phrasing is that the annotation "may be silently ignored"</td><td>Move the method to another bean, or inject <code>self</code> via <code>@Lazy</code>, or use the template API directly. AspectJ weaving is the only mode that advises it; an IDE inspection catches it in review</td></tr>
         <tr><td><code>private</code> or <code>final</code> method</td><td>CGLIB cannot override it — advice skipped</td><td>Make it <code>public</code> (or at least non-final) on the proxied bean</td></tr>
         <tr><td><code>final</code> class</td><td>CGLIB cannot subclass — bean creation fails, or proxying is skipped</td><td>Remove <code>final</code>, or implement an interface so a JDK proxy can be used</td></tr>
         <tr><td>Object created with <code>new</code></td><td>Not a bean, so no proxy exists at all</td><td>Let Spring create it</td></tr>
@@ -5250,8 +5347,11 @@ record OrderView(
     @JsonProperty(access = WRITE_ONLY)              // accepted in, never echoed back
     String idempotencyKey,
 
-    @JsonUnwrapped                                  // flatten a nested object into the parent
-    Money amount
+    // @JsonUnwrapped flattens a nested object into the parent — but it does
+    // NOT work on a record component: Jackson cannot unwrap into a creator
+    // parameter, so writing works and reading fails. Flatten it by hand.
+    long amountMinor,
+    String currency
 ) { }
 
 // Deserialisation entry points
@@ -5591,8 +5691,8 @@ class Listeners {
            condition = "#status != null", unless = "#result.isEmpty()")
 List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
 
-// 2. Security rules
-@PreAuthorize("hasRole('OPS') or #cmd.customerId == authentication.name")
+// 2. Security rules  (.value() — a value type never equals a String)
+@PreAuthorize("hasRole('OPS') or #cmd.customerId.value() == authentication.name")
 @PreAuthorize("@orderAccess.canView(#id, authentication)")   // call a bean — preferred
 
 // 3. Event conditions
@@ -5663,8 +5763,13 @@ List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
   metrics.tags.application: ${spring.application.name}
 
 info.app:                                # surfaces at /info
-  version: @project.version@
-  commit: ${GIT_COMMIT:unknown}</code></pre>
+  version: ${project.version}            # Gradle: processResources { expand(...) }
+  # version: @project.version@           # Maven: resource filtering uses @...@
+  commit: ${GIT_COMMIT:unknown}
+
+# Simpler than either: let the build plugin write build-info.properties
+# (Gradle springBoot { buildInfo() } / Maven build-info goal) and Boot
+# exposes group, artifact, version and time at /info with no placeholders.</code></pre>
     </div>
     <div class="note bad"><span class="lbl">The outage pattern to avoid</span>Putting the database in the <b>liveness</b> group means a brief database blip fails liveness on every pod at once, Kubernetes restarts the entire fleet, and the restart storm turns a 30-second blip into a 10-minute outage. Liveness answers "is this JVM wedged"; <b>readiness</b> answers "can it serve right now". Dependencies belong in readiness only.</div>
   </div>
@@ -6171,10 +6276,10 @@ jcmd &lt;pid&gt; GC.heap_dump /dumps/heap.hprof
       <tbody>
         <tr><td>Baseline</td><td>Java 17, Jakarta EE 10</td><td>Java 17 still (25 recommended), Jakarta EE 11, Servlet 6.1</td></tr>
         <tr><td>Module layout</td><td>Few large jars</td><td>Finer-grained modules — <b>the most common upgrade surprise</b>; imports move</td></tr>
-        <tr><td>Auto-config registry</td><td><code>AutoConfiguration.imports</code>; <code>spring.factories</code> deprecated</td><td><code>spring.factories</code> support removed — old in-house starters contribute nothing, silently</td></tr>
+        <tr><td>Auto-config registry</td><td><code>AutoConfiguration.imports</code> only — <code>spring.factories</code> registration was already removed in <b>Boot 3.0</b></td><td>Unchanged. Worth knowing the removal date: a starter that silently contributes nothing broke at 3.0, not at 4.0</td></tr>
         <tr><td>HTTP clients</td><td><code>RestClient</code>, <code>HttpServiceProxyFactory</code> by hand</td><td><code>@ImportHttpServices</code> — declarative groups with shared config</td></tr>
         <tr><td>API versioning</td><td>Roll your own, or a gateway</td><td>First class: <code>@GetMapping(version = "2")</code> + <code>ApiVersionConfigurer</code></td></tr>
-        <tr><td>Resilience</td><td>Spring Retry (<code>retryFor</code>) or Resilience4j</td><td>Core <code>@Retryable</code> (<code>includes</code>/<code>excludes</code>, <code>jitter</code>) and <code>@ConcurrencyLimit</code></td></tr>
+        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code></td></tr>
         <tr><td>Null safety</td><td>Spring's own <code>@Nullable</code> (JSR-305 style)</td><td>JSpecify — <code>@NullMarked</code> at package level, real tooling support</td></tr>
         <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — ISO-8601 dates by default, unchecked exceptions</td></tr>
         <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — queries generated at build time, notably faster startup</td></tr>
@@ -6545,14 +6650,20 @@ orders.order.placed.v1-retry-0
       <div class="codewrap">
         <div class="codelabel">The settings behind each guarantee</div>
 <pre><code class="language-yaml"># Producer — do not lose writes
-acks: all                       # default is 1; a leader failover can lose it
-enable.idempotence: true        # default true since Kafka 3.0
-                                # de-duplicates producer retries within a session
+acks: all                       # client default SINCE KAFKA 3.0 (was 1 before).
+                                # Pin it: acks=1 acknowledges on the leader alone,
+                                # so a failover before replication loses the write.
+enable.idempotence: true        # nominally default true in 3.0, but a config-validation
+                                # bug (KAFKA-13598) meant it only took effect from
+                                # 3.0.1/3.1.1/3.2.0 — so pin it. Requires acks=all,
+                                # and de-duplicates producer retries in a session
 min.insync.replicas: 2          # TOPIC setting; with acks=all and RF=3 this is
                                 # what actually makes the durability promise real
 
 # Consumer — do not lose messages
-enable.auto.commit: false       # the default commits on a TIMER, regardless of success
+enable.auto.commit: false       # RAW-CLIENT default is true, committing on a timer
+                                # regardless of success. Spring's container already
+                                # forces false — set it anyway so it is visible.
 isolation.level: read_committed # skip records from aborted transactions</code></pre>
       </div>
       <div class="note warn"><span class="lbl"><code>acks=all</code> alone is not enough</span>With replication factor 3 and <code>min.insync.replicas=1</code>, "all" can mean "the leader only" when the followers are lagging. The pair that makes a real durability promise is <b>RF=3 and min.insync.replicas=2</b>: the write survives losing one broker, and the partition goes read-only rather than silently accepting unsafe writes when two are down.</div>
@@ -6709,18 +6820,24 @@ CREATE INDEX ON outbox (created_at) WHERE sent_at IS NULL;   -- partial: stays t
 <pre style="margin-top:12px"><code class="language-java">@Scheduled(fixedDelay = 200)
 @Transactional
 void relay() {
+    // LIMIT comes BEFORE the locking clause — Postgres rejects the
+    // other order. FOR UPDATE SKIP LOCKED makes this safe on N pods.
     var batch = jdbc.sql("""
         SELECT * FROM outbox WHERE sent_at IS NULL
-        ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 200
-        """).query(OutboxRow.class).list();     // SKIP LOCKED = safe on N pods
+        ORDER BY id
+        LIMIT 200
+        FOR UPDATE SKIP LOCKED
+        """).query(OutboxRow.class).list();
 
     for (var row : batch) {
         kafka.send(topicFor(row), row.aggregateId(), row.payload());
     }
     kafka.flush();                              // confirm before marking
     jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY(?)")
-        .param(ids(batch)).update();
+        .param(batch.stream().map(OutboxRow::id).toArray(Long[]::new))
+        .update();                              // ANY(?) needs an ARRAY, not a List
 }</code></pre>
+      <div class="note warn" style="margin-top:10px"><span class="lbl">Yes, this holds a transaction across a network call</span>Everywhere else in this atlas the rule is "never call an external system inside <code>@Transactional</code>". The relay is the deliberate exception: the rows are locked with <code>SKIP LOCKED</code> so no other pod blocks on them, the batch is bounded, and the send has a <code>delivery.timeout.ms</code> that caps how long the transaction can live. Keep the batch small, keep the timeout short, and size the relay's pool separately from the request pool — then one slow broker delays events instead of exhausting the connections checkout needs.</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="codewrap">
@@ -7054,15 +7171,15 @@ public void on(OrderStatusChanged e, Acknowledgment ack) {
         <line x1="712" y1="82" x2="736" y2="82" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
 
         <text x="14" y="158" font-size="10.5" fill="currentColor" opacity="0.8">A batch is sent when it is full (<tspan font-family="monospace">batch.size</tspan>) or when it has waited long enough (<tspan font-family="monospace">linger.ms</tspan>) — whichever comes first.</text>
-        <text x="14" y="176" font-size="10.5" fill="currentColor" opacity="0.8">Default <tspan font-family="monospace">linger.ms=0</tspan> means "send as soon as the sender thread is free", which produces small batches and low throughput under load.</text>
-        <text x="14" y="196" font-size="10.5" fill="#D26A3F">Setting linger.ms=5–20 adds a few milliseconds of latency and often multiplies throughput, because compression works on the batch.</text>
+        <text x="14" y="176" font-size="10.5" fill="currentColor" opacity="0.8"><tspan font-family="monospace">linger.ms</tspan> defaults to 5 since Kafka 4.0 (KIP-1030); it was 0 on 3.x — send immediately, so small batches and low throughput under load.</text>
+        <text x="14" y="196" font-size="10.5" fill="#D26A3F">Raising linger.ms to 10–20 adds a few milliseconds of latency and can multiply throughput further, because compression works on the batch.</text>
       </svg>
     </div>
     <figcaption>Compression is applied per batch, so bigger batches compress far better — this is why <code>linger.ms</code> affects network and disk cost as much as throughput. The buffer is bounded: when it fills, <code>send()</code> blocks for up to <code>max.block.ms</code> and then throws, which is Kafka's only producer-side backpressure.</figcaption>
   </figure>
 
   <div class="grid3">
-    <div class="card"><h4>The idempotent producer</h4><p>On by default since Kafka 3.0. Each producer gets a PID and a per-partition sequence number, so a broker can discard a duplicate caused by a retry. It prevents duplicates <em>from retries within a session</em> — not from your application sending twice.</p></div>
+    <div class="card"><h4>The idempotent producer</h4><p>Default-on as of Kafka 3.0 in name (KIP-679) — but a config-validation bug meant it did not actually engage until 3.0.1/3.1.1/3.2.0 (KAFKA-13598), so set it explicitly on anything older. Each producer gets a PID and a per-partition sequence number, so a broker can discard a duplicate caused by a retry. It prevents duplicates <em>from retries within a session</em> — not from your application sending twice.</p></div>
     <div class="card"><h4><code>send()</code> is async — handle the failure</h4><p>Fire-and-forget loses records silently. Either use the callback and log or route failures, or call <code>get()</code> and accept the throughput cost. In Spring, add a <code>whenComplete</code> to the returned future.</p></div>
     <div class="card"><h4>Ordering and in-flight requests</h4><p>With idempotence on, up to 5 in-flight requests per connection still preserve order. With idempotence off, more than 1 in-flight plus retries can reorder records — a subtle way to lose per-key ordering.</p></div>
   </div>
@@ -7079,7 +7196,7 @@ public void on(OrderStatusChanged e, Acknowledgment ack) {
       <tbody>
         <tr><td><code>acks</code></td><td><code>all</code> (since 3.0)</td><td><code>all</code></td><td>Anything less can lose an acknowledged write on leader failover</td></tr>
         <tr><td><code>enable.idempotence</code></td><td><code>true</code></td><td>leave on</td><td>De-duplicates retries; required for transactions</td></tr>
-        <tr><td><code>linger.ms</code></td><td><code>0</code></td><td><code>5–20</code></td><td>Bigger batches: better compression, far better throughput, a few ms of latency</td></tr>
+        <tr><td><code>linger.ms</code></td><td><code>5</code> (since 4.0; <code>0</code> before)</td><td><code>5–20</code></td><td>Bigger batches: better compression, far better throughput, a few ms of latency. Pin it if you run 3.x clients</td></tr>
         <tr><td><code>batch.size</code></td><td>16 KB</td><td>32–128 KB</td><td>An upper bound per partition batch, not a wait condition</td></tr>
         <tr><td><code>compression.type</code></td><td><code>none</code></td><td><code>lz4</code> or <code>zstd</code></td><td>Typically 3–5× less network and disk; <code>zstd</code> compresses hardest, <code>lz4</code> is cheapest on CPU</td></tr>
         <tr><td><code>max.in.flight.requests</code></td><td>5</td><td>≤ 5</td><td>Above 5 disables idempotence guarantees</td></tr>
@@ -7197,28 +7314,35 @@ public void on(OrderStatusChanged e, Acknowledgment ack) {
 <!-- events 23 -->
 <section class="slide" data-sec="Kafka internals" data-title="Offsets & commits">
   <h2>Offsets: when you commit decides what you lose</h2>
-  <p class="dek">Three strategies, and only one of them is safe by default. The dangerous one is the default.</p>
+  <p class="dek">Four strategies. The dangerous one is the <em>raw client's</em> default — Spring's container quietly saves you from it, which is worth knowing precisely, because the answer to "what happens if I crash mid-batch?" depends on which of these you are actually running.</p>
 
-  <div class="grid3">
+  <div class="grid2x2">
     <div class="card">
-      <h3><span class="tag b">Auto-commit</span></h3>
+      <h3><span class="tag b">Auto-commit</span> — raw client default</h3>
 <pre style="margin-top:6px"><code class="language-yaml">enable.auto.commit: true
 auto.commit.interval.ms: 5000</code></pre>
       <p>Commits on a <b>timer</b>, during <code>poll()</code>, regardless of whether your handler succeeded. A crash after the commit but before processing loses those records permanently.</p>
-      <p style="color:var(--text-3)">Acceptable only for telemetry where loss is cheaper than complexity.</p>
+      <p style="color:var(--text-3)">Acceptable only for telemetry where loss is cheaper than complexity — and <b>you will not get this by accident in Spring</b>: since spring-kafka 2.3 the listener container sets it to <code>false</code> unless you explicitly ask for <code>true</code>.</p>
     </div>
     <div class="card">
-      <h3><span class="tag w">Sync commit per record</span></h3>
+      <h3><span class="tag a">BATCH</span> — what Spring actually gives you</h3>
+<pre style="margin-top:6px"><code class="language-yaml"># nothing to configure — this is the container default
+ack-mode: BATCH</code></pre>
+      <p>Offsets for the whole poll are committed after <em>every</em> record in it has been handled. No timer, so nothing is acknowledged before it was processed.</p>
+      <p style="color:var(--text-3)">Fine for most consumers. The gap: fail on record 400 of 500 and the poll's offsets are not committed, so all 500 are redelivered — which is correct, and is why the handler must be idempotent.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag w">RECORD</span> — commit per message</h3>
 <pre style="margin-top:6px"><code class="language-yaml">ack-mode: RECORD</code></pre>
-      <p>Safest and slowest: a network round trip to the coordinator per message. At any volume this dominates your processing time.</p>
+      <p>The container commits after each record returns. Narrowest redelivery window, and the most commit traffic — at volume it can dominate your processing time.</p>
       <p style="color:var(--text-3)">Use when each message is expensive and irreplaceable, so the commit cost is noise.</p>
     </div>
     <div class="card">
-      <h3><span class="tag g">Manual, after work</span></h3>
+      <h3><span class="tag g">MANUAL_IMMEDIATE</span> — you decide</h3>
 <pre style="margin-top:6px"><code class="language-yaml">enable.auto.commit: false
 ack-mode: MANUAL_IMMEDIATE</code></pre>
-      <p>Commit after the work has committed. You get at-least-once, duplicates on crash, and no loss.</p>
-      <p style="color:var(--text-3)"><b>The default for anything that matters.</b> Batch the commit across a poll for throughput.</p>
+      <p>You take an <code>Acknowledgment</code> and call it once the work has committed. Same guarantee as RECORD, but <em>you</em> choose the moment — which is what lets you ack a duplicate early and skip the work.</p>
+      <p style="color:var(--text-3)"><b>The choice for anything that matters</b>, because the acknowledgement point becomes explicit in the code rather than implicit in a property.</p>
     </div>
   </div>
 
@@ -7326,16 +7450,24 @@ cleanup.policy: compact,delete  # both: compact, and also drop very old records<
 
   <div class="split">
     <div class="codewrap">
-      <div class="codelabel">In Spring: one annotation, two settings</div>
+      <div class="codelabel">In Spring: it is the property, not an annotation</div>
 <pre><code class="language-yaml">spring.kafka:
-  producer.transaction-id-prefix: order-enricher-
-  consumer.isolation-level: read_committed
-  consumer.enable-auto-commit: false</code></pre>
-<pre style="margin-top:12px"><code class="language-java">@KafkaListener(topics = "orders.order.placed.v1", groupId = "enricher")
-@Transactional("kafkaTransactionManager")      // consume + produce + offsets, atomically
+  producer.transaction-id-prefix: order-enricher-   # ← this is the switch
+  consumer.isolation-level: read_committed</code></pre>
+<pre style="margin-top:12px"><code class="language-java">// Setting the prefix auto-configures a KafkaTransactionManager AND hands
+// it to the listener container. The CONTAINER then opens the transaction
+// around the poll and calls sendOffsetsToTransaction() at the end — which
+// is the part that makes consume+produce+commit atomic.
+//
+// So no @Transactional here. Adding it starts a SECOND, nested Kafka
+// transaction around the container's one and buys nothing.
+@KafkaListener(topics = "orders.order.placed.v1", groupId = "enricher")
 public void enrich(OrderPlaced in) {
     kafka.send("orders.order.enriched.v1", in.orderId(), enrich(in));
-}</code></pre>
+}
+
+// @Transactional on a listener is for the OTHER resource — a JPA write —
+// and that is a different transaction manager, with the caveat opposite.</code></pre>
     </div>
     <div class="note warn"><span class="lbl">The "chained transaction" temptation</span>Spring can chain a Kafka transaction and a JPA transaction so they commit together. It is <b>not</b> atomic — it is two commits in sequence, and a crash between them leaves them inconsistent. It narrows the window; it does not close it.
     <p style="margin-top:8px">For a database write plus an event, the honest answer remains the outbox. Reach for Kafka transactions when both sides are Kafka.</p></div>
@@ -7562,9 +7694,13 @@ public void replayPartitionZero(OrderPlaced event) { ... }</code></pre>
 <pre><code class="language-java">@Bean
 DefaultErrorHandler errorHandler(KafkaTemplate&lt;Object, Object&gt; template) {
 
-    // Where a record goes when retries are exhausted: same partition, .DLT suffix
+    // Where a record goes when retries are exhausted: the .DLT suffix.
+    // Partition -1 lets the producer choose. Pinning record.partition()
+    // (the tempting version, and Spring's own default) throws the moment
+    // the DLT has fewer partitions than the source topic — which is the
+    // normal case, because nobody provisions a DLT with 24 partitions.
     var recoverer = new DeadLetterPublishingRecoverer(template,
-        (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", record.partition()));
+        (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
     var handler = new DefaultErrorHandler(recoverer,
         new ExponentialBackOffWithMaxRetries(3));      // 3 attempts, then DLT
@@ -7666,9 +7802,14 @@ public void on(OrderPlaced event) { inventory.reserve(event); }
 
 @DltHandler
 void dlt(OrderPlaced event,
-         @Header(KafkaHeaders.ORIGINAL_TOPIC) String topic,
-         @Header(KafkaHeaders.EXCEPTION_MESSAGE) String reason) {
-    support.raiseTicket(event.orderId(), reason);   // a human now owns it
+         // DLT_-prefixed constants — these are the headers the
+         // DeadLetterPublishingRecoverer writes (kafka_dlt-*). The
+         // un-prefixed ORIGINAL_TOPIC / EXCEPTION_MESSAGE are for
+         // records republished to an ordinary topic, and bind to null here.
+         @Header(KafkaHeaders.DLT_ORIGINAL_TOPIC) String topic,
+         @Header(KafkaHeaders.DLT_EXCEPTION_FQCN) String type,
+         @Header(KafkaHeaders.DLT_EXCEPTION_MESSAGE) String reason) {
+    support.raiseTicket(event.orderId(), type + ": " + reason);   // a human owns it
 }</code></pre>
     </div>
     <div class="note tip"><span class="lbl">When to use which</span><b>Blocking retry</b> (DefaultErrorHandler) when ordering matters and failures are rare and brief — a deadlock, a momentary network blip. <b>Non-blocking retry topics</b> when a downstream dependency can be down for minutes and you cannot stall the whole partition behind it. Most order-processing consumers want the first; most integration consumers calling third parties want the second.</div>
@@ -7902,8 +8043,13 @@ KStream&lt;String, OrderPlaced&gt; topology(StreamsBuilder builder) {
 
     orders
         .flatMapValues(order -&gt; order.lines())                      // one event → many
-        .groupBy((key, line) -&gt; line.sku())
-        .reduce(Integer::sum, Materialized.as("units-per-sku"));
+        .groupBy((key, line) -&gt; line.sku(), Grouped.with(Serdes.String(), lineSerde))
+        .aggregate(() -&gt; 0,                                         // units per SKU
+                   (sku, line, total) -&gt; total + line.qty(),
+                   Materialized.with(Serdes.String(), Serdes.Integer()));
+    // reduce() needs (V, V) -> V, so the values must already BE the number.
+    // Here they are OrderLines, so aggregate() with an initialiser is the
+    // right operator — or mapValues(OrderLine::qty) first, then reduce.
 
     return orders;
 }</code></pre>
@@ -7976,7 +8122,11 @@ payments.filter((k, p) -&gt; p.declined())
       <div class="codelabel">Configuration and lifecycle</div>
 <pre><code class="language-java">@Configuration
 @EnableKafkaStreams                       // Boot builds and starts the StreamsBuilder
-class StreamsConfig { }</code></pre>
+class OrderStreamsConfig {                // NOT "StreamsConfig" — that name is taken
+                                          // by org.apache.kafka.streams.StreamsConfig
+    @Bean
+    KStream&lt;String, OrderPlaced&gt; topology(StreamsBuilder builder) { ... }
+}</code></pre>
 <pre style="margin-top:12px"><code class="language-yaml">spring.kafka.streams:
   application-id: order-enrichment        # = consumer group AND state store namespace
   properties:
@@ -8008,7 +8158,7 @@ class CustomerStatsController {
 <pre><code class="language-java">@Test
 void countsOrdersPerCustomer() {
     var builder = new StreamsBuilder();
-    new StreamsConfig().topology(builder);
+    new OrderStreamsConfig().topology(builder);   // build the real topology
 
     try (var driver = new TopologyTestDriver(builder.build(), props)) {
         var in  = driver.createInputTopic("orders.order.placed.v1",
@@ -8752,7 +8902,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
 
   <div class="split">
     <div class="note tip"><span class="lbl">The honest enterprise answer</span>Most large organisations run <b>two</b>: Kafka as the event backbone for domain events and analytics, and an existing MQ estate for transactional integration with systems that will not change. That is not a failure to standardise — it is two different jobs. What matters is a clear rule for which goes where, written down.</div>
-    <div class="note warn"><span class="lbl">Kafka's queue gap is closing</span>Kafka historically could not do per-message acknowledgement or competing consumers beyond the partition count. KIP-932 "queues for Kafka" — in preview as of 4.1 — adds share groups that acknowledge individual records. Worth tracking; not yet worth designing around in production.</div>
+    <div class="note warn"><span class="lbl">Kafka's queue gap has closed</span>Kafka historically could not do per-message acknowledgement or competing consumers beyond the partition count. KIP-932 "queues for Kafka" adds share groups that acknowledge individual records and let consumer count exceed partition count. Early access in 4.0, preview in 4.1, <b>GA in Kafka 4.2</b> behind the <code>share.version</code> feature flag (level 1 by default). On 4.2+ this is a real option for work-queue workloads instead of a second broker.</div>
   </div>
 </section>
 
@@ -9022,7 +9172,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
 
       <article class="q"><header><i>Q19</i><h3>A consumer hits a message it can never process. What happens?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Bounded retries — three, with backoff — then publish to a dead-letter topic, alert, and move on. Infinite retry blocks the partition and everything behind it. Non-retryable exceptions like deserialization failures skip the retries entirely, because a poison pill never gets better.</div>
-        <p class="deeper"><b>Go deeper:</b> Add the two operational pieces: a documented replay path from the DLT after the bug is fixed, and alerting on DLT depth greater than zero plus consumer lag — those two are your real SLIs for the async side, not CPU. Also mention manual offset commit: the default auto-commit acknowledges on a timer regardless of whether your handler succeeded.</p>
+        <p class="deeper"><b>Go deeper:</b> Add the two operational pieces: a documented replay path from the DLT after the bug is fixed, and alerting on DLT depth greater than zero plus consumer lag — those two are your real SLIs for the async side, not CPU. Also mention where the offset is committed relative to the work — and get the default right, because interviewers who run Kafka will know it: the raw client auto-commits on a timer, but Spring's listener container disables that and acks per poll (<code>AckMode.BATCH</code>), so the real question is whether a mid-batch failure should redeliver 500 records or one. <code>MANUAL_IMMEDIATE</code> is how you make that choice explicit.</p>
       </div></article>
 
       <article class="q"><header><i>Q20</i><h3>How do you make an API safe to retry?</h3></header><div class="qb">
@@ -9040,7 +9190,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
       <h2>Spring and Java specifics</h2>
 
       <article class="q"><header><i>Q22</i><h3>Why doesn't <code>@Transactional</code> work when I call the method from the same class?</h3></header><div class="qb">
-        <div class="snap"><span class="lbl">30-second answer</span>Because it is implemented with a proxy. An internal <code>this.method()</code> call never goes through the proxy, so the advice never runs. Fix by moving the method to another bean, or by using <code>TransactionTemplate</code> explicitly. Spring 7 now logs a warning for this — for years it failed silently.</div>
+        <div class="snap"><span class="lbl">30-second answer</span>Because it is implemented with a proxy. An internal <code>this.method()</code> call never goes through the proxy, so the advice never runs. Fix by moving the method to another bean, or by using <code>TransactionTemplate</code> explicitly. There is no warning in any version — the reference manual says the annotation "may be silently ignored", and the code appears to work until someone tests a rollback.</div>
         <p class="deeper"><b>Go deeper:</b> Same mechanism explains why <code>@Cacheable</code>, <code>@Async</code> and <code>@Retryable</code> also do nothing on self-invocation, and why <code>final</code> or private methods cannot be advised with CGLIB proxies. This question is really testing whether you know Spring is a proxy container rather than magic.</p>
       </div></article>
 
@@ -9071,7 +9221,8 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
 
       <article class="q"><header><i>Q28</i><h3>What's new in Spring Boot 4 that matters architecturally?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Four things I would actually use: first-class API versioning on server and client; declarative HTTP interface clients via <code>@ImportHttpServices</code>; resilience in the core framework — <code>@Retryable</code> and <code>@ConcurrencyLimit</code> without an extra library; and null safety through JSpecify with <code>@NullMarked</code> packages. Java 17 is still the baseline, 25 recommended.</div>
-        <p class="deeper"><b>Go deeper:</b> Add the migration realities: the framework is split into finer modules, which is the most common upgrade surprise; Jackson 3 changes defaults (ISO-8601 dates, unchecked exceptions); and Spring Data AOT generates repository queries at build time for a meaningful startup improvement. 4.1 added gRPC support and SSRF mitigation on the HTTP clients. Knowing the version cadence — a major or minor every six months — is a cheap credibility signal.</p>
+        <p class="deeper"><b>Go deeper:</b> Add the migration realities: the framework is split into finer modules, which is the most common upgrade surprise; Jackson 3 changes defaults (ISO-8601 dates, unchecked exceptions); and Spring Data AOT generates repository queries at build time for a meaningful startup improvement. 4.1 (June 2026) added gRPC support, <code>InetAddressFilter</code> for SSRF mitigation on the HTTP clients, lazy JDBC connection acquisition and <code>@RedisListener</code>. Knowing the version cadence — a major or minor every six months — is a cheap credibility signal.
+        <br><br>The detail that separates "I read the release notes" from "I did the upgrade": core <code>@Retryable</code> is not a rename of Spring Retry's. It needs <code>@EnableResilientMethods</code>, the attribute is <code>maxRetries</code> and it counts retries rather than attempts, and there is no <code>@Recover</code> — so a copied annotation compiles, runs one extra time, and loses its fallback silently.</p>
       </div></article>
     </section>
 
@@ -9137,12 +9288,12 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
               <tr><td>Main memory read</td><td class="num">~100 ns</td></tr>
               <tr><td>SSD random read</td><td class="num">~100 µs</td></tr>
               <tr><td>Redis round trip, same DC</td><td class="num">~0.5–1 ms</td></tr>
+              <tr><td>Internal HTTP call, same DC</td><td class="num">~1–5 ms</td></tr>
               <tr><td>Indexed PostgreSQL query</td><td class="num">~1–10 ms</td></tr>
               <tr><td>Kafka produce, acks=all</td><td class="num">~5–10 ms</td></tr>
-              <tr><td>Internal HTTP call, same DC</td><td class="num">~1–5 ms</td></tr>
               <tr><td>Cross-region round trip</td><td class="num">~50–150 ms</td></tr>
-              <tr><td>Third-party payment authorisation</td><td class="num">~300–800 ms</td></tr>
               <tr><td>Mobile network RTT</td><td class="num">~100–300 ms</td></tr>
+              <tr><td>Third-party payment authorisation</td><td class="num">~300–800 ms</td></tr>
             </tbody>
           </table>
         </div>
