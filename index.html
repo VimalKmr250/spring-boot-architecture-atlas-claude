@@ -181,6 +181,62 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 .nav button:disabled{opacity:.35;cursor:default}
 .hintbar{text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--text-3);letter-spacing:.06em;padding-top:10px}
 
+/* ---------- sliding-window intuition ---------- */
+.sw-mini{font-family:var(--mono);font-size:13px;background:var(--sunk);border-radius:8px;padding:9px 12px;display:flex;flex-direction:column;gap:6px;color:var(--text-2)}
+.sw-mini div{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sw-mini b,.sw-mini s{font-weight:500;letter-spacing:.14em;padding:1px 3px 1px 6px;border-radius:4px;text-decoration:none}
+.sw-mini b{background:var(--accent-soft);color:var(--text)}
+.sw-mini b.x{background:color-mix(in srgb,var(--bad) 16%,transparent)}
+.sw-mini s{opacity:.4}
+.sw-mini em{font-style:normal;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-left:6px}
+.sw-mini em.x{color:var(--bad)}
+
+.sw{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:var(--sh)}
+.sw-top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px}
+.sw-field{display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.sw-field input{font-family:var(--mono);font-size:14px;letter-spacing:.06em;width:13em;max-width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--text)}
+.sw-btns{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.sw-btns .iconbtn{padding:7px 12px}
+.sw-btns .iconbtn:disabled{opacity:.4;cursor:default}
+.sw-btns .sw-next{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.sw-btns .sw-next:hover{color:var(--surface);border-color:var(--accent-ink)}
+.sw-grid{display:grid;grid-template-columns:repeat(var(--n,8),minmax(0,46px));column-gap:5px;row-gap:3px;justify-content:center;padding:6px 4px 0}
+.sw-cell{grid-row:1;height:46px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:17px;
+  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);transition:background .15s,opacity .15s}
+.sw-cell.todo{opacity:.4}
+.sw-cell.done{opacity:.3;border-style:dashed;background:transparent}
+.sw-cell.in{background:var(--accent-soft);border-color:transparent}
+.sw-cell.dup{background:color-mix(in srgb,var(--bad) 20%,transparent);color:var(--bad);font-weight:600}
+.sw-cell.out{border:1.5px dashed var(--async);color:var(--async);background:transparent}
+.sw-frame{grid-row:1;margin:-4px -3px;border:2px solid var(--accent);border-radius:9px;pointer-events:none}
+.sw-idx{grid-row:2;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-3)}
+.sw-ptr{grid-row:3;text-align:center;font-family:var(--mono);font-size:11.5px;line-height:1.15;color:var(--text-3);white-space:nowrap}
+.sw-ptr.moved{color:var(--accent);font-weight:600}
+.sw-say{font-size:14.5px;color:var(--text);background:var(--sunk);border-radius:8px;padding:11px 14px;min-height:5.2em}
+.sw-say code{background:var(--surface);border:1px solid var(--line-soft)}
+.sw-say .k{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:3px;color:var(--text-3)}
+.sw-say .k.grow{color:var(--accent)}
+.sw-say .k.shrink{color:var(--async)}
+.sw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 18px}
+.sw-stat{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sw-stat > span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.sw-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:22px}
+.sw-chip{font-family:var(--mono);font-size:12px;padding:1px 7px;border-radius:5px;background:var(--surface-2);color:var(--text-2)}
+.sw-chip.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad);font-weight:600}
+.sw-val{font-family:var(--mono);font-size:12.5px;color:var(--text-2)}
+.sw-tape{display:flex;flex-wrap:wrap;gap:3px;min-height:18px}
+.sw-tape i{font-style:normal;font-family:var(--mono);font-size:10.5px;width:17px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
+.sw-tape i.r{background:var(--accent-soft);color:var(--accent-ink)}
+.sw-tape i.l{background:var(--async-soft);color:var(--async)}
+.sw-tape i.now{outline:1.5px solid var(--text);outline-offset:1px}
+@media (max-width:560px){
+  .sw{padding:13px}
+  .sw-grid{column-gap:3px;padding:6px 2px 0}
+  .sw-cell{height:38px;font-size:14px;border-radius:5px}
+  .sw-frame{margin:-3px -2px;border-radius:7px}
+  .sw-btns{margin-left:0}
+}
+
 /* ---------- contents ---------- */
 .toc{position:fixed;inset:0;z-index:60;background:color-mix(in srgb,var(--ground) 96%,transparent);overflow-y:auto;
   padding:calc(20px + env(safe-area-inset-top,0px)) clamp(16px,4vw,34px) 60px}
@@ -9039,6 +9095,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
       <h3>How to use it</h3>
       <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
         <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each pattern is its own section.</li>
+        <li>New to pointer patterns? <b>Sliding window</b> opens with two extra slides that build the idea from zero, including a step-through you can type your own input into.</li>
         <li>Work one pattern to the end before starting the next. They are deliberately independent.</li>
         <li>Read the mechanics slide, then cover the dry-run table and trace the input yourself. Compare after.</li>
         <li>Type the structure from memory before reading the problems. The structure is the unit of recall.</li>
@@ -9891,10 +9948,190 @@ for (int i = 0; i &lt; n; i++)
   </div>
 </section>
 
+<!-- dsa · pattern 01 · intuition -->
+<section class="slide" data-sec="01 · Sliding window" data-title="The idea in plain words">
+  <h2>A caterpillar crawling along the array</h2>
+  <p class="dek">Forget the code for a minute. A sliding window is a caterpillar on a branch: its <b>head</b> reaches forward one letter at a time, and its <b>tail</b> creeps forward only when the body breaks a rule. Neither end ever crawls backwards. This slide shows <em>why</em> that is allowed, on LC 3 — the longest stretch of <code>"abcabcbb"</code> with no repeated letter. Everything after it is bookkeeping.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 264" role="img" aria-label="The brute-force approach on abcabcbb. Each new start re-reads three letters the previous start already proved had no repeats, and only the letter that stops the row is new information.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE SLOW WAY · RESTART FROM EVERY START</text>
+        <rect x="520" y="7" width="11" height="11" rx="2" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="537" y="16" font-size="10.5" fill="currentColor" opacity="0.7">first read</text>
+        <rect x="612" y="7" width="11" height="11" rx="2" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="629" y="16" font-size="10.5" fill="currentColor" opacity="0.7">re-read</text>
+        <rect x="690" y="7" width="11" height="11" rx="2" fill="#A22636" fill-opacity="0.14" stroke="#A22636" stroke-opacity="0.75"></rect>
+        <text x="707" y="16" font-size="10.5" fill="currentColor" opacity="0.7">repeat found → stop</text>
+
+        <!-- the string -->
+        <text x="127" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">a</text>
+        <text x="165" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">b</text>
+        <text x="203" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">c</text>
+        <text x="241" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">a</text>
+        <text x="279" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">b</text>
+        <text x="317" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">c</text>
+        <text x="355" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">b</text>
+        <text x="393" y="42" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">b</text>
+        <text x="127" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">0</text>
+        <text x="165" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">1</text>
+        <text x="203" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">2</text>
+        <text x="241" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">3</text>
+        <text x="279" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">4</text>
+        <text x="317" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">5</text>
+        <text x="355" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">6</text>
+        <text x="393" y="56" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">7</text>
+
+        <!-- start 0 -->
+        <text x="14" y="85" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">start 0</text>
+        <rect x="110" y="66" width="34" height="28" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <rect x="148" y="66" width="34" height="28" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <rect x="186" y="66" width="34" height="28" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <rect x="224" y="66" width="34" height="28" rx="4" fill="#A22636" fill-opacity="0.14" stroke="#A22636" stroke-opacity="0.75"></rect>
+        <text x="127" y="85" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="165" y="85" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="203" y="85" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="241" y="85" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#A22636">a</text>
+        <text x="450" y="85" font-size="11" fill="currentColor" opacity="0.72">a b c read for the first time · the second a stops it</text>
+
+        <!-- start 1 -->
+        <text x="14" y="121" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">start 1</text>
+        <rect x="148" y="102" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="186" y="102" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="224" y="102" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="262" y="102" width="34" height="28" rx="4" fill="#A22636" fill-opacity="0.14" stroke="#A22636" stroke-opacity="0.75"></rect>
+        <text x="165" y="121" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">b</text>
+        <text x="203" y="121" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">c</text>
+        <text x="241" y="121" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">a</text>
+        <text x="279" y="121" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#A22636">b</text>
+        <text x="450" y="121" font-size="11" fill="currentColor" opacity="0.72">b c a re-read, though start 0 already proved them clean · the second b stops it</text>
+
+        <!-- start 2 -->
+        <text x="14" y="157" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">start 2</text>
+        <rect x="186" y="138" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="224" y="138" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="262" y="138" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="300" y="138" width="34" height="28" rx="4" fill="#A22636" fill-opacity="0.14" stroke="#A22636" stroke-opacity="0.75"></rect>
+        <text x="203" y="157" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">c</text>
+        <text x="241" y="157" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">a</text>
+        <text x="279" y="157" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">b</text>
+        <text x="317" y="157" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#A22636">c</text>
+        <text x="450" y="157" font-size="11" fill="currentColor" opacity="0.72">c a b re-read · the second c stops it</text>
+
+        <!-- start 3 -->
+        <text x="14" y="193" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">start 3</text>
+        <rect x="224" y="174" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="262" y="174" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="300" y="174" width="34" height="28" rx="4" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="338" y="174" width="34" height="28" rx="4" fill="#A22636" fill-opacity="0.14" stroke="#A22636" stroke-opacity="0.75"></rect>
+        <text x="241" y="193" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">a</text>
+        <text x="279" y="193" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">b</text>
+        <text x="317" y="193" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">c</text>
+        <text x="355" y="193" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#A22636">b</text>
+        <text x="450" y="193" font-size="11" fill="currentColor" opacity="0.72">a b c re-read · the second b stops it</text>
+
+        <text x="14" y="222" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">+ starts 4 to 7, the same way</text>
+
+        <line x1="14" y1="234" x2="866" y2="234" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="253" font-size="11" fill="currentColor" opacity="0.72">25 letter reads for an 8-letter string, most of them re-reads. The sliding window does it in 15 moves: every letter goes in once and comes out at most once.</text>
+      </svg>
+    </div>
+    <figcaption>The waste is not the checking, it is the forgetting. Every restart throws away a stretch the previous row already proved clean. The window keeps that stretch, and only ever looks at one new letter or lets go of one old one.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card">
+      <h4>Fact 1 · Cutting the front off a clean window leaves it clean</h4>
+      <div class="sw-mini">
+        <div><b>abc</b><em>clean</em></div>
+        <div><s>a</s><b>bc</b><em>still clean</em></div>
+      </div>
+      <p>If <code>abc</code> has no repeats, <code>bc</code> cannot have any — you only took a letter away. So when the tail moves forward there is <b>nothing to re-check</b>. The head stays where it is and carries on. That is every grey cell in the picture, saved.</p>
+    </div>
+    <div class="card">
+      <h4>Fact 2 · Stretching a broken window never fixes it</h4>
+      <div class="sw-mini">
+        <div><b class="x">abca</b><em class="x">broken</em></div>
+        <div><b class="x">abcab</b><em class="x">still broken</em></div>
+      </div>
+      <p>If <code>abca</code> repeats <code>a</code>, every longer window from the same start repeats it too — both <code>a</code>s are still inside. So a start that breaks is broken for <b>every future end</b>. The tail can leave it behind for good; it never has a reason to come back.</p>
+    </div>
+    <div class="card">
+      <h4>So it cannot miss the answer</h4>
+      <p>The best stretch ends at some letter. When the head reaches that letter, the tail is at the earliest start that is still clean — it only ever stepped past starts that were broken, and Fact 2 says they are still broken.</p>
+      <p>So at that moment the window <em>is</em> the longest clean stretch ending there, and it gets recorded. The head visits every letter, so every possible ending is tried once.</p>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Put the two facts together</span>Fact 1 means the <b>head never goes back</b> — there is nothing behind it to re-check. Fact 2 means the <b>tail never goes back</b> — every start it has passed is dead for good. Two ends that only move forward make at most <code>n</code> moves each, so the whole run is at most <b>2n</b> moves. The slow way restarts at every start; the window never restarts at all.</div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The whole algorithm, in plain English</h3>
+      <div class="tree" style="margin-top:10px"><span class="h">for each</span> letter, left to right:           <span class="c">// the head moves</span>
+    bring it into the window
+    <span class="h">while</span> the window breaks the rule:    <span class="c">// Fact 2: it won't fix itself</span>
+        drop the letter at the tail       <span class="c">// the tail moves</span>
+    the window is fine again              <span class="c">// Fact 1: nothing to re-check</span>
+    <span class="h">if</span> it is the longest so far, remember it</div>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Six lines, and the Java on the following slides is exactly these six lines with names attached. If a line of code ever confuses you, find which of these six it is.</p>
+    </div>
+    <div class="panel">
+      <h3>The same idea, in the words the next slides use</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>head</dt><dd><code>r</code>, the right index — the <code>for</code> loop moves it</dd>
+        <dt>tail</dt><dd><code>l</code>, the left index — the inner <code>while</code> moves it</dd>
+        <dt>bring in</dt><dd><b>admit</b> <code>a[r]</code> into the window</dd>
+        <dt>drop</dt><dd><b>evict</b> <code>a[l]</code> from the window</dd>
+        <dt>breaks the rule</dt><dd>the window is <b>invalid</b></dd>
+        <dt>what's inside</dt><dd>the <b>window state</b> — here, a count for each letter</dd>
+        <dt>Fact 2</dt><dd>validity is <b>monotone</b></dd>
+        <dt>at most 2n moves</dt><dd><b>amortised O(n)</b></dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- dsa · pattern 01 · step through -->
+<section class="slide" data-sec="01 · Sliding window" data-title="Step through it yourself">
+  <h2>One move per press — predict it before you click</h2>
+  <p class="dek">Each press moves exactly one end of the window by one letter, and says why. Before every press, guess: will the <b>head</b> grow the window, or must the <b>tail</b> shrink it? When your guesses stop being wrong, you have the pattern. Type your own letters to test an idea — <code>pwwkew</code>, <code>aaaa</code> and <code>abcdef</code> are good ones.</p>
+
+  <div class="sw" id="sw-demo">
+    <div class="sw-top">
+      <label class="sw-field"><span>Your letters</span><input type="text" value="abcabcbb" maxlength="14" placeholder="up to 14 letters" spellcheck="false" autocomplete="off" autocapitalize="off"></label>
+      <div class="sw-btns">
+        <button type="button" class="iconbtn" data-sw="reset">Reset</button>
+        <button type="button" class="iconbtn" data-sw="back">‹ Back</button>
+        <button type="button" class="iconbtn" data-sw="play" aria-pressed="false">Play</button>
+        <button type="button" class="iconbtn sw-next" data-sw="next">Next ›</button>
+      </div>
+    </div>
+    <div class="sw-grid" aria-hidden="true"></div>
+    <div class="sw-say" aria-live="polite"></div>
+    <div class="sw-stats">
+      <div class="sw-stat"><span>Inside the window</span><div class="sw-chips" data-sw-out="chips"></div></div>
+      <div class="sw-stat"><span>Longest clean window so far</span><div class="sw-val" data-sw-out="best"></div></div>
+      <div class="sw-stat"><span>Moves so far</span><div class="sw-tape" data-sw-out="tape"></div><div class="sw-val" data-sw-out="moves"></div></div>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">Three things to watch for as you press</span>The <b>head moves on every letter</b>, no matter what. The <b>tail only moves when a letter is red</b>, and sometimes it has to move more than once — at <code>r = 6</code> it drops an <code>a</code> it has no quarrel with, because a window has no gaps: to lose the older <code>b</code>, everything in front of it goes too. And the <b>move tape never grows past 2n</b>, however the letters fall.</div>
+
+  <h3>Now point it at any problem: three questions</h3>
+  <div class="grid3">
+    <div class="card"><h4>1 · What does "fine" mean?</h4><p>Write down the rule a window must obey. LC 3: <em>no letter twice</em>. LC 904: <em>at most two kinds of fruit</em>. LC 209: <em>the sum is at least the target</em>.</p></div>
+    <div class="card"><h4>2 · Does growing the window only push one way?</h4><p>In LC 3 a longer window can go from fine to broken, but never back. In LC 209, with every number positive, it can go from too small to big enough, but never back. That one-way push is Fact 2, and it is what lets the tail move forward for good. With negative numbers a sum can flip back and forth — then it is not a window problem.</p></div>
+    <div class="card"><h4>3 · What must I remember to check the rule instantly?</h4><p>That memory is the window state. LC 3: a count per letter. LC 904: a count per fruit type. LC 209: a running sum. Add to it when the head moves; take away exactly the same when the tail moves.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Longest vs shortest — the one flip to remember</span>For a <b>longest</b> window (LC 3, 424, 904) the rule breaks by getting too big, so the tail moves <em>while the window is broken</em> and you record once it is fine again. For a <b>shortest</b> window (LC 209, 76) the rule is met by being big enough, so the tail moves <em>while the window is still fine</em>, recording every time — squeezing it as small as it will go. Same caterpillar, opposite reason for the tail to move.</div>
+</section>
+
 <!-- dsa · pattern 01 · mechanics -->
 <section class="slide" data-sec="01 · Sliding window" data-title="Mechanics">
   <h2>Two indices that never go backwards</h2>
-  <p class="dek">A sliding window answers questions about <b>contiguous</b> runs in one pass. The whole pattern is a bet: that when the window at <code>[l, r]</code> is invalid, no window ending further right can be fixed by moving <code>l</code> back. That bet is what turns O(n²) into O(n).</p>
+  <p class="dek">A sliding window answers questions about <b>contiguous</b> runs in one pass. The whole pattern rests on Fact 2 from two slides back: once the window <code>[l, r]</code> is invalid, stretching it further right never makes it valid again — so <code>l</code> never has a reason to move back. That one fact is what turns O(n²) into O(n).</p>
 
   <div class="split">
     <div class="panel">
@@ -9980,7 +10217,7 @@ for (int i = 0; i &lt; n; i++)
 <!-- dsa · pattern 01 · dry run -->
 <section class="slide" data-sec="01 · Sliding window" data-title="Dry run">
   <h2>LC 3 traced by hand on <code>"abcabcbb"</code></h2>
-  <p class="dek">Longest substring without repeating characters. The window state is a character count; the window is invalid exactly when the character we just admitted appears twice. Watch <code>l</code>: it moves eight times in total across the whole run, never backwards — the amortisation argument made concrete.</p>
+  <p class="dek">Longest substring without repeating characters. The window state is a character count; the window is invalid exactly when the character we just admitted appears twice. Watch <code>l</code>: it moves seven times in total across the whole run, never backwards — the amortisation argument made concrete.</p>
 
   <figure>
     <div class="figbox">
@@ -10113,7 +10350,7 @@ for (int i = 0; i &lt; n; i++)
         <text x="806" y="286" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
 
         <line x1="14" y1="304" x2="866" y2="304" stroke="currentColor" stroke-opacity="0.15"></line>
-        <text x="14" y="322" font-size="10.5" fill="currentColor" opacity="0.62">Eight iterations of r, and eight total increments of l across the whole run — never eight per step. That is why this is O(n) and not O(n²).</text>
+        <text x="14" y="322" font-size="10.5" fill="currentColor" opacity="0.62">Eight moves of r and seven of l — fifteen across the whole run, not eight per step. That is why this is O(n) and not O(n²).</text>
       </svg>
     </div>
     <figcaption>Copper marks the live window; teal marks a step where the left pointer had to move. The window never shrinks for free — every eviction is forced by the character just admitted.</figcaption>
@@ -22922,6 +23159,183 @@ boolean isInterleave(String s1, String s2, String s3) {
       });
     }, { rootMargin: "-80px 0px -70% 0px", threshold: 0 });
     secs.forEach(function (s) { io.observe(s); });
+  })();
+
+  /* ---- sliding-window stepper: every press moves exactly one pointer ---- */
+  (function windowStepper() {
+    var root = document.getElementById("sw-demo");
+    if (!root) return;
+    var input = root.querySelector("input");
+    var grid  = root.querySelector(".sw-grid");
+    var say   = root.querySelector(".sw-say");
+    var outs = {}, btns = {};
+    root.querySelectorAll("[data-sw-out]").forEach(function (el) { outs[el.getAttribute("data-sw-out")] = el; });
+    root.querySelectorAll("button[data-sw]").forEach(function (b) { btns[b.getAttribute("data-sw")] = b; });
+
+    var s = "", frames = [], at = 0, timer = null;
+
+    function esc(t) {
+      return String(t).replace(/[&<>"']/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; });
+    }
+    function q(t) { return "<code>" + esc(t) + "</code>"; }
+
+    /* LC 3 on str, recorded as one frame per pointer move */
+    function trace(str) {
+      var out = [], seen = Object.create(null), l = 0, r = -1, best = 0, bestL = 0, explained = false;
+      function win() { return str.slice(l, r + 1); }
+      function push(kind, dup, msg) { out.push({ kind: kind, l: l, r: r, dup: dup, best: best, bestL: bestL, msg: msg }); }
+      function clean(lead) {
+        var len = r - l + 1, grew = len > best;
+        if (grew) { best = len; bestL = l; }
+        return lead + " No letter repeats, so " + q(win()) + " is fine — length " + len +
+          (grew ? ", a new best." : "; the best stays " + best + ".");
+      }
+
+      push("start", null, str.length
+        ? "The window is empty. Press <b>Next</b> and the head steps onto the first letter."
+        : "Type some letters above to start.");
+
+      for (r = 0; r < str.length; r++) {
+        var c = str.charAt(r);
+        seen[c] = (seen[c] || 0) + 1;
+        var head = "The head moves to index " + r + " and brings in " + q(c) + ".";
+        if (seen[c] === 1) { push("grow", null, clean(head)); continue; }
+
+        push("grow", c, head + " Now " + q(c) + " appears twice, so " + q(win()) + " breaks the rule. " +
+          "Growing it further can never fix that (Fact 2), so the head waits and the tail moves.");
+
+        while (seen[c] > 1) {
+          var d = str.charAt(l);
+          seen[d]--; l++;
+          var tail = "The tail drops " + (d === c ? "the older " : "") + q(d) + " from index " + (l - 1) + ".";
+          if (seen[c] === 1) { push("shrink", null, clean(tail)); continue; }
+          push("shrink", c, tail + (explained ? "" : " Why drop it, when " + q(c) + " is the problem? A window has no gaps: " +
+            "to lose the older " + q(c) + ", everything in front of it has to go first.") +
+            " " + q(c) + " still appears twice, so the tail keeps going.");
+          explained = true;
+        }
+      }
+
+      if (str.length) {
+        r = str.length - 1;
+        push("done", null, "The head has reached the end, so every possible ending has been tried. Longest clean window: " +
+          q(str.substr(bestL, best)) + ", length " + best + ". The head moved " + str.length + " times and the tail " + l +
+          " — " + (str.length + l) + " moves in all, never more than 2 × " + str.length + ".");
+      }
+      return out;
+    }
+
+    function add(cls, col, text) {
+      var el = document.createElement("div");
+      el.className = cls;
+      el.style.gridColumn = String(col + 1);
+      el.textContent = text;
+      grid.appendChild(el);
+      return el;
+    }
+    function pointer(col, name, moved) {
+      var el = add("sw-ptr" + (moved ? " moved" : ""), col, "▲");
+      el.appendChild(document.createElement("br"));
+      el.appendChild(document.createTextNode(name));
+    }
+    function chip(text, cls) {
+      var el = document.createElement("span");
+      el.className = cls;
+      el.textContent = text;
+      outs.chips.appendChild(el);
+    }
+
+    function render() {
+      var f = frames[at], n = s.length, i;
+
+      grid.textContent = "";
+      grid.style.setProperty("--n", String(Math.max(n, 1)));
+      for (i = 0; i < n; i++) {
+        var cls = "sw-cell";
+        if (i > f.r) cls += " todo";
+        else if (i < f.l) cls += (f.kind === "shrink" && i === f.l - 1) ? " out" : " done";
+        else cls += (f.dup && s.charAt(i) === f.dup) ? " in dup" : " in";
+        add(cls, i, s.charAt(i));
+        add("sw-idx", i, String(i));
+      }
+      if (f.r >= f.l) add("sw-frame", f.l, "").style.gridColumn = (f.l + 1) + " / " + (f.r + 2);
+      if (n) {
+        if (f.l === f.r) pointer(f.l, "l r", f.kind === "grow" || f.kind === "shrink");
+        else {
+          pointer(f.l, "l", f.kind === "shrink");
+          if (f.r >= 0) pointer(f.r, "r", f.kind === "grow");
+        }
+      }
+
+      var label = { start: "Ready", grow: "Head moves · r = " + f.r, shrink: "Tail moves · l = " + f.l, done: "Finished" }[f.kind];
+      say.innerHTML = '<span class="k ' + f.kind + '">' +
+        (frames.length > 1 ? "Step " + at + " of " + (frames.length - 1) + " · " : "") + esc(label) + "</span>" + f.msg;
+
+      outs.chips.textContent = "";
+      if (f.r < f.l) chip("empty", "tag");
+      else {
+        chip(f.dup ? "broken" : "fine", f.dup ? "tag b" : "tag g");
+        var order = [], cnt = Object.create(null);
+        for (i = f.l; i <= f.r; i++) {
+          var ch = s.charAt(i);
+          if (!cnt[ch]) { cnt[ch] = 0; order.push(ch); }
+          cnt[ch]++;
+        }
+        order.forEach(function (ch) { chip(ch + " ×" + cnt[ch], cnt[ch] > 1 ? "sw-chip bad" : "sw-chip"); });
+      }
+
+      outs.best.textContent = f.best ? f.best + "  ·  \"" + s.substr(f.bestL, f.best) + "\"" : "0 — nothing yet";
+
+      outs.tape.textContent = "";
+      var heads = 0, tails = 0;
+      for (i = 1; i <= at; i++) {
+        var k = frames[i].kind;
+        if (k !== "grow" && k !== "shrink") continue;
+        var m = document.createElement("i");
+        m.className = (k === "grow" ? "r" : "l") + (i === at ? " now" : "");
+        m.textContent = k === "grow" ? "r" : "l";
+        outs.tape.appendChild(m);
+        if (k === "grow") heads++; else tails++;
+      }
+      outs.moves.textContent = n ? "head " + heads + " + tail " + tails + " = " + (heads + tails) +
+        "  ·  never more than 2n = " + (2 * n) : "";
+
+      btns.back.disabled = btns.reset.disabled = at === 0;
+      btns.next.disabled = at >= frames.length - 1;
+      btns.play.disabled = frames.length < 2;
+    }
+
+    function step(d) { at = Math.max(0, Math.min(frames.length - 1, at + d)); render(); }
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      btns.play.textContent = "Play";
+      btns.play.setAttribute("aria-pressed", "false");
+    }
+    function play() {
+      if (at >= frames.length - 1) at = 0;
+      btns.play.textContent = "Pause";
+      btns.play.setAttribute("aria-pressed", "true");
+      step(1);
+      timer = setInterval(function () {
+        // stop quietly once the slide is navigated away from, or the run is over
+        if (!root.offsetParent || at >= frames.length - 1) { stop(); return; }
+        step(1);
+      }, 1800);
+    }
+    function load(v) {
+      var cleaned = v.replace(/\s+/g, "").slice(0, 14);
+      if (cleaned !== v) input.value = cleaned;
+      stop();
+      s = cleaned; frames = trace(s); at = 0;
+      render();
+    }
+
+    btns.next.addEventListener("click", function () { stop(); step(1); });
+    btns.back.addEventListener("click", function () { stop(); step(-1); });
+    btns.reset.addEventListener("click", function () { stop(); at = 0; render(); });
+    btns.play.addEventListener("click", function () { if (timer) stop(); else play(); });
+    input.addEventListener("input", function () { load(input.value); });
+    load(input.value);
   })();
 
   /* ---- syntax highlighting ---- */
