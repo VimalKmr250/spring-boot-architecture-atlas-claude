@@ -35,7 +35,7 @@ The page has five tabs.
 | **Spring Boot** | 56 | Boot from the container up, on 3.4/3.5 with Boot 4 deltas |
 | **Event-driven** | 60 | Event-driven systems on Kafka 4, from first principles to production |
 | **Interview prep** | — | The same material rearranged as questions, scripts and numbers |
-| **DSA patterns** | 124 | 30 algorithm patterns, 180 linked LeetCode problems, Java 17+ |
+| **DSA patterns** | 132 | 30 algorithm patterns, 180 linked LeetCode problems, Java 17+ |
 
 ### Reference deck
 
@@ -90,6 +90,8 @@ Thirty self-contained patterns, from sliding window and two pointers through gra
 2. **Dry run**: one input traced step by step
 3. **Structure**: a reusable Java skeleton and the parts you change per problem
 4. **Problems**: six LeetCode problems, two solved in full and four shown as changes to the skeleton
+
+Before the patterns, a **Complexity analysis** section shows how to work out time and space complexity: loops, hidden costs in the Java library, amortised analysis, recursion, space, and a table deriving the figure for every pattern.
 
 ## Navigation
 
