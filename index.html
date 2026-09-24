@@ -255,7 +255,10 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 
 /* ---------- interview page ---------- */
 .iv{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,32px) 90px;display:grid;grid-template-columns:200px 1fr;gap:34px;align-items:start}
-.ivnav{position:sticky;top:calc(var(--head-h) + env(safe-area-inset-top,0px) + 22px);display:flex;flex-direction:column;gap:2px;padding-top:28px}
+.ivnav{position:sticky;top:calc(var(--head-h) + env(safe-area-inset-top,0px) + 22px);display:flex;flex-direction:column;gap:2px;padding-top:28px;
+  max-height:calc(100vh - var(--head-h) - env(safe-area-inset-top,0px) - 30px);overflow-y:auto}
+.ivnav .grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);padding:12px 10px 3px}
+.ivnav .grp:first-child{padding-top:0}
 .ivnav a{font-family:var(--mono);font-size:11.2px;letter-spacing:.04em;color:var(--text-3);text-decoration:none;padding:5px 8px;border-radius:6px;border-left:2px solid transparent}
 .ivnav a:hover{color:var(--text);background:var(--surface)}
 .ivnav a.on{color:var(--accent);border-left-color:var(--accent);background:var(--surface)}
@@ -271,6 +274,11 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 .snap .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent-ink);display:block;margin-bottom:3px}
 .deeper{font-size:13.8px;color:var(--text-2)}
 .deeper b{color:var(--text)}
+.xrefs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.xrefs .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-3);margin-right:2px}
+.xrefs a{font-family:var(--mono);font-size:11px;line-height:1.3;text-decoration:none;color:var(--text-2);background:var(--sunk);
+  border:1px solid var(--line-soft);border-radius:5px;padding:3px 8px}
+.xrefs a:hover{color:var(--accent);border-color:var(--accent)}
 
 .t-abbr{display:none}
 @media (max-width:820px){
@@ -356,7 +364,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
         <li>Copper marks the path or hop under discussion; <span style="color:var(--async);font-weight:600">teal</span> always means an asynchronous channel.</li>
         <li>Code is real Spring Boot 4 / Framework 7 on Java 21, trimmed to the line that matters.</li>
         <li><b>Versions differ by tab, on purpose.</b> This deck is written against Boot 4.1; the <b>Spring Boot</b> tab targets 3.4/3.5 because that is what most enterprise codebases run today, with <span class="tag a">Boot 4</span> boxes marking the delta; the <b>Event-driven</b> tab is Boot 3.5 code with Boot 4 notes. Build snippets are Gradle unless the slide says Maven.</li>
-        <li>The <b>Interview prep</b> tab is a separate page: the same material rearranged as questions, scripts and numbers.</li>
+        <li>The <b>Interview prep</b> tab is a separate page: the same material rearranged as questions, scripts and numbers, with every answer linking back to the slides that go deeper.</li>
       </ul>
     </div>
   </div>
@@ -22643,22 +22651,31 @@ boolean isInterleave(String s1, String s2, String s3) {
 
 <div class="iv" id="ivroot" hidden>
   <nav class="ivnav" id="ivnav">
+    <span class="grp">Orientation</span>
     <a href="#how-scored">How it's scored</a>
+    <a href="#rounds">The rounds</a>
+    <a href="#levels">By level</a>
     <a href="#framework">The framework</a>
-    <a href="#q-arch">Architecture Q&amp;A</a>
+    <a href="#coding">Coding round</a>
+    <span class="grp">Questions</span>
+    <a href="#q-arch">Architecture</a>
     <a href="#q-data">Data &amp; consistency</a>
-    <a href="#q-integration">Integration</a>
+    <a href="#q-integration">Integration &amp; Kafka</a>
     <a href="#q-spring">Spring &amp; Java</a>
     <a href="#q-api">API &amp; frontend</a>
+    <a href="#q-security">Security</a>
+    <a href="#q-ops">Production &amp; ops</a>
+    <span class="grp">Rehearsal</span>
     <a href="#whiteboard">Whiteboard scripts</a>
     <a href="#numbers">Numbers to know</a>
     <a href="#stories">Stories to have ready</a>
     <a href="#redflags">Red flags</a>
+    <a href="#plan">Three-week plan</a>
   </nav>
 
   <div class="ivbody">
     <section class="ivsec" id="how-scored">
-      <div class="eyebrow" style="color:var(--accent)">Interview prep · backend / architecture rounds</div>
+      <div class="eyebrow" style="color:var(--accent)">Interview prep · Java, Spring and architecture rounds</div>
       <h2>What the architecture round is actually testing</h2>
       <p class="lede">Not whether you know the patterns — the interviewer assumes you do. They are testing whether you reason about <b>trade-offs under constraints</b>, and whether you have operated what you designed. Most candidates who fail know more patterns than the ones who pass.</p>
       <div class="grid2">
@@ -22684,6 +22701,48 @@ boolean isInterleave(String s1, String s2, String s3) {
         </div>
       </div>
       <div class="note tip"><span class="lbl">The line that reframes a whole interview</span>"Before I design this — what's the read/write ratio, and how stale can the data be for each screen?" Almost nobody asks it, and it is the question that determines most of the architecture.</div>
+      <div class="note"><span class="lbl">How to practise with this page</span>Read the question, look away, and answer out loud for sixty seconds. Then compare with the <b>30-second answer</b> and the <b>go deeper</b> paragraph. Whatever you left out is your study list, and the <b>In the atlas</b> links under each answer open the slides that cover it. Back returns you here.</div>
+    </section>
+
+    <section class="ivsec" id="rounds">
+      <h2>Know which round you are in</h2>
+      <p class="dek">A backend loop is usually four or five rounds, and each one is scored on something different. Preparing for the wrong one is a common way for strong engineers to fail: a design-review answer in a coding round runs out of time, and a coding-round answer in a design round never gets past the happy path.</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Round</th><th>What is being scored</th><th>What sinks it</th><th>Prepare with</th></tr></thead>
+          <tbody>
+            <tr><td>Coding</td><td>Recognising the pattern, writing correct code, stating the complexity, and testing your own code without being asked.</td><td>Coding in silence. No complexity stated. The interviewer runs the first test.</td><td><div class="xrefs"><a href="#coding">Coding round</a><a data-deck="dsa" data-slide="What this deck is" href="#dsa">DSA patterns</a></div></td></tr>
+            <tr><td>Java &amp; Spring deep-dive</td><td>The mechanism behind the annotation: proxies, the persistence context, transaction boundaries, the JVM inside a container.</td><td>Definitions without failure modes. "It just works."</td><td><div class="xrefs"><a href="#q-spring">Spring &amp; Java</a><a href="#q-security">Security</a><a data-deck="sb" data-slide="What this tab covers" href="#springboot">Spring Boot tab</a></div></td></tr>
+            <tr><td>System design</td><td>Trade-offs under constraints, real numbers, and a failure story for every box you draw.</td><td>Microservices in the first minute. No numbers. No time left for failure handling.</td><td><div class="xrefs"><a href="#framework">Framework</a><a href="#whiteboard">Scripts</a><a data-deck="deck" data-slide="What this atlas is" href="#deck">Reference deck</a></div></td></tr>
+            <tr><td>Production &amp; debugging</td><td>Whether you have operated a system: an ordered diagnosis, and mitigation before root cause.</td><td>Guessing. Scaling before measuring. Investigating while customers wait.</td><td><div class="xrefs"><a href="#q-ops">Production &amp; ops</a><a data-deck="sb" data-sec="Production" href="#springboot">Boot · Production</a></div></td></tr>
+            <tr><td>Behavioural</td><td>Judgement, ownership, and how you handle disagreement and your own mistakes.</td><td>Stories with no cost, no numbers and no "I".</td><td><div class="xrefs"><a href="#stories">Stories</a></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Ask before you prepare</span>Ask the recruiter which rounds are in the loop and what each one covers. It is a routine question, and the answer tells you where your preparation hours should go.</div>
+    </section>
+
+    <section class="ivsec" id="levels">
+      <h2>What changes with the level</h2>
+      <p class="dek">The questions barely change between mid-level, senior and staff loops. The bar does. Interviewers calibrate on the scope of what you reason about — one component, one system, or several systems and the teams that own them — far more than on vocabulary.</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Signal</th><th>Mid-level</th><th>Senior</th><th>Staff / principal</th></tr></thead>
+          <tbody>
+            <tr><td>Scope</td><td>One component, built correctly</td><td>A system, including how it fails</td><td>Several systems, and the organisation that builds them</td></tr>
+            <tr><td>Trade-offs</td><td>Knows the options</td><td>Picks one, names its cost, and says what would change the choice</td><td>Frames the decision so that others can make it; separates reversible choices from irreversible ones</td></tr>
+            <tr><td>Failure</td><td>Handles errors when prompted</td><td>Volunteers the failure mode and the recovery</td><td>Designs the operating model: SLOs, on-call, blast radius</td></tr>
+            <tr><td>Evidence</td><td>"I've used it"</td><td>"We ran it at this volume, and this is what broke"</td><td>"We changed how several teams do this, and this is how we measured it"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 style="font-size:16px">One question at three levels: "a downstream service is slow"</h3>
+      <div class="grid3">
+        <div class="card"><h4>Mid-level</h4><p>"I'd add a timeout and a retry, and wrap the call in a Resilience4j circuit breaker."</p><p>Correct, and it would pass a mid-level bar. What is missing is <em>why</em> each piece is there and what happens when it fires.</p></div>
+        <div class="card"><h4>Senior</h4><p>"Timeout first, sized from the dependency's p99 and our own latency budget. Retries only on idempotent calls, with jitter. A breaker with a fallback we have agreed with product. A bulkhead so it cannot take all our threads. And an alert when the breaker opens."</p></div>
+        <div class="card accent"><h4>Staff</h4><p>All of the senior answer, then: "Why is this synchronous at all? If it is not on the critical path of the user's action, it should be an event. And across the organisation, a shared client library with these defaults, so the next forty services don't each rediscover them."</p></div>
+      </div>
+      <div class="note"><span class="lbl">Aim one level up, not two</span>Answer at the level you are interviewing for, and reach one level higher where it comes naturally. A senior candidate who closes with the shared-library point is showing staff-level reach. A mid-level candidate who opens with organisation design has skipped the part that is being assessed.</div>
     </section>
 
     <section class="ivsec" id="framework">
@@ -22700,189 +22759,490 @@ boolean isInterleave(String s1, String s2, String s3) {
       <div class="note warn"><span class="lbl">Time discipline</span>In a 45-minute round: 5 clarify, 5 contract, 10 high-level, 10 deep-dive on whatever they steer you to, 10 failure and scale, 5 spare. If you are still on step 3 at minute 25, summarise and move.</div>
     </section>
 
+    <section class="ivsec" id="coding">
+      <h2>The coding round, run like a design review</h2>
+      <p class="dek">The DSA patterns tab teaches the thirty structures. This section covers the forty-five minutes around them: what gets scored, where the time goes, and the Java slips that cost points even when the algorithm is right.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3>What the rubric scores</h3>
+          <p>Most rubrics score four things, roughly equally. <b>Problem solving</b>: did you find a sound approach and know its cost? <b>Code</b>: is it correct, readable and idiomatic? <b>Communication</b>: could the interviewer follow your reasoning while you worked? <b>Verification</b>: did you test it before they did?</p>
+          <p>Verification is the cheapest of the four to earn, and the one candidates skip most often.</p>
+        </div>
+        <div class="card">
+          <h3>When you are stuck</h3>
+          <ul class="checks tight">
+            <li>Say what you have: "brute force works, it's O(n²), and the repeated work is re-scanning the prefix."</li>
+            <li>Ask what would make it easy: sorted input, a prefix sum, a map from value to index.</li>
+            <li>Shrink it. Solve n = 2 and n = 3 by hand and look for the step you keep repeating.</li>
+            <li>Take the hint and use it well. Interviewers expect to give hints, and using one well counts for more than refusing it.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Minutes</th><th>Do</th><th>Say out loud</th></tr></thead>
+          <tbody>
+            <tr><td class="num">0–5</td><td>Restate the problem. Ask about sizes, value ranges, duplicates, empty input, and what to return when there is no answer. Work one example by hand.</td><td>"So n can be 10⁵ and values can be negative. Can the array be empty?"</td></tr>
+            <tr><td class="num">5–10</td><td>Brute force first, with its cost. Then the pattern and its invariant. Get agreement before you type.</td><td>"Brute force is O(n²). The constraints want O(n log n) or better, so I'll use a sliding window. The invariant is that the window never contains a repeat."</td></tr>
+            <tr><td class="num">10–30</td><td>Code the agreed approach. Name helpers for what they mean. No premature cleverness.</td><td>Narrate intent, not keystrokes: "now I shrink from the left until the window is valid again."</td></tr>
+            <tr><td class="num">30–38</td><td>Trace the example through the code line by line, with real values. Then the edge cases: empty, one element, all equal, negatives, maximum values.</td><td>"Let me run [2, 1, 2] through it before I call it done."</td></tr>
+            <tr><td class="num">38–45</td><td>State time and space with their qualifiers: amortised, average case, excluding the output. Take the follow-up.</td><td>"O(n) time amortised, because each index enters and leaves the window once, and O(k) space for the map."</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 style="font-size:16px">Java slips that cost points with a correct algorithm</h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Slip</th><th>Why it bites</th><th>Write instead</th></tr></thead>
+          <tbody>
+            <tr><td><code>Integer</code> compared with <code>==</code></td><td>Works for −128 to 127 because those values are cached, then fails on real data.</td><td><code>a.equals(b)</code>, or unbox to <code>int</code> first</td></tr>
+            <tr><td>Comparator <code>(a, b) -&gt; a - b</code></td><td>Overflows for large or mixed-sign values and silently mis-sorts.</td><td><code>Integer.compare(a, b)</code> or <code>Comparator.comparingInt(...)</code></td></tr>
+            <tr><td><code>(lo + hi) / 2</code></td><td>Overflows when both are near <code>Integer.MAX_VALUE</code>.</td><td><code>lo + (hi - lo) / 2</code></td></tr>
+            <tr><td><code>int</code> sums and products</td><td>Overflow at about 2.1 × 10⁹, well inside typical constraints.</td><td>A <code>long</code> accumulator. Say why out loud.</td></tr>
+            <tr><td><code>Math.abs(Integer.MIN_VALUE)</code></td><td>Returns a negative number.</td><td>Work in <code>long</code>, or <code>Math.absExact</code>, which throws</td></tr>
+            <tr><td><code>list.remove(3)</code> on a <code>List&lt;Integer&gt;</code></td><td>Calls <code>remove(int index)</code>. It removes the fourth element, not the value 3.</td><td><code>list.remove(Integer.valueOf(3))</code></td></tr>
+            <tr><td><code>Arrays.fill(grid, new int[m])</code></td><td>Every row is the <em>same</em> array. A write to one row appears in all of them.</td><td><code>new int[n][m]</code>, or a loop that allocates each row</td></tr>
+            <tr><td><code>Arrays.asList(intArray)</code></td><td>Returns a one-element <code>List&lt;int[]&gt;</code>. Any <code>Arrays.asList</code> result is also fixed-size.</td><td>A loop, or <code>new ArrayList&lt;&gt;(...)</code> over a boxed array</td></tr>
+            <tr><td>Removing inside a for-each</td><td>Usually throws <code>ConcurrentModificationException</code>.</td><td><code>iterator.remove()</code> or <code>removeIf</code></td></tr>
+            <tr><td><code>s += c</code> in a loop</td><td>Copies the whole string every time, so O(n²) overall.</td><td><code>StringBuilder</code></td></tr>
+            <tr><td>Deep recursion on a path-shaped input</td><td>A 10⁵-node chain overflows the default thread stack.</td><td>An explicit <code>ArrayDeque</code> stack, and mention the limit</td></tr>
+            <tr><td>Relying on <code>HashMap</code> order</td><td>The order is unspecified. Output that passed locally is not guaranteed.</td><td>Sort, or use <code>LinkedHashMap</code> or <code>TreeMap</code> on purpose</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Test your code, not your intention</span>When you trace, read what the code says, not what you meant it to say. Point at each line and say the variables' values. Most bugs found this way are off-by-ones at a boundary. Finding one yourself, calmly, counts in your favour, because it is exactly the habit the verification score measures.</div>
+      <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="dsa" data-slide="What this deck is" href="#dsa">DSA · What this deck is</a><a data-deck="dsa" data-slide="Choosing the pattern from the statement" href="#dsa">DSA · Choosing the pattern</a><a data-deck="dsa" data-slide="Reading complexity off the constraints" href="#dsa">DSA · Complexity from constraints</a><a data-deck="dsa" data-slide="Hidden costs in the Java library" href="#dsa">DSA · Hidden Java costs</a></p>
+    </section>
+
     <section class="ivsec" id="q-arch">
       <h2>Architecture and modularity</h2>
 
       <article class="q"><header><i>Q1</i><h3>Monolith or microservices for a new enterprise product?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Modular monolith first, with genuinely enforced boundaries, and extract services on named evidence. Microservices buy independent deployment and scaling, and charge you distributed transactions, network failure handling and an operations platform. Early on, the domain boundaries are still wrong — and fixing a wrong boundary inside one deployable is a refactor, while fixing it across a network is a quarter.</div>
         <p class="deeper"><b>Go deeper:</b> Name the four extraction triggers — divergent scaling, divergent SLA, a team blocked by the release train, and a compliance boundary you want physically separate. Then say what "enforced" means concretely: ArchUnit slice rules, Spring Modulith verification, a database role per module so a cross-schema join fails with a permission error. If they push ("we're 200 engineers"), agree immediately — at that size the coordination cost inverts the answer, and saying so shows the reasoning was about constraints, not preference.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Four styles, honestly compared" href="#deck">Deck · Four styles</a><a data-deck="deck" data-slide="What it is, precisely" href="#deck">Deck · Modular monolith</a><a data-deck="deck" data-slide="Extracting a service" href="#deck">Deck · Extracting a service</a></p>
       </div></article>
 
       <article class="q"><header><i>Q2</i><h3>How do you decide where a module boundary goes?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>By language and by change. A boundary belongs where the meaning of a word changes — "order" means something different to fulfilment than to finance — and where things change together for the same business reason. High cohesion inside, low coupling across, and one owning team.</div>
         <p class="deeper"><b>Go deeper:</b> Mention event storming as the practical technique: get domain experts in a room, map the events in time order, and the clusters that emerge are candidate contexts. Test a proposed boundary by asking whether a typical change touches one module or four. Then the honest part — you will get some wrong, which is precisely the argument for keeping them cheap to move.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Module anatomy" href="#deck">Deck · Module anatomy</a><a data-deck="deck" data-slide="Where the boundary leaks" href="#deck">Deck · Where the boundary leaks</a></p>
       </div></article>
 
       <article class="q"><header><i>Q3</i><h3>What actually stops a modular monolith from becoming a big ball of mud?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Executable rules, not documentation. Three of them: package structure where only <code>api</code> is importable, ArchUnit/Modulith tests failing the build on a violation, and a database role per module so the data boundary is enforced by PostgreSQL rather than by reviewers.</div>
         <p class="deeper"><b>Go deeper:</b> Add the human layer — one owning team per module via CODEOWNERS, and a rule that any boundary exception needs an ADR. Then the failure story: teams that write the rules in a wiki see drift inside a quarter, because a rule that is not a build failure is a suggestion under deadline pressure.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Enforcing it with ArchUnit" href="#deck">Deck · ArchUnit</a><a data-deck="deck" data-slide="Spring Modulith" href="#deck">Deck · Spring Modulith</a><a data-deck="deck" data-slide="Fitness functions" href="#deck">Deck · Fitness functions</a></p>
       </div></article>
 
       <article class="q"><header><i>Q4</i><h3>Walk me through extracting one module into a service.</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Data first, then process. Confirm no other module touches its tables; split the schema and run that way for weeks. Then keep the interface and swap the in-process implementation for an HTTP adapter behind a feature flag, with the old path still there. Cut traffic over, watch, then delete the module. Nothing in the calling code changes at any point.</div>
         <p class="deeper"><b>Go deeper:</b> Call out what changes the moment it is remote: the call can now time out, so callers need timeouts, retries with idempotency, and a fallback; the transaction that used to span both is now a saga with compensation; and you have lost the ability to join. Say explicitly that extracting a module whose tables are still shared produces a distributed monolith — all the latency, none of the autonomy.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Extracting a service" href="#deck">Deck · Extracting a service</a><a data-deck="deck" data-slide="The strangler fig" href="#deck">Deck · The strangler fig</a></p>
       </div></article>
 
       <article class="q"><header><i>Q5</i><h3>Layered, hexagonal, or clean architecture — which and why?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>They are the same idea at different volumes: dependencies point inward, the domain depends on nothing. I use ports and adapters inside each module — domain and application at the core, web/JPA/Kafka as adapters — and I apply it proportionally: full purity where the business rules are, plain JPA-to-controller for CRUD lookup tables.</div>
         <p class="deeper"><b>Go deeper:</b> The concrete payoff is testing — domain tests with no Spring context run in microseconds, so people actually write them. The concrete cost is a mapping layer. Volunteering that you would skip it for a catalog-admin screen is what separates someone who has applied this from someone who has read about it; dogmatic uniform layering is why teams abandon the approach entirely.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Layering inside a module" href="#deck">Deck · Layering inside a module</a><a data-deck="deck" data-slide="Port and adapter in code" href="#deck">Deck · Port and adapter</a></p>
       </div></article>
 
       <article class="q"><header><i>Q6</i><h3>Where do business rules go?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>On the aggregate that owns the data the rule constrains. The application service only orchestrates — load, call the domain, save, publish. If a rule sits in a service, it gets duplicated the second a second entry point appears.</div>
         <p class="deeper"><b>Go deeper:</b> Distinguish three kinds: <b>shape</b> validation (Bean Validation on the request record), <b>invariants</b> (enforced in the aggregate's constructor and state-transition methods, so an invalid object cannot exist), and <b>cross-aggregate policies</b> (a domain service, or a saga when it spans modules). The anaemic-domain anti-pattern is worth naming explicitly: entities with only getters and a 900-line service class.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The aggregate" href="#deck">Deck · The aggregate</a><a data-deck="deck" data-slide="Use case and transaction" href="#deck">Deck · Use case and transaction</a></p>
       </div></article>
 
       <article class="q"><header><i>Q7</i><h3>How do you handle a shared concept like Customer across modules?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Each context keeps its own view of it. Ordering needs a customer id and a shipping address; marketing needs preferences; finance needs billing terms. One canonical <code>Customer</code> class shared by everyone becomes a god object that no team can change. Reference across contexts by id, and duplicate the few fields you need.</div>
         <p class="deeper"><b>Go deeper:</b> This is where "duplication is not always a smell" belongs — the inventory module storing a product name is a context's own view, not a normalisation failure. Mention keeping the copies fresh via events, and that the alternative, a foreign key across contexts, is the thing that makes extraction impossible later.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Data ownership" href="#deck">Deck · Data ownership</a><a data-deck="deck" data-slide="api offers, spi requires" href="#deck">Deck · api offers, spi requires</a></p>
       </div></article>
 
       <article class="q"><header><i>Q8</i><h3>Design a system where one module needs 20× the capacity of the rest.</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>First, check whether you need a new service at all — the same artifact deployed with different profiles gives you independent scaling of web, worker and batch today. If the hot module is genuinely CPU- or memory-shaped differently, that is one of the four extraction triggers, so extract it, with its own data.</div>
         <p class="deeper"><b>Go deeper:</b> The profile trick is a strong signal you have operated this: one jar, three deployments, Kafka listeners gated by <code>@Profile("worker")</code>, no ingress on the workers. It gets you most of the isolation benefit with none of the distribution cost, and it is reversible in an afternoon.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Deployment topology" href="#deck">Deck · Deployment topology</a><a data-deck="deck" data-slide="Runtime and capacity" href="#deck">Deck · Runtime and capacity</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q9</i><h3>We depend on a mainframe that changes once a quarter. How do you integrate with it?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Keep its model out of yours. An anti-corruption layer translates its records into your domain language in exactly one place. Choose the mechanism by what the other side can offer: a queue if it already speaks MQ, change data capture if it will not build an API, a file drop only when nothing else exists. Its maintenance window and its release cadence are design constraints, not operational details.</div>
+        <p class="deeper"><b>Go deeper:</b> Describe the failure the layer prevents. Without it, a field like <code>CUST-STAT-CD</code> with eleven values leaks into your domain, your API, your database and your frontend, and the legacy model becomes yours permanently, even after the mainframe is retired. Then two points that show you have run one of these. Put a durable queue in front of anything with a nightly downtime, and make the UI honest about it: "submitted, confirmed within two hours". And build a daily reconciliation job from day one, because any integration that is not a single transaction will drift. Teams that add reconciliation after the first incident always wish they had built it first.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Systems you cannot change" href="#deck">Deck · Systems you cannot change</a><a data-deck="deck" data-slide="The strangler fig" href="#deck">Deck · The strangler fig</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q10</i><h3>How does team structure affect the architecture?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Directly. You will ship your org chart, so choose it deliberately. Each module or service has exactly one owning team, and one team may own several. If the boundaries you want do not match the teams you have, then either the teams change or, within a couple of quarters, the architecture does.</div>
+        <p class="deeper"><b>Go deeper:</b> Name the smells. An "integration team" or a "database team" means the real boundaries run through the middle of every module, so each change needs a hand-off. A module owned by two teams has no owner, and its boundary erodes. The useful limit on a team is cognitive load rather than headcount: one domain language, one data model and one set of external systems. Designing the teams to get the architecture you want is the inverse Conway manoeuvre. Saying that you would set up the teams before drawing the services is a strong senior signal.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Conway's law in practice" href="#deck">Deck · Conway's law</a><a data-deck="deck" data-slide="Governance without bottlenecks" href="#deck">Deck · Governance</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q11</i><h3>How do you record and communicate an architecture decision?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Write an ADR in the repo, in the same pull request that implements the decision. It holds a dated, numeric context, the decision, the options rejected and why, the consequences including the negative ones, and a revisit trigger. Pair it with C4 context and container diagrams to show the shape. It takes about twenty minutes, and it answers the "why is it like this?" question every new engineer asks in their second month.</div>
+        <p class="deeper"><b>Go deeper:</b> Say what makes one useful. Numbers age visibly: "6 engineers, 240 ms of a 780 ms p99" can be checked later, while "the team is small" cannot. Listing the rejected options stops someone proposing them again a year later. A trigger such as "revisit when the payments team passes ten engineers" keeps the decision alive. An ADR with only upsides was written to win an argument, not to record one. Accepted ADRs are superseded, never edited, so the history stays readable. For diagrams, prefer diagrams as code so they get reviewed like code, and generate what you can, such as module documentation and OpenAPI, because hand-drawn diagrams go stale within a quarter.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Decision records" href="#deck">Deck · Decision records</a><a data-deck="deck" data-slide="The C4 model" href="#deck">Deck · The C4 model</a><a data-deck="deck" data-slide="Documentation that stays true" href="#deck">Deck · Documentation</a></p>
       </div></article>
     </section>
 
     <section class="ivsec" id="q-data">
       <h2>Data and consistency</h2>
 
-      <article class="q"><header><i>Q9</i><h3>How do you keep data consistent across services without 2PC?</h3></header><div class="qb">
+      <article class="q"><header><i>Q12</i><h3>How do you keep data consistent across services without 2PC?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Saga: a sequence of local transactions, each with a compensating action. Reserve stock, authorise payment, capture, ship — and if authorisation fails, release the stock. Compensation is not a rollback; it is a new business fact with its own audit trail. Order the irreversible steps last.</div>
         <p class="deeper"><b>Go deeper:</b> Contrast orchestration (a saga state machine you can query — "where is order 88421 stuck") with choreography (lower coupling, but the flow exists only in traces). For enterprise work, orchestration is the default past three steps. Then the operational requirements: persist saga state, make every step idempotent, and put a timeout on every step — a saga without timeouts produces orders sitting in <code>AWAITING_PAYMENT</code> for eleven days.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Sagas" href="#deck">Deck · Sagas</a><a data-deck="ed" data-slide="Choreography vs orchestration" href="#events">Events · Choreography vs orchestration</a><a data-deck="ed" data-slide="Sagas with events" href="#events">Events · Sagas with events</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q10</i><h3>How do you write to the database and publish to Kafka atomically?</h3></header><div class="qb">
+      <article class="q"><header><i>Q13</i><h3>How do you write to the database and publish to Kafka atomically?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>You don't — you use the transactional outbox. Write the event into an outbox table in the same local transaction as the data, and let a separate relay publish it and mark it sent. Crash anywhere and the row is still there, so it gets published again. That gives at-least-once, which is why every consumer is idempotent.</div>
         <p class="deeper"><b>Go deeper:</b> Name both failure modes of the naive approach: send-then-commit publishes an event for an order that rolls back; commit-then-send loses the event on a crash. Then the two relay options — a polling relay (<code>FOR UPDATE SKIP LOCKED</code>, simple, ~200 ms–1 s latency) versus Debezium CDC reading the WAL (millisecond latency, ordering from the log, costs a Connect cluster). Bonus: Spring Modulith's event publication registry is exactly this pattern, built in.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="The dual-write problem" href="#events">Events · The dual-write problem</a><a data-deck="deck" data-slide="Outbox and CDC" href="#deck">Deck · Outbox and CDC</a><a data-deck="deck" data-slide="Events that cannot be lost" href="#deck">Deck · Events that cannot be lost</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q11</i><h3>Two customers order the last item at the same moment. What happens?</h3></header><div class="qb">
+      <article class="q"><header><i>Q14</i><h3>Two customers order the last item at the same moment. What happens?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Optimistic locking with a version column. The update is <code>WHERE sku = ? AND version = ?</code>; the loser gets zero rows updated, an <code>OptimisticLockingFailureException</code>, and a bounded retry on fresh state — where it sees stock is zero and gets a clean "out of stock". No locks held across the request.</div>
         <p class="deeper"><b>Go deeper:</b> Explain why not pessimistic: <code>SELECT FOR UPDATE</code> is correct but serialises the hot row, which is fatal for a flash-sale SKU while being fine for a rarely-contended ledger. Mention the reservation model for real e-commerce — reserve with a TTL at checkout, confirm on payment, release on expiry — so you are not holding stock indefinitely for abandoned carts.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a><a data-deck="sb" data-slide="Auditing, converters, locking" href="#springboot">Boot · Locking</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q12</i><h3>Can you guarantee exactly-once processing?</h3></header><div class="qb">
+      <article class="q"><header><i>Q15</i><h3>Can you guarantee exactly-once processing?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Not over a network — you get at-most-once or at-least-once. What you can achieve is exactly-once <em>effects</em>: at-least-once delivery into an idempotent handler. Deduplicate on a business key, not on an offset.</div>
         <p class="deeper"><b>Go deeper:</b> Show the concrete handler: check whether a reservation already exists for that <code>orderId</code>, and if so acknowledge and return — a duplicate is not an error. Mention Kafka's transactional producer and <code>read_committed</code> as exactly-once <em>within</em> Kafka, and be clear that it does not extend to your database or a third-party API. Getting this distinction right is one of the strongest signals in a mid-to-senior interview.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Delivery semantics" href="#events">Events · Delivery semantics</a><a data-deck="ed" data-slide="Idempotency" href="#events">Events · Idempotency</a><a data-deck="ed" data-slide="Transactions & EOS" href="#events">Events · Transactions &amp; EOS</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q13</i><h3>How do you change a database schema with zero downtime?</h3></header><div class="qb">
+      <article class="q"><header><i>Q16</i><h3>How do you change a database schema with zero downtime?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Expand and contract, across three releases. Add the new nullable column; dual-write and backfill in batches; switch reads; then drop the old column once no running version references it. During a rolling deploy old and new pods share one schema, so every migration must be compatible with the previous release.</div>
         <p class="deeper"><b>Go deeper:</b> Add the operational details — <code>CREATE INDEX CONCURRENTLY</code> on large tables, a <code>lock_timeout</code> so blocked DDL fails fast instead of queueing every query behind it, batched backfills, and migrations as immutable append-only files with Flyway validation on. Answer the rollback question before they ask it: you roll forward, and expand/contract is what makes the <em>deployment</em> rollback-safe even though the schema is not.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Zero-downtime schema change" href="#deck">Deck · Zero-downtime schema change</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q14</i><h3>The order history page is slow. Walk me through fixing it.</h3></header><div class="qb">
+      <article class="q"><header><i>Q17</i><h3>The order history page is slow. Walk me through fixing it.</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Measure first — is it the database, the serialization, or the network? Then in order of cost: check for an N+1, add the covering index, replace offset pagination with a keyset cursor, project a denormalised read model maintained by events, and only then cache. Each step is cheaper than the next one.</div>
         <p class="deeper"><b>Go deeper:</b> Be concrete: 501 queries in the trace means N+1 — fix with <code>@EntityGraph</code> and assert the query count in a test so it cannot come back. <code>OFFSET 100000</code> makes Postgres walk 100k rows — switch to <code>WHERE (placed_at, id) &lt; (?, ?) ORDER BY ... LIMIT 20</code>. Caching last is deliberate: caching a bad query hides the problem until the cache misses at peak.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Persistence traps" href="#deck">Deck · Persistence traps</a><a data-deck="sb" data-slide="Fetching" href="#springboot">Boot · Fetching</a><a data-deck="deck" data-slide="Read models" href="#deck">Deck · Read models</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q15</i><h3>When would you use CQRS or event sourcing?</h3></header><div class="qb">
+      <article class="q"><header><i>Q18</i><h3>When would you use CQRS or event sourcing?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>CQRS-lite — a separate read path with projections instead of aggregates — almost always pays for itself, and costs one class. Full event sourcing is justified when the audit trail <em>is</em> the requirement (ledgers, regulated workflows) or when you genuinely need to reconstruct past state. Otherwise it buys a large amount of complexity for a temporal query nobody asked for.</div>
         <p class="deeper"><b>Go deeper:</b> Name the real costs of event sourcing: schema evolution of events you can never delete, snapshotting for long streams, the difficulty of ad-hoc queries, and a steep onboarding curve for every new engineer. Then the middle ground you would actually ship: normal state storage plus a durable domain-event log, which gives most of the audit value at a fraction of the cost.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Read models" href="#deck">Deck · Read models</a><a data-deck="deck" data-slide="Event sourcing: is it justified?" href="#deck">Deck · Event sourcing</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q19</i><h3>What isolation level do you use, and what does it actually prevent?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>The database default: READ COMMITTED on PostgreSQL and Oracle, REPEATABLE READ on MySQL. I handle concurrency with optimistic locking rather than by raising the level. READ COMMITTED prevents dirty reads but still allows non-repeatable reads and phantoms. That is usually fine, because a version check catches the conflicts that actually matter.</div>
+        <p class="deeper"><b>Go deeper:</b> Show that you know engines go further than the standard requires. PostgreSQL's REPEATABLE READ is snapshot isolation and prevents phantoms, and InnoDB prevents them with gap locks. Snapshot isolation still allows write skew, where two transactions each check a condition, both write, and together they break it. That is the case SERIALIZABLE exists for. On PostgreSQL it aborts transactions with serialization failures under contention, so switching it on without a retry around the whole unit of work turns a correctness problem into an availability problem. Also mention <code>@Transactional(timeout = 5)</code>, in seconds, to bound how long long-running work holds its locks and its connection. The follow-up is nearly always Q14, and the answer there is a version column, not an isolation level.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Isolation levels" href="#springboot">Boot · Isolation levels</a><a data-deck="deck" data-slide="Transactions" href="#deck">Deck · Transactions</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q20</i><h3>How would you add caching, and how do you know when a cached value is wrong?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Start from a staleness budget for each use case, not from a technology. Product copy can be minutes stale, a price seconds stale, and stock at checkout never, so checkout is not cached at all. Then use cache-aside with two layers: Caffeine in-process (about 100 ns, per instance) in front of Redis (about 1 ms, shared). Invalidate on domain events, and keep a TTL as the safety net.</div>
+        <p class="deeper"><b>Go deeper:</b> Name the three classic failures and their fixes. In a <b>stampede</b>, a hot key expires and 500 threads hit the database at once: use <code>@Cacheable(sync = true)</code> or a short lock. In <b>penetration</b>, lookups for ids that do not exist skip the cache every time: cache the negative result briefly. In an <b>avalanche</b>, everything expires in the same second: add jitter to the TTLs. Then the multi-instance problem. Evicting locally on one pod leaves eleven others serving the old value, so the eviction has to be broadcast, through a Redis channel or an event. Close with the ordering point: fix the query first, because a cache in front of a bad query hides it until the cache misses at peak.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Caching" href="#deck">Deck · Caching</a><a data-deck="sb" data-slide="Async, scheduling, caching, testing" href="#springboot">Boot · @Cacheable</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q21</i><h3>The orders table has 500 million rows and keeps growing. What do you do?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Partition before you shard. Range-partition by month on <code>placed_at</code>, so the queries that matter, such as recent orders or one customer's latest page, touch one or two partitions. Retention then means dropping a partition instead of running a multi-hour <code>DELETE</code>. Keep the hot data small, move cold data to cheaper storage, and shard only when a single primary genuinely cannot take the write rate.</div>
+        <p class="deeper"><b>Go deeper:</b> Give the PostgreSQL details that show you have done it. The primary key must include the partition key, so it becomes <code>(id, placed_at)</code>. Partition pruning only works when the query filters on the partition key, so a lookup by id alone probes every partition: keep a narrow id-to-date lookup table, or use a time-ordered id that the date can be read from. Old partitions can be detached (<code>DETACH PARTITION ... CONCURRENTLY</code> from PostgreSQL 14) and archived without blocking queries on the parent table. Before any of this, check whether the pressure is really from reads, because a read model or a replica is far cheaper. If you do shard, key on the entity whose queries must stay local, usually the customer, and move cross-shard reporting to the warehouse.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Read models" href="#deck">Deck · Read models</a><a data-deck="deck" data-slide="Search and reporting" href="#deck">Deck · Search and reporting</a><a data-deck="deck" data-slide="Capacity and cost" href="#deck">Deck · Capacity and cost</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q22</i><h3>How do you serve search and reporting without hurting the transactional database?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Give each workload its own store, fed by events or replication, with the staleness it can tolerate. Full-text search and facets go to OpenSearch, a few seconds behind. Internal screens and exports read from a replica, milliseconds behind. Analytics go to a warehouse through CDC, minutes to hours behind. The primary serves transactions only, and nobody points a dashboard at it.</div>
+        <p class="deeper"><b>Go deeper:</b> Name the replica trap, read-your-own-writes. The customer places an order, the confirmation page reads from the replica, and the order is not there yet. The fix is about five lines: after a write, send that user's reads to the primary for a short window, using a flag keyed on their id. For search, say out loud that results may miss the newest item for a second or two, and that the UI is designed for it. The interviewer is checking that you accept eventual consistency deliberately rather than by accident.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Search and reporting" href="#deck">Deck · Search and reporting</a><a data-deck="deck" data-slide="Read models" href="#deck">Deck · Read models</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q23</i><h3>UUID or database sequence for primary keys?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>A sequence on PostgreSQL or Oracle, with Hibernate's <code>allocationSize</code> matching the sequence's <code>INCREMENT BY</code>, so ids arrive in blocks and inserts can batch. If ids must exist before persisting, or be generated across services, use a time-ordered UUIDv7, not a random v4. Avoid <code>IDENTITY</code> if you need batch inserts, because Hibernate cannot batch them.</div>
+        <p class="deeper"><b>Go deeper:</b> Give the reason for each. With <code>IDENTITY</code> the id is known only after the <code>INSERT</code>, so Hibernate round-trips per row and silently turns off JDBC batching. A mismatched <code>allocationSize</code> produces duplicate-key errors that only appear under concurrency. A random v4 key sends every insert to a random leaf page of the B-tree, which costs write throughput and bloats the index on a large table. A v7 key starts with a timestamp, so inserts land almost in order. Hibernate 7.0 added <code>UuidGenerator.Style.VERSION_7</code>; its older <code>TIME</code> style is a different, version-1-like layout. And always use a surrogate key: "the order number will never change" describes today's process, not the data.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Keys" href="#springboot">Boot · Keys</a><a data-deck="sb" data-slide="Entity basics" href="#springboot">Boot · Entity basics</a></p>
       </div></article>
     </section>
 
     <section class="ivsec" id="q-integration">
       <h2>Integration, messaging and resilience</h2>
 
-      <article class="q"><header><i>Q16</i><h3>A downstream service is slow. How do you stop it taking you down?</h3></header><div class="qb">
+      <article class="q"><header><i>Q24</i><h3>A downstream service is slow. How do you stop it taking you down?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Four layers in order. Timeout first — without a bounded call, nothing else can work. Then bounded retries with exponential backoff <em>and jitter</em>, only on idempotent operations. Then a circuit breaker so you stop calling a dead system. Then a bulkhead capping concurrency to that dependency, so it cannot consume every thread you have.</div>
         <p class="deeper"><b>Go deeper:</b> Explain why jitter matters — without it every client retries at the same millisecond and keeps the recovering dependency down. Explain retry amplification: three services each retrying three times turns one request into twenty-seven, exactly when the dependency is struggling. And say that every breaker state needs a defined fallback: a cached value, a queued write, or an honest 503 with <code>Retry-After</code>.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Resilience" href="#deck">Deck · Resilience</a><a data-deck="deck" data-slide="Calling other systems" href="#deck">Deck · Calling other systems</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q17</i><h3>Synchronous call or event — how do you choose?</h3></header><div class="qb">
+      <article class="q"><header><i>Q25</i><h3>Synchronous call or event — how do you choose?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>One question: if this step fails, should the user's action fail? Yes — synchronous, in the same transaction (taking payment). No — publish an event (confirmation email, loyalty points, search reindex). That single rule keeps checkout availability high while five downstream systems average far less.</div>
         <p class="deeper"><b>Go deeper:</b> Name the cost of the event path honestly — the order now exists in a state where payment has not happened yet, and both the domain model and the UI have to admit that state. Then availability multiplication: five synchronous dependencies at 99.9% each give you 99.5% before you have written a line of your own code.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Call or publish?" href="#deck">Deck · Call or publish?</a><a data-deck="ed" data-slide="When not to" href="#events">Events · When not to</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q18</i><h3>How do you guarantee event ordering?</h3></header><div class="qb">
+      <article class="q"><header><i>Q26</i><h3>How do you guarantee event ordering?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Only within a partition, and only by keying on the entity. All events for one order go to one partition because the key is the order id, so they arrive in order for that order. There is no global ordering across partitions, and you should not design as if there were.</div>
         <p class="deeper"><b>Go deeper:</b> Mention the consequences: partition count caps consumer parallelism, and a hot key creates a hot partition. If a consumer needs to tolerate out-of-order arrival anyway, carry a version or timestamp in the event and ignore anything older than what you have already applied — which is more robust than depending on ordering at all.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Ordering" href="#events">Events · Ordering</a><a data-deck="ed" data-slide="Partitioning" href="#events">Events · Partitioning</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q19</i><h3>A consumer hits a message it can never process. What happens?</h3></header><div class="qb">
+      <article class="q"><header><i>Q27</i><h3>A consumer hits a message it can never process. What happens?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Bounded retries — three, with backoff — then publish to a dead-letter topic, alert, and move on. Infinite retry blocks the partition and everything behind it. Non-retryable exceptions like deserialization failures skip the retries entirely, because a poison pill never gets better.</div>
         <p class="deeper"><b>Go deeper:</b> Add the two operational pieces: a documented replay path from the DLT after the bug is fixed, and alerting on DLT depth greater than zero plus consumer lag — those two are your real SLIs for the async side, not CPU. Also mention where the offset is committed relative to the work — and get the default right, because interviewers who run Kafka will know it: the raw client auto-commits on a timer, but Spring's listener container disables that and acks per poll (<code>AckMode.BATCH</code>), so the real question is whether a mid-batch failure should redeliver 500 records or one. <code>MANUAL_IMMEDIATE</code> is how you make that choice explicit.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Error handling" href="#events">Events · Error handling</a><a data-deck="ed" data-slide="Non-blocking retries" href="#events">Events · Non-blocking retries</a><a data-deck="ed" data-slide="Offsets & commits" href="#events">Events · Offsets &amp; commits</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q20</i><h3>How do you make an API safe to retry?</h3></header><div class="qb">
+      <article class="q"><header><i>Q28</i><h3>How do you make an API safe to retry?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>An <code>Idempotency-Key</code> header the client generates per logical operation. Insert it with a unique constraint before doing the work; on a duplicate key with the same request fingerprint, return the stored response; with a different fingerprint, return 422 because the client reused a key for a different request.</div>
         <p class="deeper"><b>Go deeper:</b> Mention storing the response body and status against the key with a TTL, so the retry gets an identical answer rather than a second order. Then the layering rule: no retry anywhere — client, gateway, or <code>@Retryable</code> — without idempotency. Gateways should retry GETs only. Retrying a POST without a key is how customers get charged twice.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a><a data-deck="ed" data-slide="Idempotency" href="#events">Events · Idempotency</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q21</i><h3>How do you debug a request that crossed four components and a queue?</h3></header><div class="qb">
+      <article class="q"><header><i>Q29</i><h3>How do you debug a request that crossed four components and a queue?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>One trace id, propagated end to end — including through the Kafka message headers, which is the hop teams forget. Every log line carries it, every span carries it, and the customer's error page shows it. Support quotes the id, you get the whole journey in one query.</div>
         <p class="deeper"><b>Go deeper:</b> In Spring terms: Micrometer Tracing with W3C <code>traceparent</code>, OTLP export, and <code>observation-enabled: true</code> on both the Kafka template and the listener container. Mention structured JSON logs with the correlation pattern, sampling at 10% with errors always sampled, and the cardinality rule — never tag a metric with an order id, that belongs in logs and traces.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Observability" href="#deck">Deck · Observability</a><a data-deck="ed" data-slide="Observability" href="#events">Events · Observability</a><a data-deck="sb" data-slide="Structured logging" href="#springboot">Boot · Structured logging</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q30</i><h3>What does <code>acks=all</code> actually guarantee?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>That the write reached every replica currently in the in-sync set, and that set can shrink to just the leader. On its own that is weaker than it sounds. The durable combination is replication factor 3, <code>min.insync.replicas=2</code> and <code>acks=all</code>. An acknowledged write then exists on at least two brokers, and if two brokers are lost the partition refuses writes rather than quietly accepting them on one.</div>
+        <p class="deeper"><b>Go deeper:</b> Explain the ISR. A follower that falls further behind than <code>replica.lag.time.max.ms</code> is dropped from it, and <code>acks=all</code> then means "all the replicas still keeping up". Keep <code>unclean.leader.election.enable</code> false for anything involving money: setting it true restores availability by electing an out-of-sync replica, and discards writes that were acknowledged. On the producer, <code>acks=all</code> and idempotence have been the defaults since Kafka 3.0, although idempotence only took effect from 3.0.1, 3.1.1 and 3.2.0 onwards. The real bound on delivery is <code>delivery.timeout.ms</code>, not <code>retries</code>. And followers do not serve reads for throughput; read scaling comes from partitions.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Replication & ISR" href="#events">Events · Replication &amp; ISR</a><a data-deck="ed" data-slide="Producer config" href="#events">Events · Producer config</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q31</i><h3>Consumer lag is climbing. What do you do?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Diagnose before you scale. Adding consumers triggers a rebalance and often makes things worse. First question: is the lag on every partition, or on one? One partition means a hot key or a stuck consumer. Every partition means producer volume jumped, the handler slowed down because a dependency did, or the group is stuck in a rebalance loop. Each cause has a different fix, and only the first is "scale out".</div>
+        <p class="deeper"><b>Go deeper:</b> Name the command. <code>kafka-consumer-groups.sh --describe --group …</code> shows lag per partition and which member owns it. An empty consumer id means nothing is consuming that partition at all. Then check whether the consumer count already equals the partition count, because beyond that extra pods sit idle. The fix that usually wins is a cheaper handler: a batch listener with one bulk write turns 500 inserts into one statement, and can raise throughput by an order of magnitude with no new infrastructure. Do not raise <code>max.poll.interval.ms</code> to stop rebalances. Lower <code>max.poll.records</code>, so one poll's work finishes in time.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Diagnosing lag" href="#events">Events · Diagnosing lag</a><a data-deck="ed" data-slide="Backpressure" href="#events">Events · Backpressure</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q32</i><h3>What is a consumer-group rebalance, and how do you stop it hurting?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>When group membership changes, partitions are reassigned. Under the old eager protocol every consumer stops and gives up all its partitions first, so each rolling deploy pauses the whole group several times. Cooperative sticky assignment moves only the partitions that must move. Static membership, with a <code>group.instance.id</code> per pod, means a restart within the session timeout triggers no rebalance at all. On Kafka 4, the new consumer protocol (KIP-848) removes the group-wide pause entirely.</div>
+        <p class="deeper"><b>Go deeper:</b> The failure interviewers want you to recognise is the rebalance loop. A batch takes longer than <code>max.poll.interval.ms</code>, the broker decides the consumer is dead, the partition moves, and the new owner reprocesses the same slow batch. Lag climbs while the logs show rebalances rather than errors. The fix is a lower <code>max.poll.records</code>. Also commit offsets in <code>onPartitionsRevoked</code> so the new owner does not redo work, and keep the instance id stable: a StatefulSet pod name works, while a random UUID defeats the point.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Rebalancing" href="#events">Events · Rebalancing</a><a data-deck="ed" data-slide="Consumer groups" href="#events">Events · Consumer groups</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q33</i><h3>How do you change an event's schema without breaking consumers?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Make every change additive. New fields are optional with defaults, and nothing required is removed, renamed or given a new type. Enforce it with a schema registry set to <code>BACKWARD</code> compatibility, with schemas registered from CI, so an incompatible producer fails its own deploy instead of breaking a consumer nobody knew about. Consumers are tolerant readers that ignore fields they do not recognise.</div>
+        <p class="deeper"><b>Go deeper:</b> For a genuinely breaking change, run expand and contract across the consumers. Add the new field alongside the old one, let each consumer migrate, watch a metric until nobody reads the old field, then remove it. If the meaning of the topic changes, such as a different key or granularity, publish a <code>.v2</code> topic, write both versions from the same outbox transaction, and retire v1 once its consumer groups have gone. Mention <code>auto.register.schemas: false</code> in production. Otherwise the first producer to start registers whatever schema it has, and the compatibility gate never fires.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Serialization & schema" href="#events">Events · Serialization &amp; schema</a><a data-deck="ed" data-slide="Shipping a breaking change" href="#events">Events · Breaking changes</a><a data-deck="ed" data-slide="Consumer-side versioning" href="#events">Events · Consumer-side versioning</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q34</i><h3>Kafka or RabbitMQ?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>They do different jobs. Kafka is a partitioned, replayable log with high throughput, many independent consumers, and retention and replay as features: an event backbone. RabbitMQ is a broker of queues with flexible routing, per-message TTL and priorities, and messages that are gone once consumed: a work queue. Many large organisations run both, plus an MQ estate for systems that already speak it, with a written rule for what goes where.</div>
+        <p class="deeper"><b>Go deeper:</b> Give the deciding questions. Will anyone need to replay history, or add a consumer next year that reads from the beginning? Kafka. Do you need per-message routing, priorities or delays at modest volume? RabbitMQ. Would you rather not run a broker at all? SQS and SNS, or a managed event bus. Then add the current detail. Kafka's historical gap as a queue, per-record acknowledgement and more consumers than partitions, is closing with KIP-932 share groups, GA in Kafka 4.2. That does not give Kafka RabbitMQ's routing, but it removes one common reason for running both.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="Broker comparison" href="#events">Events · Broker comparison</a><a data-deck="deck" data-slide="Event topology" href="#deck">Deck · Event topology</a></p>
       </div></article>
     </section>
 
     <section class="ivsec" id="q-spring">
       <h2>Spring and Java specifics</h2>
 
-      <article class="q"><header><i>Q22</i><h3>Why doesn't <code>@Transactional</code> work when I call the method from the same class?</h3></header><div class="qb">
+      <article class="q"><header><i>Q35</i><h3>Why doesn't <code>@Transactional</code> work when I call the method from the same class?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Because it is implemented with a proxy. An internal <code>this.method()</code> call never goes through the proxy, so the advice never runs. Fix by moving the method to another bean, or by using <code>TransactionTemplate</code> explicitly. There is no warning in any version — the reference manual says the annotation "may be silently ignored", and the code appears to work until someone tests a rollback.</div>
         <p class="deeper"><b>Go deeper:</b> Same mechanism explains why <code>@Cacheable</code>, <code>@Async</code> and <code>@Retryable</code> also do nothing on self-invocation, and why <code>final</code> or private methods cannot be advised with CGLIB proxies. This question is really testing whether you know Spring is a proxy container rather than magic.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Bean lifecycle" href="#springboot">Boot · Bean lifecycle</a><a data-deck="sb" data-slide="AOP limits" href="#springboot">Boot · AOP limits</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q23</i><h3>What rolls a Spring transaction back?</h3></header><div class="qb">
+      <article class="q"><header><i>Q36</i><h3>What rolls a Spring transaction back?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>By default, <code>RuntimeException</code> and <code>Error</code> — not checked exceptions. So a checked <code>PaymentDeclinedException</code> commits the half-written order. Either set <code>rollbackFor = Exception.class</code>, or adopt the convention that all domain exceptions are unchecked, which is what I would do.</div>
         <p class="deeper"><b>Go deeper:</b> Cover propagation while you are there: <code>REQUIRED</code> joins the caller's transaction (the default), <code>REQUIRES_NEW</code> suspends it and takes a <em>second connection from the pool</em> — nest that in a loop and you deadlock your own pool. Legitimate uses are audit rows that must survive a rollback, and post-commit event listeners.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Transactions" href="#deck">Deck · Transactions</a><a data-deck="sb" data-slide="Transaction propagation" href="#springboot">Boot · Propagation</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q24</i><h3>What is an N+1 and how would you catch it before production?</h3></header><div class="qb">
+      <article class="q"><header><i>Q37</i><h3>What is an N+1 and how would you catch it before production?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>One query for a list, then one per row for a lazy association — 501 queries for 500 orders. Fix with <code>@EntityGraph</code> or <code>join fetch</code>. Catch it by asserting the query count on the hot endpoints in an integration test, so a regression six months later fails the build rather than a dashboard.</div>
         <p class="deeper"><b>Go deeper:</b> Mention <code>open-in-view: false</code> — the default is <code>true</code> and it hides N+1s behind a request-scoped session until production load exposes them. Then the adjacent traps: two <code>join fetch</code>es on collections give a cartesian explosion, and pagination combined with <code>join fetch</code> makes Hibernate log "applying in memory" and then run out of heap.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Fetching" href="#springboot">Boot · Fetching</a><a data-deck="deck" data-slide="Persistence traps" href="#deck">Deck · Persistence traps</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q25</i><h3>How do you size a connection pool?</h3></header><div class="qb">
+      <article class="q"><header><i>Q38</i><h3>How do you size a connection pool?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Little's law: concurrency = throughput × hold time. Ten orders a second, 40 ms of database work each, is 0.4 connections on average; times five for peak is about two, so set it to 10–20 for headroom. Then check the total across all pods against the database's <code>max_connections</code>.</div>
         <p class="deeper"><b>Go deeper:</b> Explain why bigger is worse: PostgreSQL context-switches between hundreds of backends, latency rises, each request holds its connection longer, which needs more connections. Pools are queues, and oversizing just moves the queue somewhere less observable. Forty pods at 20 each is 800 connections, which is how a healthy service takes down a shared cluster.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Runtime and capacity" href="#deck">Deck · Runtime and capacity</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q26</i><h3>Do virtual threads change your architecture?</h3></header><div class="qb">
+      <article class="q"><header><i>Q39</i><h3>Do virtual threads change your architecture?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>They remove the thread-per-request ceiling for IO-bound work, so you can handle far more concurrent blocked requests without going reactive. They do not create capacity downstream — if your throughput is limited by the database or a third party, ten thousand virtual threads queue on twenty connections instead of on a thread pool.</div>
         <p class="deeper"><b>Go deeper:</b> In Boot it is <code>spring.threads.virtual.enabled: true</code>. Note that pinning on <code>synchronized</code> blocks is largely resolved in modern JDKs but legacy libraries can still pin, and that the honest framing is: virtual threads make the simple blocking programming model scale, which removes most of the reason to adopt WebFlux.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Runtime and capacity" href="#deck">Deck · Runtime and capacity</a><a data-deck="sb" data-slide="JVM memory" href="#springboot">Boot · JVM memory</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q27</i><h3>How do you test a Spring Boot application properly?</h3></header><div class="qb">
+      <article class="q"><header><i>Q40</i><h3>How do you test a Spring Boot application properly?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Match the test to the layer. Domain rules in plain JUnit with no context, microseconds. Slices — <code>@WebMvcTest</code>, <code>@DataJpaTest</code> — for serialization, validation and SQL. Testcontainers with the real PostgreSQL and Kafka for integration. A handful of end-to-end journeys, no more. Plus architecture tests, which are tests like any other.</div>
         <p class="deeper"><b>Go deeper:</b> Say explicitly that H2 is not your database — it passes SQL that production rejects and skips the constraints and locking behaviour that matter. Mention <code>@ServiceConnection</code> and container reuse to keep the suite fast, and that three reliable E2E tests beat forty flaky ones, because a suite people re-run "because it's probably flaky" has stopped being a gate.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Testing strategy" href="#deck">Deck · Testing strategy</a><a data-deck="sb" data-slide="Async, scheduling, caching, testing" href="#springboot">Boot · Test slices</a><a data-deck="ed" data-slide="Testing" href="#events">Events · Testing</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q28</i><h3>What's new in Spring Boot 4 that matters architecturally?</h3></header><div class="qb">
+      <article class="q"><header><i>Q41</i><h3>What's new in Spring Boot 4 that matters architecturally?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Four things I would actually use: first-class API versioning on server and client; declarative HTTP interface clients via <code>@ImportHttpServices</code>; resilience in the core framework — <code>@Retryable</code> and <code>@ConcurrencyLimit</code> without an extra library; and null safety through JSpecify with <code>@NullMarked</code> packages. Java 17 is still the baseline, 25 recommended.</div>
         <p class="deeper"><b>Go deeper:</b> Add the migration realities: the framework is split into finer modules, which is the most common upgrade surprise; Jackson 3 changes defaults (ISO-8601 dates, unchecked exceptions); and Spring Data AOT generates repository queries at build time for a meaningful startup improvement. 4.1 (June 2026) added gRPC support, <code>InetAddressFilter</code> for SSRF mitigation on the HTTP clients, lazy JDBC connection acquisition and <code>@RedisListener</code>. Knowing the version cadence — a major or minor every six months — is a cheap credibility signal.
         <br><br>The detail that separates "I read the release notes" from "I did the upgrade": core <code>@Retryable</code> is not a rename of Spring Retry's. It needs <code>@EnableResilientMethods</code>, the attribute is <code>maxRetries</code> and it counts retries rather than attempts, and there is no <code>@Recover</code> — so a copied annotation compiles, runs one extra time, and loses its fallback silently.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="3.x → 4.x changes" href="#springboot">Boot · 3.x → 4.x changes</a><a data-deck="deck" data-slide="Versioning and evolution" href="#deck">Deck · Versioning</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q42</i><h3>How does Spring Boot auto-configuration actually work?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span><code>@SpringBootApplication</code> turns on component scanning and <code>@EnableAutoConfiguration</code>, which reads every <code>AutoConfiguration.imports</code> file on the classpath, about 150 classes from Boot itself. Each class is guarded by conditions: <code>@ConditionalOnClass</code> (is the library present?), <code>@ConditionalOnProperty</code>, and above all <code>@ConditionalOnMissingBean</code>, which makes Boot back off whenever you declare the bean yourself. Your own configuration is registered first, which is how that back-off can see it.</div>
+        <p class="deeper"><b>Go deeper:</b> The diagnostic answers half the follow-ups. Run with <code>--debug</code>, or call <code>/actuator/conditions</code>, and the condition evaluation report says exactly why each auto-configuration did or did not apply. Then give the four ways to take control, weakest first. Set a property. Declare a <code>*Customizer</code> bean, which changes one setting and keeps Boot's defaults. Declare your own bean, which makes you own every default: define your own <code>ObjectMapper</code> and you lose the modules Boot had registered. Or <code>exclude</code> the auto-configuration, the blunt instrument. The legacy trap: before Boot 2.7 the list lived in <code>spring.factories</code>, and Boot 3.0 removed that route. An in-house starter that never migrated contributes nothing, and nothing reports an error.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Auto-configuration" href="#springboot">Boot · Auto-configuration</a><a data-deck="sb" data-slide="The @Conditional family" href="#springboot">Boot · @Conditional</a><a data-deck="sb" data-slide="Overriding auto-config" href="#springboot">Boot · Overriding auto-config</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q43</i><h3>Constructor or field injection, and what happens with a circular dependency?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Constructor injection. The dependencies are explicit and final, the object is complete once constructed, and a test can build it with <code>new</code>. A cycle of constructor-injected beans fails at startup, which is the right outcome because a cycle is a design smell, and Boot has refused circular references by default since 2.6. Fix the design, usually by extracting the shared piece into a third bean or turning one direction into an event. <code>@Lazy</code> on one side is a stopgap.</div>
+        <p class="deeper"><b>Go deeper:</b> Scopes are the usual next question. Singleton is the default. A prototype injected into a singleton is created once, at injection time, so it behaves like a singleton; inject an <code>ObjectProvider&lt;T&gt;</code> to get a fresh instance per call. Request and session scopes are injected as scoped proxies. Prototype beans never get a destroy callback. Finally, constructors should wire, not work: a constructor that calls the database makes startup depend on that system, and a brief outage there becomes a crash loop here.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Bean lifecycle" href="#springboot">Boot · Bean lifecycle</a><a data-deck="sb" data-slide="Injection & configuration" href="#springboot">Boot · Injection</a><a data-deck="sb" data-slide="Startup hooks and shutdown" href="#springboot">Boot · Startup hooks</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q44</i><h3>What goes wrong with <code>@Async</code> and <code>@Scheduled</code>?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Four things. Self-invocation bypasses the proxy, so the method runs synchronously. Boot's auto-configured executor has 8 core threads and an unbounded queue, so <code>max-size</code> never takes effect and a backlog grows in memory instead of being rejected. Exceptions from a <code>void</code> async method go to an uncaught-exception handler, which logs them and nothing else. And thread-bound context, such as the MDC, the trace and the security context, does not follow the task unless you propagate it.</div>
+        <p class="deeper"><b>Go deeper:</b> Give the fixes. Name a bounded executor per workload, <code>@Async("notificationExecutor")</code>, with a queue capacity and a rejection policy you chose. Return <code>CompletableFuture</code> when the caller needs the outcome. Add a <code>TaskDecorator</code> (Framework 6.1 ships <code>ContextPropagatingTaskDecorator</code>) so logs and traces stay correlated. For <code>@Scheduled</code>, the default scheduler has one thread, so one slow job delays all the others. In a multi-pod deployment every pod runs every job unless you add a lock, such as ShedLock, or run schedulers only in the worker deployment. With virtual threads enabled, Boot switches both to virtual-thread executors and the pool settings stop applying.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Async, scheduling, caching, testing" href="#springboot">Boot · Async and scheduling</a><a data-deck="deck" data-slide="Deployment topology" href="#deck">Deck · Deployment topology</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q45</i><h3>What does a <code>HashMap</code> need from its keys, and why is that awkward for a JPA entity?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Consistent <code>equals</code> and <code>hashCode</code>. Equal objects must have equal hash codes, and neither may change while the object is in the map. Change a field that <code>hashCode</code> reads and the entry is stranded in the wrong bucket: <code>get</code> and <code>remove</code> miss it, although iteration still finds it. Records and other immutable value objects get this right by construction.</div>
+        <p class="deeper"><b>Go deeper:</b> The JPA twist is that a generated id is null until the entity is persisted, so an id-based <code>hashCode</code> changes the moment you save. An entity added to a <code>HashSet</code> before saving can no longer be found in it. There are three sound options: an immutable business key; an id assigned at construction, such as a client-generated UUIDv7; or equality on the id with a <code>hashCode</code> that is constant for the class, trading bucket speed for correctness. Never use Lombok's <code>@Data</code> on an entity, because it hashes every field, including lazy associations, which triggers loads. For the internals follow-up: an array of buckets with a default capacity of 16 and a load factor of 0.75, doubling on resize. Since Java 8, a bucket that grows past 8 entries becomes a red-black tree once the table has at least 64 buckets, which limits the damage from poor hash codes to O(log n).</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Entity basics" href="#springboot">Boot · Entity basics</a><a data-deck="sb" data-slide="Keys" href="#springboot">Boot · Keys</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q46</i><h3><code>volatile</code>, <code>synchronized</code>, atomics, <code>ConcurrentHashMap</code>: when do you need which?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span><code>volatile</code> gives visibility and ordering for a single variable. It is right for a stop flag or a safely published reference, and wrong for <code>count++</code>, which is a read, an add and a write that can interleave. <code>synchronized</code> or a <code>Lock</code> gives mutual exclusion for compound actions. Atomics give lock-free updates to one variable, with <code>LongAdder</code> for heavily contended counters. <code>ConcurrentHashMap</code> gives thread-safe map operations, and <code>compute</code>, <code>merge</code> and <code>computeIfAbsent</code> make check-then-act atomic.</div>
+        <p class="deeper"><b>Go deeper:</b> The bug interviewers plant is check-then-act on a concurrent map. <code>if (!map.containsKey(k)) map.put(k, v)</code> is two operations and it races; <code>putIfAbsent</code> or <code>computeIfAbsent</code> is one. Keep the function passed to <code>compute*</code> short, and never modify the same map from inside it. <code>ConcurrentHashMap</code> rejects null keys and values, and its iterators are weakly consistent rather than fail-fast. Then the enterprise framing: in a Spring service, most shared mutable state is a bug. Singletons should be stateless, and state belongs in the database, where transactions and version columns handle concurrency. On virtual threads, a <code>synchronized</code> block around blocking IO used to pin the carrier thread. JDK 24 largely fixed that, but <code>ReentrantLock</code> is still the safe choice for code that must run on older JDKs.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Runtime and capacity" href="#deck">Deck · Runtime and capacity</a><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q47</i><h3>Do records and sealed types change how you model a domain?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Yes. They make illegal states harder to write. Records are immutable value objects with correct <code>equals</code> and <code>hashCode</code>, plus a compact constructor for validation, which is exactly what <code>Money</code>, <code>OrderId</code> or <code>Address</code> should be. Sealed interfaces close a hierarchy, so a payment result becomes a fixed set of types, and since Java 21 the compiler checks a pattern-matching <code>switch</code> over them for exhaustiveness.</div>
+        <p class="deeper"><b>Go deeper:</b> Show the payoff with <code>sealed interface PaymentResult permits Authorised, Declined, Pending</code>, where each is a record carrying only the data that state has. A declined result cannot accidentally carry an authorisation code. Add a new state and every <code>switch</code> without a default stops compiling, which is exactly the reminder you want. Know the limits too. Records are not JPA entities, because they are final and immutable while entities need a no-argument constructor and mutable state. They work well as embeddables from Hibernate 6.2, as query projections and as DTOs, and Jackson handles them natively.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The aggregate" href="#deck">Deck · The aggregate</a><a data-deck="sb" data-slide="Entity basics" href="#springboot">Boot · Entity basics</a></p>
       </div></article>
     </section>
 
     <section class="ivsec" id="q-api">
       <h2>API design and frontend</h2>
 
-      <article class="q"><header><i>Q29</i><h3>How do you version an API?</h3></header><div class="qb">
+      <article class="q"><header><i>Q48</i><h3>How do you version an API?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Avoid needing to. Additive changes only, never repurpose a field, and tolerant readers on every consumer. When a breaking change is unavoidable, expand and contract across releases — and if you must cut a version, pick one scheme across the whole organisation rather than three.</div>
         <p class="deeper"><b>Go deeper:</b> Compare path versioning (obvious in logs, gateways and curl — what most enterprises pick) with header or media-type versioning (cleaner REST, and what Spring 7 optimises for with <code>@GetMapping(version = "2")</code>). Then the part people forget: deprecation needs teeth — <code>Deprecation</code> and <code>Sunset</code> headers plus a metric tagged by client and version, or v1 lives forever.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Versioning and evolution" href="#deck">Deck · Versioning and evolution</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q30</i><h3>Where should the access token live in a browser app?</h3></header><div class="qb">
+      <article class="q"><header><i>Q49</i><h3>Where should the access token live in a browser app?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Not in the browser. Use the BFF pattern: the browser holds an httpOnly, SameSite session cookie, the BFF holds the tokens and attaches the bearer server-side. Token theft via injected script leaves the threat model entirely. The cost is a stateful hop and CSRF defence.</div>
         <p class="deeper"><b>Go deeper:</b> Both options use OIDC authorization code with PKCE — the only difference is storage, which is why retrofitting the BFF later is an interceptor change rather than a re-architecture. localStorage is defensible for internal tools with low-value data; say so, because the interviewer is checking whether you weigh risk or recite rules.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Authentication" href="#deck">Deck · Authentication</a><a data-deck="deck" data-slide="Gateway, BFF or mesh" href="#deck">Deck · Gateway, BFF or mesh</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q31</i><h3>How do you keep the frontend and backend contracts in sync?</h3></header><div class="qb">
+      <article class="q"><header><i>Q50</i><h3>How do you keep the frontend and backend contracts in sync?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Generate, never hand-write. The build publishes an OpenAPI document from the controllers; the frontend regenerates its typed client from it on every build, and the generated folder is gitignored so it cannot drift. Renaming a field in Java then breaks the frontend compile in CI, before merge.</div>
         <p class="deeper"><b>Go deeper:</b> Add the breaking-change gate — <code>oasdiff</code> against main turns "is this breaking?" from a judgement call into a build result. Mention that the async side needs the same treatment: Avro or JSON schemas in a registry with <code>BACKWARD</code> compatibility, so an incompatible producer is rejected at deploy time.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="One contract, two ends" href="#deck">Deck · One contract, two ends</a><a data-deck="ed" data-slide="Contract testing" href="#events">Events · Contract testing</a></p>
       </div></article>
 
-      <article class="q"><header><i>Q32</i><h3>Would you use micro-frontends?</h3></header><div class="qb">
+      <article class="q"><header><i>Q51</i><h3>Would you use micro-frontends?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>Usually no. They solve an organisational problem — independent deployment by separate teams — at a real technical cost in shared dependencies, bundle size and cross-app state. The default is one app with enforced feature boundaries and lazy routes, which is the frontend's modular monolith.</div>
         <p class="deeper"><b>Go deeper:</b> Name the three cases where they genuinely pay: four or more teams on one screen surface, strangling a legacy app page by page (the most defensible), and post-acquisition integration. All three are org or history problems, not UI problems — which is the point worth making.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Micro-frontends" href="#deck">Deck · Micro-frontends</a><a data-deck="deck" data-slide="Frontend architecture" href="#deck">Deck · Frontend architecture</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q52</i><h3>What should an error response look like?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>One shape for the whole system: RFC 9457 Problem Details, built into Spring as <code>ProblemDetail</code> since Framework 6. It carries a <code>type</code> URI for each kind of error, a human-readable <code>title</code> and <code>detail</code>, and the status. Add typed extension fields the UI can act on, such as the SKU and the quantity still available rather than just a sentence, plus the trace id, which links a customer's screenshot to your logs.</div>
+        <p class="deeper"><b>Go deeper:</b> Use status codes that mean something. 400 is malformed, 401 not authenticated, 403 authenticated but not allowed, 404 absent or not visible to you, 409 in conflict with current state, 422 well-formed but breaking a rule, 429 slow down, and 503 with <code>Retry-After</code> when a dependency is down. Never return a 200 carrying <code>{"error": …}</code>. Stack traces, SQL fragments and internal hostnames in an error body are a security finding, not a debugging aid. Build every response in one <code>@RestControllerAdvice</code> so the trace id cannot be forgotten.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="One error shape" href="#deck">Deck · One error shape</a><a data-deck="deck" data-slide="The API layer" href="#deck">Deck · The API layer</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q53</i><h3>Which HTTP methods are idempotent, and why does it matter?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>GET, HEAD, PUT and DELETE are idempotent by definition: repeating them leaves the server in the same state. POST is not, and PATCH is not guaranteed to be. That decides what infrastructure may retry for you. A gateway can safely retry a GET after a timeout, but retrying a POST without an idempotency key is how a customer ends up with two orders.</div>
+        <p class="deeper"><b>Go deeper:</b> Separate idempotent from safe. GET is both; DELETE is idempotent but not safe. Idempotence is about server state, not the response, so a second DELETE can return 404 and still be idempotent. For design, PUT replaces the whole resource at a known URI, PATCH sends a partial change (JSON Merge Patch or JSON Patch), and POST creates something or triggers a command. State transitions that do not fit CRUD, such as cancel or refund, are best modelled as a POST to a sub-resource with an idempotency key, rather than a PATCH to a status field that bypasses the domain's rules.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The API layer" href="#deck">Deck · The API layer</a><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a></p>
+      </div></article>
+    </section>
+
+    <section class="ivsec" id="q-security">
+      <h2>Security</h2>
+      <p class="dek">Security questions in a backend loop are rarely about cryptography. They check whether you know where each check happens, and which one teams most often forget.</p>
+
+      <article class="q"><header><i>Q54</i><h3>Walk me through what Spring Security does with a request carrying a JWT.</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>The request passes through the <code>SecurityFilterChain</code>. <code>BearerTokenAuthenticationFilter</code> extracts the token, and a <code>JwtDecoder</code> checks the signature against the issuer's JWKS keys (cached, and refetched for an unknown <code>kid</code>), then the issuer, the expiry and the not-before time. A converter maps scopes and role claims to authorities, and the resulting <code>Authentication</code> goes into the <code>SecurityContext</code>. Only then do the URL rules in <code>authorizeHttpRequests</code> and any <code>@PreAuthorize</code> methods run.</div>
+        <p class="deeper"><b>Go deeper:</b> Name the check most answers miss: the audience is validated only if you configure it. Without <code>audiences: [order-api]</code>, a valid token minted for the marketing API is accepted by the payments API, because both trust the same issuer. One line of YAML closes that lateral-movement path. Then the choices for a bearer-token API: stateless sessions and CSRF protection off, while a cookie-based BFF keeps CSRF on. And authorisation at three layers, URL, method and row, because a URL rule cannot know who owns order 88421.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="The filter chain" href="#springboot">Boot · The filter chain</a><a data-deck="sb" data-slide="OAuth2 & JWT" href="#springboot">Boot · OAuth2 &amp; JWT</a><a data-deck="sb" data-slide="Method security" href="#springboot">Boot · Method security</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q55</i><h3>JWT or opaque tokens? And how do you revoke a JWT?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>You cannot revoke a JWT directly. A signed JWT stays valid until it expires, and that is the price of validating it locally without a network call. So keep access tokens short-lived, five to fifteen minutes, and keep refresh tokens on the server. Where instant revocation genuinely matters, use opaque tokens with introspection: a call to the identity provider per request, which you can cache for a few seconds, in exchange for real revocation and no readable claims.</div>
+        <p class="deeper"><b>Go deeper:</b> Say where each fits. JWTs suit internal service-to-service traffic and high request rates. Opaque tokens suit external-facing APIs and regulated work, and many banks mandate them. A middle ground is a short-lived JWT plus a deny-list checked only on sensitive operations, such as payouts or password changes. Mention that a JWT is signed, not encrypted: anyone holding it can decode the claims, so it must not carry personal data.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="OAuth2 & JWT" href="#springboot">Boot · OAuth2 &amp; JWT</a><a data-deck="deck" data-slide="Authentication" href="#deck">Deck · Authentication</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q56</i><h3>How do you stop one customer reading another customer's order?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Check ownership on every object access, not only authentication at the door. A valid token plus <code>GET /orders/88421</code> with someone else's id is broken object-level authorisation, first on the OWASP API Security Top 10. URL rules cannot catch it, because the URL is legitimate. Enforce it in three layers: the filter chain for who you are, method security for whether you may act on this object, and scoping at the data layer, so a query that forgets <code>WHERE customer_id = ?</code> still cannot return other customers' rows.</div>
+        <p class="deeper"><b>Go deeper:</b> Make it concrete. Write <code>@PreAuthorize("@orderAccess.mayView(#id, authentication)")</code>, with the check in a bean you can unit-test, rather than SpEL that grows a third <code>or</code>. At the row level, use a Hibernate <code>@Filter</code> enabled per request, or PostgreSQL row-level security, which still holds when someone bypasses the ORM with native SQL. Return 404 rather than 403 for objects the caller may not see, so ids cannot be probed. For multi-tenant systems, say which isolation model you would pick: a shared schema with row-level security by default, and a schema or database per tenant for customers who pay for it.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Security" href="#deck">Deck · Security</a><a data-deck="sb" data-slide="Method security" href="#springboot">Boot · Method security</a><a data-deck="sb" data-slide="Tenancy & testing" href="#springboot">Boot · Tenancy</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q57</i><h3>How should one service authenticate to another?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>There are two parts: proving which service is calling, and deciding whose authority the call carries. For the first, use OAuth2 client credentials, a token for the calling service whose audience is the service being called, or mTLS, ideally issued and rotated by a service mesh. For the second, either relay the user's token, or exchange it for a narrower one, so the downstream service can enforce user-level rules and audit a person. Or call as a service account and pass the user id as data.</div>
+        <p class="deeper"><b>Go deeper:</b> Give the trade-off. Token relay couples you more tightly to the identity provider and carries tokens further, but the audit trail names a person, which is what regulated, customer-affecting flows need. Service accounts are simpler and faster, but the downstream service must trust the caller, which is why they are paired with mTLS. In Spring, <code>OAuth2ClientHttpRequestInterceptor</code> on a <code>RestClient</code> handles the client side. And the operational point: hand-managed truststores expire at 3 a.m. on a bank holiday, so let the platform issue and rotate workload certificates.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Enterprise SSO & mTLS" href="#springboot">Boot · SSO &amp; mTLS</a><a data-deck="deck" data-slide="Gateway, BFF or mesh" href="#deck">Deck · Gateway, BFF or mesh</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q58</i><h3>Where do secrets live, and how do they get rotated?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Never in the repo, the image or <code>application.yaml</code>, not even test credentials. Secrets come from a secret manager, such as Vault or the cloud provider's, injected at runtime. The real requirement is rotation. Short-lived, dynamically issued credentials, such as Vault database secrets or cloud IAM roles for workloads, make rotation routine rather than an incident.</div>
+        <p class="deeper"><b>Go deeper:</b> Separate configuration from secrets. Environment-specific values come from config maps or a config server, and are validated at startup with <code>@ConfigurationProperties</code> and <code>@Validated</code>, so a typo fails the boot rather than the first payment. Secrets take a separate, access-logged path. Add secret scanning on every commit, and accept the uncomfortable rule that a secret that has ever been in git history is compromised: rotate it rather than rewriting history. Actuator's <code>/env</code> and <code>/configprops</code> mask values by default, but they belong on an internal port anyway.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Config and secrets" href="#deck">Deck · Config and secrets</a><a data-deck="sb" data-slide="Actuator" href="#springboot">Boot · Actuator</a></p>
+      </div></article>
+    </section>
+
+    <section class="ivsec" id="q-ops">
+      <h2>Production and operations</h2>
+      <p class="dek">The questions that tell an interviewer whether you have been on call for what you built. Mitigation before diagnosis, measurement before guessing, and a precise vocabulary for what the JVM does inside a container.</p>
+
+      <article class="q"><header><i>Q59</i><h3>What does "production ready" mean to you?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>That the team can run the service at 3 a.m. without the person who wrote it. Concretely: one artifact promoted through every environment, with no secrets inside. Timeouts on every outbound call. Liveness and readiness probes that mean different things. Graceful shutdown. A trace id end to end. SLOs with burn-rate alerts and a runbook for each alert. Idempotent consumers with a dead-letter topic. Expand-and-contract migrations. And a backup that has actually been restored.</div>
+        <p class="deeper"><b>Go deeper:</b> Pick the two that most teams skip and say why they matter. Restoring a backup: most teams have never tried, and find out at the worst moment that the restore takes nine hours or leaves out a schema. And killing a pod in production, deliberately, during business hours: if that feels frightening, the graceful-shutdown and retry story is not real yet. Presenting this as a go-live checklist, rather than a list of technologies, is what the question is looking for.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Readiness checklist" href="#springboot">Boot · Readiness checklist</a><a data-deck="deck" data-slide="Deployment topology" href="#deck">Deck · Deployment topology</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q60</i><h3>What goes in the liveness probe, and what goes in readiness?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Liveness asks "is this JVM wedged, and should it be restarted?", so it checks nothing external. Readiness asks "can this instance serve right now?", so it includes the dependencies the service cannot work without, such as its own database. Put the database in liveness and a thirty-second database blip fails liveness on every pod at once. Kubernetes restarts the whole fleet, and the restart storm turns a blip into a ten-minute outage.</div>
+        <p class="deeper"><b>Go deeper:</b> Then the second-order rule: third-party dependencies belong in neither. If the payment gateway is in readiness, a gateway outage pulls every pod out of the load balancer, and customers get a connection error instead of "payments are temporarily unavailable, your basket is saved". Report it as a custom <code>DEGRADED</code> status that still maps to HTTP 200, and alert on it. In Boot these are the <code>/actuator/health/liveness</code> and <code>/readiness</code> groups. Add a <code>startupProbe</code> for slow starts so liveness can stay aggressive, and give every custom health check a timeout, because probes run every few seconds on every pod.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Actuator" href="#springboot">Boot · Actuator</a><a data-deck="sb" data-slide="Health indicators" href="#springboot">Boot · Health indicators</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q61</i><h3>How do you deploy without dropping requests?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Three things have to line up. Graceful shutdown, so on SIGTERM the server stops accepting new requests and finishes in-flight ones within a bounded timeout; this is Boot's default since 3.4. A preStop sleep of a few seconds, so the pod leaves the Service endpoints before it stops accepting, otherwise the last requests are routed to a closed connector. And a readiness probe that stays down until the new pod is warm, so it does not receive traffic early.</div>
+        <p class="deeper"><b>Go deeper:</b> Then the parts that concern data rather than pods. During a rolling deploy two versions run against one schema, so migrations must be expand-only and backward compatible, run once as a job before the rollout rather than from every pod. Kafka consumers stop during shutdown, and any uncommitted batch is redelivered to the next owner, which is fine because the consumers are idempotent. Add a PodDisruptionBudget so a node drain cannot take every replica at once. And check that <code>terminationGracePeriodSeconds</code>, 30 seconds by default, is longer than the preStop sleep plus the shutdown timeout, or Kubernetes kills the JVM halfway through draining.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Startup hooks and shutdown" href="#springboot">Boot · Shutdown</a><a data-deck="deck" data-slide="Deployment topology" href="#deck">Deck · Deployment topology</a><a data-deck="deck" data-slide="Zero-downtime schema change" href="#deck">Deck · Schema change</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q62</i><h3>p99 latency doubled right after a deploy. Walk me through it.</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Mitigate first, then diagnose. If the deploy is the obvious suspect and the SLO is burning, roll back; the diagnosis can use the data you already have and a canary. Then work from the cheapest check. Is it every request or only the tail? A trace of one slow request finds the hop. Then the query count and time on that hop, the pool wait time, and thread dumps. A CPU profile comes last, because CPU-bound application code is the rarest cause in an enterprise service.</div>
+        <p class="deeper"><b>Go deeper:</b> Name the usual suspects, roughly in order of likelihood: a new N+1 or a missing index in the change, an unbounded result set, a new downstream call without a timeout, connection-pool starvation (where the time shows up as waiting to acquire rather than working), and a huge response being serialised. Mention the three-thread-dump trick: take three dumps ten seconds apart, and any thread stuck on the same frame in all three is the problem. Mention JFR too, which is safe to run in production at around 1% overhead. And compare before and after on the same dashboard under comparable load, because "it feels faster" is not a result.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Profiling" href="#springboot">Boot · Profiling</a><a data-deck="deck" data-slide="Observability" href="#deck">Deck · Observability</a><a data-deck="deck" data-slide="SLOs and alerting" href="#deck">Deck · SLOs</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q63</i><h3>Pods are being OOMKilled, but the heap graph looks fine. Why?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>Because the process is killed for memory that is not heap. Exit code 137 with no <code>OutOfMemoryError</code> in the logs means the container went over its limit. Metaspace, thread stacks (up to about 1 MB for each platform thread), the code cache, and the direct buffers used by Netty and the Kafka client all live outside <code>-Xmx</code>. Raising the heap makes it worse.</div>
+        <p class="deeper"><b>Go deeper:</b> The fix is headroom, set as a percentage: <code>-XX:MaxRAMPercentage=75</code> rather than a hard-coded <code>-Xmx</code>, which crash-loops the day someone shrinks the container. Diagnose with Native Memory Tracking: start with <code>-XX:NativeMemoryTracking=summary</code>, then run <code>jcmd &lt;pid&gt; VM.native_memory summary</code>. Check the thread count, since hundreds of platform threads can reserve hundreds of megabytes of stack. Then contrast the other case: an actual <code>OutOfMemoryError</code> in the logs is a heap problem, usually a leak or an unbounded query, and it needs a heap dump rather than a bigger heap.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="JVM memory" href="#springboot">Boot · JVM memory</a><a data-deck="sb" data-slide="Memory leaks" href="#springboot">Boot · Memory leaks</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q64</i><h3>The heap climbs until the pod restarts. How do you find the leak?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>First confirm that it is a leak. A healthy heap is a sawtooth with a flat baseline; a leak is a sawtooth whose low points keep rising after full collections. Then take a class histogram with <code>jcmd &lt;pid&gt; GC.class_histogram</code>, which is often enough on its own. If it is not, take a heap dump from a pod already out of rotation and open it in Eclipse MAT: the dominator tree, then the path to GC roots. That path is the bug.</div>
+        <p class="deeper"><b>Go deeper:</b> List the leaks that actually happen in Spring services: a <code>ConcurrentHashMap</code> used as a cache with no eviction (use Caffeine with a maximum size), a <code>ThreadLocal</code> set on a pooled thread and never removed, listeners registered and never unregistered, a list field on a singleton that only grows, and large objects in long-lived HTTP sessions. Then the handling point that shows experience in regulated work: a heap dump contains every string in memory, including names, addresses and tokens. It is production data, so it goes to restricted storage and is deleted afterwards, never onto a laptop. Also note that frequent deploys hide leaks: if pods restart as often as you release, a leak can stay invisible for years.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Memory leaks" href="#springboot">Boot · Memory leaks</a><a data-deck="sb" data-slide="Garbage collection" href="#springboot">Boot · Garbage collection</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q65</i><h3>Which garbage collector would you use?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>G1, the default, for almost every enterprise service, and then fix allocation rather than tuning flags. Generational ZGC (JDK 21+) when the heap is large or there is a hard p99 target, because its pauses stay under a millisecond whatever the heap size, at a small cost in throughput. Parallel for batch jobs where only total throughput matters. The collector is rarely the real problem: an endpoint that loads 50,000 entities to return 20 rows is a query problem showing up as GC.</div>
+        <p class="deeper"><b>Go deeper:</b> Volunteer the container trap. The JVM sizes itself from the processors it can see, and a CPU limit of 500m makes it see one. With one processor it picks SerialGC and sizes the common ForkJoinPool to a single thread. Give the container at least two full cores, or set <code>-XX:ActiveProcessorCount</code>. Then read symptoms before touching flags. Frequent young collections are normal. An old generation that grows after each full GC is a leak. Long full GCs mean the heap is too small for the live data, or leaking. G1 humongous allocations come from huge arrays, so page the query. Turn on GC logging with <code>-Xlog:gc*</code> so the evidence exists before you need it, and remember that <code>MaxGCPauseMillis</code> is a target, not a guarantee.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Garbage collection" href="#springboot">Boot · Garbage collection</a><a data-deck="sb" data-slide="JVM memory" href="#springboot">Boot · JVM memory</a></p>
+      </div></article>
+
+      <article class="q"><header><i>Q66</i><h3>How do you decide what to alert on?</h3></header><div class="qb">
+        <div class="snap"><span class="lbl">30-second answer</span>On symptoms the customer feels, derived from SLOs, not on CPU. Pick an SLI for each journey, such as the share of <code>POST /orders</code> that succeed within 1.5 s. Set an objective, such as 99.9% over 28 days. Then alert on how fast the error budget is burning: a fast window that pages (about 14× the sustainable rate over an hour) and a slow window that opens a ticket (about 6× over six hours). That catches both the outage and the slow bleed without paging on a blip.</div>
+        <p class="deeper"><b>Go deeper:</b> Explain the budget. 99.9% allows about 43 minutes a month, and that figure turns "can we ship this risky change?" into arithmetic. Every paging alert has a runbook. Below the SLOs, dashboards follow RED for endpoints (rate, errors, duration) and USE for resources (utilisation, saturation, errors) such as pools, heap and disk. On the asynchronous side, consumer lag and dead-letter depth are the SLIs. And keep metric tags low-cardinality: an order id belongs in logs and traces, never on a metric.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="SLOs and alerting" href="#deck">Deck · SLOs and alerting</a><a data-deck="sb" data-slide="Metrics" href="#springboot">Boot · Metrics</a><a data-deck="ed" data-slide="SLIs & alerting" href="#events">Events · SLIs &amp; alerting</a></p>
       </div></article>
     </section>
 
     <section class="ivsec" id="whiteboard">
-      <h2>Two whiteboard scripts</h2>
+      <h2>Five scripts for the long questions</h2>
       <p class="dek">Rehearse these out loud. Not to recite — to have the shape of the answer available so your attention goes to the interviewer's constraints instead of to structure.</p>
 
       <div class="q"><header><i>W1</i><h3>"Design an order management system for a large retailer"</h3></header><div class="qb">
@@ -22893,6 +23253,7 @@ boolean isInterleave(String s1, String s2, String s3) {
         <p class="deeper"><b>Data:</b> PostgreSQL, schema per module, no cross-schema joins. <code>order_summary</code> read model for history, maintained by events. Redis for the price cache and rate limits. OpenSearch for search, fed by events. Partition the orders table by month once it passes tens of millions of rows.</p>
         <p class="deeper"><b>Scale the bottleneck:</b> "The bottleneck at 40× is the orders write path and the inventory hot rows." Queue the non-critical work; optimistic locking plus reservation TTL on inventory; scale workers separately from web; pre-warm and raise the cache TTL for the sale window; shed load at the gateway before the database gets there.</p>
         <p class="deeper"><b>Failure and ops:</b> Payment gateway down → circuit breaker, order accepted as <code>PAYMENT_PENDING</code> with a retry job, customer told honestly. WMS down → events queue, fulfilment lags, nothing lost. Kafka down → outbox rows accumulate, the database still serves checkout. SLO 99.9% on place-order with burn-rate alerts; trace id end to end; DLT depth and consumer lag alerted.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="System context (C4 L1)" href="#deck">Deck · System context</a><a data-deck="deck" data-slide="The whole picture" href="#deck">Deck · The whole picture</a></p>
       </div></div>
 
       <div class="q"><header><i>W2</i><h3>"We have a five-year-old monolith with 400 tables. Modernise it."</h3></header><div class="qb">
@@ -22903,6 +23264,40 @@ boolean isInterleave(String s1, String s2, String s3) {
         <p class="deeper"><b>Split the data:</b> schema per module, one role per module, cross-schema joins replaced by API calls or read models. Run this way for a while. "If I can't split the data, I definitely can't split the service."</p>
         <p class="deeper"><b>Then extract, one module, on evidence:</b> pick the one with a named trigger — usually the one with a different scaling profile or a compliance boundary. Interface stays, adapter swaps, feature flag, cut over, delete. Measure whether it helped before doing a second one.</p>
         <p class="deeper"><b>Close with the business framing:</b> "Each phase ships value on its own — the tracing pays for itself in incident time, the modularisation in change lead time. Nothing here requires a two-year programme with no deliverable until the end." That sentence is often what the question was really probing.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The strangler fig" href="#deck">Deck · The strangler fig</a><a data-deck="deck" data-slide="Fitness functions" href="#deck">Deck · Fitness functions</a><a data-deck="deck" data-slide="First 90 days" href="#deck">Deck · First 90 days</a></p>
+      </div></div>
+
+      <div class="q"><header><i>W3</i><h3>"Design rate limiting for our public partner API"</h3></header><div class="qb">
+        <p class="deeper"><b>Clarify:</b> Limit by what: API key, partner, endpoint, or all three? What shape: "100 requests a second sustained, bursts to 200" is the usual contract. Is the limit contractual, so billing and fairness depend on it, or protective, to keep us up? How exact must it be across 50 gateway instances; is going 5% over for a second acceptable? Total traffic: say 20k requests a second.</p>
+        <p class="deeper"><b>Algorithm:</b> A token bucket per key: a refill rate and a capacity, two numbers of state. It expresses "sustained rate plus burst", which is what partner contracts usually say. Name the alternatives and why not. A fixed window is simplest but lets through double the limit across a window boundary. A sliding log is exact but stores every request. A sliding-window counter is a good approximation using two counters, and a fine second choice.</p>
+        <p class="deeper"><b>Where:</b> At the edge, in the gateway, before a request costs anything. Spring Cloud Gateway's <code>RedisRateLimiter</code> is a token bucket implemented in a Lua script. Add a second, service-level concurrency limit on the expensive endpoints, because rate and concurrency protect against different things: a hundred cheap requests are fine, and ten report exports are not.</p>
+        <p class="deeper"><b>State:</b> Redis, one key per partner holding tokens and a timestamp, updated atomically by a Lua script so the read-modify-write cannot race across 50 instances. Keys carry a TTL, so idle partners cost nothing. That is about a millisecond per check, and a single Redis node handles on the order of 100k simple operations a second.</p>
+        <p class="deeper"><b>Response:</b> <code>429 Too Many Requests</code> with <code>Retry-After</code>, plus remaining-quota headers (the common <code>X-RateLimit-*</code> convention, or the IETF RateLimit header fields draft), so well-behaved clients slow down before they hit the wall.</p>
+        <p class="deeper"><b>Failure:</b> Decide deliberately what happens when Redis is down. For a protective limit, fail open to a coarse in-memory limiter on each instance (the limit divided by the instance count), so the limiter's store failing does not take the API down with it. For a contractual limit, you might fail closed. Across regions, give each region its share of the budget rather than making a synchronous cross-region check on every request.</p>
+        <p class="deeper"><b>Operate it:</b> Keep limits in configuration, changeable without a deploy. Graph 429s per partner and alert when a top partner starts being limited, because that is often an incident on their side, or a bug on ours. Close with: "Partners should be able to see their own limits and usage. A rate limiter is part of the product, not only a defence."</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Gateway configuration" href="#deck">Deck · Gateway configuration</a><a data-deck="deck" data-slide="Resilience" href="#deck">Deck · Resilience</a></p>
+      </div></div>
+
+      <div class="q"><header><i>W4</i><h3>"Design a flash sale: 10,000 units, 500,000 people, starting at noon"</h3></header><div class="qb">
+        <p class="deeper"><b>Clarify:</b> How many SKUs? A limit per customer? How long is a unit held in the basket? Is overselling ever acceptable? It is not: it is a legal and trust problem. Is fairness first come, first served? Traffic: most of the 500,000 arrive in the first minute, so tens of thousands of page loads a second, and thousands of purchase attempts a second.</p>
+        <p class="deeper"><b>Reframe it out loud:</b> "Ninety-eight per cent of these people will be told no. The design is about telling them no quickly and cheaply, and serving the two per cent well." That sentence usually changes the conversation.</p>
+        <p class="deeper"><b>Shape:</b> The sale page is static and served from the CDN; it never reaches the origin. A waiting room at the edge admits users at the rate checkout can handle. Web and worker deployments are scaled up before noon, not by an autoscaler reacting at 12:00:30.</p>
+        <p class="deeper"><b>Inventory, the hard part:</b> Do not let 500,000 requests update one row. Put a gatekeeper counter in Redis and <code>DECR</code> it atomically. A result below zero means sold out, answered in a millisecond. Only the winners write a durable reservation to PostgreSQL, with a TTL of about ten minutes, so the database sees around 10,000 writes rather than 500,000. An expired reservation returns its unit to the counter. Redis is the gate and PostgreSQL is the truth, and a reconciliation job compares them. If you cannot use Redis, split the stock across several rows so the writes spread out; optimistic retries on a single hot row collapse under this much contention.</p>
+        <p class="deeper"><b>Idempotency and abuse:</b> A unique constraint on (customer, sale) and an idempotency key on the purchase request, so double clicks and retries cannot take two units. Limits per account and per device at the edge. Optionally, allow only accounts created before the sale was announced.</p>
+        <p class="deeper"><b>Payment and failure:</b> Payment follows the reservation. If it fails or times out, the reservation is released back to the pool. When stock runs out, flip one flag that the CDN serves, so the sold-out page never touches the origin. Shed load at the gateway with a queue page rather than letting the database become the queue. Load-test at twice the forecast the week before, and have a kill switch.</p>
+        <p class="deeper"><b>Close with the invariant:</b> "Every 'no' comes from the edge or from Redis in milliseconds. Only the ten thousand winners ever touch the database."</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a><a data-deck="deck" data-slide="Caching" href="#deck">Deck · Caching</a><a data-deck="sb" data-slide="Load testing" href="#springboot">Boot · Load testing</a></p>
+      </div></div>
+
+      <div class="q"><header><i>W5</i><h3>"Checkout errors spiked ten minutes ago. You're on call. Talk me through it."</h3></header><div class="qb">
+        <p class="deeper"><b>Acknowledge and size it (first two minutes):</b> Acknowledge the page so others know it is owned. Open the SLO dashboard: how many customers, which journeys, and since when. If customers are affected, declare an incident. Severity follows impact, not cause.</p>
+        <p class="deeper"><b>Look for the change:</b> What happened at that time? A deploy, a flag, a migration, a config change, a dependency's status page, a traffic spike? Most incidents follow a change, and the timeline is the fastest diagnostic you have.</p>
+        <p class="deeper"><b>Mitigate before you diagnose:</b> Roll back the deploy, turn off the flag, fail over, or shed load. "Restoring service comes first. The root cause can wait for the postmortem, and a rollback is cheaper than being right." This is the sentence the round is listening for.</p>
+        <p class="deeper"><b>Communicate:</b> Open an incident channel. Name an incident commander once more than two people are involved, so the people debugging are not also writing updates. Post updates on a fixed cadence, every fifteen to thirty minutes, even when nothing has changed. Update the customer status page if customers can see the problem.</p>
+        <p class="deeper"><b>Diagnose, if no change explains it or the rollback did not help:</b> The RED dashboard shows which endpoint and which status codes. Are they 5xx errors or timeouts? Trace one failing request. Check the dependency dashboard: is a breaker open, has the gateway's latency jumped? Check pool saturation, then the logs filtered by trace id.</p>
+        <p class="deeper"><b>Confirm recovery:</b> The error rate is back inside the SLO, consumer lag is draining, and nothing is stuck. Orders left in <code>PAYMENT_PENDING</code> get retried, and a reconciliation run finds anything that needs repair, such as duplicates or half-processed orders.</p>
+        <p class="deeper"><b>Postmortem:</b> Blameless, with a timeline, contributing factors (usually several, not one root cause), what slowed detection and mitigation, and action items with owners. The permanent change is the part interviewers want to hear.</p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="SLOs and alerting" href="#deck">Deck · SLOs and alerting</a><a data-deck="ed" data-slide="Failure scenarios" href="#events">Events · Failure scenarios</a><a data-deck="ed" data-slide="Replay playbook" href="#events">Events · Replay playbook</a></p>
       </div></div>
     </section>
 
@@ -22944,6 +23339,32 @@ boolean isInterleave(String s1, String s2, String s3) {
           <div class="note tip"><span class="lbl">How to deploy a number</span>Not "it'll be fast" but "an indexed lookup is single-digit milliseconds, so at 40 requests a second that's well under one connection of concurrency — the database isn't the constraint here, the payment gateway's 800 ms is." Specific, checkable, and it moves the conversation to the real bottleneck.</div>
         </div>
       </div>
+      <h3 style="font-size:16px">Defaults that come up in follow-up questions</h3>
+      <p class="dek" style="font-size:14.5px">Interviewers who have run these systems ask about defaults, because the default is what most teams are actually running. Knowing the value, and why it matters, is a quick credibility signal.</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Setting</th><th>Default</th><th>Why it comes up</th></tr></thead>
+          <tbody>
+            <tr><td>HikariCP <code>maximum-pool-size</code></td><td class="num">10</td><td>It applies per pod. Multiply by the pod count and compare with the database's limit.</td></tr>
+            <tr><td>PostgreSQL <code>max_connections</code></td><td class="num">100</td><td>Shared by every pod, job and tool. Running out is a cluster-wide outage.</td></tr>
+            <tr><td>Tomcat <code>server.tomcat.threads.max</code></td><td class="num">200</td><td>The platform-thread ceiling that virtual threads remove.</td></tr>
+            <tr><td>Boot's <code>@Async</code> executor</td><td class="num">8 core, unbounded queue</td><td><code>max-size</code> never takes effect, and a backlog grows in memory.</td></tr>
+            <tr><td>Boot's <code>@Scheduled</code> pool</td><td class="num">1 thread</td><td>One slow job delays every other scheduled job.</td></tr>
+            <tr><td><code>@Transactional</code> rollback</td><td class="num">unchecked only</td><td>A checked exception commits the transaction.</td></tr>
+            <tr><td><code>spring.jpa.open-in-view</code></td><td class="num">true</td><td>Boot logs a warning at startup. It hides N+1s until production load.</td></tr>
+            <tr><td><code>server.shutdown</code></td><td class="num">graceful (Boot 3.4+)</td><td>Bounded by <code>spring.lifecycle.timeout-per-shutdown-phase</code>, 30 s by default.</td></tr>
+            <tr><td>Kubernetes <code>terminationGracePeriodSeconds</code></td><td class="num">30 s</td><td>Must exceed the preStop sleep plus the shutdown timeout.</td></tr>
+            <tr><td>JVM <code>MaxRAMPercentage</code></td><td class="num">25%</td><td>An untuned JVM in a container uses a quarter of its memory for heap.</td></tr>
+            <tr><td>G1 <code>MaxGCPauseMillis</code></td><td class="num">200 ms</td><td>A target, not a guarantee.</td></tr>
+            <tr><td>Kafka <code>min.insync.replicas</code></td><td class="num">1</td><td>Leaves <code>acks=all</code> weaker than it sounds. Set it to 2 with replication factor 3.</td></tr>
+            <tr><td>Kafka <code>max.poll.records</code></td><td class="num">500</td><td>Records per poll. Lower it before you raise the poll interval.</td></tr>
+            <tr><td>Kafka <code>max.poll.interval.ms</code></td><td class="num">5 min</td><td>Exceed it and the consumer is evicted: the rebalance loop.</td></tr>
+            <tr><td>Kafka <code>session.timeout.ms</code></td><td class="num">45 s (3.0+)</td><td>How long a dead consumer keeps its partitions.</td></tr>
+            <tr><td>Kafka <code>auto.offset.reset</code></td><td class="num">latest</td><td>A new consumer group skips everything already on the topic.</td></tr>
+            <tr><td>Kafka <code>retention.ms</code> / <code>offsets.retention.minutes</code></td><td class="num">7 days / 7 days</td><td>Your replay window, and how long an idle group keeps its position.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="ivsec" id="stories">
@@ -22957,6 +23378,21 @@ boolean isInterleave(String s1, String s2, String s3) {
         <div class="card"><h4>Something you simplified or deleted</h4><p>Removing a service, a cache, or a flag. Senior engineers are measured on what they removed as much as what they built, and almost nobody prepares this one.</p></div>
         <div class="card"><h4>Tailoring</h4><p>If the role is domain-heavy — payments, supply chain, trading — pick stories where the <b>domain rules</b> drove the design. It reads as someone who engages with the business, not only the stack.</p></div>
       </div>
+      <h3 style="font-size:16px">One story, many questions</h3>
+      <p class="dek" style="font-size:14.5px">Behavioural questions come in dozens of phrasings but draw on the same few stories. Map yours in advance, so that an unfamiliar question becomes "which of my five is this?"</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Story</th><th>Also answers</th></tr></thead>
+          <tbody>
+            <tr><td>Production incident</td><td>"A time you worked under pressure" · "How do you handle on-call?" · "A time you improved reliability" · "A mistake you made", if you caused it</td></tr>
+            <tr><td>Decision you got wrong</td><td>"Tell me about a failure" · "A time you changed your mind" · "What would you do differently?" · "Feedback that changed how you work"</td></tr>
+            <tr><td>Performance problem</td><td>"Your hardest technical problem" · "A time you used data to make a decision" · "Something you're proud of"</td></tr>
+            <tr><td>Architecture disagreement</td><td>"Conflict with a colleague" · "Disagreeing with your manager" · "Influencing without authority" · "Disagree and commit"</td></tr>
+            <tr><td>Something you deleted</td><td>"A time you reduced cost or complexity" · "Technical debt you paid down" · "A time you pushed back on scope"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">"We" for context, "I" for decisions</span>Interviewers score what <em>you</em> did. Use "we" to set the scene and "I" for what you decided, measured or changed. End with a number, such as time to recover, p99 before and after, or cost per month, because a result without a number sounds like a hope.</div>
     </section>
 
     <section class="ivsec" id="redflags">
@@ -22970,6 +23406,11 @@ boolean isInterleave(String s1, String s2, String s3) {
             <tr><td>"We'd just add a cache."</td><td>"I'd fix the query first; caching a bad query hides it until the cache misses at peak. Then cache, with an invalidation story."</td></tr>
             <tr><td>"It scales horizontally."</td><td>"The app layer scales horizontally; the bottleneck is the database write path, and here's how I'd relieve it."</td></tr>
             <tr><td>"We use Spring Boot and Kubernetes."</td><td>Describe behaviour and boundaries. Tools are the last five percent of the answer.</td></tr>
+            <tr><td>"I'd make the connection pool bigger."</td><td>"I'd check pool wait time first. If the database is the constraint, a bigger pool just moves the queue. I'd size it from throughput × hold time."</td></tr>
+            <tr><td>"We'd add more consumers."</td><td>"Consumers stop helping at the partition count, and scaling triggers a rebalance. I'd check whether the lag is on one partition or all of them first."</td></tr>
+            <tr><td>"I'd give it more heap."</td><td>"Is there an <code>OutOfMemoryError</code>, or an exit 137? The second is native memory, and a bigger heap makes it worse."</td></tr>
+            <tr><td>"The payment call goes inside the transaction."</td><td>"I'd never hold a database transaction open across a remote call. It holds a connection and its locks for the gateway's 800 ms."</td></tr>
+            <tr><td>"We validate the JWT, so it's secure."</td><td>"The token says who you are. It doesn't say you own order 88421, so the ownership check happens on every access."</td></tr>
             <tr><td>Silence while thinking.</td><td>"Let me think about the consistency requirement here — I'm weighing a saga against keeping it in one transaction." Narrate; they are grading reasoning.</td></tr>
             <tr><td>Defending the first idea.</td><td>"That constraint changes it — with a hard 200 ms budget I'd drop the synchronous tax call and use a cached estimate."</td></tr>
             <tr><td>No failure discussion.</td><td>Volunteer it: "The obvious failure mode here is the payment gateway, so…" Bring it up before they have to ask.</td></tr>
@@ -22977,6 +23418,43 @@ boolean isInterleave(String s1, String s2, String s3) {
         </table>
       </div>
       <div class="note tip"><span class="lbl">The last minute</span>When they ask if you have questions, ask something that only someone who would have to live in the system would ask: "What's your deployment frequency, and what usually blocks it?" · "Where do your boundaries currently hurt most?" · "How do you decide when to extract a service?" The answers tell you more about the job than any job description, and asking them is itself a signal.</div>
+    </section>
+
+    <section class="ivsec" id="plan">
+      <h2>A three-week plan</h2>
+      <p class="dek">If the interview is booked, this order gets the most out of the atlas per hour. It assumes about ninety minutes on weekdays and a longer session at the weekend. With less time, shorten each week but keep the order: mechanisms first, then systems, then rehearsal.</p>
+      <div class="grid3">
+        <div class="card">
+          <h3>Week 1 · Mechanisms</h3>
+          <ul class="checks tight">
+            <li>Spring Boot tab: Lifecycle, JPA and Internals. The proxy, the persistence context and transaction boundaries answer a third of any Spring deep-dive.</li>
+            <li>This page: Spring &amp; Java and Security, answered out loud before you read the answers.</li>
+            <li>DSA: the orientation and complexity slides, then patterns 01–10, about two a day. Code the two "if you only drill two" problems for each.</li>
+          </ul>
+          <p class="xrefs"><a data-deck="sb" data-sec="Lifecycle" href="#springboot">Boot · Lifecycle</a><a data-deck="sb" data-sec="JPA" href="#springboot">Boot · JPA</a><a data-deck="sb" data-sec="Internals" href="#springboot">Boot · Internals</a><a data-deck="dsa" data-slide="What this deck is" href="#dsa">DSA · Start</a></p>
+        </div>
+        <div class="card">
+          <h3>Week 2 · Systems</h3>
+          <ul class="checks tight">
+            <li>Reference deck: Modular monolith, Backend, Middleware and Data.</li>
+            <li>Event-driven tab: Guarantees and Kafka internals.</li>
+            <li>This page: Architecture, Data and Integration. Rehearse W1 and W2 out loud against a 45-minute timer.</li>
+            <li>DSA patterns 11–20.</li>
+          </ul>
+          <p class="xrefs"><a data-deck="deck" data-sec="Modular monolith" href="#deck">Deck · Modular monolith</a><a data-deck="deck" data-sec="Middleware" href="#deck">Deck · Middleware</a><a data-deck="ed" data-sec="Guarantees" href="#events">Events · Guarantees</a><a data-deck="ed" data-sec="Kafka internals" href="#events">Events · Kafka internals</a><a data-deck="dsa" data-sec="11 · Heap / top K" href="#dsa">DSA · 11</a></p>
+        </div>
+        <div class="card">
+          <h3>Week 3 · Operating it, then rehearsal</h3>
+          <ul class="checks tight">
+            <li>Spring Boot tab: Production. Reference deck: Cross-cutting.</li>
+            <li>This page: Production &amp; ops, scripts W3–W5, and the numbers.</li>
+            <li>Two mock interviews, one design and one coding, with someone who will interrupt you. Write your five stories and time each at ninety seconds.</li>
+            <li>DSA patterns 21–30.</li>
+          </ul>
+          <p class="xrefs"><a data-deck="sb" data-sec="Production" href="#springboot">Boot · Production</a><a data-deck="deck" data-sec="Cross-cutting" href="#deck">Deck · Cross-cutting</a><a data-deck="dsa" data-sec="21 · Topological sort" href="#dsa">DSA · 21</a></p>
+        </div>
+      </div>
+      <div class="note good"><span class="lbl">The day before</span>Re-read the numbers, the red flags and your five stories. Learn nothing new: new material the night before crowds out what you already know, and the interview rewards fluent recall of the basics far more than one extra pattern.</div>
     </section>
   </div>
 </div>
@@ -23346,10 +23824,35 @@ boolean isInterleave(String s1, String s2, String s3) {
     }
   } catch (e) { /* highlighting is decorative; the code still reads */ }
 
-  /* ---- boot from hash ---- */
-  (function boot() {
+  /* ---- cross-references: interview answers link to the slides that cover them ---- */
+  // Links name a slide by data-sec and/or data-slide (its data-title), not by number,
+  // so inserting slides never breaks them. The href is filled in here.
+  function findSlide(key, sec, title) {
+    var d = DECKS[key];
+    if (!d) return -1;
+    for (var i = 0; i < d.slides.length; i++) {
+      var s = d.slides[i];
+      if ((!sec || s.getAttribute("data-sec") === sec) &&
+          (!title || s.getAttribute("data-title") === title)) return i;
+    }
+    return -1;
+  }
+  document.querySelectorAll("a[data-deck]").forEach(function (a) {
+    var key = a.getAttribute("data-deck");
+    var i = findSlide(key, a.getAttribute("data-sec"), a.getAttribute("data-slide"));
+    if (i >= 0) a.setAttribute("href", "#" + DECKS[key].slug + "/" + (i + 1));
+  });
+  // Before following one, record the current section on this history entry,
+  // so Back lands on the question you left rather than the top of the page.
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("#ivroot a[data-deck]") : null;
+    var sec = a && a.closest(".ivsec");
+    if (sec && sec.id) { try { history.replaceState(null, "", "#" + sec.id); } catch (err) {} }
+  });
+
+  /* ---- routing: the hash on load, and Back/Forward afterwards ---- */
+  function route(initial) {
     var h = (location.hash || "").replace("#", "");
-    if (h === "interview") { setView("iv", true); return; }
     var m = /^(deck|springboot|events|dsa)\/(\d+)$/.exec(h);
     if (m) {
       var key = m[1] === "springboot" ? "sb" : (m[1] === "events" ? "ed" : (m[1] === "dsa" ? "dsa" : "deck"));
@@ -23357,8 +23860,18 @@ boolean isInterleave(String s1, String s2, String s3) {
       setView(key, true);
       return;
     }
-    setView("deck", true);
-  })();
+    var target = h && h !== "interview" ? document.getElementById(h) : null;
+    if (h === "interview" || (target && ivroot.contains(target))) {
+      // Already on the interview page: an in-page anchor, which the browser scrolls to itself.
+      if (view === "iv" && !initial) return;
+      setView("iv", true);
+      if (target) target.scrollIntoView();
+      return;
+    }
+    if (initial) setView("deck", true);
+  }
+  window.addEventListener("hashchange", function () { route(false); });
+  route(true);
 })();
 </script>
 
