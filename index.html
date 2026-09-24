@@ -9043,7 +9043,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
         <li>Read the mechanics slide, then cover the dry-run table and trace the input yourself. Compare after.</li>
         <li>Type the structure from memory before reading the problems. The structure is the unit of recall.</li>
         <li>Copper marks the pointer or value that moved this step; <span style="color:var(--async);font-weight:600">teal</span> marks auxiliary state changing.</li>
-        <li>Complexity is always stated as <code>time / space</code>, excluding the space taken by the output.</li>
+        <li>Complexity is always stated as <code>time / space</code>, excluding the space taken by the output. The <b>Complexity analysis</b> section, straight after these orientation slides, shows how every one of those figures is derived.</li>
       </ul>
     </div>
   </div>
@@ -9229,6 +9229,667 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
   <div class="note tip"><span class="lbl">Say this in the interview</span>"The constraints put n at 10⁵, so I need O(n log n) or better — which rules out the pairwise approach I'd otherwise reach for." In one sentence you have demonstrated that you design against a budget rather than guessing. It reliably scores, and it costs five seconds.</div>
 </section>
 
+
+<!-- dsa · complexity 01 · the method -->
+<section class="slide" data-sec="Complexity analysis" data-title="Finding complexity: the method">
+  <h2>Count the work, then keep only what grows</h2>
+  <p class="dek">Every pattern in this deck quotes a <code>time / space</code> figure. None of them needs memorising: each one is <b>derived</b> by counting, and the counting takes the same five steps every time. Learn the steps once and you can price code that is not on the list — including your own half-written solution, while there is still time to change it.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The five steps</h3>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Name the size variables.</b> <code>n</code> for the array, but also <code>m</code> for a second input, <code>k</code> for a window or heap, <code>L</code> for a string's length, <code>V</code> and <code>E</code> for a graph. Never fold two independent inputs into one <code>n</code>.</li>
+        <li><b>Price one unit of work.</b> Find the statement that runs most often, and cost every line that is not O(1): a sort, a <code>substring</code>, a heap push, a copy of a list.</li>
+        <li><b>Count how often it runs.</b> Sequential blocks add. Nested loops multiply. A range that halves contributes a log. Recursion is calls × work per call. A pointer that only moves forward is counted over the whole run, not per iteration.</li>
+        <li><b>Simplify.</b> Drop constant factors and lower-order terms: <code>3n² + 5n + 7</code> is O(n²). Independent variables stay side by side — O(n + m) does not become O(n).</li>
+        <li><b>Repeat for space.</b> The peak extra memory alive at any one moment: structures that grow with the input, plus the deepest recursion stack. The input and the output are excluded, and you say so.</li>
+      </ol>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Code shape</th><th>Contributes</th></tr></thead>
+        <tbody>
+          <tr><td>Block A, then block B</td><td class="num">O(A + B) — the larger wins</td></tr>
+          <tr><td>A loop of n whose body costs B</td><td class="num">O(n · B)</td></tr>
+          <tr><td>Two nested loops, both to n</td><td class="num">O(n²)</td></tr>
+          <tr><td>Inner loop starts at <code>i + 1</code></td><td class="num">n(n−1)/2 → O(n²)</td></tr>
+          <tr><td>A loop over n, then a separate one over m</td><td class="num">O(n + m)</td></tr>
+          <tr><td>A loop over n with a loop over m inside</td><td class="num">O(n · m)</td></tr>
+          <tr><td><code>i *= 2</code>, or the range halves</td><td class="num">O(log n)</td></tr>
+          <tr><td><code>while (i * i &lt;= n)</code></td><td class="num">O(√n)</td></tr>
+          <tr><td>Inner bound is a constant, like 26</td><td class="num">O(n) — 26 is a constant</td></tr>
+          <tr><td>A pointer that never moves back</td><td class="num">O(n) in total — amortised</td></tr>
+          <tr><td>Recursion</td><td class="num">calls × work per call</td></tr>
+          <tr><td>Memoised recursion</td><td class="num">states × work per state</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 264" role="img" aria-label="Operations needed at n equal to one hundred thousand for each complexity class, on a log scale, against a budget of one hundred million operations per second">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">OPERATIONS AT n = 10⁵ · LOG SCALE</text>
+        <text x="486" y="16" font-size="10.5" font-family="monospace" fill="#D26A3F">BUDGET · 10⁸ ≈ ONE SECOND</text>
+        <path d="M480 22 L480 226" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3"></path>
+
+        <!-- within budget -->
+        <text x="14" y="42" font-size="11.5" font-family="monospace" fill="currentColor">O(1)</text>
+        <rect x="130" y="30" width="4" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="142" y="42" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">1</text>
+
+        <text x="14" y="66" font-size="11.5" font-family="monospace" fill="currentColor">O(log n)</text>
+        <rect x="130" y="54" width="54" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="192" y="66" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">17</text>
+
+        <text x="14" y="90" font-size="11.5" font-family="monospace" fill="currentColor">O(√n)</text>
+        <rect x="130" y="78" width="109" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="247" y="90" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">316</text>
+
+        <text x="14" y="114" font-size="11.5" font-family="monospace" fill="currentColor">O(n)</text>
+        <rect x="130" y="102" width="219" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="357" y="114" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">10⁵ · ≈ 1 ms</text>
+
+        <text x="14" y="138" font-size="11.5" font-family="monospace" fill="currentColor">O(n log n)</text>
+        <rect x="130" y="126" width="272" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="394" y="138" text-anchor="end" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.8">1.7 × 10⁶ · ≈ 17 ms</text>
+
+        <!-- over budget -->
+        <text x="14" y="162" font-size="11.5" font-family="monospace" fill="currentColor">O(n²)</text>
+        <rect x="130" y="150" width="438" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="576" y="162" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10¹⁰ · ≈ 100 s</text>
+
+        <text x="14" y="186" font-size="11.5" font-family="monospace" fill="currentColor">O(n³)</text>
+        <rect x="130" y="174" width="656" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="778" y="186" text-anchor="end" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10¹⁵ · ≈ four months</text>
+
+        <text x="14" y="210" font-size="11.5" font-family="monospace" fill="currentColor">O(2ⁿ)</text>
+        <rect x="130" y="198" width="700" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <path d="M830 206 L862 206" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></path>
+        <text x="820" y="210" text-anchor="end" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10³⁰¹⁰³ · never finishes</text>
+
+        <!-- axis -->
+        <line x1="130" y1="226" x2="830" y2="226" stroke="currentColor" stroke-opacity="0.3"></line>
+        <path d="M130 226 V230 M217.5 226 V230 M305 226 V230 M392.5 226 V230 M480 226 V230 M567.5 226 V230 M655 226 V230 M742.5 226 V230 M830 226 V230" stroke="currentColor" stroke-opacity="0.3"></path>
+        <text x="130" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁰</text>
+        <text x="217.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10²</text>
+        <text x="305" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁴</text>
+        <text x="392.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁶</text>
+        <text x="480" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁸</text>
+        <text x="567.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁰</text>
+        <text x="655" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹²</text>
+        <text x="742.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁴</text>
+        <text x="830" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁶</text>
+
+        <text x="14" y="259" font-size="11" fill="currentColor" opacity="0.72">One rung down the ladder — n² to n log n — is a 6 000× saving at this size. No faster machine buys you that.</text>
+      </svg>
+    </div>
+    <figcaption>The same n = 10⁵ priced at each rung, against the budget of roughly 10⁸ simple operations per second from the constraints slide. Everything left of the dashed line finishes in time; everything right of it is a time-limit error.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">Worst case, unless you say otherwise</span>A bare Big-O is read as the worst case. When a figure only holds <b>on average</b> — <code>HashMap</code> lookups, quickselect — say so, and expect the worst case as the follow-up question. When it only holds over the whole run, as with the sliding window's inner loop, say <b>amortised</b>. Interviewers listen for those two qualifiers.</div>
+</section>
+
+<!-- dsa · complexity 02 · loops -->
+<section class="slide" data-sec="Complexity analysis" data-title="Time from loops">
+  <h2>Count executions of the innermost line, not loop keywords</h2>
+  <p class="dek">For iterative code, the time complexity is the number of times the innermost statement runs, multiplied by what that statement costs. The loop <b>bounds</b> decide that number — so read each bound and ask what it depends on: n, the outer index, a second input, or a constant.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Shapes 1–5 · the everyday ones</div>
+<pre><code class="language-java">// 1 · One pass — O(n)
+for (int i = 0; i &lt; n; i++) sum += a[i];
+
+// 2 · Two passes in sequence — O(n) + O(n) = O(n), not O(n²)
+for (int i = 0; i &lt; n; i++) max = Math.max(max, a[i]);
+for (int i = 0; i &lt; n; i++) if (a[i] == max) count++;
+
+// 3 · Nested, both bounded by n — O(n²)
+for (int i = 0; i &lt; n; i++)
+    for (int j = 0; j &lt; n; j++)
+        prod[i][j] = a[i] * a[j];
+
+// 4 · Inner loop starts at i + 1 — still O(n²)
+//     (n-1) + (n-2) + ... + 1 = n(n-1)/2 pairs
+for (int i = 0; i &lt; n; i++)
+    for (int j = i + 1; j &lt; n; j++)
+        if (a[i] + a[j] == target) return true;
+
+// 5 · The range halves each pass — O(log n)
+while (lo &lt;= hi) {
+    int mid = lo + (hi - lo) / 2;
+    if (a[mid] &lt; target) lo = mid + 1; else hi = mid - 1;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Shapes 6–9 · the ones people misread</div>
+<pre><code class="language-java">// 6 · Linear outer, doubling inner — O(n log n)
+//     the inner loop runs log2(n) times per i
+for (int i = 0; i &lt; n; i++)
+    for (int j = 1; j &lt; n; j *= 2)
+        work(i, j);
+
+// 7 · Two different inputs — O(n · L), never "O(n²)"
+for (String w : words)                      // n words
+    for (int j = 0; j &lt; w.length(); j++)    // L chars each
+        freq[w.charAt(j) - 'a']++;
+
+// 8 · Square-root bound — O(√n)
+//     d stops as soon as d * d passes n
+int divisors = 0;
+for (long d = 1; d * d &lt;= n; d++)
+    if (n % d == 0) divisors += (d * d == n) ? 1 : 2;
+
+// 9 · Constant inner bound — O(26 · n) = O(n)
+//     say "26n" once, so they hear you noticed it
+for (int i = 0; i &lt; n; i++)
+    for (int c = 0; c &lt; 26; c++)
+        best = Math.max(best, cnt[i][c]);</code></pre>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 222" role="img" aria-label="Left: an eight by eight grid of index pairs with the cells above the diagonal shaded, showing that a dependent nested loop covers half the square. Right: a range of sixteen halving down to one in four steps.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">INNER LOOP STARTS AT i + 1 · n = 8</text>
+        <text x="120" y="30" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">j →</text>
+        <text x="32" y="118" text-anchor="end" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">i ↓</text>
+
+        <rect x="40" y="34" width="160" height="160" fill="currentColor" fill-opacity="0.04"></rect>
+        <path d="M60 34 L200 34 L200 174 L180 174 L180 154 L160 154 L160 134 L140 134 L140 114 L120 114 L120 94 L100 94 L100 74 L80 74 L80 54 L60 54 Z" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.7" stroke-width="1.3"></path>
+        <path d="M40 34 V194 M60 34 V194 M80 34 V194 M100 34 V194 M120 34 V194 M140 34 V194 M160 34 V194 M180 34 V194 M200 34 V194 M40 34 H200 M40 54 H200 M40 74 H200 M40 94 H200 M40 114 H200 M40 134 H200 M40 154 H200 M40 174 H200 M40 194 H200" fill="none" stroke="currentColor" stroke-opacity="0.18"></path>
+
+        <text x="222" y="70" font-size="11" font-family="monospace" fill="#D26A3F">(n−1) + (n−2) + … + 1</text>
+        <text x="222" y="88" font-size="11" font-family="monospace" fill="currentColor">= n(n−1)/2 = 28 of 64 cells</text>
+        <text x="222" y="116" font-size="11" fill="currentColor" opacity="0.72">Skipping half the pairs halves</text>
+        <text x="222" y="132" font-size="11" fill="currentColor" opacity="0.72">the constant, not the order.</text>
+        <text x="222" y="148" font-size="11" fill="currentColor" opacity="0.72">n²/2 is still O(n²).</text>
+        <text x="40" y="212" font-size="10.5" fill="currentColor" opacity="0.6">shaded: the pairs (i, j) with j &gt; i that the inner loop visits</text>
+
+        <line x1="446" y1="26" x2="446" y2="212" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <text x="470" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE RANGE HALVES EACH PASS · n = 16</text>
+        <rect x="470" y="32" width="352" height="20" rx="3" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="478" y="46" font-size="11" font-family="monospace" fill="currentColor">16</text>
+        <text x="830" y="46" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">start</text>
+        <rect x="470" y="62" width="176" height="20" rx="3" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="478" y="76" font-size="11" font-family="monospace" fill="currentColor">8</text>
+        <text x="654" y="76" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">pass 1</text>
+        <rect x="470" y="92" width="88" height="20" rx="3" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="478" y="106" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="566" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">pass 2</text>
+        <rect x="470" y="122" width="44" height="20" rx="3" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="478" y="136" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="522" y="136" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">pass 3</text>
+        <rect x="470" y="152" width="22" height="20" rx="3" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="478" y="166" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="500" y="166" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">pass 4 — one element left</text>
+
+        <text x="470" y="194" font-size="11" fill="currentColor" opacity="0.72">After t passes n has halved t times — it hits 1 at t = log₂ n.</text>
+        <text x="470" y="212" font-size="11" fill="currentColor" opacity="0.72">Doubling n adds a single pass — which is why 10⁹ needs only 30.</text>
+      </svg>
+    </div>
+    <figcaption>Left, shape 4: starting the inner loop at <code>i + 1</code> visits the triangle above the diagonal — half the square, still quadratic. Right, shape 5: a log appears whenever each step throws away a constant fraction of what is left.</figcaption>
+  </figure>
+
+  <div class="note warn"><span class="lbl">The number of loops is a hint, not a proof</span>Two nested loops can be O(n): in a sliding window the inner <code>while</code> moves a pointer that persists across the whole run, so it is counted once overall — the amortised slide covers it. One loop can be O(n²): a body that calls <code>s += c</code>, <code>list.remove(0)</code> or <code>list.contains(x)</code> hides a second loop inside a library call — the next slide lists them.</div>
+</section>
+
+<!-- dsa · complexity 03 · hidden costs -->
+<section class="slide" data-sec="Complexity analysis" data-title="Hidden costs in the Java library">
+  <h2>The line that looks O(1) and is not</h2>
+  <p class="dek">Step 2 of the method — price every line — is where most wrong answers come from. A single library call can hide a loop over the whole collection or the whole string. These are the Java calls that appear throughout this deck's solutions, with what each one really costs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Call</th><th>Cost</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td><code>ArrayList</code> <code>get(i)</code> · <code>set(i, x)</code></td><td class="num">O(1)</td><td>Backed by an array. The same calls on a <code>LinkedList</code> walk the list from the nearer end: O(n).</td></tr>
+        <tr><td><code>list.add(x)</code></td><td class="num">O(1) amortised</td><td>A full list grows by half its size and copies across. Growth is geometric, so the copying over n adds totals O(n).</td></tr>
+        <tr><td><code>list.add(0, x)</code> · <code>list.remove(0)</code></td><td class="num">O(n)</td><td>Shifts every later element. Using an <code>ArrayList</code> as a queue this way quietly makes a BFS quadratic.</td></tr>
+        <tr><td><code>list.contains(x)</code> · <code>indexOf</code> · <code>remove(Object)</code></td><td class="num">O(n)</td><td>A linear scan. For membership tests, use a <code>HashSet</code>.</td></tr>
+        <tr><td><code>ArrayDeque</code> push · pop · offer · poll · peek</td><td class="num">O(1) amortised</td><td>The default stack and queue, at either end. Prefer it to <code>java.util.Stack</code> and <code>LinkedList</code>.</td></tr>
+        <tr><td><code>HashMap</code> get · put · containsKey<br><code>HashSet</code> add · contains</td><td class="num">O(1) average</td><td>Plus the cost of hashing and comparing the key: O(L) for a <code>String</code> or <code>List</code> key of length L. That is why LC 49 is O(n·L), not O(n).</td></tr>
+        <tr><td><code>TreeMap</code> · <code>TreeSet</code> get · put · floorKey · ceilingKey · first</td><td class="num">O(log n)</td><td>A red-black tree. The price of keeping keys in order.</td></tr>
+        <tr><td><code>PriorityQueue</code> offer · poll</td><td class="num">O(log n)</td><td><code>peek</code> is O(1). <code>remove(x)</code> and <code>contains(x)</code> are O(n) scans — which is why Dijkstra in Java pushes duplicates and skips stale entries instead.</td></tr>
+        <tr><td><code>new PriorityQueue&lt;&gt;(collection)</code></td><td class="num">O(n)</td><td>Heapifies in one pass — cheaper than n separate offers at O(n log n).</td></tr>
+        <tr><td><code>Arrays.sort(int[])</code></td><td class="num">O(n log n)</td><td>Dual-pivot quicksort on primitives. Not stable, which cannot matter for primitives.</td></tr>
+        <tr><td><code>Arrays.sort(T[], cmp)</code> · <code>Collections.sort</code> · <code>list.sort</code></td><td class="num">O(n log n) time<br>O(n) space</td><td>Timsort: stable, and allocates up to n/2 temporary slots. That buffer is what "the sort's working memory" means when a space figure leaves it out.</td></tr>
+        <tr><td><code>new int[n]</code> · <code>Arrays.fill</code> · <code>clone()</code> · <code>Arrays.copyOf</code></td><td class="num">O(n)</td><td>Allocation zeroes the memory. A <code>new int[n]</code> inside a loop of n is O(n²).</td></tr>
+        <tr><td><code>s.substring(i, j)</code></td><td class="num">O(j − i)</td><td>A copy, not a view, since Java 7u6. <code>charAt</code> is O(1); slicing is not.</td></tr>
+        <tr><td><code>s.toCharArray()</code> · <code>new String(chars)</code></td><td class="num">O(L) time and space</td><td>A full copy. Do it once, outside the loop.</td></tr>
+        <tr><td><code>s.equals(t)</code> · <code>compareTo</code> · <code>hashCode()</code></td><td class="num">O(L)</td><td>Character by character. <code>hashCode</code> is cached on each <code>String</code> object after its first call, but a freshly built key pays it again.</td></tr>
+        <tr><td><code>s + t</code> · <code>s += c</code></td><td class="num">O(|s| + |t|)</td><td>Builds a new <code>String</code> every time: n appends in a loop cost O(n²). Use a <code>StringBuilder</code>.</td></tr>
+        <tr><td><code>sb.append(c)</code> · <code>sb.setLength(len − 1)</code></td><td class="num">O(1) amortised</td><td>The backtracking pair: append to choose, shorten to undo.</td></tr>
+        <tr><td><code>sb.insert(0, c)</code> · <code>sb.deleteCharAt(0)</code> · <code>sb.reverse()</code></td><td class="num">O(L)</td><td>Shifts or touches every character. Prepending in a loop is O(n²) — append, then reverse once.</td></tr>
+        <tr><td><code>new ArrayList&lt;&gt;(path)</code></td><td class="num">O(size)</td><td>The copy made at every backtracking leaf. It is the n in O(n·2ⁿ).</td></tr>
+        <tr><td><code>stream()…</code> · <code>Collections.max</code> · <code>String.join</code></td><td class="num">O(n) per call</td><td>Each one walks the whole collection. Inside a loop, it is a nested loop.</td></tr>
+        <tr><td>Boxed <code>Integer</code> in collections</td><td class="num">O(1), bigger constant</td><td>Same Big-O as <code>int[]</code>, but every element is a separate object: several times the memory, and slower. Prefer <code>int[]</code> when the key range is small.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note bad"><span class="lbl">The three that most often turn O(n) into O(n²)</span><b><code>s += c</code> in a loop</b> — every append copies the whole string so far; use a <code>StringBuilder</code>. <b><code>list.remove(0)</code> as a queue</b> — every poll shifts the rest of the list; use an <code>ArrayDeque</code>. <b><code>list.contains(x)</code> as a set</b> — every lookup is a scan; use a <code>HashSet</code>. In each case the algorithm stays identical and only the container changes.</div>
+</section>
+
+<!-- dsa · complexity 04 · amortised -->
+<section class="slide" data-sec="Complexity analysis" data-title="Amortised analysis">
+  <h2>When a loop inside a loop is still linear</h2>
+  <p class="dek">Read per iteration, a <code>while</code> inside a <code>for</code> looks like n × n. That bound is true but loose. The <b>aggregate</b> question is sharper: across the entire run, how many times can the inner body execute <em>in total</em>? If every execution consumes something that can only be consumed once, the answer is n — and so is the complexity.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The aggregate method, in three moves</h3>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Name what the inner loop consumes.</b> An index passed over by <code>l</code>, an element popped from a stack, a node taken off a queue.</li>
+        <li><b>Show it cannot be consumed twice.</b> <code>l</code> never decreases. A popped index is never pushed again. A visited node is never queued again.</li>
+        <li><b>Sum, then divide.</b> Total inner work is at most the number of things there are to consume. Add the outer loop's own n and you have the total; divide by n and you have the <em>amortised</em> cost per step — O(1).</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Amortised is not the same as average. An average is an expectation over inputs, and an unlucky input can beat it. An amortised bound holds for <b>every</b> input: individual steps may be expensive, but the total over any run is guaranteed.</p>
+    </div>
+    <div class="panel">
+      <h3>The same argument, pattern by pattern</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>01 window</dt><dd><code>r</code> admits each index once; <code>l</code> evicts each at most once. At most 2n moves.</dd>
+        <dt>02 two pointers</dt><dd>The gap <code>r − l</code> starts below n and every step shrinks it. At most n steps.</dd>
+        <dt>09 · 10 stack, deque</dt><dd>Each index is pushed once and removed at most once. At most 2n operations.</dd>
+        <dt>16 · 20 · 21 BFS</dt><dd>Each node is queued once — mark it when you enqueue it — and its adjacency list is scanned once, when it is dequeued. O(V + E).</dd>
+        <dt>22 union-find</dt><dd>Path compression flattens every path it walks. With union by size, O(α(n)) amortised — and α(n) ≤ 4 for any input that fits in memory.</dd>
+        <dt>ArrayList.add</dt><dd>A resize copies everything, but capacity grows geometrically, so all the copying over n adds sums to O(n). O(1) amortised.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 252" role="img" aria-label="The pair of window pointers drawn as a walk on an n by n grid. The walk only moves right when r advances or up when l advances, so it takes at most 2n steps rather than visiting all n squared cells.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE (r, l) WALK OF A SLIDING WINDOW · n = 8</text>
+
+        <rect x="60" y="40" width="160" height="160" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <path d="M80 40 V200 M100 40 V200 M120 40 V200 M140 40 V200 M160 40 V200 M180 40 V200 M200 40 V200 M60 60 H220 M60 80 H220 M60 100 H220 M60 120 H220 M60 140 H220 M60 160 H220 M60 180 H220" fill="none" stroke="currentColor" stroke-opacity="0.1"></path>
+        <path d="M60 200 L220 40" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="3 3"></path>
+        <path d="M60 200 H120 V180 H140 V140 H180 V120 H200 V80 H220" fill="none" stroke="#D26A3F" stroke-width="2.2" stroke-linejoin="round"></path>
+        <circle cx="60" cy="200" r="3.5" fill="#D26A3F"></circle>
+        <circle cx="220" cy="80" r="3.5" fill="#D26A3F"></circle>
+        <text x="140" y="218" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">r → admits</text>
+        <text x="52" y="124" text-anchor="end" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">l ↑</text>
+        <text x="52" y="138" text-anchor="end" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">evicts</text>
+
+        <text x="260" y="50" font-size="11.5" font-weight="600" fill="#D26A3F">The staircase — what actually runs</text>
+        <text x="260" y="68" font-size="11" fill="currentColor" opacity="0.72">Each step right is r++ (admit); each step up is l++ (evict).</text>
+        <text x="260" y="84" font-size="11" fill="currentColor" opacity="0.72">Neither can be undone, so the walk has at most n + n = 2n steps.</text>
+        <text x="260" y="100" font-size="11" fill="currentColor" opacity="0.72">Here: 8 admits + 6 evictions = 14 steps.</text>
+
+        <text x="260" y="128" font-size="11.5" font-weight="600" fill="currentColor">The shaded square — what the nested-loop reading assumes</text>
+        <text x="260" y="146" font-size="11" fill="currentColor" opacity="0.72">Every (r, l) pair visited: n² = 64 steps. True, but loose.</text>
+        <text x="260" y="162" font-size="11" fill="currentColor" opacity="0.72">The dashed diagonal is l = r; the walk can never cross above it.</text>
+
+        <text x="260" y="190" font-size="11.5" font-weight="600" fill="#3AA79B">The same walk, under other names</text>
+        <text x="260" y="208" font-size="11" fill="currentColor" opacity="0.72">two pointers closing a gap · merging two sorted lists (i, j) · stack pushes and pops</text>
+
+        <line x1="14" y1="226" x2="866" y2="226" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="244" font-size="11" fill="currentColor" opacity="0.72">Count the steps of the walk, not the product of the loop bounds. That sentence is the whole amortised argument.</text>
+      </svg>
+    </div>
+    <figcaption>Any algorithm whose state can be drawn as a walk that only moves right or up is linear in the size of the grid's side, not its area. Being able to name the variable that never moves back is what makes the O(n) claim checkable.</figcaption>
+  </figure>
+
+  <div class="note warn"><span class="lbl">When the argument breaks</span>The whole bound rests on "cannot be consumed twice". Reset <code>l</code> to 0, restart a scan from the beginning, or push a popped element back on, and the walk stops being monotone — the honest bound becomes O(n²). Before claiming O(n) for a nested loop, point at the variable that never moves backwards.</div>
+</section>
+
+<!-- dsa · complexity 05 · recursion -->
+<section class="slide" data-sec="Complexity analysis" data-title="Time from recursion">
+  <h2>Draw the call tree, then count it</h2>
+  <p class="dek">A recursive function's running time is the sum of the work done at every node of its call tree, each node charged only for what it does <em>outside</em> its recursive calls. Two questions settle the time: how many nodes does the tree have, and how much work does each do? Space asks a third question: how deep does the tree go?</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Two call trees. Left: a take-or-skip recursion that doubles at every level, ending in two to the n leaves. Right: merge sort splitting in half, doing n work on each of log n levels.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">BRANCHING — COUNT THE NODES</text>
+        <text x="470" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">DIVIDE AND CONQUER — ADD UP THE LEVELS</text>
+        <line x1="446" y1="26" x2="446" y2="196" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <!-- left: take-or-skip tree -->
+        <path d="M194 52 L106 82 M194 52 L282 82 M106 98 L62 128 M106 98 L150 128 M282 98 L238 128 M282 98 L326 128 M62 144 L40 174 M62 144 L84 174 M150 144 L128 174 M150 144 L172 174 M238 144 L216 174 M238 144 L260 174 M326 144 L304 174 M326 144 L348 174" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <text x="144" y="62" text-anchor="end" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.6">take</text>
+        <text x="244" y="62" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.6">skip</text>
+        <circle cx="194" cy="44" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="106" cy="90" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="282" cy="90" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="62" cy="136" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="150" cy="136" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="238" cy="136" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="326" cy="136" r="8" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="40" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="84" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="128" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="172" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="216" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="260" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="304" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <circle cx="348" cy="182" r="8" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></circle>
+        <text x="372" y="48" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">1</text>
+        <text x="372" y="94" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">2</text>
+        <text x="372" y="140" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">4</text>
+        <text x="372" y="186" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">2ⁿ leaves</text>
+
+        <!-- right: merge sort levels -->
+        <rect x="480" y="36" width="340" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="650" y="48" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n</text>
+        <rect x="480" y="82" width="168" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="652" y="82" width="168" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="564" y="94" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/2</text>
+        <text x="736" y="94" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/2</text>
+        <rect x="480" y="128" width="82" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="566" y="128" width="82" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="652" y="128" width="82" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="738" y="128" width="82" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="521" y="140" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/4</text>
+        <text x="607" y="140" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/4</text>
+        <text x="693" y="140" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/4</text>
+        <text x="779" y="140" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">n/4</text>
+        <rect x="480" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="523" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="566" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="609" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="652" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="695" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="738" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <rect x="781" y="174" width="39" height="16" rx="3" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="499.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="542.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="585.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="628.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="671.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="714.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="757.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="800.5" y="186" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="830" y="48" font-size="11" font-family="monospace" fill="#D26A3F">→ n</text>
+        <text x="830" y="94" font-size="11" font-family="monospace" fill="#D26A3F">→ n</text>
+        <text x="830" y="140" font-size="11" font-family="monospace" fill="#D26A3F">→ n</text>
+        <text x="830" y="186" font-size="11" font-family="monospace" fill="#D26A3F">→ n</text>
+
+        <line x1="14" y1="206" x2="866" y2="206" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="224" font-size="11" fill="currentColor" opacity="0.8">2ⁿ leaves × O(n) to copy each subset → <tspan font-weight="600" fill="#D26A3F">O(n · 2ⁿ) time</tspan></text>
+        <text x="14" y="240" font-size="11" fill="currentColor" opacity="0.65">but only n levels deep → O(n) stack</text>
+        <text x="470" y="224" font-size="11" fill="currentColor" opacity="0.8">log₂ n levels × O(n) merge work per level → <tspan font-weight="600" fill="#D26A3F">O(n log n)</tspan></text>
+        <text x="470" y="240" font-size="11" fill="currentColor" opacity="0.65">log₂ n deep → O(log n) stack, plus an O(n) merge buffer</text>
+      </svg>
+    </div>
+    <figcaption>Left: when the problem does not shrink by a fraction, the tree widens by the branching factor at every level, and the leaf count dominates. Right: when it halves, the tree is only log n deep, and each level together touches all n elements once.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Recurrence</th><th>Where you meet it</th><th>Solves to</th></tr></thead>
+      <tbody>
+        <tr><td class="num" style="white-space:nowrap">T(n) = T(n/2) + O(1)</td><td>Binary search (04, 05), a BST descent (17)</td><td class="num" style="white-space:nowrap">O(log n)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = T(n−1) + O(1)</td><td>Recursion down a linked list, one call per node</td><td class="num" style="white-space:nowrap">O(n)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = 2T(n/2) + O(1)</td><td>DFS over a balanced tree (15) — every node once</td><td class="num" style="white-space:nowrap">O(n)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = T(n/2) + O(n)</td><td>Quickselect, on average: n + n/2 + n/4 + … &lt; 2n</td><td class="num" style="white-space:nowrap">O(n)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = 2T(n/2) + O(n)</td><td>Merge sort; any split-in-half-then-merge</td><td class="num" style="white-space:nowrap">O(n log n)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = T(n−1) + O(n)</td><td>Quickselect's worst case; one element peeled off per linear pass</td><td class="num" style="white-space:nowrap">O(n²)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = 2T(n−1) + O(1)</td><td>Take-or-skip subsets (18); it also bounds naive Fibonacci</td><td class="num" style="white-space:nowrap">O(2ⁿ)</td></tr>
+        <tr><td class="num" style="white-space:nowrap">T(n) = n·T(n−1) + O(n)</td><td>Permutations (18): n choices, then n − 1, then …</td><td class="num" style="white-space:nowrap">O(n!)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The master theorem, for recursions that divide</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">For <code>T(n) = a·T(n/b) + O(n<sup>d</sup>)</code> — a calls on inputs of size n/b, plus n<sup>d</sup> work to split and combine — compare <code>a</code> with <code>b<sup>d</sup></code>:</p>
+      <dl class="kv" style="margin-top:10px">
+        <dt>a &lt; b<sup>d</sup></dt><dd>The top call dominates: O(n<sup>d</sup>). Quickselect on average: a = 1, b = 2, d = 1 gives O(n).</dd>
+        <dt>a = b<sup>d</sup></dt><dd>Every level costs the same: O(n<sup>d</sup> log n). Merge sort gives O(n log n); binary search, with d = 0, gives O(log n).</dd>
+        <dt>a &gt; b<sup>d</sup></dt><dd>The leaves dominate: O(n<sup>log<sub>b</sub> a</sup>). Balanced-tree DFS: a = 2, b = 2, d = 0 gives O(n).</dd>
+      </dl>
+    </div>
+    <div class="note good"><span class="lbl">Memoisation changes what you count</span>With a memo, each distinct argument is computed once, so the tree collapses into a table: time = <b>distinct states × work per state</b>. Fibonacci drops from O(2ⁿ) to n states × O(1) = O(n). LC 322 is <code>amount</code> states × one try per coin = O(amount · coins). LC 1143 is m·n states × O(1). That one sentence derives every DP figure in patterns 27–30.</div>
+  </div>
+</section>
+
+<!-- dsa · complexity 06 · space -->
+<section class="slide" data-sec="Complexity analysis" data-title="Finding space complexity">
+  <h2>Space is the peak, not the total</h2>
+  <p class="dek">Time adds up everything that ever runs. Space asks a narrower question: at the worst single moment, how much <b>extra</b> memory is alive? Memory that is released and reused does not accumulate — which is why naive Fibonacci makes O(2ⁿ) calls but never needs more than O(n) of stack.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>What goes in the count</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Counts</dt><dd>Every structure you allocate that grows with the input: arrays, maps, sets, heaps, queues, DP tables.</dd>
+        <dt>Counts</dt><dd>The recursion stack — its <b>maximum depth</b> times a constant-size frame. It is the term most often forgotten.</dd>
+        <dt>Counts</dt><dd>Copies you make: <code>substring</code>, <code>toCharArray</code>, <code>new ArrayList&lt;&gt;(path)</code>, a sorted copy of the input, an object sort's temporary buffer.</dd>
+        <dt>Excluded</dt><dd>The input, unless you copy it. Mutating it in place costs no space — but say that you are doing it.</dd>
+        <dt>Excluded</dt><dd>The output, by this deck's convention. Say "excluding the output" out loud, because some interviewers include it.</dd>
+        <dt>Constant</dt><dd>Anything whose size does not depend on the input — <code>int[26]</code>, <code>int[128]</code>, ten local variables — is O(1), however large it looks.</dd>
+      </dl>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Where it goes</th><th>Space</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Recursion on a tree</td><td class="num">O(h)</td><td>One frame per node on the current path: log n balanced, n skewed.</td></tr>
+          <tr><td>Recursion along an array or list</td><td class="num">O(n)</td><td>One frame per element, all alive at the deepest point.</td></tr>
+          <tr><td>BFS queue on a tree</td><td class="num">O(w)</td><td>About one level at a time; the widest level of a complete tree is about n/2.</td></tr>
+          <tr><td>BFS or DFS on a grid</td><td class="num">O(R·C)</td><td>The visited grid, and a frontier or stack that can hold much of it.</td></tr>
+          <tr><td>Map or set of values seen</td><td class="num">O(distinct)</td><td>At most n, and at most the alphabet — which is why <code>int[26]</code> is O(1).</td></tr>
+          <tr><td>Heap capped at k</td><td class="num">O(k)</td><td>Poll whenever it grows past k.</td></tr>
+          <tr><td>DP table</td><td class="num">product of the dimensions</td><td>One cell per state: O(n), O(m·n), O(n·capacity).</td></tr>
+          <tr><td>DP with rolling rows</td><td class="num">one dimension fewer</td><td>Possible when row i reads only row i − 1.</td></tr>
+          <tr><td>Backtracking</td><td class="num">O(depth)</td><td>The path plus the stack; the answers themselves are output.</td></tr>
+          <tr><td>Two pointers, in-place tricks</td><td class="num">O(1)</td><td>A fixed set of variables, whatever n is.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 232" role="img" aria-label="A seven-node binary tree and the call stack at the moment each node is entered during a depth-first search. The stack never holds more than three frames, the height of the tree.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">DFS ON 7 NODES · THE CALL STACK AS EACH NODE IS ENTERED</text>
+
+        <!-- tree -->
+        <path d="M200 64 L140 90 M200 64 L260 90 M140 118 L110 144 M140 118 L170 144 M260 118 L230 144 M260 118 L290 144" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="200" cy="50" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="140" cy="104" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="260" cy="104" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="110" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="170" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="230" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="290" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="200" y="54" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">A</text>
+        <text x="140" y="108" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">B</text>
+        <text x="260" y="108" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">C</text>
+        <text x="110" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">D</text>
+        <text x="170" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">E</text>
+        <text x="230" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">F</text>
+        <text x="290" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">G</text>
+        <text x="14" y="54" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 1</text>
+        <text x="14" y="108" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 2</text>
+        <text x="14" y="162" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 3</text>
+
+        <!-- stack snapshots -->
+        <path d="M344 96 L844 96" stroke="#D26A3F" stroke-opacity="0.6" stroke-dasharray="4 3"></path>
+        <text x="350" y="88" font-size="10.5" font-family="monospace" fill="#D26A3F">peak: 3 frames — the height of the tree</text>
+        <line x1="344" y1="172" x2="844" y2="172" stroke="currentColor" stroke-opacity="0.25"></line>
+
+        <rect x="350" y="148" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="378" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+
+        <rect x="422" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="422" y="124" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="450" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="450" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+
+        <rect x="494" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="494" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="494" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="522" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="522" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+        <text x="522" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">D</text>
+
+        <rect x="566" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="566" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="566" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="594" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="594" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+        <text x="594" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">E</text>
+
+        <rect x="638" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="638" y="124" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="666" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="666" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+
+        <rect x="710" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="710" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="710" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="738" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="738" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+        <text x="738" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">F</text>
+
+        <rect x="782" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="782" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="782" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="810" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="810" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+        <text x="810" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">G</text>
+
+        <text x="378" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter A</text>
+        <text x="450" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter B</text>
+        <text x="522" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter D</text>
+        <text x="594" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter E</text>
+        <text x="666" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter C</text>
+        <text x="738" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter F</text>
+        <text x="810" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter G</text>
+
+        <line x1="14" y1="202" x2="866" y2="202" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="222" font-size="11" fill="currentColor" opacity="0.8">7 calls in total → <tspan font-weight="600" fill="#D26A3F">O(n) time</tspan></text>
+        <text x="300" y="222" font-size="11" fill="currentColor" opacity="0.8">at most 3 frames alive at once → <tspan font-weight="600" fill="#D26A3F">O(h) space</tspan></text>
+        <text x="600" y="222" font-size="11" fill="currentColor" opacity="0.65">a skewed tree stacks all 7 → O(n) space</text>
+      </svg>
+    </div>
+    <figcaption>Copper is the call running now; teal frames are waiting for it to return. When D returns, its frame is freed and E reuses the slot — so seven calls never need more than three frames at once. That is the difference between counting calls (time) and measuring depth (space).</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="note warn"><span class="lbl">Java's stack is smaller than your Big-O</span>A recursive solution can be O(n) in space and still crash. The default thread stack — typically 512 KB to 1 MB, set with <code>-Xss</code> — holds on the order of 10⁴ frames for a small method, so recursing down a 10⁵-node linked list or skewed tree throws <code>StackOverflowError</code>. When depth can reach n, rewrite with an explicit <code>ArrayDeque</code>: the same Big-O, but the stack now lives on the heap.</div>
+    <div class="note tip"><span class="lbl">Space is usually spent to buy time</span>A <code>HashSet</code> turns an O(n²) pair scan into O(n) (06). A memo table turns O(2ⁿ) into a polynomial (27–30). When a problem demands O(1) extra space, it is refusing that trade — reach for Floyd's cycle detection (03), in-place marking, or a rolling array instead.</div>
+  </div>
+</section>
+
+<!-- dsa · complexity 07 · all thirty -->
+<section class="slide" data-sec="Complexity analysis" data-title="All thirty patterns, derived">
+  <h2>Every pattern's figure, and the sentence that derives it</h2>
+  <p class="dek">The five steps, applied to each pattern's reusable structure. The two right-hand columns are the part to say out loud: if you can state where the time and the space go, the figure follows — and you can rebuild it for any variant. Variables: n input length, k window, heap or distinct-value count, L word length, h tree height, R × C a grid, V and E a graph's vertices and edges. In pattern 5 only, V is the width of the answer range.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Pattern</th><th>Time</th><th>Space</th><th>Where the time comes from</th><th>Where the space comes from</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Sliding Window</td><td class="num">O(n)</td><td class="num">O(k)</td><td><code>r</code> admits each index once and <code>l</code> evicts each at most once: at most 2n moves.</td><td>Window state over k distinct values; a fixed <code>int[128]</code> makes it O(1).</td></tr>
+        <tr><td class="num">2</td><td>Two Pointers</td><td class="num">O(n)<br>O(n log n) if sorted first<br>O(n<sup>k−1</sup>) for k-sum</td><td class="num">O(1)</td><td>Every step shrinks the gap <code>r − l</code>, so at most n steps. k-sum wraps k − 2 anchor loops around that pass.</td><td>Two indices — the sort's working memory aside.</td></tr>
+        <tr><td class="num">3</td><td>Fast / Slow Pointers</td><td class="num">O(n)</td><td class="num">O(1)</td><td>Phase 1 ends within the tail plus one lap, L + C ≤ n steps; phase 2 walks the tail, L steps.</td><td>Two references. A visited set also works, at O(n).</td></tr>
+        <tr><td class="num">4</td><td>Binary Search on Sorted Data</td><td class="num">O(log n)</td><td class="num">O(1)</td><td>The range halves every iteration: after t steps n / 2<sup>t</sup> remain, which is 1 at t = log₂ n.</td><td>Iterative. A recursive version adds an O(log n) stack for nothing.</td></tr>
+        <tr><td class="num">5</td><td>Binary Search on Answer</td><td class="num">O(n log V)</td><td class="num">O(1)</td><td>log₂ V halvings of the answer range, each paying for one O(n) feasibility pass.</td><td>The check keeps a few counters.</td></tr>
+        <tr><td class="num">6</td><td>Hashing / Frequency Maps</td><td class="num">O(n) average<br>O(n·L) string keys</td><td class="num">O(n)</td><td>n inserts and lookups at O(1) average each, plus O(L) to hash a string key.</td><td>One entry per distinct key.</td></tr>
+        <tr><td class="num">7</td><td>Prefix Sum / Running Sum</td><td class="num">O(n) build<br>O(1) per query</td><td class="num">O(n)</td><td>One pass, <code>pre[i + 1] = pre[i] + a[i]</code>; a range query subtracts two entries.</td><td>The prefix array, or a map of the prefix sums seen so far.</td></tr>
+        <tr><td class="num">8</td><td>Difference Array / Range Updates</td><td class="num">O(n + q)</td><td class="num">O(n)</td><td>Each of q updates touches two cells; a single prefix pass rebuilds the array.</td><td>The difference array itself.</td></tr>
+        <tr><td class="num">9</td><td>Monotonic Stack</td><td class="num">O(n)</td><td class="num">O(n)</td><td>Each index is pushed once and popped at most once: at most 2n operations.</td><td>Sorted input never pops, so the stack can hold all n.</td></tr>
+        <tr><td class="num">10</td><td>Monotonic Queue / Deque</td><td class="num">O(n)</td><td class="num">O(k)</td><td>Each index is added once and removed at most once, from either end.</td><td>At most one window's k indices; over prefix sums, as in 862, up to n.</td></tr>
+        <tr><td class="num">11</td><td>Heap / Top K</td><td class="num">O(n log k)</td><td class="num">O(k)</td><td>n offers into a heap capped at k, each costing O(log k).</td><td>The heap never holds more than k + 1 entries.</td></tr>
+        <tr><td class="num">12</td><td>Intervals</td><td class="num">O(n log n)</td><td class="num">O(1)<br>O(n) with a heap</td><td>The sort by start dominates; the sweep after it is O(n).</td><td>Merging writes only the output; 253 keeps a heap of up to n end times.</td></tr>
+        <tr><td class="num">13</td><td>Greedy Scheduling / Sorting</td><td class="num">O(n)<br>O(n log n) with a sort</td><td class="num">O(1)</td><td>One pass making the locally best choice, plus a sort when the choice needs an order. 406's list inserts are the exception, at O(n²).</td><td>A few running values, or a 26-slot count.</td></tr>
+        <tr><td class="num">14</td><td>Linked List Manipulation</td><td class="num">O(n)<br>O(n log k) for k lists</td><td class="num">O(1)<br>O(k) for k lists</td><td>Each node is relinked once. A k-way merge passes every node through a heap of size k.</td><td>Pointer variables if iterative; the heap of k list heads for 23.</td></tr>
+        <tr><td class="num">15</td><td>Tree DFS</td><td class="num">O(n)</td><td class="num">O(h)</td><td>Each node is visited once with O(1) work: T(n) = 2T(n/2) + O(1) when balanced.</td><td>One stack frame per level of the current path — log n balanced, n skewed.</td></tr>
+        <tr><td class="num">16</td><td>Tree BFS / Level Order</td><td class="num">O(n)</td><td class="num">O(w)</td><td>Each node is enqueued and dequeued once.</td><td>The queue holds about one level; the widest is about n/2.</td></tr>
+        <tr><td class="num">17</td><td>BST Problems</td><td class="num">O(h) per operation<br>O(n) in-order</td><td class="num">O(1) iterative<br>O(h) recursive</td><td>One comparison per level discards an entire subtree.</td><td>One pointer iteratively; one frame per level recursively.</td></tr>
+        <tr><td class="num">18</td><td>Backtracking Basics</td><td class="num">O(n·2ⁿ)<br>O(n·n!)</td><td class="num">O(n)</td><td>2ⁿ subsets or n! permutations, each copied into the answer in O(n).</td><td>The path plus a stack n deep; the answers are output.</td></tr>
+        <tr><td class="num">19</td><td>Backtracking with Constraints</td><td class="num">O(m·n·4<sup>L</sup>)<br>O(n!)</td><td class="num">O(L)<br>O(n)</td><td>Branching factor to the power of the depth, from every start. Pruning cuts the practical cost, not the worst case.</td><td>Stack depth, plus the constraint sets — N-Queens' column and diagonal flags.</td></tr>
+        <tr><td class="num">20</td><td>Graph BFS / DFS</td><td class="num">O(R·C)</td><td class="num">O(R·C)</td><td>Each cell is queued once and checks four neighbours.</td><td>The visited grid, and a frontier that can hold much of it.</td></tr>
+        <tr><td class="num">21</td><td>Topological Sort / DAG</td><td class="num">O(V + E)</td><td class="num">O(V + E)</td><td>Each node is dequeued once; each edge decrements an indegree once.</td><td>The adjacency list, plus the indegree array and the queue.</td></tr>
+        <tr><td class="num">22</td><td>Union Find / DSU</td><td class="num">O(E·α(n))</td><td class="num">O(n)</td><td>E unions or finds at O(α(n)) amortised each, with path compression and union by size.</td><td>The parent and size arrays.</td></tr>
+        <tr><td class="num">23</td><td>Shortest Path</td><td class="num">O(E log E)<br>O(k·E) Bellman-Ford</td><td class="num">O(V + E)</td><td>Each edge can push one heap entry, and each push or poll costs O(log E). Bellman-Ford relaxes all E edges once per round.</td><td>The graph, the distances, and a heap that may hold stale entries under lazy deletion.</td></tr>
+        <tr><td class="num">24</td><td>MST / Graph Greedy</td><td class="num">O(E log E)</td><td class="num">O(V + E)</td><td>Kruskal sorts the edges, then runs E finds at α(n) each. Prim with a heap is O(E log V).</td><td>The edge list plus DSU arrays; array-based Prim on a complete graph needs only O(V).</td></tr>
+        <tr><td class="num">25</td><td>Trie</td><td class="num">O(L) per operation</td><td class="num">O(chars × 26)</td><td>One node per character of the word, with an O(1) child lookup at each.</td><td>One node per inserted character, each carrying a 26-slot child array.</td></tr>
+        <tr><td class="num">26</td><td>Bit Manipulation</td><td class="num">O(n)<br>O(1) per integer</td><td class="num">O(1)</td><td>The word size is fixed at 32 or 64 bits, so any loop over the bits is constant.</td><td>A few integers.</td></tr>
+        <tr><td class="num">27</td><td>1D DP Basics</td><td class="num">O(states × transitions)</td><td class="num">O(n) → O(1)</td><td>States × work per state: 70 is n × 1, 300 is n × n (or n log n by patience sorting), 322 is amount × coins.</td><td>The table; a fixed lookback rolls into a few variables.</td></tr>
+        <tr><td class="num">28</td><td>Knapsack / Subset DP</td><td class="num">O(n × capacity)</td><td class="num">O(capacity)</td><td>n items × capacity values, O(1) per cell — pseudo-polynomial, since it grows with the capacity's magnitude.</td><td>One row, with capacity iterated downwards for 0/1 items so each is used once.</td></tr>
+        <tr><td class="num">29</td><td>Grid DP</td><td class="num">O(R·C)</td><td class="num">O(C)</td><td>Each cell is computed once from O(1) neighbours.</td><td>A rolling row; O(1) if overwriting the grid is allowed.</td></tr>
+        <tr><td class="num">30</td><td>String DP / Sequence DP</td><td class="num">O(m·n)</td><td class="num">O(min(m, n))</td><td>One cell per pair of prefixes, O(1) each.</td><td>Two rolling rows, laid along the shorter string.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">How to use this table</span>Cover the two figure columns and read only the sentences. For each row, say which of the method's rules the sentence invokes — a nested multiply, a halving, an amortised bound, states × transitions — and produce the figure yourself. Each pattern's mechanics slide carries the same argument in more detail, next to the diagram it comes from.</div>
+</section>
+
+<!-- dsa · complexity 08 · worked example -->
+<section class="slide" data-sec="Complexity analysis" data-title="A worked derivation, and the usual mistakes">
+  <h2>One derivation out loud, and six ways to get it wrong</h2>
+  <p class="dek">LC 15, 3Sum, condensed from pattern 02. It has a sort, a loop, a <code>while</code> inside that, and two more <code>while</code>s inside that. Counting keywords suggests O(n³). The five steps give O(n²), and every cost below sits on the line that incurs it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 15 · each line priced</div>
+<pre><code class="language-java">public List&lt;List&lt;Integer&gt;&gt; threeSum(int[] nums) {
+    Arrays.sort(nums);                  // O(n log n), once
+    List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();  // output
+
+    for (int i = 0; i + 2 &lt; nums.length; i++) {   // n anchors
+        if (i &gt; 0 &amp;&amp; nums[i] == nums[i - 1]) continue;
+
+        // The gap r - l starts below n. Every path through
+        // the body moves l right or r left, so the gap closes
+        // by at least 1 per pass: at most n passes per anchor.
+        int l = i + 1, r = nums.length - 1;
+        while (l &lt; r) {
+            int sum = nums[i] + nums[l] + nums[r];
+            if (sum &lt; 0)      l++;
+            else if (sum &gt; 0) r--;
+            else {
+                // List.of on three items is O(1).
+                out.add(List.of(nums[i], nums[l], nums[r]));
+
+                // These move the SAME two pointers, so they
+                // spend the same budget of n: nothing extra.
+                while (l &lt; r &amp;&amp; nums[l] == nums[l + 1]) l++;
+                while (l &lt; r &amp;&amp; nums[r] == nums[r - 1]) r--;
+                l++; r--;
+            }
+        }
+    }
+    // n log n + n × n = O(n²) time.
+    // O(1) extra space, beyond the output and the sort.
+    return out;
+}</code></pre>
+    </div>
+    <div class="panel">
+      <h3>The five steps, applied</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>1 · Variables</dt><dd>Just one: n, the length of <code>nums</code>. The triples are output, which is not counted.</dd>
+        <dt>2 · Unit of work</dt><dd>One pass of the <code>while</code> body: an addition, a comparison, a pointer move — O(1). <code>List.of</code> on three items is O(1). The sort is the only line that is not.</dd>
+        <dt>3 · Count</dt><dd>The sort runs once: n log n. The <code>for</code> loop runs n times. Within one anchor, every pass — including the duplicate-skipping <code>while</code>s, which move the same two pointers — shrinks <code>r − l</code>, which starts below n. So at most n passes per anchor: n × n.</dd>
+        <dt>4 · Simplify</dt><dd>n log n + n² is O(n²). The sort is absorbed only because a larger term exists — in pattern 12 there is none, and the sort <em>is</em> the answer.</dd>
+        <dt>5 · Space</dt><dd>A handful of ints: O(1). Name the two exclusions — the output list and the sort's own working memory — rather than leaving them implied.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say it in one breath</span>"Sorting is n log n. Then, for each of n anchors, the two pointers close a gap of at most n, and the duplicate skips move those same pointers — so n² overall, which absorbs the sort. Space is O(1) beyond the output and the sort's own memory." Four claims, and every one of them can be checked against the code.</div>
+
+  <div class="grid2">
+    <div class="card"><h4>Counting loop keywords</h4><p>Two nested loops can be O(n) — the window's inner loop is bounded over the whole run. One loop can be O(n²) — <code>s += c</code> or <code>list.remove(0)</code> in its body is a second loop in disguise.</p></div>
+    <div class="card"><h4>Forgetting the sort</h4><p>A solution that opens with <code>Arrays.sort</code> pays n log n before anything else runs, however linear the rest looks. Name it, then say whether a larger term absorbs it.</p></div>
+    <div class="card"><h4>Collapsing variables</h4><p>O(n·L) is not O(n): hashing n strings costs their length. O(R·C) is not O(n²) unless the grid is square. O(V + E) is not O(V): a dense graph has about V² edges.</p></div>
+    <div class="card"><h4>Forgetting the stack</h4><p>A recursive DFS that allocates nothing is still O(h) in space, and O(n) on a skewed tree. Only iterative code with a fixed set of variables earns O(1).</p></div>
+    <div class="card"><h4>Counting calls for space</h4><p>Space is measured at the deepest moment, not summed: naive Fibonacci makes O(2ⁿ) calls on an O(n) stack. Calls are time; depth is space.</p></div>
+    <div class="card"><h4>Quoting average as worst</h4><p><code>HashMap</code> is O(1) on average; quickselect is O(n) on average and O(n²) at worst. Knapsack's O(n × capacity) looks polynomial but grows with the capacity's magnitude. Say which one you mean.</p></div>
+  </div>
+</section>
 
 <!-- dsa · pattern 01 · mechanics -->
 <section class="slide" data-sec="01 · Sliding window" data-title="Mechanics">
