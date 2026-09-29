@@ -23492,14 +23492,15 @@ boolean isInterleave(String s1, String s2, String s3) {
   var navbar   = document.getElementById("navbar");
   var tocEl    = document.getElementById("toc");
   var tocGrid  = document.getElementById("tocgrid");
-  var tocbtn   = document.getElementById("tocbtn");
   var prevBtn  = document.getElementById("prev");
   var nextBtn  = document.getElementById("next");
   var tabIv    = document.getElementById("tab-iv");
+  var ivnav    = document.getElementById("ivnav");
 
   var view = "deck";
   var tocFor = null;
   var tocButtons = [];
+  var ivCur = "";
 
   /* ---- prepare both decks: eyebrows, and hide all but the first ---- */
   DECK_KEYS.forEach(function (k) {
@@ -23516,18 +23517,53 @@ boolean isInterleave(String s1, String s2, String s3) {
 
   function activeDeck() { return view === "iv" ? null : DECKS[view]; }
 
-  /* ---- contents, rebuilt when the deck changes ---- */
+  /* ---- contents, rebuilt when the view changes ---- */
+  // Decks list their slides; the interview page lists the sections in its side nav.
+  function tocGroups(key) {
+    var groups = [];
+    function add(sec, item) {
+      var g = groups[groups.length - 1];
+      if (!g || g.name !== sec) { g = { name: sec, items: [] }; groups.push(g); }
+      g.items.push(item);
+    }
+    if (key === "iv") {
+      var sec = "Other", n = 0;
+      Array.prototype.forEach.call(ivnav.children, function (el) {
+        if (el.classList.contains("grp")) { sec = el.textContent; return; }
+        var id = el.getAttribute("href").slice(1);
+        if (!ivCur) ivCur = id;
+        add(sec, { i: n++, key: id, title: el.textContent, go: function () { showIvSection(id); } });
+      });
+    } else {
+      DECKS[key].slides.forEach(function (s, i) {
+        add(s.getAttribute("data-sec") || "Other",
+            { i: i, key: String(i), title: s.getAttribute("data-title") || ("Slide " + (i + 1)), go: function () { show(i); } });
+      });
+    }
+    return groups;
+  }
+
+  function showIvSection(id) {
+    var target = document.getElementById(id);
+    if (!target) return;
+    ivCur = id;
+    markToc();
+    target.scrollIntoView();
+    try { history.replaceState(null, "", "#" + id); } catch (e) {}
+  }
+
+  function markToc() {
+    var cur = tocFor === "iv" ? ivCur : (DECKS[tocFor] ? String(DECKS[tocFor].cur) : "");
+    tocButtons.forEach(function (b) {
+      b.setAttribute("data-cur", b.getAttribute("data-key") === cur ? "1" : "0");
+    });
+  }
+
   function buildToc(key) {
     if (tocFor === key) return;
     tocFor = key;
     tocGrid.textContent = "";
-    var groups = [];
-    DECKS[key].slides.forEach(function (s, i) {
-      var sec = s.getAttribute("data-sec") || "Other";
-      var g = groups[groups.length - 1];
-      if (!g || g.name !== sec) { g = { name: sec, items: [] }; groups.push(g); }
-      g.items.push({ i: i, title: s.getAttribute("data-title") || ("Slide " + (i + 1)) });
-    });
+    var groups = tocGroups(key);
     groups.forEach(function (g) {
       var wrap = document.createElement("div");
       wrap.className = "toc-sec";
@@ -23539,19 +23575,20 @@ boolean isInterleave(String s1, String s2, String s3) {
         var li = document.createElement("li");
         var b = document.createElement("button");
         b.type = "button";
-        b.setAttribute("data-idx", String(it.i));
+        b.setAttribute("data-key", it.key);
         var n = document.createElement("i");
         n.textContent = String(it.i + 1).padStart(2, "0");
         b.appendChild(n);
         b.appendChild(document.createTextNode(it.title));
-        b.addEventListener("click", function () { show(it.i); toggleToc(false); });
+        b.addEventListener("click", function () { toggleToc(false); it.go(); });
         li.appendChild(b);
         ol.appendChild(li);
       });
       wrap.appendChild(ol);
       tocGrid.appendChild(wrap);
     });
-    tocButtons = Array.prototype.slice.call(tocGrid.querySelectorAll("button[data-idx]"));
+    tocButtons = Array.prototype.slice.call(tocGrid.querySelectorAll("button[data-key]"));
+    markToc();
   }
 
   function show(i, skipHash) {
@@ -23563,9 +23600,7 @@ boolean isInterleave(String s1, String s2, String s3) {
     railfill.style.width = ((d.cur + 1) / d.slides.length * 100).toFixed(2) + "%";
     prevBtn.disabled = d.cur === 0;
     nextBtn.disabled = d.cur === d.slides.length - 1;
-    tocButtons.forEach(function (b) {
-      b.setAttribute("data-cur", b.getAttribute("data-idx") === String(d.cur) ? "1" : "0");
-    });
+    markToc();
     window.scrollTo({ top: 0, behavior: "auto" });
     if (!skipHash) { try { history.replaceState(null, "", "#" + d.slug + "/" + (d.cur + 1)); } catch (e) {} }
   }
@@ -23574,7 +23609,6 @@ boolean isInterleave(String s1, String s2, String s3) {
 
   function toggleToc(force) {
     var open = typeof force === "boolean" ? force : tocEl.hidden;
-    if (open && !activeDeck()) return;
     tocEl.hidden = !open;
     if (open) {
       var active = tocGrid.querySelector('button[data-cur="1"]');
@@ -23590,13 +23624,13 @@ boolean isInterleave(String s1, String s2, String s3) {
     navbar.hidden = !d;
     rail.hidden = !d;
     counter.hidden = !d;
-    tocbtn.hidden = !d;
     DECK_KEYS.forEach(function (k) {
       document.getElementById(DECKS[k].tab).setAttribute("aria-selected", k === view ? "true" : "false");
     });
     tabIv.setAttribute("aria-selected", view === "iv" ? "true" : "false");
     toggleToc(false);
-    if (d) { buildToc(view); show(d.cur, true); }
+    buildToc(view);
+    if (d) show(d.cur, true);
     window.scrollTo({ top: 0, behavior: "auto" });
     if (!skipHash) {
       try { history.replaceState(null, "", d ? "#" + d.slug + "/" + (d.cur + 1) : "#interview"); } catch (e) {}
@@ -23614,12 +23648,12 @@ boolean isInterleave(String s1, String s2, String s3) {
     var t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     if (e.key === "Escape" && !tocEl.hidden) { toggleToc(false); e.preventDefault(); return; }
+    if (e.key === "c" || e.key === "C") { toggleToc(); e.preventDefault(); return; }
     if (!activeDeck()) return;
     if (e.key === "ArrowRight" || e.key === "PageDown") { go(1); e.preventDefault(); }
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { go(-1); e.preventDefault(); }
     else if (e.key === "Home") { show(0); e.preventDefault(); }
     else if (e.key === "End") { show(activeDeck().slides.length - 1); e.preventDefault(); }
-    else if (e.key === "c" || e.key === "C") { toggleToc(); e.preventDefault(); }
   });
 
   /* ---- interview-page scroll spy ---- */
@@ -23631,6 +23665,8 @@ boolean isInterleave(String s1, String s2, String s3) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
         if (!en.isIntersecting) return;
+        ivCur = en.target.id;
+        if (tocFor === "iv") markToc();
         links.forEach(function (a) {
           a.classList.toggle("on", a.getAttribute("href").slice(1) === en.target.id);
         });
