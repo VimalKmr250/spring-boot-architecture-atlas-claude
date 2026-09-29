@@ -1,0 +1,65 @@
+<!-- deck 49 -->
+<section class="slide" data-sec="Cross-cutting" data-title="Security">
+  <h2>Security: the filter chain, then the method, then the row</h2>
+  <p class="dek">Three layers, each catching what the one above cannot. Authorisation at only one of them is how data leaks between customers.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Layer 1 · the filter chain — who are you, broadly what may you reach</div>
+<pre><code class="language-java">@Bean
+SecurityFilterChain api(HttpSecurity http) throws Exception {
+    return http
+        .securityMatcher("/api/**")
+        .authorizeHttpRequests(a -&gt; a
+            .requestMatchers(GET, "/api/products/**").permitAll()
+            .requestMatchers("/api/admin/**").hasRole("OPS")
+            .anyRequest().authenticated())
+        .oauth2ResourceServer(o -&gt; o.jwt(j -&gt; j.jwtAuthenticationConverter(rolesConverter())))
+        .sessionManagement(s -&gt; s.sessionCreationPolicy(STATELESS))
+        .csrf(CsrfConfigurer::disable)          // stateless bearer API; the BFF keeps CSRF ON
+        .headers(h -&gt; h.contentSecurityPolicy(c -&gt; c.policyDirectives(
+             "default-src 'self'; frame-ancestors 'none'")))
+        .build();
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">Layer 2 · method security — may you do this to this thing</div>
+<pre><code class="language-java">// CustomerId is a value type, so unwrap it — comparing the record
+// itself to a String is always false, and fails OPEN-looking (denies
+// everyone but the OPS role, so nobody notices until a customer calls).
+@PreAuthorize("hasRole('OPS') or #command.customerId.value() == authentication.name")
+public void cancel(CancelOrderCommand command) { ... }
+
+@PostAuthorize("returnObject.customerId.value() == authentication.name")
+public OrderView find(OrderId id) { ... }
+
+// Past one `or`, move it into a bean you can unit-test:
+@PreAuthorize("@orderAccess.mayCancel(#command, authentication)")
+public void cancel(CancelOrderCommand command) { ... }</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Layer 3 · the row</h3>
+        <p>The layer most teams skip. A bug in a repository method that forgets <code>WHERE customer_id = ?</code> returns other customers' orders with a perfectly valid token.</p>
+<pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query
+@Entity
+@FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
+@Filter(name = "tenant", condition = "tenant_id = :tenantId")
+class OrderJpaEntity { ... }
+
+@Component
+class TenantFilterActivator {
+    @PersistenceContext EntityManager em;
+
+    void activate() {   // called once per request, from an interceptor
+        em.unwrap(Session.class)
+          .enableFilter("tenant")
+          .setParameter("tenantId", TenantContext.current());
+    }
+}</code></pre>
+        <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Multi-tenancy: pick deliberately</span><b>Shared schema + tenant column</b> — cheapest, needs RLS discipline. <b>Schema per tenant</b> — good isolation, migrations across 500 schemas get slow. <b>Database per tenant</b> — strongest, viable only with tens of tenants. Enterprise default is shared schema with RLS; regulated customers buy the database.</div>
+      <div class="note"><span class="lbl">Audit is a feature</span>Who changed what, when, from where — with the trace id. Append-only, its own schema, read-only role for auditors. Retrofitting it after an incident or an audit finding is far more expensive than adding it in week two.</div>
+    </div>
+  </div>
+</section>
+

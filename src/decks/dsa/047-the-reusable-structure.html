@@ -1,0 +1,97 @@
+<!-- dsa · pattern 07 · structure -->
+<section class="slide" data-sec="07 · Prefix sum" data-title="The reusable structure">
+  <h2>Two skeletons: build-and-query, and sweep-and-count</h2>
+  <p class="dek">The first materialises the prefix array because there will be many queries. The second never stores it at all — it keeps one running sum and a map, because it only ever needs to compare the current prefix against earlier ones.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton A · build once, query O(1) (LC 303, 724)</div>
+<pre><code class="language-java">// P has length n + 1 and P[0] = 0. That leading zero is what
+// removes every "does the range start at index 0?" special case.
+class PrefixSum {
+    private final long[] P;
+
+    PrefixSum(int[] a) {
+        P = new long[a.length + 1];          // n + 1, never n
+        for (int i = 0; i &lt; a.length; i++) {
+            P[i + 1] = P[i] + a[i];          // long: 1e5 * 1e9 overflows int
+        }
+    }
+
+    /** Inclusive on both ends. */
+    long range(int l, int r) {
+        return P[r + 1] - P[l];              // one subtraction, any width
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Skeleton B · sweep and count (LC 560, 930, 974, 523)</div>
+<pre><code class="language-java">// No prefix ARRAY is built. One running sum, one map of
+// "how many times has this prefix value occurred so far".
+int countSubarraysSummingTo(int[] a, int k) {
+    Map&lt;Long, Integer&gt; seen = new HashMap&lt;&gt;();
+    seen.put(0L, 1);                    // the empty prefix — never omit this
+
+    long sum = 0;
+    int count = 0;
+
+    for (int v : a) {
+        sum += v;
+
+        // LOOK UP FIRST. With k == 0 the key equals `sum`,
+        // so inserting first would let a prefix match itself.
+        count += seen.getOrDefault(sum - k, 0);
+
+        seen.merge(sum, 1, Integer::sum);
+    }
+    return count;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">The modular variant — when the question is "divisible by k" (LC 974, 523)</div>
+<pre><code class="language-java">/**
+ * A subarray sum is divisible by k exactly when its two end
+ * prefixes have the SAME remainder mod k:
+ *     (P[r] - P[l]) % k == 0   is the same as   P[r] % k == P[l] % k
+ *
+ * So the map is keyed on the remainder, not on the sum itself,
+ * and it never grows beyond k entries.
+ */
+int subarraysDivByK(int[] a, int k) {
+    int[] seen = new int[k];        // remainders are 0..k-1, so an array beats a map
+    seen[0] = 1;                    // the empty prefix again
+
+    int sum = 0, count = 0;
+
+    for (int v : a) {
+        sum += v;
+
+        // Java's % returns a NEGATIVE remainder for negative operands,
+        // so -1 % 5 is -1, not 4. This normalisation is mandatory,
+        // and forgetting it is the single most common failure here.
+        int r = ((sum % k) + k) % k;
+
+        count += seen[r];
+        seen[r]++;
+    }
+    return count;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Choosing the skeleton</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Many range queries</dt><dd>Skeleton A. Build the array once in the constructor; the whole point is that the queries are then free.</dd>
+        <dt>Count subarrays</dt><dd>Skeleton B. Do not build the array — you only ever need the current prefix and a tally of earlier ones.</dd>
+        <dt>Divisible by k</dt><dd>The modular variant, keyed on the normalised remainder. An <code>int[k]</code> beats a <code>HashMap</code>.</dd>
+        <dt>A multiple of k, length ≥ 2</dt><dd>Store the <em>first index</em> at which each remainder appeared rather than a count, so you can enforce the minimum length.</dd>
+        <dt>Balance point</dt><dd>Compare <code>left</code> against <code>total − left − a[i]</code> as you sweep. No map and no array at all.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Omitting the <code>{0:1}</code> seed</b> — every subarray that starts at index 0 goes uncounted, and the answer is quietly too low on exactly the inputs where the prefix first equals k. <b>Negative remainders</b> — Java's <code>%</code> can return a negative value, so <code>seen[sum % k]</code> throws or silently mis-buckets; always normalise with <code>((x % k) + k) % k</code>. <b><code>int</code> accumulation</b> — 10⁵ elements of 10⁹ overflows long before anything looks wrong, and the count comes back plausible but incorrect.</div>
+  </div>
+</section>
+

@@ -1,0 +1,32 @@
+<!-- deck 66 -->
+<section class="slide" data-sec="Wrap-up" data-title="Decision records">
+  <h2>Write the decision down while you still remember why</h2>
+  <p class="dek">An ADR takes twenty minutes and answers the question every new engineer asks in month two: "why is it like this?" — which is otherwise answered by guessing, and then by an unnecessary rewrite.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>ADR-014 · Keep the modular monolith; do not split payment yet</h3>
+      <dl class="kv" style="margin-top:12px">
+        <dt>Status</dt><dd>Accepted — 2026-03-11 · supersedes ADR-006</dd>
+        <dt>Context</dt><dd>Payments team wants an independent release cadence. Checkout p99 is 780 ms; payment is 240 ms of it. Team is 6 engineers. No separate SLA is contractually required today.</dd>
+        <dt>Decision</dt><dd>Keep payment as a module. Extract the gateway <em>adapters</em> into a separate deployable behind <code>PaymentGatewayClient</code>, which isolates the PCI surface and the third-party latency without splitting the domain.</dd>
+        <dt>Consequences</dt><dd><b>+</b> PCI scope narrows to one small service. <b>+</b> Release cadence unblocked for the adapter, which is what actually changed weekly. <b>−</b> One more deployable to operate. <b>−</b> Revisit if payment needs its own data store.</dd>
+        <dt>Revisit</dt><dd>When any of: payment team &gt; 10 engineers · a contractual payment SLA appears · checkout and payment scaling diverge by more than 3×</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>What makes an ADR useful</h3>
+        <ul class="tight">
+          <li><b>The context is dated and numeric.</b> "6 engineers, 240 ms" ages visibly; "the team is small" does not.</li>
+          <li><b>The rejected options are listed</b>, with why. Otherwise someone re-proposes them in a year.</li>
+          <li><b>Consequences include the negatives.</b> An ADR with only upsides was written to win an argument, not to record one.</li>
+          <li><b>A revisit trigger.</b> This is the line that turns a decision into a living one.</li>
+        </ul>
+      </div>
+      <div class="note"><span class="lbl">Where they live</span>In the repo, under <code>docs/adr/</code>, in the PR that implements them. A decision record in a wiki nobody opens is a decision record nobody reads.</div>
+      <div class="note tip"><span class="lbl">Worth recording</span>Anything in levels 1–4 of the decision hierarchy, any library that becomes load-bearing, any deliberate deviation from your own standard, and every "we tried X and it did not work".</div>
+    </div>
+  </div>
+</section>
+

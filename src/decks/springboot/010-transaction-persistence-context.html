@@ -1,0 +1,52 @@
+<!-- springboot 10 -->
+<section class="slide" data-sec="Lifecycle" data-title="Transaction & persistence context">
+  <h2>The persistence context: open, dirty, flush, commit</h2>
+  <p class="dek">Most JPA surprises — "I never called save() and it updated anyway", "my change vanished", "LazyInitializationException" — are this lifecycle, not a mapping problem.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 270" role="img" aria-label="Timeline of a transactional method: proxy opens transaction and EntityManager, entity loaded becomes managed, field changed marks it dirty, flush issues UPDATE before commit, commit closes the persistence context and detaches entities">
+        <line x1="60" y1="120" x2="820" y2="120" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5"></line>
+
+        <line x1="90" y1="106" x2="90" y2="134" stroke="#D26A3F" stroke-width="2"></line>
+        <text x="90" y="98" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">proxy enters</text>
+        <text x="90" y="152" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">BEGIN + EntityManager</text>
+        <text x="90" y="165" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">bound to the thread</text>
+
+        <line x1="264" y1="106" x2="264" y2="134" stroke="currentColor" stroke-opacity="0.5" stroke-width="2"></line>
+        <text x="264" y="98" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">findById()</text>
+        <text x="264" y="152" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">SELECT · entity is now</text>
+        <text x="264" y="165" text-anchor="middle" font-size="9" fill="#2C7448">MANAGED</text>
+
+        <line x1="438" y1="106" x2="438" y2="134" stroke="currentColor" stroke-opacity="0.5" stroke-width="2"></line>
+        <text x="438" y="98" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">order.markPaid()</text>
+        <text x="438" y="152" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">no SQL yet — just a</text>
+        <text x="438" y="165" text-anchor="middle" font-size="9" fill="#8E6200">dirty field in memory</text>
+
+        <line x1="612" y1="106" x2="612" y2="134" stroke="#D26A3F" stroke-width="2"></line>
+        <text x="612" y="98" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">flush</text>
+        <text x="612" y="152" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">dirty checking runs,</text>
+        <text x="612" y="165" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">UPDATE is issued</text>
+
+        <line x1="786" y1="106" x2="786" y2="134" stroke="#2C7448" stroke-width="2"></line>
+        <text x="786" y="98" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">commit</text>
+        <text x="786" y="152" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">context closed, entities</text>
+        <text x="786" y="165" text-anchor="middle" font-size="9" fill="#A22636">DETACHED</text>
+
+        <rect x="76" y="186" width="724" height="30" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        <text x="438" y="205" text-anchor="middle" font-size="10.5" fill="currentColor">persistence context alive · the database connection is held for this whole span</text>
+
+        <text x="14" y="242" font-size="10.5" fill="currentColor" opacity="0.8">No <tspan font-family="monospace">save()</tspan> is needed for an entity loaded in the same transaction — dirty checking finds the change. That is a feature until someone mutates an entity</text>
+        <text x="14" y="258" font-size="10.5" fill="currentColor" opacity="0.8">inside a read path and is surprised by an UPDATE; <tspan font-family="monospace">@Transactional(readOnly = true)</tspan> disables dirty checking and prevents exactly that.</text>
+      </svg>
+    </div>
+    <figcaption>The dashed span is also how long a connection is borrowed from the pool. An external HTTP call placed inside it turns a 2-second timeout into 2 seconds of held connection — the arithmetic on the capacity slide of the architecture deck.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Flush happens three times</h4><p>Before a query that would read stale data, on <code>flush()</code>, and at commit. So an <code>INSERT</code> can appear far from the <code>save()</code> that caused it — which is why constraint-violation stack traces often point at an unrelated line.</p></div>
+    <div class="card"><h4>Detached is where lazies die</h4><p>After commit, a lazy association on a detached entity throws <code>LazyInitializationException</code>. Map to a DTO <b>inside</b> the transaction. <code>open-in-view</code> hides this by keeping the context open for the whole request — set it to <code>false</code> and fix the real cause.</p></div>
+    <div class="card"><h4>Entity states</h4><p><b>Transient</b> (new, no id) → <b>Managed</b> (tracked) → <b>Detached</b> (context closed) → <b>Removed</b>. <code>save()</code> on a detached entity does a merge, which issues a <code>SELECT</code> first — a quiet source of double queries in bulk loops.</p></div>
+  </div>
+</section>
+

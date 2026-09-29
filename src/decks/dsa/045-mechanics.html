@@ -1,0 +1,80 @@
+<!-- dsa · pattern 07 · mechanics -->
+<section class="slide" data-sec="07 · Prefix sum" data-title="Mechanics">
+  <h2>Pay once up front, answer every range for free</h2>
+  <p class="dek">Build an array where <code>P[i]</code> is the sum of everything before index <code>i</code>. Then the sum of any range <code>[l, r]</code> is <code>P[r+1] − P[l]</code> — one subtraction, O(1), no matter how wide the range. That single identity is the whole pattern.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px"><code>P[0] = 0</code>, and <code>P[i] = a[0] + … + a[i−1]</code>. The leading zero is not decoration: it is what makes ranges starting at index 0 need no special case.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">So <code>P</code> has length <code>n + 1</code>. Sizing it <code>n</code> is the most common implementation error here, and it forces an <code>if (l == 0)</code> branch that then gets the boundary wrong.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Build is O(n) once; every subsequent range query is O(1). The trade is O(n) extra memory, which is almost always worth it the moment there is more than one query.</p>
+    </div>
+    <div class="panel">
+      <h3>The second move — counting with a map</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Range lookup is only half the pattern. The other half answers "how many subarrays sum to K?" without examining any range at all.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">A subarray <code>(l, r]</code> sums to K exactly when <code>P[r] − P[l] = K</code>, that is when <code>P[l] = P[r] − K</code>. So as you sweep <code>r</code>, ask a hash map how many earlier prefixes equalled <code>P[r] − K</code> and add that count.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">This works with <b>negative numbers</b>, which is exactly the case a sliding window cannot handle — there the window has no valid shrink rule, because extending it may raise or lower the sum.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 254" role="img" aria-label="Prefix sum array and the range subtraction identity, plus the complement lookup for counting subarrays">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE RANGE IDENTITY</text>
+
+        <text x="14" y="44" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">a</text>
+        <rect x="60" y="28" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="120" y="28" width="58" height="26" rx="4" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="180" y="28" width="58" height="26" rx="4" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="240" y="28" width="58" height="26" rx="4" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="300" y="28" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="89" y="46" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">2</text>
+        <text x="149" y="46" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">4</text>
+        <text x="209" y="46" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">1</text>
+        <text x="269" y="46" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <text x="329" y="46" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="209" y="70" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#D26A3F">the range [1, 3] — sum 11</text>
+
+        <text x="14" y="112" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">P</text>
+        <rect x="30" y="96" width="58" height="26" rx="4" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.5"></rect>
+        <rect x="90" y="96" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="150" y="96" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="210" y="96" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="270" y="96" width="58" height="26" rx="4" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.5"></rect>
+        <rect x="330" y="96" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="59" y="114" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">0</text>
+        <text x="119" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">2</text>
+        <text x="179" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <text x="239" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">7</text>
+        <text x="299" y="114" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">13</text>
+        <text x="359" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">16</text>
+        <text x="59" y="136" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">P[0] = 0</text>
+        <text x="299" y="136" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.4">P[4]</text>
+        <text x="119" y="136" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.4">P[1]</text>
+
+        <rect x="420" y="90" width="330" height="40" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="434" y="108" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">sum(l..r) = P[r + 1] − P[l]</text>
+        <text x="434" y="124" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">sum(1..3) = P[4] − P[1] = 13 − 2 = 11</text>
+        <text x="766" y="114" font-size="10.5" fill="currentColor" opacity="0.6">O(1), any width</text>
+
+        <line x1="14" y1="156" x2="866" y2="156" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="176" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE COUNTING MOVE — NO RANGE IS EVER EXAMINED</text>
+
+        <text x="14" y="200" font-size="11.5" fill="currentColor" opacity="0.75">A subarray ending at <tspan font-family="monospace">r</tspan> sums to K exactly when some earlier prefix equalled <tspan font-family="monospace" fill="#D26A3F">P[r] − K</tspan>.</text>
+        <text x="14" y="220" font-size="11.5" fill="currentColor" opacity="0.75">So sweep once, and at each step ask a hash map how many times that value has already been seen.</text>
+        <text x="14" y="240" font-size="11.5" fill="currentColor" opacity="0.75">Seed the map with <tspan font-family="monospace" fill="#3AA79B">{0 : 1}</tspan> — the empty prefix — or every subarray starting at index 0 is missed.</text>
+      </svg>
+    </div>
+    <figcaption>The top half is the O(1) range query. The bottom half is the counting variant, which never materialises a range at all — it only ever compares two prefix values.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Repeated <b>range sum</b> queries on a static array, or any "count the subarrays whose sum has property X" question — including sums that are <b>negative</b>, where a window has no valid shrink rule.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>The array is updated between queries — that needs a Fenwick or segment tree, since every update would rebuild O(n) of the prefix array. Also when the question is about a longest run rather than a count and all values are positive; a window is cheaper there.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> to build, <b>O(1)</b> per range query. The counting variant is <b>O(n)</b> total with <b>O(n)</b> map space. Always accumulate in <code>long</code>: 10⁵ values of 10⁹ overflows <code>int</code>.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the sum of the elements between indices left and right"</b> · <b>"multiple queries"</b> or <b>"called many times"</b> · <b>"how many subarrays sum to k"</b> · <b>"divisible by k"</b> · <b>"a subarray whose sum is a multiple of"</b> · <b>"the pivot index"</b> · and critically <b>"nums[i] can be negative"</b>, which is what rules out a window and leaves this.</div>
+</section>
+

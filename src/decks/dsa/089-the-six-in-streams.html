@@ -1,0 +1,230 @@
+<!-- dsa · pattern 15 · streams -->
+<section class="slide" data-sec="15 · Tree DFS" data-title="The six, in streams">
+  <h2>Recursing through a stream eats the stack, so walk the levels instead</h2>
+  <p class="dek">The natural stream DFS, <code>Stream.of(left, right).mapToInt(this::depth)</code>, is pure, short and fragile. Every level of recursion now costs several frames of pipeline machinery instead of one, and LeetCode's skewed test trees go deep: 10⁴ nodes for 104 and 543, 3·10⁴ for 124. So these six walk the tree iteratively, level by level with <code>Stream.iterate</code>, and each node carries in a record whatever the DFS would have passed down. The two that need children before parents (543 and 124) read the levels bottom-up into a map.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">104</td><td><a href="https://leetcode.com/problems/maximum-depth-of-binary-tree/" target="_blank" rel="noopener">Maximum Depth of Binary Tree</a></td><td>The depth is the number of levels: <code>levels(root).count()</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">226</td><td><a href="https://leetcode.com/problems/invert-binary-tree/" target="_blank" rel="noopener">Invert Binary Tree</a></td><td>Collect every node first, then swap each one's children in a <code>forEach</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">112</td><td><a href="https://leetcode.com/problems/path-sum/" target="_blank" rel="noopener">Path Sum</a></td><td>Each node carries its root-to-node sum in a record; <code>anyMatch</code> a leaf that hits the target.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">113</td><td><a href="https://leetcode.com/problems/path-sum-ii/" target="_blank" rel="noopener">Path Sum II</a></td><td>Each node also carries its own immutable path, so nothing is ever undone.</td><td><span class="tag g">clean</span></td><td class="num">O(n·h) / O(w·h)</td><td class="num">O(n·h) / O(h)</td></tr>
+        <tr><td class="num">543</td><td><a href="https://leetcode.com/problems/diameter-of-binary-tree/" target="_blank" rel="noopener">Diameter of Binary Tree</a></td><td>Heights filled into a map from the deepest level up, then <code>max</code> of left + right.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">124</td><td><a href="https://leetcode.com/problems/binary-tree-maximum-path-sum/" target="_blank" rel="noopener">Binary Tree Maximum Path Sum</a></td><td>The same bottom-up map, holding each node's best downward gain, with negative gains dropped.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(h)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 104 · Maximum Depth of Binary Tree · clean</div>
+<pre><code class="language-java">class Solution {
+    public int maxDepth(TreeNode root) {
+        // The depth is the number of levels. Nothing recurses,
+        // so a 10⁴-deep skewed tree costs no stack at all.
+        return (int) levels(root).count();
+    }
+
+    // ---- the same level walk in 104, 226, 543 and 124 ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 226 · Invert Binary Tree · clean</div>
+<pre><code class="language-java">class Solution {
+    public TreeNode invertTree(TreeNode root) {
+        // Collect every node first, then swap each one's
+        // children: the walk is over before anything moves.
+        levels(root).flatMap(List::stream).toList()
+                .forEach(n -&gt; {
+                    TreeNode t = n.left;
+                    n.left = n.right;
+                    n.right = t;
+                });
+        return root;
+    }
+
+    // ---- the same level walk in 104, 226, 543 and 124 ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 112 · Path Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    // a node, with the sum of the path from the root to it
+    record At(TreeNode node, int sum) {
+        boolean hits(int target) {
+            return node.left == null &amp;&amp; node.right == null
+                    &amp;&amp; sum == target;
+        }
+        Stream&lt;At&gt; children() {
+            return Stream.of(node.left, node.right)
+                    .filter(Objects::nonNull)
+                    .map(c -&gt; new At(c, sum + c.val));
+        }
+    }
+
+    public boolean hasPathSum(TreeNode root, int targetSum) {
+        if (root == null) return false;
+        // What recursion would pass down, each node carries.
+        At start = new At(root, root.val);
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream().flatMap(At::children)
+                                .toList())
+                .flatMap(List::stream)
+                .anyMatch(a -&gt; a.hits(targetSum));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 113 · Path Sum II · clean</div>
+<pre><code class="language-java">class Solution {
+    // a node, its root-to-node sum, and the path itself
+    record At(TreeNode node, int sum, List&lt;Integer&gt; path) {
+        boolean hits(int target) {
+            return node.left == null &amp;&amp; node.right == null
+                    &amp;&amp; sum == target;
+        }
+        Stream&lt;At&gt; children() {
+            return Stream.of(node.left, node.right)
+                    .filter(Objects::nonNull)
+                    .map(c -&gt; new At(c, sum + c.val,
+                                     with(c.val)));
+        }
+        List&lt;Integer&gt; with(int v) {
+            return Stream.concat(path.stream(), Stream.of(v))
+                    .toList();
+        }
+    }
+
+    public List&lt;List&lt;Integer&gt;&gt; pathSum(TreeNode root,
+                                       int targetSum) {
+        if (root == null) return List.of();
+        // Each node carries its own immutable path, so there is
+        // nothing to undo: no add-then-remove backtracking.
+        At start = new At(root, root.val, List.of(root.val));
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream().flatMap(At::children)
+                                .toList())
+                .flatMap(List::stream)
+                .filter(a -&gt; a.hits(targetSum))
+                .map(At::path)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 543 · Diameter of Binary Tree · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int diameterOfBinaryTree(TreeNode root) {
+        List&lt;List&lt;TreeNode&gt;&gt; lv = levels(root).toList();
+        int d = lv.size();
+        // Heights need both children first, so fill a map from
+        // the deepest level up. That fill order is the state.
+        Map&lt;TreeNode, Integer&gt; h = new HashMap&lt;&gt;();
+        IntStream.range(0, d).mapToObj(i -&gt; lv.get(d - 1 - i))
+                .flatMap(List::stream)
+                .forEach(n -&gt; h.put(n, 1 + Math.max(
+                        h.getOrDefault(n.left, 0),
+                        h.getOrDefault(n.right, 0))));
+        // The longest path through n uses both child heights.
+        return h.keySet().stream()
+                .mapToInt(n -&gt; h.getOrDefault(n.left, 0)
+                        + h.getOrDefault(n.right, 0))
+                .max().orElse(0);
+    }
+
+    // ---- the same level walk in 104, 226, 543 and 124 ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 124 · Binary Tree Maximum Path Sum · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maxPathSum(TreeNode root) {
+        List&lt;List&lt;TreeNode&gt;&gt; lv = levels(root).toList();
+        int d = lv.size();
+        // gain(n) = the best downward path that starts at n,
+        // filled deepest level first. A negative child gain is
+        // simply not taken.
+        Map&lt;TreeNode, Integer&gt; gain = new HashMap&lt;&gt;();
+        ToIntFunction&lt;TreeNode&gt; g =
+                n -&gt; n == null ? 0 : Math.max(0, gain.get(n));
+        IntStream.range(0, d).mapToObj(i -&gt; lv.get(d - 1 - i))
+                .flatMap(List::stream)
+                .forEach(n -&gt; gain.put(n, n.val
+                        + Math.max(g.applyAsInt(n.left),
+                                   g.applyAsInt(n.right))));
+        // The best path bends at some n and takes both sides.
+        return gain.keySet().stream()
+                .mapToInt(n -&gt; n.val + g.applyAsInt(n.left)
+                        + g.applyAsInt(n.right))
+                .max().getAsInt();
+    }
+
+    // ---- the same level walk in 104, 226, 543 and 124 ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Measured, not guessed</span>On a 1 MB thread stack with OpenJDK 25, a skewed tree gave these limits. Plain recursive <code>maxDepth</code> survived about 41,000 levels. The version recursing through <code>Stream.of(left, right).mapToInt(…)</code> survived about 10,000 once the JIT had compiled it, and only 1,500 to 3,000 in a fresh JVM before it had. Every solution here runs 10⁴ to 3·10⁴-deep skewed trees on that same 1 MB stack without trouble, because nothing in them recurses.</div>
+  <div class="note tip"><span class="lbl">Return versus record, in stream form</span>104, 112 and 113 are "pass something down", so the value rides in the record. 543 and 124 are "return one thing, record another", and returning needs children before parents. Reading the levels bottom-up gives that order without recursion, at the cost of a map. That map is exactly what makes those two stateful.</div>
+</section>
+
+

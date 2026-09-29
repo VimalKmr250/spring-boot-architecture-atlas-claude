@@ -1,0 +1,163 @@
+<!-- dsa · pattern 03 · streams -->
+<section class="slide" data-sec="03 · Fast/slow pointers" data-title="The six, in streams">
+  <h2>A list is already a stream; two pointers are one record</h2>
+  <p class="dek"><code>Stream.iterate(head, Objects::nonNull, x -&gt; x.next)</code> turns any list into a stream of its nodes. Two pointers moving at different speeds become a record whose step method moves both, and <code>filter(…).findFirst()</code> stops on the state you are after: the meeting point, the middle, or the node before the one to delete. Five of the six keep the loop's O(1) space. Only the palindrome check copies the values out.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">876</td><td><a href="https://leetcode.com/problems/middle-of-the-linked-list/" target="_blank" rel="noopener">Middle of the Linked List</a></td><td>Stream the <code>(slow, fast)</code> states until fast cannot move again. That state holds the middle.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">141</td><td><a href="https://leetcode.com/problems/linked-list-cycle/" target="_blank" rel="noopener">Linked List Cycle</a></td><td>The Floyd states, <code>skip(1)</code>, then <code>anyMatch(slow == fast)</code>. Without a cycle the stream just ends.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">142</td><td><a href="https://leetcode.com/problems/linked-list-cycle-ii/" target="_blank" rel="noopener">Linked List Cycle II</a></td><td>Phase 1 as in 141; phase 2 is a second <code>iterate</code> at equal speeds, stopped where the pointers meet.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">19</td><td><a href="https://leetcode.com/problems/remove-nth-node-from-end-of-list/" target="_blank" rel="noopener">Remove Nth Node From End of List</a></td><td>A <code>(slow, fast, lead)</code> record: fast opens a lead of n + 1, then both walk until fast falls off.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">160</td><td><a href="https://leetcode.com/problems/intersection-of-two-linked-lists/" target="_blank" rel="noopener">Intersection of Two Linked Lists</a></td><td>Each pointer switches lists at its end; <code>filter(a == b)</code> stops at the join, or at null.</td><td><span class="tag g">clean</span></td><td class="num">O(n+m) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">234</td><td><a href="https://leetcode.com/problems/palindrome-linked-list/" target="_blank" rel="noopener">Palindrome Linked List</a></td><td>Copy the values out with the node stream, then <code>allMatch</code> the mirrored pairs.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 876 · Middle of the Linked List · clean</div>
+<pre><code class="language-java">class Solution {
+    record Ptrs(ListNode slow, ListNode fast) {
+        boolean canStep() {
+            return fast != null &amp;&amp; fast.next != null;
+        }
+        Ptrs step() {
+            return new Ptrs(slow.next, fast.next.next);
+        }
+    }
+
+    public ListNode middleNode(ListNode head) {
+        // Slow moves one node, fast two. The first state where
+        // fast cannot move again has slow on the middle. step()
+        // only ever runs on states that failed the filter.
+        return Stream.iterate(new Ptrs(head, head), Ptrs::step)
+                .filter(p -&gt; !p.canStep())
+                .findFirst().get().slow();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 141 · Linked List Cycle · clean</div>
+<pre><code class="language-java">class Solution {
+    record Ptrs(ListNode slow, ListNode fast) {
+        boolean canStep() {
+            return fast != null &amp;&amp; fast.next != null;
+        }
+        Ptrs step() {
+            return new Ptrs(slow.next, fast.next.next);
+        }
+    }
+
+    public boolean hasCycle(ListNode head) {
+        // Floyd: in a cycle, fast gains a node per step, so it
+        // must land on slow. With no cycle, fast hits the end,
+        // canStep() fails, and the stream simply stops.
+        return Stream.iterate(new Ptrs(head, head),
+                              Ptrs::canStep, Ptrs::step)
+                .skip(1)
+                .anyMatch(p -&gt; p.slow() == p.fast());
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 142 · Linked List Cycle II · clean</div>
+<pre><code class="language-java">class Solution {
+    // a always moves 1 node; b moves 2 in phase 1, 1 in phase 2
+    record P(ListNode a, ListNode b) {
+        boolean met() { return a == b; }
+        boolean canRun() { return b != null &amp;&amp; b.next != null; }
+        P run() { return new P(a.next, b.next.next); }
+        P walk() { return new P(a.next, b.next); }
+    }
+
+    public ListNode detectCycle(ListNode head) {
+        // Phase 1: Floyd finds a meeting point in the cycle.
+        ListNode meet = Stream.iterate(new P(head, head),
+                                       P::canRun, P::run)
+                .skip(1)
+                .filter(P::met)
+                .findFirst().map(P::a).orElse(null);
+        if (meet == null) return null;
+        // Phase 2: from head and from the meeting point, at
+        // equal speed, the pointers meet exactly at the entry.
+        return Stream.iterate(new P(head, meet), P::walk)
+                .filter(P::met)
+                .findFirst().get().a();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 19 · Remove Nth Node From End of List · clean</div>
+<pre><code class="language-java">class Solution {
+    // fast first opens a lead of n + 1, then both walk together
+    record Gap(ListNode slow, ListNode fast, int lead) {
+        Gap step(int n) {
+            return lead &lt;= n
+                    ? new Gap(slow, fast.next, lead + 1)
+                    : new Gap(slow.next, fast.next, lead);
+        }
+    }
+
+    public ListNode removeNthFromEnd(ListNode head, int n) {
+        ListNode dummy = new ListNode(0, head);
+        // When fast falls off the end, slow is n + 1 behind it:
+        // on the node just before the one to remove.
+        Gap end = Stream.iterate(new Gap(dummy, dummy, 0),
+                                 g -&gt; g.step(n))
+                .filter(g -&gt; g.fast() == null)
+                .findFirst().get();
+        end.slow().next = end.slow().next.next;
+        return dummy.next;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 160 · Intersection of Two Linked Lists · clean</div>
+<pre><code class="language-java">class Solution {
+    record P(ListNode a, ListNode b) {
+        // at its list's end, each pointer jumps to the other
+        P next(ListNode headA, ListNode headB) {
+            return new P(a == null ? headB : a.next,
+                         b == null ? headA : b.next);
+        }
+    }
+
+    public ListNode getIntersectionNode(ListNode headA,
+                                        ListNode headB) {
+        // Both pointers walk m + n nodes, so they line up on
+        // the shared tail, or on null together if there's none.
+        return Stream.iterate(new P(headA, headB),
+                              p -&gt; p.next(headA, headB))
+                .filter(p -&gt; p.a() == p.b())
+                .findFirst().get().a();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 234 · Palindrome Linked List · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean isPalindrome(ListNode head) {
+        // Copy the values out, then compare mirrored pairs.
+        // int[], not List&lt;Integer&gt;: == on boxed values past 127
+        // compares references.
+        int[] v = Stream.iterate(head, Objects::nonNull,
+                                 x -&gt; x.next)
+                .mapToInt(x -&gt; x.val)
+                .toArray();
+        return IntStream.range(0, v.length / 2)
+                .allMatch(i -&gt; v[i] == v[v.length - 1 - i]);
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Why <code>fast.next.next</code> never throws here</span>On an infinite <code>Stream.iterate(seed, f)</code>, <code>filter(test).findFirst()</code> applies <code>f</code> only to states that failed the test. So a step that would throw on the last state is safe, because the last state is the one the filter returns. The three-argument form applies its step once more on the last state it emits, so there (141, 142) the step must be safe on every state that passes <code>hasNext</code>, and <code>canStep</code> guarantees exactly that.</div>
+  <div class="note warn"><span class="lbl">Where streams stop</span>234's O(1)-space answer reverses the second half in place, and every problem in the linked-list pattern later in this deck is that kind of pointer surgery. A stream can walk the nodes and work out where each should go, but it must not rewire them while it walks: that is interference with its own source. It computes an order, and the rewiring happens once, afterwards.</div>
+</section>
+
+

@@ -1,0 +1,37 @@
+<!-- events 07 -->
+<section class="slide" data-sec="Foundations" data-title="Naming & ownership">
+  <h2>Topic naming, ownership and the catalogue</h2>
+  <p class="dek">Once you pass twenty topics, the problem stops being technical. Nobody can tell what a topic contains, who owns it, whether it is safe to consume, or whether anyone still reads it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A naming convention that answers the questions people ask</div>
+<pre><code class="language-yaml">&lt;domain&gt;.&lt;entity&gt;.&lt;event&gt;.v&lt;major&gt;
+
+orders.order.placed.v1
+orders.order.cancelled.v1
+payments.payment.authorised.v2
+inventory.stock.reserved.v1
+
+# Internal / intermediate topics, clearly marked as not-a-contract:
+_internal.orders.dedupe.v1
+orders.order.placed.v1.DLT
+orders.order.placed.v1-retry-0
+
+# Environment in the CLUSTER, never in the topic name — otherwise
+# promotion between environments becomes a code change.</code></pre>
+      <div class="note tip" style="margin-top:12px"><span class="lbl">Why the major version is in the name</span>A breaking schema change becomes a <b>new topic</b> plus a dual-publish window, rather than a coordinated big-bang deploy across every consumer you cannot name. Consumers migrate on their own schedule; you retire v1 when the metrics say nobody reads it.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The event catalogue</h3>
+        <p>One page per topic, generated where possible, holding: owning team, schema and its history, semantics in a sentence, the key, partition count, retention, expected volume, known consumers, and an example payload.</p>
+        <p>Without it, every integration starts with an engineer reading someone else's producer code to guess what a field means — and guessing wrong.</p>
+        <p style="color:var(--text-3)">AsyncAPI is the OpenAPI equivalent for this, and a schema registry gives you the schema half for free. Generating the page from both keeps it true.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Ownership is the thing that rots first</span>A topic with no owning team is one nobody will change, fix or retire. Put the owner in the catalogue, in the topic's ACLs, and in the alert routing. When a team is disbanded, their topics need reassigning like any other asset.</div>
+      <div class="note"><span class="lbl">Know who consumes you</span>Kafka does not tell the producer who reads a topic — that is the point, and it is also the problem when you want to change something. Monitor consumer groups per topic and publish the list. "Can I remove this field?" is then a query, not a broadcast email.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,153 @@
+<!-- dsa · pattern 08 · streams -->
+<section class="slide" data-sec="08 · Difference array" data-title="The six, in streams">
+  <h2>Build the difference array with a collect; only the sweep carries state</h2>
+  <p class="dek">Each update touches two cells of a difference array. Accumulating those is a textbook mutable reduction: a supplier makes the array, an accumulator applies one update, and a combiner adds two partial arrays, so it is even safe in parallel. The sweep that turns differences back into values is a scan, and it is the one stateful line in each solution.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">370</td><td><a href="https://leetcode.com/problems/range-addition/" target="_blank" rel="noopener">Range Addition</a></td><td><code>collect</code> the updates into a difference array, then sweep it with one running-sum <code>map</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(q + n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1109</td><td><a href="https://leetcode.com/problems/corporate-flight-bookings/" target="_blank" rel="noopener">Corporate Flight Bookings</a></td><td>The same, 1-indexed: +seats at <code>first − 1</code>, −seats at <code>last</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(q + n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1094</td><td><a href="https://leetcode.com/problems/car-pooling/" target="_blank" rel="noopener">Car Pooling</a></td><td>Collect pick-ups and drop-offs by stop; <code>allMatch</code> the running load against the capacity.</td><td><span class="tag w">stateful</span></td><td class="num">O(q + M) / O(M)</td><td class="num">same</td></tr>
+        <tr><td class="num">1893</td><td><a href="https://leetcode.com/problems/check-if-all-the-integers-in-a-range-are-covered/" target="_blank" rel="noopener">Check if All the Integers in a Range Are Covered</a></td><td>At most 50 × 50: <code>allMatch</code> every point against an <code>anyMatch</code> over the ranges.</td><td><span class="tag g">clean</span></td><td class="num">O(M·q) / O(1)</td><td class="num">O(q + M) / O(M)</td></tr>
+        <tr><td class="num">1943</td><td><a href="https://leetcode.com/problems/describe-the-painting/" target="_blank" rel="noopener">Describe the Painting</a></td><td><code>groupingBy(TreeMap::new, summingLong)</code> keeps every event point, even those with a zero change; a sweep labels each gap.</td><td><span class="tag w">stateful</span></td><td class="num">O(q log q) / O(q)</td><td class="num">same</td></tr>
+        <tr><td class="num">2381</td><td><a href="https://leetcode.com/problems/shifting-letters-ii/" target="_blank" rel="noopener">Shifting Letters II</a></td><td>A difference array of ±1 shifts, swept into net shifts and applied with <code>floorMod</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(q + n) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 370 · Range Addition · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] getModifiedArray(int length, int[][] updates) {
+        // The difference array is a mutable reduction with a
+        // real combiner: +inc at start, -inc just past the end.
+        int[] diff = Arrays.stream(updates).collect(
+                () -&gt; new int[length + 1],
+                (d, u) -&gt; {
+                    d[u[0]] += u[2];
+                    d[u[1] + 1] -= u[2];
+                },
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        // Sweeping back to values is a scan: the stateful line.
+        int[] run = {0};
+        return Arrays.stream(diff, 0, length)
+                .map(d -&gt; run[0] += d)
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1109 · Corporate Flight Bookings · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] corpFlightBookings(int[][] bookings, int n) {
+        // 370 with 1-indexed flights: +seats at first - 1,
+        // -seats at last (just past the range, 0-indexed).
+        int[] diff = Arrays.stream(bookings).collect(
+                () -&gt; new int[n + 1],
+                (d, bk) -&gt; {
+                    d[bk[0] - 1] += bk[2];
+                    d[bk[1]] -= bk[2];
+                },
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        int[] run = {0};
+        return Arrays.stream(diff, 0, n)
+                .map(d -&gt; run[0] += d)
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1094 · Car Pooling · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean carPooling(int[][] trips, int capacity) {
+        // Pick-ups add at "from", drop-offs subtract at "to":
+        // a passenger is out of the car at the stop they leave.
+        int[] diff = Arrays.stream(trips).collect(
+                () -&gt; new int[1001],
+                (d, t) -&gt; { d[t[1]] += t[0]; d[t[2]] -= t[0]; },
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        // Sweep the load and stop at the first overload.
+        int[] load = {0};
+        return Arrays.stream(diff)
+                .allMatch(d -&gt; (load[0] += d) &lt;= capacity);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1893 · Check if All the Integers in a Range Are Covered · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean isCovered(int[][] ranges, int left,
+                             int right) {
+        // At most 50 points × 50 ranges: brute force is clean,
+        // instant, and needs no difference array at all.
+        return IntStream.rangeClosed(left, right)
+                .allMatch(x -&gt; Arrays.stream(ranges)
+                        .anyMatch(r -&gt; r[0] &lt;= x &amp;&amp; x &lt;= r[1]));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1943 · Describe the Painting · stateful</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Long&gt;&gt; splitPainting(int[][] segments) {
+        // position -&gt; net colour change. Keep every key, even a
+        // zero: a mix can change while its sum stays the same.
+        TreeMap&lt;Integer, Long&gt; delta = Arrays.stream(segments)
+                .flatMap(s -&gt; Stream.of(
+                        new long[]{ s[0], s[2] },
+                        new long[]{ s[1], -s[2] }))
+                .collect(Collectors.groupingBy(e -&gt; (int) e[0],
+                        TreeMap::new,
+                        Collectors.summingLong(e -&gt; e[1])));
+        List&lt;Integer&gt; at = new ArrayList&lt;&gt;(delta.keySet());
+        // mix[i] = colour sum on [at[i], at[i+1]): the scan
+        long[] run = {0};
+        long[] mix = delta.values().stream()
+                .mapToLong(d -&gt; run[0] += d).toArray();
+        return IntStream.range(0, at.size() - 1)
+                .filter(i -&gt; mix[i] &gt; 0)
+                .mapToObj(i -&gt; List.of((long) at.get(i),
+                        (long) at.get(i + 1), mix[i]))
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 2381 · Shifting Letters II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public String shiftingLetters(String s, int[][] shifts) {
+        int n = s.length();
+        // +1 forward, -1 backward, over [start, end]
+        int[] diff = Arrays.stream(shifts).collect(
+                () -&gt; new int[n + 1],
+                (d, t) -&gt; {
+                    int v = t[2] == 1 ? 1 : -1;
+                    d[t[0]] += v;
+                    d[t[1] + 1] -= v;
+                },
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        // The sweep to each letter's net shift is the scan.
+        int[] run = {0};
+        int[] shift = Arrays.stream(diff, 0, n)
+                .map(d -&gt; run[0] += d).toArray();
+        return IntStream.range(0, n)
+                .map(i -&gt; s.charAt(i) - 'a' + shift[i])
+                .map(x -&gt; 'a' + Math.floorMod(x, 26))
+                .collect(StringBuilder::new,
+                         StringBuilder::appendCodePoint,
+                         StringBuilder::append)
+                .toString();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">A collect with a real combiner is clean</span><code>Arrays.setAll(a, i -&gt; a[i] + b[i])</code> merges two partial difference arrays correctly, so the accumulation is safe in parallel. That is exactly what the three-argument <code>collect</code> is for. The contrast is the sweep after it: in Java 17 it has no correct combiner, because each output needs everything before it. So the one stateful line is always the sweep, never the build.</div>
+  <div class="note warn"><span class="lbl">1943's trap is the same in a stream</span>Drop the zero-change keys, or sum into a <code>HashMap</code> and rebuild the order some other way, and you merge two different colour mixes that happen to have the same sum. The <code>TreeMap</code> collector keeps every event point, so each output segment really is a single mix.</div>
+</section>
+
+

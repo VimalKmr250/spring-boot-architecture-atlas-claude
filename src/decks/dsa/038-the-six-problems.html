@@ -1,0 +1,119 @@
+<!-- dsa · pattern 05 · problems -->
+<section class="slide" data-sec="05 · Binary search on the answer" data-title="The six problems">
+  <h2>Six problems that are the same problem</h2>
+  <p class="dek">875, 1011, 410 and 1283 differ only in what <code>feasible</code> counts. Once you see that 1011 and 410 are <em>literally</em> the same algorithm with the inputs renamed, the family collapses into one thing to remember.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The answer being searched</th><th><code>feasible(x)</code> counts</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">875</td><td><a href="https://leetcode.com/problems/koko-eating-bananas/" target="_blank" rel="noopener">Koko Eating Bananas</a></td><td><span class="tag w">Medium</span></td><td>Eating speed, <code>[1, max]</code></td><td>Hours needed ≤ h</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">1011</td><td><a href="https://leetcode.com/problems/capacity-to-ship-packages-within-d-days/" target="_blank" rel="noopener">Capacity To Ship Packages Within D Days</a></td><td><span class="tag w">Medium</span></td><td>Ship capacity, <code>[max, sum]</code></td><td>Days needed ≤ days</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">1283</td><td><a href="https://leetcode.com/problems/find-the-smallest-divisor-given-a-threshold/" target="_blank" rel="noopener">Find the Smallest Divisor Given a Threshold</a></td><td><span class="tag w">Medium</span></td><td>Divisor, <code>[1, max]</code></td><td>Sum of ceilings ≤ threshold</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">1482</td><td><a href="https://leetcode.com/problems/minimum-number-of-days-to-make-m-bouquets/" target="_blank" rel="noopener">Minimum Number of Days to Make m Bouquets</a></td><td><span class="tag w">Medium</span></td><td>Day, <code>[min day, max day]</code></td><td>Bouquets formable ≥ m</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">410</td><td><a href="https://leetcode.com/problems/split-array-largest-sum/" target="_blank" rel="noopener">Split Array Largest Sum</a></td><td><span class="tag b">Hard</span></td><td>Largest allowed part, <code>[max, sum]</code></td><td>Parts needed ≤ k</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">774</td><td><a href="https://leetcode.com/problems/minimize-max-distance-to-gas-station/" target="_blank" rel="noopener">Minimize Max Distance to Gas Station</a> <span class="tag">Premium</span></td><td><span class="tag b">Hard</span></td><td>Distance — a <b>real number</b></td><td>Extra stations needed ≤ k</td><td class="num">O(n·100) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 875 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Try every speed from 1 upwards and stop at the first that fits. O(max · n) — with piles to 10⁹ that is 10¹⁴ operations.</dd>
+          <dt>The constraint tell</dt><dd><code>n ≤ 10⁴</code> but <code>piles[i] ≤ 10⁹</code>. A tiny array with gigantic values means the search is over the value range, not the array.</dd>
+          <dt>The observation</dt><dd>Eating faster never takes more hours. So feasibility is monotone in speed, and the brute-force scan is a linear search over a sorted-by-feasibility axis — exactly what binary search replaces.</dd>
+          <dt>The check</dt><dd><code>sum(ceil(pile / k)) ≤ h</code>. She never moves on mid-pile, which is <em>why</em> it is a ceiling — that sentence in the statement is the whole modelling step.</dd>
+          <dt>Edge cases</dt><dd>Use <code>long</code> for the hour total. Round up with integer arithmetic, never <code>Math.ceil</code> on doubles — at 10⁹ the division loses precision.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 875 · O(n log maxPile) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int minEatingSpeed(int[] piles, int h) {
+        int lo = 1, hi = 0;
+        for (int p : piles) hi = Math.max(hi, p);   // fastest useful speed
+
+        while (lo &lt; hi) {
+            int mid = lo + (hi - lo) / 2;
+
+            if (canFinish(piles, mid, h)) hi = mid;      // maybe the answer
+            else                          lo = mid + 1;  // definitely too slow
+        }
+        return lo;
+    }
+
+    private boolean canFinish(int[] piles, int speed, int h) {
+        long hours = 0;
+        for (int p : piles) {
+            hours += (p + speed - 1) / speed;   // ceil(p / speed), integer only
+            if (hours &gt; h) return false;        // early exit
+        }
+        return true;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 410 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The DP solution</dt><dd><code>dp[i][j]</code> = best split of the first <code>i</code> elements into <code>j</code> parts. O(n²k) time, O(nk) space. It is the textbook answer and it passes — mention it, then beat it.</dd>
+          <dt>The inversion</dt><dd>Stop asking "what is the smallest possible largest sum" and ask "with a cap of M, how many parts do I need?" That second question is a single greedy pass.</dd>
+          <dt>Why greedy is optimal here</dt><dd>Fill each part as full as the cap allows before starting the next. Closing a part early can never reduce the total count, so the greedy count is the minimum. Say this — it is the step interviewers push on.</dd>
+          <dt>Monotonicity</dt><dd>A larger cap never needs more parts, so <code>partsNeeded(M) ≤ k</code> reads F F F T T T in M.</dd>
+          <dt>Bounds</dt><dd><code>lo = max(nums)</code> — no part can be smaller than its largest element. <code>hi = sum(nums)</code> — one part holds everything. Starting <code>lo</code> at 0 or 1 is the classic error.</dd>
+          <dt>Same problem</dt><dd>LC 1011 is this with "parts" renamed "days" and "cap" renamed "capacity". Identical code.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 410 · O(n log sum) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int splitArray(int[] nums, int k) {
+        long lo = 0, hi = 0;
+        for (int v : nums) {
+            lo = Math.max(lo, v);   // a part can never be smaller than one element
+            hi += v;                // one part holding everything always works
+        }
+
+        while (lo &lt; hi) {
+            long mid = lo + (hi - lo) / 2;
+
+            if (partsNeeded(nums, mid) &lt;= k) hi = mid;
+            else                             lo = mid + 1;
+        }
+        return (int) lo;
+    }
+
+    /** Greedy: fill each part to the cap before opening the next. */
+    private int partsNeeded(int[] nums, long cap) {
+        int parts = 1;
+        long cur = 0;
+
+        for (int v : nums) {
+            if (cur + v &gt; cap) { parts++; cur = v; }   // open a new part
+            else                 cur += v;
+        }
+        return parts;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>1011 · Capacity To Ship Packages <span class="tag a">greedy packing</span></h4><p><b>Path:</b> identical to 410 in every respect — only the vocabulary differs. Recognising that equivalence out loud is itself worth points.</p><p><b>Delta:</b> <code>lo = max(weights)</code> (a package must fit on one ship), <code>hi = sum(weights)</code>. <code>feasible(cap)</code> counts days by the same greedy fill.</p><p><b>Watch for:</b> packages must ship <b>in order</b>, which is what makes the greedy valid. If reordering were allowed this would be bin packing, and NP-hard.</p></div>
+
+    <div class="card"><h4>1283 · Smallest Divisor Given a Threshold <span class="tag a">count units</span></h4><p><b>Path:</b> the same shape as 875 with "hours" renamed "sum of quotients". If you solved Koko, you can write this in two minutes.</p><p><b>Delta:</b> <code>lo = 1</code>, <code>hi = max(nums)</code> — at that divisor every term is 1, so the sum is <code>n</code>, and the statement guarantees <code>threshold ≥ n</code>. <code>feasible(d)</code> is <code>sum(ceil(v/d)) ≤ threshold</code>.</p><p><b>Watch for:</b> the ceiling again. <code>Math.ceil((double) v / d)</code> works here but integer arithmetic is faster and exact — build the habit.</p></div>
+
+    <div class="card"><h4>1482 · Min Days to Make m Bouquets <span class="tag a">count runs</span></h4><p><b>Path:</b> the answer is a <em>day</em>, not a size — the first cue that the answer space is a time axis. By day <code>x</code>, the bloomed flowers form fixed runs, and each run of length <code>L</code> yields <code>L / k</code> bouquets.</p><p><b>Delta:</b> <code>feasible(x)</code> scans once, tracking the current run of flowers with <code>bloomDay ≤ x</code> and resetting it at every unbloomed flower.</p><p><b>Watch for:</b> check <code>(long) m * k &gt; n</code> up front and return −1 — the multiplication overflows <code>int</code> at the stated limits, and it is the only impossible case.</p></div>
+
+    <div class="card"><h4>774 · Minimize Max Distance to Gas Station <span class="tag a">real-valued</span></h4><p><b>Path:</b> a heap-based greedy that repeatedly splits the widest gap looks natural but is wrong — it is locally greedy and misses the optimum. Binary searching the distance is both simpler and correct.</p><p><b>Delta:</b> the answer is a <code>double</code>, so there is no integer grid to converge onto. Run a <b>fixed 100 iterations</b> instead of comparing against an epsilon. <code>feasible(d)</code> sums <code>(int)(gap / d)</code> extra stations per gap and tests against <code>k</code>.</p><p><b>Watch for:</b> <code>while (hi - lo &gt; 1e-6)</code> can spin forever when the two doubles become adjacent representable values. The fixed count cannot.</p><p><b>Premium:</b> this one is behind LeetCode's paywall. <a href="https://leetcode.com/problems/magnetic-force-between-two-balls/" target="_blank" rel="noopener">LC 1552</a> is a free substitute: the same "maximise the minimum distance" shape, and it drills the mirrored template.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>875</b> and <b>410</b>. 875 teaches the recognition — small n, huge values, "minimum speed". 410 teaches the inversion in its purest form: a Hard problem with a well-known DP solution that collapses to twenty lines once you binary search the answer instead of constructing it. That collapse is the single most transferable move in this deck.</div>
+</section>
+

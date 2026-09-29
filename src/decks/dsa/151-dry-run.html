@@ -1,0 +1,105 @@
+<!-- dsa · pattern 28 · dry run -->
+<section class="slide" data-sec="28 · Knapsack / subset DP" data-title="Dry run">
+  <h2>LC 416 traced on <code>[1,5,11,5]</code></h2>
+  <p class="dek">Can the array split into two equal-sum halves? The total is 22, so the question becomes: is a subset summing to exactly 11 reachable? The table is boolean, and each row processes one item with the capacity loop running <b>backwards</b>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 300" role="img" aria-label="A boolean subset-sum table filled one item at a time, backwards across capacities">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">dp[c] = "IS SUM c REACHABLE?"  ·  TARGET = 22 / 2 = 11</text>
+
+        <text x="14" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">c</text>
+        <text x="96" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+        <text x="146" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">1</text>
+        <text x="256" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">5</text>
+        <text x="306" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">6</text>
+        <text x="416" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">10</text>
+        <text x="466" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">11</text>
+
+        <text x="14" y="76" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">init</text>
+        <rect x="86" y="60" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="101" y="77" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <text x="146" y="77" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="256" y="77" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="306" y="77" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="416" y="77" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="466" y="77" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="540" y="77" font-size="10.5" fill="currentColor" opacity="0.55">only 0 is reachable — take nothing</text>
+
+        <text x="14" y="112" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">+1</text>
+        <rect x="86" y="96" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="101" y="113" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="136" y="96" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="151" y="113" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <text x="256" y="113" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="306" y="113" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="416" y="113" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="466" y="113" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="540" y="113" font-size="10.5" fill="currentColor" opacity="0.55">{1}</text>
+
+        <text x="14" y="148" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">+5</text>
+        <rect x="86" y="132" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="101" y="149" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="136" y="132" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="151" y="149" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="246" y="132" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="261" y="149" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="296" y="132" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="311" y="149" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <text x="416" y="149" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="466" y="149" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <text x="540" y="149" font-size="10.5" fill="currentColor" opacity="0.55">{5}, {1,5}</text>
+
+        <text x="14" y="184" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">+11</text>
+        <rect x="86" y="168" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="101" y="185" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="136" y="168" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="151" y="185" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="246" y="168" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="261" y="185" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="296" y="168" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="311" y="185" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <text x="416" y="185" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.3">F</text>
+        <rect x="456" y="168" width="30" height="24" rx="3" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-width="1.7"></rect>
+        <text x="471" y="185" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="600" fill="currentColor">T</text>
+        <text x="540" y="185" font-size="10.5" font-weight="600" fill="#D26A3F">{11} reaches the target — answer is true</text>
+
+        <text x="14" y="220" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">+5</text>
+        <rect x="86" y="204" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="101" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="136" y="204" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="151" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="246" y="204" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="261" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="296" y="204" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="311" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="406" y="204" width="30" height="24" rx="3" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="421" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor">T</text>
+        <rect x="456" y="204" width="30" height="24" rx="3" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-width="1.7"></rect>
+        <text x="471" y="221" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="600" fill="currentColor">T</text>
+        <text x="540" y="221" font-size="10.5" fill="currentColor" opacity="0.55">{1,5,5} also reaches 11</text>
+
+        <line x1="14" y1="242" x2="866" y2="242" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="262" font-size="11" fill="currentColor" opacity="0.72">The backwards loop is what keeps each item to one use. Running forwards, item 1 would mark <tspan font-family="monospace">c = 1, 2, 3, …</tspan> — reusing it repeatedly.</text>
+        <text x="14" y="284" font-size="11" fill="currentColor" opacity="0.72">That wrong version reports true for <tspan font-family="monospace">[1, 1]</tspan> with target 2 from a single 1, which is the test case that exposes it.</text>
+      </svg>
+    </div>
+    <figcaption>Row <code>+11</code> reaches the target directly. The algorithm continues anyway, since the answer is read only at the end — checking mid-loop is a valid early exit, but not required.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>after item</th><th>reachable sums (≤ 11)</th><th>new this round</th><th>why</th></tr></thead>
+      <tbody>
+        <tr><td class="num">—</td><td class="num">{0}</td><td class="num">—</td><td>taking nothing sums to zero</td></tr>
+        <tr><td class="num">1</td><td class="num">{0, 1}</td><td class="num">1</td><td><code>dp[1] |= dp[0]</code></td></tr>
+        <tr><td class="num">5</td><td class="num">{0, 1, 5, 6}</td><td class="num">5, 6</td><td><code>dp[6] |= dp[1]</code>, <code>dp[5] |= dp[0]</code></td></tr>
+        <tr><td class="num">11</td><td class="num">{0, 1, 5, 6, 11}</td><td class="num">11</td><td><code>dp[11] |= dp[0]</code> — <b>target hit</b></td></tr>
+        <tr><td class="num">5</td><td class="num">{0, 1, 5, 6, 10, 11}</td><td class="num">10</td><td><code>dp[10] |= dp[5]</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why an odd total returns false immediately</span>Two equal halves each sum to <code>total / 2</code>, which must be an integer. So if <code>total</code> is odd the answer is false with no work at all. That check is one line and it removes the entire table — always state the cheap impossibility test before building anything.</div>
+</section>
+

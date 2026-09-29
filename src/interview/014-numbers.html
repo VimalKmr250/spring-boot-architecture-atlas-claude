@@ -1,0 +1,66 @@
+    <section class="ivsec" id="numbers">
+      <h2>Numbers worth knowing by heart</h2>
+      <p class="dek">Using a real figure mid-answer signals operational experience more strongly than any pattern name. These are order-of-magnitude, which is all an interview needs.</p>
+      <div class="split">
+        <div class="tblwrap">
+          <table class="tbl" style="min-width:0">
+            <thead><tr><th>Operation</th><th>Typical</th></tr></thead>
+            <tbody>
+              <tr><td>L1 cache reference</td><td class="num">~1 ns</td></tr>
+              <tr><td>In-process cache hit (Caffeine)</td><td class="num">~100 ns</td></tr>
+              <tr><td>Main memory read</td><td class="num">~100 ns</td></tr>
+              <tr><td>SSD random read</td><td class="num">~100 µs</td></tr>
+              <tr><td>Redis round trip, same DC</td><td class="num">~0.5–1 ms</td></tr>
+              <tr><td>Internal HTTP call, same DC</td><td class="num">~1–5 ms</td></tr>
+              <tr><td>Indexed PostgreSQL query</td><td class="num">~1–10 ms</td></tr>
+              <tr><td>Kafka produce, acks=all</td><td class="num">~5–10 ms</td></tr>
+              <tr><td>Cross-region round trip</td><td class="num">~50–150 ms</td></tr>
+              <tr><td>Mobile network RTT</td><td class="num">~100–300 ms</td></tr>
+              <tr><td>Third-party payment authorisation</td><td class="num">~300–800 ms</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <h3>Capacity arithmetic to do in your head</h3>
+            <dl class="kv">
+              <dt>1M/day</dt><dd>≈ 12 per second average; assume 5–10× at peak</dd>
+              <dt>Pool size</dt><dd>throughput × hold time, then headroom — not "100 to be safe"</dd>
+              <dt>Availability</dt><dd>five dependencies at 99.9% each ≈ 99.5% combined</dd>
+              <dt>99.9%</dt><dd>43 minutes of budget per month</dd>
+              <dt>99.99%</dt><dd>4.3 minutes per month — needs multi-AZ and automated failover</dd>
+              <dt>Row size</dt><dd>1 KB × 100M rows ≈ 100 GB before indexes; index bloat is often 2×</dd>
+              <dt>Partitions</dt><dd>Kafka partition count is your consumer parallelism ceiling</dd>
+            </dl>
+          </div>
+          <div class="note tip"><span class="lbl">How to deploy a number</span>Not "it'll be fast" but "an indexed lookup is single-digit milliseconds, so at 40 requests a second that's well under one connection of concurrency — the database isn't the constraint here, the payment gateway's 800 ms is." Specific, checkable, and it moves the conversation to the real bottleneck.</div>
+        </div>
+      </div>
+      <h3 style="font-size:16px">Defaults that come up in follow-up questions</h3>
+      <p class="dek" style="font-size:14.5px">Interviewers who have run these systems ask about defaults, because the default is what most teams are actually running. Knowing the value, and why it matters, is a quick credibility signal.</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Setting</th><th>Default</th><th>Why it comes up</th></tr></thead>
+          <tbody>
+            <tr><td>HikariCP <code>maximum-pool-size</code></td><td class="num">10</td><td>It applies per pod. Multiply by the pod count and compare with the database's limit.</td></tr>
+            <tr><td>PostgreSQL <code>max_connections</code></td><td class="num">100</td><td>Shared by every pod, job and tool. Running out is a cluster-wide outage.</td></tr>
+            <tr><td>Tomcat <code>server.tomcat.threads.max</code></td><td class="num">200</td><td>The platform-thread ceiling that virtual threads remove.</td></tr>
+            <tr><td>Boot's <code>@Async</code> executor</td><td class="num">8 core, unbounded queue</td><td><code>max-size</code> never takes effect, and a backlog grows in memory.</td></tr>
+            <tr><td>Boot's <code>@Scheduled</code> pool</td><td class="num">1 thread</td><td>One slow job delays every other scheduled job.</td></tr>
+            <tr><td><code>@Transactional</code> rollback</td><td class="num">unchecked only</td><td>A checked exception commits the transaction.</td></tr>
+            <tr><td><code>spring.jpa.open-in-view</code></td><td class="num">true</td><td>Boot logs a warning at startup. It hides N+1s until production load.</td></tr>
+            <tr><td><code>server.shutdown</code></td><td class="num">graceful (Boot 3.4+)</td><td>Bounded by <code>spring.lifecycle.timeout-per-shutdown-phase</code>, 30 s by default.</td></tr>
+            <tr><td>Kubernetes <code>terminationGracePeriodSeconds</code></td><td class="num">30 s</td><td>Must exceed the preStop sleep plus the shutdown timeout.</td></tr>
+            <tr><td>JVM <code>MaxRAMPercentage</code></td><td class="num">25%</td><td>An untuned JVM in a container uses a quarter of its memory for heap.</td></tr>
+            <tr><td>G1 <code>MaxGCPauseMillis</code></td><td class="num">200 ms</td><td>A target, not a guarantee.</td></tr>
+            <tr><td>Kafka <code>min.insync.replicas</code></td><td class="num">1</td><td>Leaves <code>acks=all</code> weaker than it sounds. Set it to 2 with replication factor 3.</td></tr>
+            <tr><td>Kafka <code>max.poll.records</code></td><td class="num">500</td><td>Records per poll. Lower it before you raise the poll interval.</td></tr>
+            <tr><td>Kafka <code>max.poll.interval.ms</code></td><td class="num">5 min</td><td>Exceed it and the consumer is evicted: the rebalance loop.</td></tr>
+            <tr><td>Kafka <code>session.timeout.ms</code></td><td class="num">45 s (3.0+)</td><td>How long a dead consumer keeps its partitions.</td></tr>
+            <tr><td>Kafka <code>auto.offset.reset</code></td><td class="num">latest</td><td>A new consumer group skips everything already on the topic.</td></tr>
+            <tr><td>Kafka <code>retention.ms</code> / <code>offsets.retention.minutes</code></td><td class="num">7 days / 7 days</td><td>Your replay window, and how long an idle group keeps its position.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+

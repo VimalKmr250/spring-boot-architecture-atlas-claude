@@ -1,0 +1,45 @@
+<!-- streams 06 -->
+<section class="slide" data-sec="How a stream runs" data-title="Short-circuiting operations">
+  <h2>Some operations can stop early, and only they can handle infinity</h2>
+  <p class="dek">A short-circuiting operation can finish without reading the whole source. It is the only kind that can make a pipeline over an infinite stream terminate, and it is what lets a search over a million orders stop at the first match. When a short-circuit fires anywhere downstream, the source stops being pulled.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Operation</th><th>Kind</th><th>Stops as soon as</th></tr></thead>
+        <tbody>
+          <tr><td><code>limit(n)</code></td><td>intermediate</td><td>n elements have passed</td></tr>
+          <tr><td><code>takeWhile(p)</code> <span class="tag a">9</span></td><td>intermediate</td><td>the first element that fails <code>p</code></td></tr>
+          <tr><td><code>gather(g)</code> <span class="tag a">24</span></td><td>intermediate</td><td>the gatherer says it wants no more</td></tr>
+          <tr><td><code>findFirst()</code> · <code>findAny()</code></td><td>terminal</td><td>one element arrives</td></tr>
+          <tr><td><code>anyMatch(p)</code></td><td>terminal</td><td>an element matches: returns <code>true</code></td></tr>
+          <tr><td><code>allMatch(p)</code></td><td>terminal</td><td>an element fails: returns <code>false</code></td></tr>
+          <tr><td><code>noneMatch(p)</code></td><td>terminal</td><td>an element matches: returns <code>false</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Infinite source, finite answer, and the one that never returns</div>
+<pre><code class="language-java">// Terminates: iterate never ends, but findFirst stops at a match
+int first = Stream.iterate(1, n -&gt; n * 2)
+        .filter(n -&gt; n &gt; 1_000)
+        .findFirst()
+        .orElseThrow();                       // 1024
+
+// Terminates: limit caps an infinite generator
+List&lt;Double&gt; samples = Stream.generate(Math::random)
+        .limit(3)
+        .toList();
+
+// Never returns: every element passes, so allMatch
+// has to keep looking for one that fails
+Stream.generate(() -&gt; 1).allMatch(n -&gt; n &gt; 0);</code></pre>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>Short-circuit is not the same as cheap</h4><p><code>anyMatch</code> over orders stops at the first match. If there is no match it still reads every order, so the worst case is the whole source. In a database-backed stream that is a full table read. Push the condition into the query when it can be pushed.</p></div>
+    <div class="card"><h4><code>flatMap</code> honours it since Java 10</h4><p>In Java 8 and 9, <code>flatMap</code> pushed each inner stream through in full, even when the step downstream had already stopped. So <code>Stream.of(1).flatMap(i -&gt; Stream.iterate(0, x -&gt; x + 1)).findFirst()</code> never returned. JDK 10 fixed it (JDK-8075939), and on 25 it returns <code>Optional[0]</code>. The fix still catches out anyone reading Java 8 advice.</p></div>
+  </div>
+</section>
+

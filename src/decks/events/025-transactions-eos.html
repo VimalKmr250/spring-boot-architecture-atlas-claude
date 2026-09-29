@@ -1,0 +1,67 @@
+<!-- events 25 -->
+<section class="slide" data-sec="Kafka internals" data-title="Transactions & EOS">
+  <h2>Kafka transactions: read-process-write, atomically</h2>
+  <p class="dek">The genuine exactly-once story, and its exact boundary. Worth knowing precisely because it is asked constantly and answered loosely.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 210" role="img" aria-label="A transactional consumer-producer reads from an input topic, produces to an output topic and commits its consumer offsets inside the same Kafka transaction, so all three succeed or none do">
+        <rect x="14" y="66" width="130" height="48" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="79" y="88" text-anchor="middle" font-size="10.5" fill="currentColor">input topic</text>
+        <text x="79" y="104" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">orders.placed</text>
+
+        <rect x="216" y="40" width="330" height="106" rx="10" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-dasharray="5 4" stroke-width="1.6"></rect>
+        <text x="381" y="34" text-anchor="middle" font-size="10.5" font-weight="600" fill="#D26A3F">ONE KAFKA TRANSACTION</text>
+        <rect x="236" y="60" width="132" height="34" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="302" y="81" text-anchor="middle" font-size="9.5" fill="currentColor">consume + transform</text>
+        <rect x="236" y="102" width="132" height="34" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="302" y="123" text-anchor="middle" font-size="9.5" fill="currentColor">produce result</text>
+        <rect x="392" y="80" width="136" height="36" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="460" y="96" text-anchor="middle" font-size="9.5" fill="currentColor">sendOffsetsToTransaction</text>
+        <text x="460" y="110" text-anchor="middle" font-size="8.5" fill="#D26A3F">offsets commit INSIDE the tx</text>
+        <line x1="146" y1="90" x2="212" y2="90" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+
+        <rect x="600" y="66" width="130" height="48" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="665" y="88" text-anchor="middle" font-size="10.5" fill="currentColor">output topic</text>
+        <text x="665" y="104" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">orders.enriched</text>
+        <line x1="550" y1="90" x2="596" y2="90" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+
+        <text x="744" y="80" font-size="10" fill="currentColor" opacity="0.75">Readers set</text>
+        <text x="744" y="94" font-size="9" font-family="monospace" fill="currentColor" opacity="0.75">isolation.level</text>
+        <text x="744" y="107" font-size="9" font-family="monospace" fill="currentColor" opacity="0.75">= read_committed</text>
+        <text x="744" y="122" font-size="9.5" fill="currentColor" opacity="0.6">or they see aborted records</text>
+
+        <line x1="14" y1="162" x2="866" y2="162" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="182" font-size="10.5" fill="#2C7448">Inside this boundary: exactly-once. Produce and offset-commit are atomic, so a crash cannot leave the output written and the offset uncommitted.</text>
+        <text x="14" y="202" font-size="10.5" fill="#A22636">Outside it: your database write, your HTTP call, your email. Those are not in the transaction and need idempotency as always.</text>
+      </svg>
+    </div>
+    <figcaption>Cost is real: transactional writes add markers to the log, <code>read_committed</code> consumers cannot read past an open transaction (so latency rises with transaction duration), and throughput drops meaningfully. Use it for Kafka-to-Kafka pipelines; do not turn it on everywhere by reflex.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">In Spring: it is the property, not an annotation</div>
+<pre><code class="language-yaml">spring.kafka:
+  producer.transaction-id-prefix: order-enricher-   # ← this is the switch
+  consumer.isolation-level: read_committed</code></pre>
+<pre style="margin-top:12px"><code class="language-java">// Setting the prefix auto-configures a KafkaTransactionManager AND hands
+// it to the listener container. The CONTAINER then opens the transaction
+// around the poll and calls sendOffsetsToTransaction() at the end — which
+// is the part that makes consume+produce+commit atomic.
+//
+// So no @Transactional here. Adding it starts a SECOND, nested Kafka
+// transaction around the container's one and buys nothing.
+@KafkaListener(topics = "orders.order.placed.v1", groupId = "enricher")
+public void enrich(OrderPlaced in) {
+    kafka.send("orders.order.enriched.v1", in.orderId(), enrich(in));
+}
+
+// @Transactional on a listener is for the OTHER resource — a JPA write —
+// and that is a different transaction manager, with the caveat opposite.</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">The "chained transaction" temptation</span>Spring can chain a Kafka transaction and a JPA transaction so they commit together. It is <b>not</b> atomic — it is two commits in sequence, and a crash between them leaves them inconsistent. It narrows the window; it does not close it.
+    <p style="margin-top:8px">For a database write plus an event, the honest answer remains the outbox. Reach for Kafka transactions when both sides are Kafka.</p></div>
+  </div>
+</section>
+

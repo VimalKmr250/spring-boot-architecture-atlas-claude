@@ -1,0 +1,24 @@
+<!-- streams 47 -->
+<section class="slide" data-sec="Interview questions" data-title="Q7–9 · Transforming">
+  <h2><code>map</code>, <code>flatMap</code>, <code>mapMulti</code>, and infinite sources</h2>
+  <p class="dek"><code>map</code> versus <code>flatMap</code> is the single most asked stream question. The other two here are how interviewers check whether your knowledge stopped at Java 8.</p>
+
+  <article class="q"><header><i>Q7</i><h3>What is the difference between <code>map</code> and <code>flatMap</code>?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span><code>map</code> turns each element into exactly one element: <code>orders.stream().map(Order::lines)</code> gives a <code>Stream&lt;List&lt;Line&gt;&gt;</code>. <code>flatMap</code> turns each element into a stream and splices those streams together: <code>flatMap(o -&gt; o.lines().stream())</code> gives a <code>Stream&lt;Line&gt;</code>. Use <code>flatMap</code> to flatten nested collections, split text into words, or turn <code>Optional</code>s into zero or one element.</div>
+    <p class="deeper"><b>Go deeper:</b> The telltale bug is <code>map(o -&gt; o.lines().stream())</code>, which produces a <code>Stream&lt;Stream&lt;Line&gt;&gt;</code> that prints as <code>ReferencePipeline$Head@…</code>. There are primitive versions, <code>flatMapToInt</code> and friends, and <code>Optional.flatMap</code> is the same idea for optionals. A <code>flatMap</code> function that returns <code>null</code> is treated as an empty stream. Historical detail: until Java 10, <code>flatMap</code> ignored short-circuiting and consumed each inner stream fully (JDK-8075939).</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="st" data-slide="flatMap and mapMulti" href="#streams">flatMap and mapMulti</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q8</i><h3>When would you use <code>mapMulti</code> instead of <code>flatMap</code>?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span><code>mapMulti</code> (Java 16) replaces each element with zero or more elements by pushing them into a consumer instead of returning a stream. It is the better choice when each element yields only a few results, often zero or one, because it avoids creating a stream per element, and when the logic is easier to write imperatively, such as an <code>instanceof</code> test.</div>
+    <p class="deeper"><b>Go deeper:</b> Show the shape: <code>.&lt;Line&gt;mapMulti((order, sink) -&gt; { for (Line l : order.lines()) if (l.qty() &gt;= 10) sink.accept(l); })</code>. Point out the type witness: without <code>&lt;Line&gt;</code> the compiler infers <code>Stream&lt;Object&gt;</code>, and the assignment to <code>List&lt;Line&gt;</code> fails. There are primitive versions, <code>mapMultiToInt</code> and friends. When each element already <em>is</em> a collection, <code>flatMap(List::stream)</code> is still the clearer choice.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="st" data-slide="flatMap and mapMulti" href="#streams">flatMap and mapMulti</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q9</i><h3>How do you create an infinite stream, and how do you stop it?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span><code>Stream.iterate(seed, f)</code> produces <code>seed</code>, <code>f(seed)</code>, <code>f(f(seed))</code> and so on; <code>Stream.generate(supplier)</code> produces independent values. Both are infinite, so something downstream must short-circuit: <code>limit</code>, <code>takeWhile</code>, <code>findFirst</code>, <code>anyMatch</code>. Since Java 9, <code>iterate(seed, hasNext, next)</code> is finite on its own: the <code>for</code> loop as a stream.</div>
+    <p class="deeper"><b>Go deeper:</b> Give the two traps. <code>Stream.iterate(1, n -&gt; n * 3).filter(n -&gt; n &lt;= 100).toList()</code> never ends, because <code>filter</code> does not short-circuit and does not know the values only grow; <code>takeWhile</code> is the fix. And a stateful operation before the short-circuit defeats it: <code>iterate(…).sorted().limit(3)</code> made about 46 million pulls in two seconds on JDK 25 without producing anything, and ends in <code>OutOfMemoryError</code>. <code>iterate</code> is ordered; <code>generate</code> is not.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="st" data-slide="Generated and infinite streams" href="#streams">Infinite streams</a><a data-deck="st" data-slide="Short-circuiting operations" href="#streams">Short-circuiting</a></p>
+  </div></article>
+</section>
+

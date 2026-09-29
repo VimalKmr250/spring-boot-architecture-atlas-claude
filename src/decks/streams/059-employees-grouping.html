@@ -1,0 +1,81 @@
+<!-- streams 59 -->
+<section class="slide" data-sec="Coding drills" data-title="Employees: grouping">
+  <h2>Employees: grouping and aggregating</h2>
+  <p class="dek">Using the <code>employees</code> list from the first drill slide. Every answer here is a single <code>groupingBy</code> with the right downstream collector, and a <code>TreeMap::new</code> so that the printed output is in a stable order.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Drills 48–53</div>
+<pre><code class="language-java">// 48 · Names grouped by department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+                                      mapping(Employee::name, toList())));
+// {Engineering=[Asha, Bruno, Chen], Finance=[Goran, Hana],
+//  Sales=[Dara, Emeka, Farah, Kofi], Support=[Ivo, Jia]}
+
+// 49 · Headcount per department
+Map&lt;String, Long&gt; headcount = employees.stream()
+        .collect(groupingBy(Employee::dept, TreeMap::new, counting()));
+// {Engineering=3, Finance=2, Sales=4, Support=2}
+
+// 50 · Average salary per department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+                                      averagingDouble(Employee::salary)));
+// {Engineering=113666.66666666667, Finance=91500.0, Sales=75750.0, Support=57500.0}
+
+// 51 · The department with the most employees
+headcount.entrySet().stream()
+         .max(Map.Entry.comparingByValue())
+         .map(Map.Entry::getKey);                     // Optional[Sales]
+
+// 52 · Average age by gender
+employees.stream().collect(groupingBy(Employee::gender, TreeMap::new,
+                                      averagingInt(Employee::age)));
+// {F=31.0, M=33.666666666666664}
+
+// 53 · Split by age above 30
+employees.stream().collect(partitioningBy(e -&gt; e.age() &gt; 30,
+                                          mapping(Employee::name, toList())));
+// {false=[Chen, Dara, Hana, Ivo, Kofi],
+//  true=[Asha, Bruno, Emeka, Farah, Goran, Jia]}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Drills 54–58</div>
+<pre><code class="language-java">// 54 · Total salary bill
+employees.stream().mapToDouble(Employee::salary).sum();      // 942000.0
+
+// 55 · Names per department as one string
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+                                      mapping(Employee::name, joining(", "))));
+// {Engineering=Asha, Bruno, Chen, Finance=Goran, Hana, ...}
+
+// 56 · Headcount per city
+employees.stream().collect(groupingBy(Employee::city, TreeMap::new, counting()));
+// {Dublin=2, Lagos=2, Lisbon=2, Prague=1, Pune=3, Zagreb=1}
+
+// 57 · Employees earning over 80,000, per department, keeping every department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+                                      filtering(e -&gt; e.salary() &gt; 80_000, counting())));
+// {Engineering=3, Finance=2, Sales=2, Support=0}
+
+// 58 · Salary statistics for one department
+employees.stream()
+         .collect(groupingBy(Employee::dept, summarizingDouble(Employee::salary)))
+         .get("Sales");
+// DoubleSummaryStatistics{count=4, sum=303000.000000, min=69000.000000,
+//                         average=75750.000000, max=81000.000000}</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>The follow-up they ask</th><th>What to say</th></tr></thead>
+      <tbody>
+        <tr><td class="num">49</td><td>Why is the value <code>Long</code>?</td><td><code>counting()</code> returns <code>Long</code>. For <code>Integer</code> counts, use <code>summingInt(e -&gt; 1)</code>.</td></tr>
+        <tr><td class="num">51</td><td>What if two departments tie?</td><td><code>max</code> returns one of them. State the rule: "all of them" means finding the max count first, then filtering the entries equal to it.</td></tr>
+        <tr><td class="num">57</td><td>Why <code>filtering</code> and not <code>filter</code> first?</td><td>Filtering before grouping drops Support entirely. <code>filtering</code> (Java 9) keeps it, with a count of 0.</td></tr>
+        <tr><td class="num">50</td><td>The client wants two decimal places.</td><td>Format at the edge: keep the <code>double</code> in the map and format when printing. For money, prefer <code>long</code> cents or <code>BigDecimal</code> throughout.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

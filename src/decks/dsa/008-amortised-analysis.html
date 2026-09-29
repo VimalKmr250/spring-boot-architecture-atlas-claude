@@ -1,0 +1,65 @@
+<!-- dsa · complexity 04 · amortised -->
+<section class="slide" data-sec="Complexity analysis" data-title="Amortised analysis">
+  <h2>When a loop inside a loop is still linear</h2>
+  <p class="dek">Read per iteration, a <code>while</code> inside a <code>for</code> looks like n × n. That bound is true but loose. The <b>aggregate</b> question is sharper: across the entire run, how many times can the inner body execute <em>in total</em>? If every execution consumes something that can only be consumed once, the answer is n — and so is the complexity.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The aggregate method, in three moves</h3>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Name what the inner loop consumes.</b> An index passed over by <code>l</code>, an element popped from a stack, a node taken off a queue.</li>
+        <li><b>Show it cannot be consumed twice.</b> <code>l</code> never decreases. A popped index is never pushed again. A visited node is never queued again.</li>
+        <li><b>Sum, then divide.</b> Total inner work is at most the number of things there are to consume. Add the outer loop's own n and you have the total; divide by n and you have the <em>amortised</em> cost per step — O(1).</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Amortised is not the same as average. An average is an expectation over inputs, and an unlucky input can beat it. An amortised bound holds for <b>every</b> input: individual steps may be expensive, but the total over any run is guaranteed.</p>
+    </div>
+    <div class="panel">
+      <h3>The same argument, pattern by pattern</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>01 window</dt><dd><code>r</code> admits each index once; <code>l</code> evicts each at most once. At most 2n moves.</dd>
+        <dt>02 two pointers</dt><dd>The gap <code>r − l</code> starts below n and every step shrinks it. At most n steps.</dd>
+        <dt>09 · 10 stack, deque</dt><dd>Each index is pushed once and removed at most once. At most 2n operations.</dd>
+        <dt>16 · 20 · 21 BFS</dt><dd>Each node is queued once — mark it when you enqueue it — and its adjacency list is scanned once, when it is dequeued. O(V + E).</dd>
+        <dt>22 union-find</dt><dd>Path compression flattens every path it walks. With union by size, O(α(n)) amortised — and α(n) ≤ 4 for any input that fits in memory.</dd>
+        <dt>ArrayList.add</dt><dd>A resize copies everything, but capacity grows geometrically, so all the copying over n adds sums to O(n). O(1) amortised.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 252" role="img" aria-label="The pair of window pointers drawn as a walk on an n by n grid. The walk only moves right when r advances or up when l advances, so it takes at most 2n steps rather than visiting all n squared cells.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE (r, l) WALK OF A SLIDING WINDOW · n = 8</text>
+
+        <rect x="60" y="40" width="160" height="160" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <path d="M80 40 V200 M100 40 V200 M120 40 V200 M140 40 V200 M160 40 V200 M180 40 V200 M200 40 V200 M60 60 H220 M60 80 H220 M60 100 H220 M60 120 H220 M60 140 H220 M60 160 H220 M60 180 H220" fill="none" stroke="currentColor" stroke-opacity="0.1"></path>
+        <path d="M60 200 L220 40" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="3 3"></path>
+        <path d="M60 200 H120 V180 H140 V140 H180 V120 H200 V80 H220" fill="none" stroke="#D26A3F" stroke-width="2.2" stroke-linejoin="round"></path>
+        <circle cx="60" cy="200" r="3.5" fill="#D26A3F"></circle>
+        <circle cx="220" cy="80" r="3.5" fill="#D26A3F"></circle>
+        <text x="140" y="218" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">r → admits</text>
+        <text x="52" y="124" text-anchor="end" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">l ↑</text>
+        <text x="52" y="138" text-anchor="end" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">evicts</text>
+
+        <text x="260" y="50" font-size="11.5" font-weight="600" fill="#D26A3F">The staircase — what actually runs</text>
+        <text x="260" y="68" font-size="11" fill="currentColor" opacity="0.72">Each step right is r++ (admit); each step up is l++ (evict).</text>
+        <text x="260" y="84" font-size="11" fill="currentColor" opacity="0.72">Neither can be undone, so the walk has at most n + n = 2n steps.</text>
+        <text x="260" y="100" font-size="11" fill="currentColor" opacity="0.72">Here: 8 admits + 6 evictions = 14 steps.</text>
+
+        <text x="260" y="128" font-size="11.5" font-weight="600" fill="currentColor">The shaded square — what the nested-loop reading assumes</text>
+        <text x="260" y="146" font-size="11" fill="currentColor" opacity="0.72">Every (r, l) pair visited: n² = 64 steps. True, but loose.</text>
+        <text x="260" y="162" font-size="11" fill="currentColor" opacity="0.72">The dashed diagonal is l = r; the walk can never cross above it.</text>
+
+        <text x="260" y="190" font-size="11.5" font-weight="600" fill="#3AA79B">The same walk, under other names</text>
+        <text x="260" y="208" font-size="11" fill="currentColor" opacity="0.72">two pointers closing a gap · merging two sorted lists (i, j) · stack pushes and pops</text>
+
+        <line x1="14" y1="226" x2="866" y2="226" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="244" font-size="11" fill="currentColor" opacity="0.72">Count the steps of the walk, not the product of the loop bounds. That sentence is the whole amortised argument.</text>
+      </svg>
+    </div>
+    <figcaption>Any algorithm whose state can be drawn as a walk that only moves right or up is linear in the size of the grid's side, not its area. Being able to name the variable that never moves back is what makes the O(n) claim checkable.</figcaption>
+  </figure>
+
+  <div class="note warn"><span class="lbl">When the argument breaks</span>The whole bound rests on "cannot be consumed twice". Reset <code>l</code> to 0, restart a scan from the beginning, or push a popped element back on, and the walk stops being monotone — the honest bound becomes O(n²). Before claiming O(n) for a nested loop, point at the variable that never moves backwards.</div>
+</section>
+

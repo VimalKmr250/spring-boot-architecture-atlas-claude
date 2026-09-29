@@ -1,0 +1,33 @@
+<!-- springboot 54 -->
+<section class="slide" data-sec="Production" data-title="Load testing">
+  <h2>A load test that tells you something true</h2>
+  <p class="dek">Most load tests measure the test harness, or a cold JVM, or a database with no data in it. Four things separate a number you can plan with from one you cannot.</p>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>The four that matter</h3>
+      <ol class="tight">
+        <li><b>Realistic data volume.</b> A query against 1,000 rows tells you nothing about 40 million. Seed production-shaped data — same distribution, same skew, same index sizes.</li>
+        <li><b>Realistic mix.</b> Hammering one endpoint measures that endpoint. Real traffic is ~80% reads, ~15% writes, and one nightly batch competing for the same connections.</li>
+        <li><b>Warm up, then measure.</b> The first 30–60 seconds are JIT compilation and cold caches. Discard them or you are benchmarking the interpreter.</li>
+        <li><b>Model think time.</b> A closed-loop test with zero delay creates a pattern no user produces and hides queueing effects. Use an open model with an arrival rate.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Four tests, four questions</h3>
+        <dl class="kv">
+          <dt>Load</dt><dd>Does it meet the SLO at expected peak?</dd>
+          <dt>Stress</dt><dd>Where does it break, and <em>how</em> — shedding load gracefully, or falling over?</dd>
+          <dt>Soak</dt><dd>8–24 hours. Leaks, connection exhaustion and log-disk growth only appear here.</dd>
+          <dt>Spike</dt><dd>0 → peak in 30 seconds. Does autoscaling react in time, or does the cold pool starve?</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">Watch the dependencies, not just your service</span>The bottleneck is almost never your application tier. Instrument the database (connections, slow queries, lock waits, CPU), cache hit ratio, and consumer lag during the run. A test that only reports response times tells you "it got slow" and nothing about why.</div>
+      <div class="note tip"><span class="lbl">One number worth deriving</span>State the <b>cost per 1,000 orders</b> at the achieved throughput. It converts a technical result into the language the people funding capacity use, and it is the number that justifies a caching project.</div>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">Where it belongs</span>A nightly load test on a scaled-down environment, tracked over time, catches a regression the week it is introduced. A one-off test two weeks before go-live describes a system that no longer exists by launch.</div>
+</section>
+

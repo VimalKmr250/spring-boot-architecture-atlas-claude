@@ -1,0 +1,53 @@
+<!-- streams 14 -->
+<section class="slide" data-sec="Intermediate operations" data-title="filter and map">
+  <h2><code>filter</code> keeps or drops; <code>map</code> replaces</h2>
+  <p class="dek">The two operations in almost every pipeline. <code>filter</code> keeps the elements a predicate accepts. <code>map</code> replaces each element with a function of it. Its primitive variants, <code>mapToInt</code>, <code>mapToLong</code> and <code>mapToDouble</code>, avoid boxing when the result is a number.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The running example</div>
+<pre><code class="language-java">double paidRevenue = orders.stream()
+        .filter(o -&gt; "PAID".equals(o.status()))    // constant first: null-safe
+        .mapToDouble(Order::total)                 // DoubleStream: no boxing
+        .sum();
+
+List&lt;String&gt; customers = orders.stream()
+        .map(Order::customer)                      // Stream&lt;Order&gt; → Stream&lt;String&gt;
+        .toList();
+
+List&lt;String&gt; labels = IntStream.range(0, 3)
+        .mapToObj(i -&gt; "#" + i)                    // IntStream → Stream&lt;String&gt;
+        .toList();                                 // [#0, #1, #2]
+
+Predicate&lt;Order&gt; paid = o -&gt; "PAID".equals(o.status());
+Predicate&lt;Order&gt; large = o -&gt; o.total() &gt; 500;
+orders.stream().filter(paid.and(large.negate()));  // composed predicates</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>Signature</th></tr></thead>
+        <tbody>
+          <tr><td><code>filter</code></td><td><code>Stream&lt;T&gt; filter(Predicate&lt;? super T&gt;)</code></td></tr>
+          <tr><td><code>map</code></td><td><code>&lt;R&gt; Stream&lt;R&gt; map(Function&lt;? super T, ? extends R&gt;)</code></td></tr>
+          <tr><td><code>mapToInt</code></td><td><code>IntStream mapToInt(ToIntFunction&lt;? super T&gt;)</code></td></tr>
+          <tr><td><code>mapToLong</code> · <code>mapToDouble</code></td><td>The same, to <code>LongStream</code> and <code>DoubleStream</code></td></tr>
+          <tr><td><code>mapToObj</code> · <code>boxed</code></td><td>On primitive streams: back to a <code>Stream</code> of objects</td></tr>
+          <tr><td><code>map</code> on <code>IntStream</code></td><td><code>IntStream map(IntUnaryOperator)</code>: int to int only</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Mistake</th><th>What happens</th><th>Write instead</th></tr></thead>
+      <tbody>
+        <tr><td><code>filter(o -&gt; o.status().equals("PAID"))</code></td><td><code>NullPointerException</code> on the first order with no status</td><td><code>"PAID".equals(o.status())</code>, or <code>Objects.equals</code></td></tr>
+        <tr><td><code>map</code> returns <code>null</code> for some elements</td><td>The nulls flow on. <code>findFirst</code>, <code>toMap</code> and <code>sorted</code> throw later, far from the cause</td><td><code>.filter(Objects::nonNull)</code>, or <code>flatMap</code> with <code>Stream.ofNullable</code></td></tr>
+        <tr><td><code>map(Order::total).reduce(0.0, Double::sum)</code></td><td>Boxes and unboxes every element</td><td><code>mapToDouble(Order::total).sum()</code></td></tr>
+        <tr><td>Merging three filters into one "for speed"</td><td>No gain: chained filters are not extra passes, because elements travel one at a time</td><td>Whichever reads better</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

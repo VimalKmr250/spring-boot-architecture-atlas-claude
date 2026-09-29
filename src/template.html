@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+<!-- @include css/base.css -->
+</style>
+</head>
+<body>
+<title>Spring Boot Architecture Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+<!-- @include css/atlas.css -->
+</style>
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8A94A3"></path>
+    </marker>
+    <marker id="arwA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#D26A3F"></path>
+    </marker>
+    <marker id="arwB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#3AA79B"></path>
+    </marker>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="brand"><b>Architecture Atlas</b><span>Spring Boot 4 · 2026</span></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-deck" aria-selected="true" onclick="setView('deck')"><span class="t-full">Reference deck</span><span class="t-abbr">Deck</span></button>
+    <button role="tab" id="tab-sb" aria-selected="false" onclick="setView('sb')"><span class="t-full">Spring Boot</span><span class="t-abbr">Boot</span></button>
+    <button role="tab" id="tab-ed" aria-selected="false" onclick="setView('ed')"><span class="t-full">Event-driven</span><span class="t-abbr">Events</span></button>
+    <button role="tab" id="tab-iv" aria-selected="false" onclick="setView('iv')"><span class="t-full">Interview prep</span><span class="t-abbr">Interview</span></button>
+    <button role="tab" id="tab-dsa" aria-selected="false" onclick="setView('dsa')"><span class="t-full">DSA patterns</span><span class="t-abbr">DSA</span></button>
+    <button role="tab" id="tab-st" aria-selected="false" onclick="setView('st')"><span class="t-full">Java streams</span><span class="t-abbr">Streams</span></button>
+  </div>
+  <span class="counter" id="counter">1 / 1</span>
+  <button class="iconbtn" id="tocbtn" onclick="toggleToc()">Contents</button>
+</header>
+<div class="rail" id="rail"><i id="railfill"></i></div>
+
+<main class="stage" id="stage">
+
+<!-- @include decks/deck/*.html -->
+</main>
+
+
+<main class="stage" id="stage-sb" hidden>
+
+<!-- @include decks/springboot/*.html -->
+</main>
+
+
+<main class="stage" id="stage-ed" hidden>
+
+<!-- @include decks/events/*.html -->
+</main>
+
+
+<main class="stage" id="stage-dsa" hidden>
+
+<!-- @include decks/dsa/*.html -->
+</main>
+
+
+<main class="stage" id="stage-st" hidden>
+
+<!-- @include decks/streams/*.html -->
+</main>
+
+<div class="iv" id="ivroot" hidden>
+  <nav class="ivnav" id="ivnav">
+    <span class="grp">Orientation</span>
+    <a href="#how-scored">How it's scored</a>
+    <a href="#rounds">The rounds</a>
+    <a href="#levels">By level</a>
+    <a href="#framework">The framework</a>
+    <a href="#coding">Coding round</a>
+    <span class="grp">Questions</span>
+    <a href="#q-arch">Architecture</a>
+    <a href="#q-data">Data &amp; consistency</a>
+    <a href="#q-integration">Integration &amp; Kafka</a>
+    <a href="#q-spring">Spring &amp; Java</a>
+    <a href="#q-api">API &amp; frontend</a>
+    <a href="#q-security">Security</a>
+    <a href="#q-ops">Production &amp; ops</a>
+    <span class="grp">Rehearsal</span>
+    <a href="#whiteboard">Whiteboard scripts</a>
+    <a href="#numbers">Numbers to know</a>
+    <a href="#stories">Stories to have ready</a>
+    <a href="#redflags">Red flags</a>
+    <a href="#plan">Three-week plan</a>
+  </nav>
+
+  <div class="ivbody">
+<!-- @include interview/*.html -->
+  </div>
+</div>
+
+<div class="nav" id="navbar">
+  <button id="prev" onclick="go(-1)">← Prev</button>
+  <button id="next" onclick="go(1)">Next →</button>
+</div>
+
+<div class="toc" id="toc" hidden>
+  <div class="toc-head">
+    <h3>Contents</h3>
+    <button class="iconbtn" onclick="toggleToc()">Close ✕</button>
+  </div>
+  <div class="toc-grid" id="tocgrid"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+<!-- @include js/app.js -->
+</script>
+
+</body>
+</html>

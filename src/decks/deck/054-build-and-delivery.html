@@ -1,0 +1,38 @@
+<!-- deck 54 -->
+<section class="slide" data-sec="Cross-cutting" data-title="Build and delivery">
+  <h2>One build, one artifact, four environments</h2>
+  <p class="dek">The artifact that reaches production is the one that was tested — byte for byte. Anything rebuilt per environment reintroduces the class of bug this rule exists to eliminate.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">settings.gradle.kts — modules as Gradle projects, when you want hard walls</div>
+<pre><code class="language-java">rootProject.name = "shop"
+include("modules:order", "modules:payment", "modules:inventory",
+        "modules:catalog", "modules:shared", "app")
+
+// modules/order/build.gradle.kts
+dependencies {
+    api(project(":modules:shared"))
+    implementation(project(":modules:payment"))   // sees payment's api only
+    // a compile error is now impossible to merge, not just discouraged
+}</code></pre>
+      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px"><b>Trade-off:</b> Gradle modules give compiler-enforced boundaries and faster incremental builds, at the cost of more build files and slower IDE indexing. One source set plus ArchUnit is lighter and usually enough; escalate to Gradle modules when the rules keep getting suppressed.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>The pipeline</h3>
+        <ol class="tight">
+          <li><b>Build + unit + arch tests</b> — under 5 minutes or people stop watching.</li>
+          <li><b>Integration</b> — Testcontainers, module tests.</li>
+          <li><b>Contract gates</b> — OpenAPI breaking-change check, schema registry compatibility.</li>
+          <li><b>Security</b> — dependency scan (CVE), SAST, image scan, license check.</li>
+          <li><b>Package once</b> — <code>bootBuildImage</code>, tagged with the commit sha.</li>
+          <li><b>Promote</b> the same digest: dev → test → staging → prod.</li>
+          <li><b>Deploy</b> rolling or canary; migrate before, expand/contract always.</li>
+        </ol>
+      </div>
+      <div class="note tip"><span class="lbl">Deploy ≠ release</span>Deploying the artifact and enabling the behaviour are separate events. Deploy continuously; release with a flag. This is what makes a Tuesday-afternoon deploy boring, which is the actual goal.</div>
+    </div>
+  </div>
+</section>
+

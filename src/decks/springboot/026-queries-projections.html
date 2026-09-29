@@ -1,0 +1,61 @@
+<!-- springboot 26 -->
+<section class="slide" data-sec="JPA" data-title="Queries & projections">
+  <h2>Queries: derived, JPQL, native, dynamic — and when to leave JPA</h2>
+  <p class="dek">Four query mechanisms in Spring Data, in increasing order of power and decreasing order of readability. Knowing when to stop using JPA entirely is part of using it well.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The four mechanisms</div>
+<pre><code class="language-java">interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt;,
+                                     JpaSpecificationExecutor&lt;OrderJpaEntity&gt; {
+
+    // 1. Derived — parsed from the method name. Great up to ~3 conditions.
+    List&lt;OrderJpaEntity&gt; findByCustomerIdAndStatusOrderByPlacedAtDesc(UUID id, OrderStatus s);
+    boolean existsByIdempotencyKey(String key);
+    long countByStatus(OrderStatus status);
+
+    // 2. JPQL — portable, type-checked against the entity model at startup
+    @Query("select o from OrderJpaEntity o where o.placedAt &gt; :since and o.totalMinor &gt; :min")
+    List&lt;OrderJpaEntity&gt; recentLargeOrders(@Param("since") Instant since, @Param("min") long min);
+
+    // 3. Native — when you need database features JPQL has no words for
+    @Query(value = """
+            select date_trunc('day', placed_at) as day, count(*) as orders
+              from order_mgmt.orders
+             where placed_at &gt;= :since
+             group by 1 order by 1
+            """, nativeQuery = true)
+    List&lt;DailyCount&gt; dailyCounts(@Param("since") Instant since);
+
+    // 4. Modifying — bulk operations that bypass the persistence context
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update OrderJpaEntity o set o.status = :to where o.status = :from and o.placedAt &lt; :cut")
+    int expireStale(@Param("from") OrderStatus from, @Param("to") OrderStatus to,
+                    @Param("cut") Instant cut);
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Projections — do not load an entity you will not change</div>
+<pre><code class="language-java">// Interface projection: Spring Data generates the select list for you
+interface OrderCard {
+    UUID getId();
+    Instant getPlacedAt();
+    long getTotalMinor();
+    @Value("#{target.customer.displayName}") String getCustomerName();  // careful: loads it
+}
+List&lt;OrderCard&gt; findByStatus(OrderStatus status);
+
+// Class/record projection: explicit and obvious
+record OrderSummary(UUID id, Instant placedAt, long totalMinor) { }
+
+// Or skip JPA: JdbcClient straight to a record, no entity, no persistence context
+jdbc.sql("select id, placed_at, total_minor from order_mgmt.orders where customer_id = ?")
+    .param(customerId).query(OrderSummary.class).list();</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl"><code>@Modifying</code> bypasses everything</span>A bulk update runs SQL directly: no dirty checking, no <code>@Version</code> increment, no entity listeners, no cache eviction. Entities already in the persistence context keep the old values — which is exactly what <code>clearAutomatically</code> and <code>flushAutomatically</code> are for. Bulk operations also skip auditing, so <code>updatedBy</code> silently stops being true.</div>
+      <div class="note tip"><span class="lbl">When to leave JPA</span><b>Specifications / Criteria</b> for search screens with a dozen optional filters — verbose but composable. <b>jOOQ</b> when the SQL is genuinely complex and you want it type-checked. <b>JdbcClient</b> for every read that does not need an entity, which in a typical service is most of them. Using JPA for writes and something simpler for reads is CQRS-lite and needs no framework.</div>
+    </div>
+  </div>
+</section>
+

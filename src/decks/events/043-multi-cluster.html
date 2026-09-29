@@ -1,0 +1,32 @@
+<!-- events 43 -->
+<section class="slide" data-sec="At scale" data-title="Multi-cluster">
+  <h2>More than one cluster: why, and how they connect</h2>
+  <p class="dek">A second cluster is never free — it doubles the operational surface and introduces offsets that do not translate. There are four reasons that justify it, and "we have a lot of topics" is not one.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Reason</th><th>Topology</th><th>Tool</th><th>Watch for</th></tr></thead>
+      <tbody>
+        <tr><td>Disaster recovery</td><td>Active cluster → passive replica in another region</td><td>MirrorMaker 2, or a vendor replicator</td><td>Offsets differ between clusters; failover needs offset translation</td></tr>
+        <tr><td>Data locality / residency</td><td>One cluster per region, selective topic replication</td><td>MirrorMaker 2 with allow-lists</td><td>Which topics may legally cross a border is a compliance decision</td></tr>
+        <tr><td>Isolation of blast radius</td><td>Separate clusters per domain or criticality tier</td><td>—</td><td>Cross-cluster flows now need replication and a story for their ordering</td></tr>
+        <tr><td>On-prem to cloud migration</td><td>Bidirectional or one-way bridge during the move</td><td>MirrorMaker 2, Cluster Linking</td><td>Cycles: <code>A→B→A</code> loops unless topics are prefixed or filtered</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>What MirrorMaker 2 actually does</h3>
+      <p>Runs on Kafka Connect. Copies records, topic configuration and ACLs from source to target, and — critically — maintains a <b>checkpoint</b> topic that maps source offsets to target offsets per consumer group.</p>
+      <p>By default it prefixes replicated topics with the source cluster alias (<code>eu.orders.order.placed.v1</code>), which is how it avoids replication cycles in an active-active setup. <code>IdentityReplicationPolicy</code> keeps the original names for a simple DR topology.</p>
+      <p style="color:var(--text-3)">Replication is asynchronous. There is no cross-cluster ordering guarantee and no exactly-once across the bridge.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">Offsets do not transfer</span>Offset 918,224 on the source is a different record on the target. Failing over means translating offsets from the checkpoint topic — and the translation is approximate, so a consumer restarted on the DR cluster will reprocess some records. <b>Idempotent consumers are what make failover survivable</b>, which is one more reason they are not optional.</div>
+      <div class="note tip"><span class="lbl">Stretch cluster as the alternative</span>One logical cluster spanning three availability zones in the same region, with rack-aware replica placement. You get automatic failover and no offset translation, at the cost of cross-AZ latency on every replicated write. Within one region this is usually better than two clusters; across regions the latency makes it impractical.</div>
+      <div class="note"><span class="lbl">Test the failover</span>The same rule as database DR: a replication topology that has never been failed over is a diagram. Run the drill, measure how long consumers take to resume, and publish the number.</div>
+    </div>
+  </div>
+</section>
+

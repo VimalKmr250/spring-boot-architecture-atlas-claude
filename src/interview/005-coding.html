@@ -1,0 +1,55 @@
+    <section class="ivsec" id="coding">
+      <h2>The coding round, run like a design review</h2>
+      <p class="dek">The DSA patterns tab teaches the thirty structures. This section covers the forty-five minutes around them: what gets scored, where the time goes, and the Java slips that cost points even when the algorithm is right.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3>What the rubric scores</h3>
+          <p>Most rubrics score four things, roughly equally. <b>Problem solving</b>: did you find a sound approach and know its cost? <b>Code</b>: is it correct, readable and idiomatic? <b>Communication</b>: could the interviewer follow your reasoning while you worked? <b>Verification</b>: did you test it before they did?</p>
+          <p>Verification is the cheapest of the four to earn, and the one candidates skip most often.</p>
+        </div>
+        <div class="card">
+          <h3>When you are stuck</h3>
+          <ul class="checks tight">
+            <li>Say what you have: "brute force works, it's O(n²), and the repeated work is re-scanning the prefix."</li>
+            <li>Ask what would make it easy: sorted input, a prefix sum, a map from value to index.</li>
+            <li>Shrink it. Solve n = 2 and n = 3 by hand and look for the step you keep repeating.</li>
+            <li>Take the hint and use it well. Interviewers expect to give hints, and using one well counts for more than refusing it.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Minutes</th><th>Do</th><th>Say out loud</th></tr></thead>
+          <tbody>
+            <tr><td class="num">0–5</td><td>Restate the problem. Ask about sizes, value ranges, duplicates, empty input, and what to return when there is no answer. Work one example by hand.</td><td>"So n can be 10⁵ and values can be negative. Can the array be empty?"</td></tr>
+            <tr><td class="num">5–10</td><td>Brute force first, with its cost. Then the pattern and its invariant. Get agreement before you type.</td><td>"Brute force is O(n²). The constraints want O(n log n) or better, so I'll use a sliding window. The invariant is that the window never contains a repeat."</td></tr>
+            <tr><td class="num">10–30</td><td>Code the agreed approach. Name helpers for what they mean. No premature cleverness.</td><td>Narrate intent, not keystrokes: "now I shrink from the left until the window is valid again."</td></tr>
+            <tr><td class="num">30–38</td><td>Trace the example through the code line by line, with real values. Then the edge cases: empty, one element, all equal, negatives, maximum values.</td><td>"Let me run [2, 1, 2] through it before I call it done."</td></tr>
+            <tr><td class="num">38–45</td><td>State time and space with their qualifiers: amortised, average case, excluding the output. Take the follow-up.</td><td>"O(n) time amortised, because each index enters and leaves the window once, and O(k) space for the map."</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 style="font-size:16px">Java slips that cost points with a correct algorithm</h3>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Slip</th><th>Why it bites</th><th>Write instead</th></tr></thead>
+          <tbody>
+            <tr><td><code>Integer</code> compared with <code>==</code></td><td>Works for −128 to 127 because those values are cached, then fails on real data.</td><td><code>a.equals(b)</code>, or unbox to <code>int</code> first</td></tr>
+            <tr><td>Comparator <code>(a, b) -&gt; a - b</code></td><td>Overflows for large or mixed-sign values and silently mis-sorts.</td><td><code>Integer.compare(a, b)</code> or <code>Comparator.comparingInt(...)</code></td></tr>
+            <tr><td><code>(lo + hi) / 2</code></td><td>Overflows when both are near <code>Integer.MAX_VALUE</code>.</td><td><code>lo + (hi - lo) / 2</code></td></tr>
+            <tr><td><code>int</code> sums and products</td><td>Overflow at about 2.1 × 10⁹, well inside typical constraints.</td><td>A <code>long</code> accumulator. Say why out loud.</td></tr>
+            <tr><td><code>Math.abs(Integer.MIN_VALUE)</code></td><td>Returns a negative number.</td><td>Work in <code>long</code>, or <code>Math.absExact</code>, which throws</td></tr>
+            <tr><td><code>list.remove(3)</code> on a <code>List&lt;Integer&gt;</code></td><td>Calls <code>remove(int index)</code>. It removes the fourth element, not the value 3.</td><td><code>list.remove(Integer.valueOf(3))</code></td></tr>
+            <tr><td><code>Arrays.fill(grid, new int[m])</code></td><td>Every row is the <em>same</em> array. A write to one row appears in all of them.</td><td><code>new int[n][m]</code>, or a loop that allocates each row</td></tr>
+            <tr><td><code>Arrays.asList(intArray)</code></td><td>Returns a one-element <code>List&lt;int[]&gt;</code>. Any <code>Arrays.asList</code> result is also fixed-size.</td><td>A loop, or <code>new ArrayList&lt;&gt;(...)</code> over a boxed array</td></tr>
+            <tr><td>Removing inside a for-each</td><td>Usually throws <code>ConcurrentModificationException</code>.</td><td><code>iterator.remove()</code> or <code>removeIf</code></td></tr>
+            <tr><td><code>s += c</code> in a loop</td><td>Copies the whole string every time, so O(n²) overall.</td><td><code>StringBuilder</code></td></tr>
+            <tr><td>Deep recursion on a path-shaped input</td><td>A 10⁵-node chain overflows the default thread stack.</td><td>An explicit <code>ArrayDeque</code> stack, and mention the limit</td></tr>
+            <tr><td>Relying on <code>HashMap</code> order</td><td>The order is unspecified. Output that passed locally is not guaranteed.</td><td>Sort, or use <code>LinkedHashMap</code> or <code>TreeMap</code> on purpose</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Test your code, not your intention</span>When you trace, read what the code says, not what you meant it to say. Point at each line and say the variables' values. Most bugs found this way are off-by-ones at a boundary. Finding one yourself, calmly, counts in your favour, because it is exactly the habit the verification score measures.</div>
+      <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="dsa" data-slide="What this deck is" href="#dsa">DSA · What this deck is</a><a data-deck="dsa" data-slide="Choosing the pattern from the statement" href="#dsa">DSA · Choosing the pattern</a><a data-deck="dsa" data-slide="Reading complexity off the constraints" href="#dsa">DSA · Complexity from constraints</a><a data-deck="dsa" data-slide="Hidden costs in the Java library" href="#dsa">DSA · Hidden Java costs</a><a data-deck="st" data-slide="How to answer a stream coding question" href="#streams">Streams · Coding drills</a></p>
+    </section>
+

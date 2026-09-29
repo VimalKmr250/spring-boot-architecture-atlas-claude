@@ -1,0 +1,302 @@
+<!-- dsa · pattern 22 · streams -->
+<section class="slide" data-sec="22 · Union find" data-title="The six, in streams">
+  <h2>Union-find is mutable by design; the stream decides which edges it sees</h2>
+  <p class="dek">A disjoint-set forest is a mutable structure by definition: every union rewires a parent link. So all six of these are stateful, and honestly labelled so. What the stream adds is the shape of the question. It can count the unions that merged something (provinces = n − merges), find the first edge whose union fails (684), or group indices by their root (1202). Here <code>find</code> is a read-only <code>IntStream.iterate</code> up the parent links, and union by size keeps those walks O(log n).</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">547</td><td><a href="https://leetcode.com/problems/number-of-provinces/" target="_blank" rel="noopener">Number of Provinces</a></td><td>Provinces = n − the unions that really merged: <code>filter(dsu.union(…)).count()</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(n² log n) / O(n)</td><td class="num">O(n²·α) / O(n)</td></tr>
+        <tr><td class="num">684</td><td><a href="https://leetcode.com/problems/redundant-connection/" target="_blank" rel="noopener">Redundant Connection</a></td><td><code>filter(e -&gt; !dsu.union(…)).findFirst()</code>: the first edge that closes a cycle.</td><td><span class="tag w">stateful</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n·α) / O(n)</td></tr>
+        <tr><td class="num">1319</td><td><a href="https://leetcode.com/problems/number-of-operations-to-make-network-connected/" target="_blank" rel="noopener">Number of Operations to Make Network Connected</a></td><td>If there are enough cables, the answer is components − 1 = (n − merges) − 1.</td><td><span class="tag w">stateful</span></td><td class="num">O(E log n) / O(n)</td><td class="num">O(E·α) / O(n)</td></tr>
+        <tr><td class="num">990</td><td><a href="https://leetcode.com/problems/satisfiability-of-equality-equations/" target="_blank" rel="noopener">Satisfiability of Equality Equations</a></td><td>Union every <code>==</code> first, then <code>allMatch</code> every <code>!=</code> against the roots.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">1202</td><td><a href="https://leetcode.com/problems/smallest-string-with-swaps/" target="_blank" rel="noopener">Smallest String With Swaps</a></td><td>Group the indices with <code>groupingBy(dsu::find)</code>; each group takes its own letters back, sorted.</td><td><span class="tag w">stateful</span></td><td class="num">O(n log n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1579</td><td><a href="https://leetcode.com/problems/remove-max-number-of-edges-to-keep-graph-fully-traversable/" target="_blank" rel="noopener">Remove Max Number of Edges to Keep Graph Fully Traversable</a></td><td>Two forests. Shared edges go first, merged into both with a non-short-circuit <code>|</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(E log n) / O(n)</td><td class="num">O(E·α) / O(n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 547 · Number of Provinces · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int findCircleNum(int[][] isConnected) {
+        int n = isConnected.length;
+        DSU dsu = new DSU(n);
+        // Every city starts alone, and each union that merges
+        // two groups removes one: provinces = n - merges.
+        long merges = IntStream.range(0, n).boxed()
+                .flatMap(i -&gt; IntStream.range(i + 1, n)
+                        .filter(j -&gt; isConnected[i][j] == 1)
+                        .mapToObj(j -&gt; new int[]{ i, j }))
+                .filter(e -&gt; dsu.union(e[0], e[1]))
+                .count();
+        return (int) (n - merges);
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 684 · Redundant Connection · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] findRedundantConnection(int[][] edges) {
+        DSU dsu = new DSU(edges.length + 1);
+        // The first edge whose ends are already joined closes
+        // the cycle: the last cycle edge in input order.
+        return Arrays.stream(edges)
+                .filter(e -&gt; !dsu.union(e[0], e[1]))
+                .findFirst().get();
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1319 · Number of Operations to Make Network Connected · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int makeConnected(int n, int[][] connections) {
+        if (connections.length &lt; n - 1) return -1;  // too few
+        DSU dsu = new DSU(n);
+        long merges = Arrays.stream(connections)
+                .filter(c -&gt; dsu.union(c[0], c[1]))
+                .count();
+        // With enough spare cables, each extra component costs
+        // exactly one move: components - 1.
+        return (int) (n - merges) - 1;
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 990 · Satisfiability of Equality Equations · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean equationsPossible(String[] equations) {
+        DSU dsu = new DSU(26);
+        // Every "==" first, so the groups are final ...
+        Arrays.stream(equations)
+                .filter(e -&gt; e.charAt(1) == '=')
+                .forEach(e -&gt; dsu.union(e.charAt(0) - 'a',
+                                        e.charAt(3) - 'a'));
+        // ... then no "!=" may join two letters of one group.
+        return Arrays.stream(equations)
+                .filter(e -&gt; e.charAt(1) == '!')
+                .allMatch(e -&gt; dsu.find(e.charAt(0) - 'a')
+                        != dsu.find(e.charAt(3) - 'a'));
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1202 · Smallest String With Swaps · stateful</div>
+<pre><code class="language-java">class Solution {
+    public String smallestStringWithSwaps(String s,
+            List&lt;List&lt;Integer&gt;&gt; pairs) {
+        int n = s.length();
+        DSU dsu = new DSU(n);
+        pairs.forEach(p -&gt; dsu.union(p.get(0), p.get(1)));
+        // Indices that share a root can be permuted freely, so
+        // each group gets its own letters back, sorted.
+        char[] out = new char[n];
+        IntStream.range(0, n).boxed()
+                .collect(Collectors.groupingBy(dsu::find))
+                .values()
+                .forEach(idx -&gt; {
+                    List&lt;Character&gt; letters = idx.stream()
+                            .map(s::charAt).sorted().toList();
+                    IntStream.range(0, idx.size())
+                            .forEach(k -&gt; out[idx.get(k)] =
+                                    letters.get(k));
+                });
+        return new String(out);
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1579 · Remove Max Number of Edges to Keep Graph Fully Traversable · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maxNumEdgesToRemove(int n, int[][] edges) {
+        DSU alice = new DSU(n + 1), bob = new DSU(n + 1);
+        // Shared edges first: one can replace two private ones.
+        // | not ||: both forests must see every shared edge.
+        long shared = Arrays.stream(edges)
+                .filter(e -&gt; e[0] == 3)
+                .filter(e -&gt; alice.union(e[1], e[2])
+                           | bob.union(e[1], e[2]))
+                .count();
+        long a = Arrays.stream(edges).filter(e -&gt; e[0] == 1)
+                .filter(e -&gt; alice.union(e[1], e[2])).count();
+        long b = Arrays.stream(edges).filter(e -&gt; e[0] == 2)
+                .filter(e -&gt; bob.union(e[1], e[2])).count();
+        // Each person needs n - 1 merges to span every node.
+        if (shared + a != n - 1 || shared + b != n - 1)
+            return -1;
+        return (int) (edges.length - shared - a - b);
+    }
+
+    // ---- the same union-find in all six ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        // Walk the parent links up to the root; writes nothing.
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        // Union by size keeps every tree O(log n) deep. The
+        // two writes here are the only state in the solution.
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Why <code>|</code> and not <code>||</code></span>In 1579, every shared edge must be offered to both forests. <code>alice.union(…) || bob.union(…)</code> would skip Bob every time Alice's union returned true. The short-circuit that makes <code>||</code> fast becomes a bug when both sides have effects. The non-short-circuit <code>|</code> always evaluates both, and that is the whole point of using it here.</div>
+  <div class="note good"><span class="lbl">A find that writes nothing</span><code>find</code> walks the parent links with <code>IntStream.iterate</code> and changes nothing, so the only writes in each solution are the two lines inside <code>union</code>. Union by size keeps every tree O(log n) deep, which is what path compression would otherwise buy. The price is that the loop's α(n) per operation becomes log n here, which is still milliseconds at 10⁵ edges.</div>
+</section>
+
+

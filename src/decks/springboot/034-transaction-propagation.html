@@ -1,0 +1,46 @@
+<!-- springboot 34 -->
+<section class="slide" data-sec="Internals" data-title="Transaction propagation">
+  <h2>All seven propagation modes, and the two you should use</h2>
+  <p class="dek">Propagation answers one question: when a transactional method is called from inside an existing transaction, what happens? Most teams only ever need <code>REQUIRED</code> and <code>REQUIRES_NEW</code> — but the others appear in interviews and in inherited code.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Propagation</th><th>Called with no transaction</th><th>Called inside one</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td><code>REQUIRED</code> <span class="tag g">default</span></td><td>Starts one</td><td>Joins it</td><td>Almost everything. One transaction per use case</td></tr>
+        <tr><td><code>REQUIRES_NEW</code></td><td>Starts one</td><td><b>Suspends</b> the outer, starts an independent one on a <b>second connection</b></td><td>Audit rows that must survive the caller's rollback; post-commit listeners</td></tr>
+        <tr><td><code>SUPPORTS</code></td><td>Runs without one</td><td>Joins it</td><td>Reads that are fine either way. Rarely worth specifying</td></tr>
+        <tr><td><code>NOT_SUPPORTED</code></td><td>Runs without one</td><td>Suspends it, runs without</td><td>A long report inside a transactional flow, to release the connection early</td></tr>
+        <tr><td><code>MANDATORY</code></td><td><b>Throws</b></td><td>Joins it</td><td>Enforcing "this may only be called as part of a larger unit of work"</td></tr>
+        <tr><td><code>NEVER</code></td><td>Runs</td><td><b>Throws</b></td><td>Guarding a method that must not hold a transaction</td></tr>
+        <tr><td><code>NESTED</code></td><td>Starts one</td><td>Savepoint inside the outer — rolls back to the savepoint only</td><td>Partial rollback. JDBC only, not supported by all setups. Rare</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The audit case — the one real use of REQUIRES_NEW</div>
+<pre><code class="language-java">@Service
+class OrderService {
+    @Transactional                                   // REQUIRED
+    void place(PlaceOrderCommand cmd) {
+        audit.record("place attempted", cmd);        // must survive a rollback
+        var order = Order.place(...);                // may throw → outer rolls back
+        orders.save(order);
+    }
+}
+
+@Service
+class AuditService {
+    @Transactional(propagation = REQUIRES_NEW)       // its own connection, its own commit
+    void record(String what, Object payload) { ... }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">REQUIRES_NEW in a loop is a self-inflicted deadlock</span>It takes a <b>second connection while holding the first</b>. A pool of 20 with a loop calling a <code>REQUIRES_NEW</code> method exhausts itself at 20 concurrent callers, each holding one connection and waiting for another that will never come free. The symptom is a hang, not an error.</div>
+      <div class="note warn"><span class="lbl">rollback-only is contagious</span>If an inner <code>REQUIRED</code> method throws and you catch the exception in the caller, the transaction is already marked rollback-only. Your caller finishes happily, then commit throws <code>UnexpectedRollbackException</code> — which looks like it came from nowhere. If you intend to recover from an inner failure, that inner call needs <code>REQUIRES_NEW</code>.</div>
+    </div>
+  </div>
+</section>
+

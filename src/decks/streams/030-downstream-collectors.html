@@ -1,0 +1,51 @@
+<!-- streams 30 -->
+<section class="slide" data-sec="Collectors" data-title="Downstream collectors">
+  <h2>Adapters that reshape what each group becomes</h2>
+  <p class="dek">A downstream collector decides what each group of a <code>groupingBy</code> or <code>partitioningBy</code> turns into. Five adapters reshape it without leaving the collector: transform the elements, filter them, flatten them, finish with a function, or reduce them.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Adapter</th><th>What it does to each group</th><th>Since</th></tr></thead>
+      <tbody>
+        <tr><td><code>mapping(f, downstream)</code></td><td>Transforms each element, then collects: the ids of each customer's orders</td><td>8</td></tr>
+        <tr><td><code>filtering(p, downstream)</code></td><td>Keeps matching elements, but <b>keeps the group</b> even when nothing matches</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>flatMapping(f, downstream)</code></td><td>Expands each element into a stream: every SKU each customer bought</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>collectingAndThen(downstream, finisher)</code></td><td>Applies a function to the finished result: unwrap an <code>Optional</code>, freeze a list</td><td>8</td></tr>
+        <tr><td><code>reducing(identity, mapper, op)</code> · <code>reducing(identity, op)</code> · <code>reducing(op)</code></td><td>A <code>reduce</code> per group; the one-argument form returns an <code>Optional</code></td><td>8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Four adapters on the order data</div>
+<pre><code class="language-java">// mapping: customer → the ids of their orders
+Map&lt;String, List&lt;String&gt;&gt; idsByCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.mapping(Order::id, Collectors.toList())));
+
+// filtering: large orders per customer, and customers with none stay in the map
+Map&lt;String, List&lt;Order&gt;&gt; largeByCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.filtering(o -&gt; o.total() &gt; 500, Collectors.toList())));
+
+// flatMapping: customer → every SKU they bought
+Map&lt;String, Set&lt;String&gt;&gt; skusByCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.flatMapping(o -&gt; o.lines().stream().map(Line::sku),
+                                        Collectors.toSet())));
+
+// collectingAndThen: the biggest order per customer, without the Optional
+Map&lt;String, Order&gt; biggest = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.collectingAndThen(
+                     Collectors.maxBy(Comparator.comparingDouble(Order::total)),
+                     Optional::get)));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">filtering versus filter-then-group, on JDK 25</span>Two employees, one in <code>ops</code> earning 10 and one in <code>dev</code> earning 50, grouped by department after keeping salaries above 20:<br><code>filtering</code> inside the grouping gives <code>{dev=[…], ops=[]}</code>.<br><code>filter</code> before the grouping gives <code>{dev=[…]}</code>.<br>A report of "large orders per customer" usually wants every customer listed, which is exactly why <code>filtering</code> was added in Java 9.</div>
+      <div class="note good"><span class="lbl">Why <code>Optional::get</code> is safe here, and only here</span>A group exists only because at least one element produced its key, so <code>maxBy</code> inside <code>groupingBy</code> can never be empty. The same result in one step, with no <code>Optional</code> at all: <code>toMap(Order::customer, o -&gt; o, BinaryOperator.maxBy(Comparator.comparingDouble(Order::total)))</code>.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,144 @@
+<!-- dsa · pattern 19 · problems -->
+<section class="slide" data-sec="19 · Backtracking with constraints" data-title="The six problems">
+  <h2>Six constrained searches</h2>
+  <p class="dek">17 has no pruning at all and is the gentle start. 40 adds the dedup rule. 131 guards on a predicate. 79 mutates the grid. 51 and 52 are the same search with different outputs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The constraint</th><th>State kept</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">17</td><td><a href="https://leetcode.com/problems/letter-combinations-of-a-phone-number/" target="_blank" rel="noopener">Letter Combinations of a Phone Number</a></td><td><span class="tag w">Medium</span></td><td>None — pure enumeration over a fixed mapping.</td><td>path only</td><td class="num">O(4ⁿ·n)</td></tr>
+        <tr><td class="num">40</td><td><a href="https://leetcode.com/problems/combination-sum-ii/" target="_blank" rel="noopener">Combination Sum II</a></td><td><span class="tag w">Medium</span></td><td>Each number once, and no duplicate combinations.</td><td>remaining sum</td><td class="num">O(2ⁿ·n)</td></tr>
+        <tr><td class="num">131</td><td><a href="https://leetcode.com/problems/palindrome-partitioning/" target="_blank" rel="noopener">Palindrome Partitioning</a></td><td><span class="tag w">Medium</span></td><td>Every piece must be a palindrome.</td><td>cut position</td><td class="num">O(n·2ⁿ)</td></tr>
+        <tr><td class="num">79</td><td><a href="https://leetcode.com/problems/word-search/" target="_blank" rel="noopener">Word Search</a></td><td><span class="tag w">Medium</span></td><td>Adjacent cells, and no cell reused within one path.</td><td>the board itself</td><td class="num">O(m·n·4^L)</td></tr>
+        <tr><td class="num">51</td><td><a href="https://leetcode.com/problems/n-queens/" target="_blank" rel="noopener">N-Queens</a></td><td><span class="tag b">Hard</span></td><td>No shared column or diagonal.</td><td>three boolean arrays</td><td class="num">O(n!)</td></tr>
+        <tr><td class="num">52</td><td><a href="https://leetcode.com/problems/n-queens-ii/" target="_blank" rel="noopener">N-Queens II</a></td><td><span class="tag b">Hard</span></td><td>Identical — only the return type differs.</td><td>three boolean arrays</td><td class="num">O(n!)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 79 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The shape</dt><dd>From every cell, try to walk the word. Each step moves to one of four neighbours, and the search is depth-first because a path must be followed to its end before an alternative is tried.</dd>
+          <dt>The constraint</dt><dd>A cell may not be reused <em>within one path</em> — but it is free again once that path is abandoned. So the visited set is per-branch, not global, which is exactly what backtracking provides.</dd>
+          <dt>The space trick</dt><dd>Instead of a separate <code>boolean[][]</code>, overwrite the cell with a sentinel such as <code>'#'</code>. Since the sentinel never equals a real letter, the existing letter comparison also rejects visited cells — one check does two jobs.</dd>
+          <dt>Restoring</dt><dd>Put the character back before returning, on <b>both</b> the success and failure paths. The grid belongs to the caller.</dd>
+          <dt>Pruning that matters</dt><dd>The letter check at the top is the pruning — most starting cells fail at depth 0 or 1, which is why the exponential bound is rarely approached.</dd>
+          <dt>Worth mentioning</dt><dd>If the first letter is rarer than the last, searching the reversed word is faster. It is a small optimisation that signals you thought about the search shape.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 79 · O(m·n·4^L) worst case, O(L) space</div>
+<pre><code class="language-java">class Solution {
+    private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
+
+    public boolean exist(char[][] board, String word) {
+        for (int r = 0; r &lt; board.length; r++)
+            for (int c = 0; c &lt; board[0].length; c++)
+                if (dfs(board, word, r, c, 0)) return true;
+        return false;
+    }
+
+    private boolean dfs(char[][] b, String w, int r, int c, int k) {
+        if (k == w.length()) return true;          // matched everything
+
+        // GUARD first: bounds, then the letter. A visited cell holds
+        // '#', which matches no real letter, so this single test also
+        // enforces "do not revisit".
+        if (r &lt; 0 || r &gt;= b.length || c &lt; 0 || c &gt;= b[0].length) return false;
+        if (b[r][c] != w.charAt(k)) return false;
+
+        char saved = b[r][c];
+        b[r][c] = '#';                             // choose
+
+        for (int[] d : DIRS) {
+            if (dfs(b, w, r + d[0], c + d[1], k + 1)) {
+                b[r][c] = saved;                   // restore on SUCCESS too
+                return true;
+            }
+        }
+
+        b[r][c] = saved;                           // un-choose
+        return false;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 51 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Place queens on any of <code>n²</code> squares in all combinations. Astronomically large and entirely unnecessary.</dd>
+          <dt>Observation one</dt><dd>Exactly one queen per row, since two in a row always attack. So the search has depth <code>n</code> and each level chooses only a <b>column</b> — the problem collapses from <code>C(n², n)</code> to at most <code>n!</code>.</dd>
+          <dt>Observation two</dt><dd>Two queens share a <b>↘ diagonal</b> exactly when <code>r − c</code> is equal, and a <b>↗ diagonal</b> exactly when <code>r + c</code> is equal. Both are computable in O(1).</dd>
+          <dt>The encoding</dt><dd>Three boolean arrays: <code>col[n]</code>, <code>diag[2n]</code> indexed by <code>r + c</code>, and <code>anti[2n]</code> indexed by <code>r − c + n</code>. The <code>+ n</code> shifts a range that would otherwise be negative.</dd>
+          <dt>Why it is fast in practice</dt><dd>Conflicts appear early, so most branches die in the first few rows. The <code>n!</code> bound is never approached for the <code>n ≤ 9</code> the problem allows.</dd>
+          <dt>LC 52</dt><dd>Identical search, incrementing a counter instead of building boards. Write 51 and you have both.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 51 · O(n!) worst case, O(n) space beyond the output</div>
+<pre><code class="language-java">class Solution {
+    private int n;
+    private boolean[] col, diag, anti;
+    private List&lt;List&lt;String&gt;&gt; out;
+
+    public List&lt;List&lt;String&gt;&gt; solveNQueens(int n) {
+        this.n = n;
+        col  = new boolean[n];
+        diag = new boolean[2 * n];      // indexed by r + c
+        anti = new boolean[2 * n];      // indexed by r - c + n
+        out  = new ArrayList&lt;&gt;();
+
+        solve(0, new ArrayList&lt;&gt;());
+        return out;
+    }
+
+    private void solve(int row, List&lt;String&gt; board) {
+        if (row == n) { out.add(new ArrayList&lt;&gt;(board)); return; }
+
+        for (int c = 0; c &lt; n; c++) {
+            int d = row + c;            // constant along a diagonal
+            int a = row - c + n;        // + n keeps the index non-negative
+
+            // O(1) guard — three reads, no board scan.
+            if (col[c] || diag[d] || anti[a]) continue;
+
+            col[c] = diag[d] = anti[a] = true;
+            board.add(rowOf(c));
+
+            solve(row + 1, board);
+
+            board.remove(board.size() - 1);
+            col[c] = diag[d] = anti[a] = false;    // undo ALL THREE
+        }
+    }
+
+    private String rowOf(int queenCol) {
+        char[] row = new char[n];
+        Arrays.fill(row, '.');
+        row[queenCol] = 'Q';
+        return new String(row);
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>17 · Letter Combinations <span class="tag a">no pruning</span></h4><p><b>Path:</b> a Cartesian product over the digit-to-letter mapping. Every branch is valid, so there is nothing to prune — which makes it the cleanest place to practise the skeleton.</p><p><b>Delta:</b> depth equals the number of digits, and the branching factor is 3 or 4. Record at full depth.</p><p><b>Watch for:</b> an empty input must return an <b>empty list</b>, not a list containing one empty string. Guard before recursing — it is the only edge case, and it is the one the tests check.</p></div>
+
+    <div class="card"><h4>40 · Combination Sum II <span class="tag a">dedup + sum guard</span></h4><p><b>Path:</b> each candidate may be used at most once, and the input contains duplicates, so both the start index and the dedup rule matter.</p><p><b>Delta:</b> sort, recurse with <code>i + 1</code>, and skip with <code>if (i &gt; start &amp;&amp; nums[i] == nums[i-1]) continue;</code>. Prune with <code>if (nums[i] &gt; remaining) break;</code> — after sorting, every later candidate is larger too.</p><p><b>Watch for:</b> <code>break</code> rather than <code>continue</code> on the sum prune. Using <code>continue</code> is correct but pointlessly scans the rest of the sorted range.</p></div>
+
+    <div class="card"><h4>131 · Palindrome Partitioning <span class="tag a">predicate guard</span></h4><p><b>Path:</b> a cut position at every index, with each resulting piece required to be a palindrome. The guard is the palindrome test.</p><p><b>Delta:</b> loop <code>end</code> from <code>start</code>, check the piece, and recurse from <code>end + 1</code>. Record when <code>start</code> reaches the end of the string.</p><p><b>Watch for:</b> the same substring is tested many times. Precomputing <code>isPal[i][j]</code> with an O(n²) DP makes the guard O(1) and is the expected optimisation if asked to improve it.</p></div>
+
+    <div class="card"><h4>52 · N-Queens II <span class="tag a">same search</span></h4><p><b>Path:</b> identical to 51. The only question is whether you notice that building the boards is wasted work when only a count is needed.</p><p><b>Delta:</b> drop the board list and increment a counter at <code>row == n</code>. Everything else is unchanged.</p><p><b>Watch for:</b> the bitmask version — three integers instead of three arrays, with <code>Integer.lowestOneBit</code> to iterate free columns — is meaningfully faster and a good thing to mention. Correctness first, then offer it.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>79</b> and <b>51</b>. 79 teaches per-branch state that lives in the input itself, and the restore-on-every-path discipline that goes with it. 51 teaches the move that defines this pattern: recognising that a constraint can be encoded so the feasibility test is O(1), which is what separates a search that finishes from one that does not.</div>
+</section>
+

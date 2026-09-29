@@ -1,0 +1,256 @@
+<!-- dsa · pattern 05 · streams -->
+<section class="slide" data-sec="05 · Binary search on the answer" data-title="The six, in streams">
+  <h2>The search is one helper; the feasibility test is a pipeline</h2>
+  <p class="dek">Binary search on the answer has two parts: a search over candidate values, and a yes-or-no test for one candidate. The search is the sorted-data pattern's <code>firstTrue</code> helper, unchanged. The test is nearly always a sum or a count over the input, which makes it a single pipeline. Even the greedy packing in 1011 and 410 becomes a pure fold over a three-field record.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">875</td><td><a href="https://leetcode.com/problems/koko-eating-bananas/" target="_blank" rel="noopener">Koko Eating Bananas</a></td><td><code>firstTrue</code> over speeds, with hours as <code>mapToLong(ceil).sum()</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n log V) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">1011</td><td><a href="https://leetcode.com/problems/capacity-to-ship-packages-within-d-days/" target="_blank" rel="noopener">Capacity To Ship Packages Within D Days</a></td><td>Greedy packing as a record fold, <code>Stream.iterate(…).skip(n)</code>, inside <code>firstTrue</code> over capacities.</td><td><span class="tag g">clean</span></td><td class="num">O(n log V) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">1283</td><td><a href="https://leetcode.com/problems/find-the-smallest-divisor-given-a-threshold/" target="_blank" rel="noopener">Find the Smallest Divisor Given a Threshold</a></td><td>The sum of <code>ceil(x / d)</code> in <code>long</code>, inside <code>firstTrue</code> over divisors.</td><td><span class="tag g">clean</span></td><td class="num">O(n log V) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">1482</td><td><a href="https://leetcode.com/problems/minimum-number-of-days-to-make-m-bouquets/" target="_blank" rel="noopener">Minimum Number of Days to Make m Bouquets</a></td><td>Bouquets read off the gaps between unbloomed flowers, with nothing carried, inside <code>firstTrue</code> over days.</td><td><span class="tag g">clean</span></td><td class="num">O(n log V) / O(n)</td><td class="num">O(n log V) / O(1)</td></tr>
+        <tr><td class="num">410</td><td><a href="https://leetcode.com/problems/split-array-largest-sum/" target="_blank" rel="noopener">Split Array Largest Sum</a></td><td>1011 in disguise: the same packing fold, counting pieces instead of days.</td><td><span class="tag g">clean</span></td><td class="num">O(n log V) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">774</td><td><a href="https://leetcode.com/problems/minimize-max-distance-to-gas-station/" target="_blank" rel="noopener">Minimize Max Distance to Gas Station</a></td><td>A real-valued <code>(lo, hi)</code> record, halved exactly 100 times with <code>skip(100)</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n·100) / O(n)</td><td class="num">O(n·100) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 875 · Koko Eating Bananas · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minEatingSpeed(int[] piles, int h) {
+        int max = Arrays.stream(piles).max().getAsInt();
+        // Hours only shrink as the speed grows, so "fits in h"
+        // is monotone: search for the first speed that fits.
+        return firstTrue(1, max, k -&gt; Arrays.stream(piles)
+                .mapToLong(p -&gt; (p + k - 1) / k)  // ceil(p/k)
+                .sum() &lt;= h);
+    }
+
+    // ---- the same helper as in the sorted-data search ----
+    // [lo, hi) halves towards the first index where ok holds
+    record Range(int lo, int hi) {
+        Range halve(IntPredicate ok) {
+            int mid = (lo + hi) &gt;&gt;&gt; 1;
+            return ok.test(mid) ? new Range(lo, mid)
+                                : new Range(mid + 1, hi);
+        }
+    }
+
+    // First value in [lo, hi) where ok holds, else hi.
+    static int firstTrue(int lo, int hi, IntPredicate ok) {
+        return Stream.iterate(new Range(lo, hi),
+                              r -&gt; r.halve(ok))
+                .filter(r -&gt; r.lo() == r.hi())
+                .findFirst().get().lo();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1011 · Capacity To Ship Packages Within D Days · clean</div>
+<pre><code class="language-java">class Solution {
+    public int shipWithinDays(int[] weights, int days) {
+        int max = Arrays.stream(weights).max().getAsInt();
+        int sum = Arrays.stream(weights).sum();
+        // The least capacity whose greedy packing fits in days.
+        return firstTrue(max, sum,
+                         cap -&gt; need(weights, cap) &lt;= days);
+    }
+
+    // Greedy packing as a fold: one package per step, carrying
+    // the days used so far and the load on the current day.
+    record Pack(int i, int days, int load) {
+        Pack add(int w, int cap) {
+            return load + w &gt; cap
+                    ? new Pack(i + 1, days + 1, w)
+                    : new Pack(i + 1, days, load + w);
+        }
+    }
+
+    static int need(int[] w, int cap) {
+        return Stream.iterate(new Pack(0, 1, 0),
+                              p -&gt; p.add(w[p.i()], cap))
+                .skip(w.length)   // exactly n steps
+                .findFirst().get().days();
+    }
+
+    // ---- the same helper as in the sorted-data search ----
+    // [lo, hi) halves towards the first index where ok holds
+    record Range(int lo, int hi) {
+        Range halve(IntPredicate ok) {
+            int mid = (lo + hi) &gt;&gt;&gt; 1;
+            return ok.test(mid) ? new Range(lo, mid)
+                                : new Range(mid + 1, hi);
+        }
+    }
+
+    // First value in [lo, hi) where ok holds, else hi.
+    static int firstTrue(int lo, int hi, IntPredicate ok) {
+        return Stream.iterate(new Range(lo, hi),
+                              r -&gt; r.halve(ok))
+                .filter(r -&gt; r.lo() == r.hi())
+                .findFirst().get().lo();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1283 · Find the Smallest Divisor Given a Threshold · clean</div>
+<pre><code class="language-java">class Solution {
+    public int smallestDivisor(int[] nums, int threshold) {
+        int max = Arrays.stream(nums).max().getAsInt();
+        // The sum of ceil(x / d) only falls as d grows. Sum in
+        // long: at d = 1 it can reach 5·10¹⁰.
+        return firstTrue(1, max, d -&gt; Arrays.stream(nums)
+                .mapToLong(x -&gt; (x + d - 1) / d)
+                .sum() &lt;= threshold);
+    }
+
+    // ---- the same helper as in the sorted-data search ----
+    // [lo, hi) halves towards the first index where ok holds
+    record Range(int lo, int hi) {
+        Range halve(IntPredicate ok) {
+            int mid = (lo + hi) &gt;&gt;&gt; 1;
+            return ok.test(mid) ? new Range(lo, mid)
+                                : new Range(mid + 1, hi);
+        }
+    }
+
+    // First value in [lo, hi) where ok holds, else hi.
+    static int firstTrue(int lo, int hi, IntPredicate ok) {
+        return Stream.iterate(new Range(lo, hi),
+                              r -&gt; r.halve(ok))
+                .filter(r -&gt; r.lo() == r.hi())
+                .findFirst().get().lo();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1482 · Minimum Number of Days to Make m Bouquets · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minDays(int[] bloomDay, int m, int k) {
+        if ((long) m * k &gt; bloomDay.length) return -1;
+        int max = Arrays.stream(bloomDay).max().getAsInt();
+        return firstTrue(1, max,
+                day -&gt; bouquets(bloomDay, day, k) &gt;= m);
+    }
+
+    // Unbloomed flowers cut the row into runs, and a run of
+    // length len makes len / k bouquets. Read the runs off the
+    // gaps between consecutive cuts: nothing is carried.
+    static long bouquets(int[] bloom, int day, int k) {
+        int n = bloom.length;
+        int[] cut = IntStream.concat(IntStream.of(-1),
+                IntStream.concat(IntStream.range(0, n)
+                                .filter(i -&gt; bloom[i] &gt; day),
+                        IntStream.of(n)))
+                .toArray();
+        return IntStream.range(1, cut.length)
+                .mapToLong(j -&gt; (cut[j] - cut[j - 1] - 1) / k)
+                .sum();
+    }
+
+    // ---- the same helper as in the sorted-data search ----
+    // [lo, hi) halves towards the first index where ok holds
+    record Range(int lo, int hi) {
+        Range halve(IntPredicate ok) {
+            int mid = (lo + hi) &gt;&gt;&gt; 1;
+            return ok.test(mid) ? new Range(lo, mid)
+                                : new Range(mid + 1, hi);
+        }
+    }
+
+    // First value in [lo, hi) where ok holds, else hi.
+    static int firstTrue(int lo, int hi, IntPredicate ok) {
+        return Stream.iterate(new Range(lo, hi),
+                              r -&gt; r.halve(ok))
+                .filter(r -&gt; r.lo() == r.hi())
+                .findFirst().get().lo();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 410 · Split Array Largest Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int splitArray(int[] nums, int k) {
+        int max = Arrays.stream(nums).max().getAsInt();
+        int sum = Arrays.stream(nums).sum();
+        // 1011 in disguise: the least cap on each piece's sum
+        // whose greedy split needs at most k pieces.
+        return firstTrue(max, sum,
+                         cap -&gt; pieces(nums, cap) &lt;= k);
+    }
+
+    // Greedy split as a fold: pieces so far, current load.
+    record Pack(int i, int pieces, int load) {
+        Pack add(int x, int cap) {
+            return load + x &gt; cap
+                    ? new Pack(i + 1, pieces + 1, x)
+                    : new Pack(i + 1, pieces, load + x);
+        }
+    }
+
+    static int pieces(int[] a, int cap) {
+        return Stream.iterate(new Pack(0, 1, 0),
+                              p -&gt; p.add(a[p.i()], cap))
+                .skip(a.length)
+                .findFirst().get().pieces();
+    }
+
+    // ---- the same helper as in the sorted-data search ----
+    // [lo, hi) halves towards the first index where ok holds
+    record Range(int lo, int hi) {
+        Range halve(IntPredicate ok) {
+            int mid = (lo + hi) &gt;&gt;&gt; 1;
+            return ok.test(mid) ? new Range(lo, mid)
+                                : new Range(mid + 1, hi);
+        }
+    }
+
+    // First value in [lo, hi) where ok holds, else hi.
+    static int firstTrue(int lo, int hi, IntPredicate ok) {
+        return Stream.iterate(new Range(lo, hi),
+                              r -&gt; r.halve(ok))
+                .filter(r -&gt; r.lo() == r.hi())
+                .findFirst().get().lo();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 774 · Minimize Max Distance to Gas Station · clean</div>
+<pre><code class="language-java">class Solution {
+    record Real(double lo, double hi) {}
+
+    public double minmaxGasDist(int[] stations, int k) {
+        int[] gap = IntStream.range(1, stations.length)
+                .map(i -&gt; stations[i] - stations[i - 1])
+                .toArray();
+        // New stations needed so that no gap exceeds d
+        DoubleToLongFunction need = d -&gt; Arrays.stream(gap)
+                .mapToLong(g -&gt; (long) Math.ceil(g / d) - 1)
+                .sum();
+        // A real-valued answer has no "empty range" to stop on,
+        // so run a fixed 100 halvings: 10⁸ / 2¹⁰⁰ is far below
+        // the 10⁻⁶ tolerance.
+        double hi = Arrays.stream(gap).max().getAsInt();
+        return Stream.iterate(new Real(0, hi), r -&gt; {
+                    double mid = (r.lo() + r.hi()) / 2;
+                    return need.applyAsLong(mid) &lt;= k
+                            ? new Real(r.lo(), mid)
+                            : new Real(mid, r.hi());
+                })
+                .skip(100)
+                .findFirst().get().hi();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">The fold idiom</span>Java 17 has no <code>foldLeft</code>. <code>Stream.iterate(seed, step).skip(n).findFirst()</code> works as one. It applies <code>step</code> exactly n times, so a record can index the array with its own counter and never read past the end. 1011 and 410 use it for the greedy packing, and the DP patterns later in this deck use it for rolling state.</div>
+  <div class="note tip"><span class="lbl">The pattern, restated as code</span>Suppose the question asks for the smallest X that still works, and working only gets easier as X grows. Then the answer is <code>firstTrue(lo, hi, x -&gt; works(x))</code>. Writing <code>works</code> as a pipeline makes you state it as a pure function of <code>x</code>. That purity is exactly the monotonicity argument the interviewer is waiting to hear.</div>
+</section>
+
+

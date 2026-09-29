@@ -1,0 +1,107 @@
+<!-- dsa · pattern 26 · structure -->
+<section class="slide" data-sec="26 · Bit manipulation" data-title="The reusable structure">
+  <h2>A small vocabulary, used precisely</h2>
+  <p class="dek">There is no single skeleton here — the pattern is a set of idioms. Knowing which operator matches which structure is the whole skill, and the list is short enough to memorise.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The idioms</div>
+<pre><code class="language-java">// XOR FOLD — pairs cancel, the unpaired survivor remains
+int unique = 0;
+for (int v : nums) unique ^= v;          // O(n) time, O(1) space
+
+// COUNT SET BITS — one iteration per SET bit, not 32
+int count = 0;
+while (n != 0) { n &amp;= (n - 1); count++; }   // clears the lowest set bit
+
+// READ and WRITE a single bit
+boolean isSet = ((n &gt;&gt; i) &amp; 1) == 1;
+n |=  (1 &lt;&lt; i);                          // set
+n &amp;= ~(1 &lt;&lt; i);                          // clear
+n ^=  (1 &lt;&lt; i);                          // flip
+
+// ISOLATE the lowest set bit — splits a set into two halves
+int lowest = n &amp; (-n);
+
+// SAFE SHIFTING. Always &gt;&gt;&gt; when looping over bits: &gt;&gt; copies the
+// sign bit downward, so a negative number never reaches zero.
+for (int i = 0; i &lt; 32; i++) { int bit = (n &gt;&gt;&gt; i) &amp; 1; }
+
+// ENUMERATE every subset of n elements
+for (int mask = 0; mask &lt; (1 &lt;&lt; n); mask++)
+    for (int i = 0; i &lt; n; i++)
+        if ((mask &amp; (1 &lt;&lt; i)) != 0) { /* element i is in this subset */ }</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">The three problem shapes</div>
+<pre><code class="language-java">// 1 · PARITY PER LANE — appears twice except one (LC 136)
+int singleNumber(int[] nums) {
+    int x = 0;
+    for (int v : nums) x ^= v;
+    return x;
+}
+
+// 2 · COUNT PER LANE MOD k — appears three times except one (LC 137)
+int singleNumberIII(int[] nums) {
+    int result = 0;
+    for (int bit = 0; bit &lt; 32; bit++) {
+        int count = 0;
+        for (int v : nums) count += (v &gt;&gt;&gt; bit) &amp; 1;
+        if (count % 3 != 0) result |= (1 &lt;&lt; bit);
+    }
+    return result;
+}
+
+// 3 · BUILD FROM SMALLER ANSWERS — DP over bits (LC 338)
+int[] countBits(int n) {
+    int[] dp = new int[n + 1];
+    for (int i = 1; i &lt;= n; i++) {
+        // i &gt;&gt; 1 is i with the last bit dropped — already solved.
+        // Add back that last bit.
+        dp[i] = dp[i &gt;&gt; 1] + (i &amp; 1);
+    }
+    return dp;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Reversing bits, and why the mask matters (LC 190)</div>
+<pre><code class="language-java">// Java has no unsigned int, so the result is returned as a signed
+// int whose BIT PATTERN is correct — that is what the problem wants.
+public int reverseBits(int n) {
+    int result = 0;
+
+    for (int i = 0; i &lt; 32; i++) {
+        result &lt;&lt;= 1;              // make room at the bottom
+        result |= (n &amp; 1);         // take n's lowest bit
+        n &gt;&gt;&gt;= 1;                  // UNSIGNED shift — &gt;&gt; would loop forever
+    }
+    return result;
+}
+
+// The follow-up asks what to do if the function is called many
+// times. Cache the reversal of each BYTE in a 256-entry table,
+// then reverse four bytes and reassemble:
+//     rev(n) = table[n &amp; 0xff] &lt;&lt; 24
+//            | table[(n &gt;&gt;&gt; 8) &amp; 0xff] &lt;&lt; 16
+//            | table[(n &gt;&gt;&gt; 16) &amp; 0xff] &lt;&lt; 8
+//            | table[(n &gt;&gt;&gt; 24) &amp; 0xff];</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Matching shape to operator</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Pairs cancel</dt><dd>XOR fold. One line, O(1) space.</dd>
+          <dt>Groups of k cancel</dt><dd>Count each lane modulo k. The state-machine form is an optimisation of this, not a separate idea.</dd>
+          <dt>Two unique values</dt><dd>XOR everything, isolate any set bit of the result with <code>x &amp; (-x)</code>, and split the array by that bit — each half then has one unique value.</dd>
+          <dt>Counting bits for a range</dt><dd>DP on <code>i &gt;&gt; 1</code>, which is a strictly smaller index and therefore already computed.</dd>
+          <dt>Missing from a range</dt><dd>XOR all indices with all values; everything pairs off except the missing one. The arithmetic-sum version works too, but can overflow.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Using <code>&gt;&gt;</code> instead of <code>&gt;&gt;&gt;</code></b> — the arithmetic shift copies the sign bit, so a loop over the bits of a negative number never terminates. <b>Operator precedence</b> — <code>&amp;</code> binds looser than <code>==</code> in Java, so <code>if (n &amp; 1 == 1)</code> does not compile as intended; parenthesise every bitwise sub-expression. <b>Overflow with <code>1 &lt;&lt; 31</code></b> — that is <code>Integer.MIN_VALUE</code>; use <code>1L &lt;&lt; i</code> when you need bit 31 or above as a positive value.</div>
+    </div>
+  </div>
+</section>
+

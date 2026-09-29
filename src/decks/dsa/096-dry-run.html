@@ -1,0 +1,77 @@
+<!-- dsa · pattern 17 · dry run -->
+<section class="slide" data-sec="17 · BST problems" data-title="Dry run">
+  <h2>LC 98 traced on a tree that fails at depth two</h2>
+  <p class="dek">The tree is <code>5</code> with children <code>1</code> and <code>4</code>, where <code>4</code> has children <code>3</code> and <code>6</code>. It looks locally valid everywhere, and a parent-only comparison accepts it. The range check rejects it at node 3.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 320" role="img" aria-label="Range propagation down a BST, detecting a violation two levels below the root">
+        <circle cx="200" cy="44" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="200" y="50" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">5</text>
+        <path d="M183 59 L127 88" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <path d="M217 59 L273 88" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <circle cx="110" cy="104" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="110" y="110" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">1</text>
+        <circle cx="290" cy="104" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="290" y="110" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">4</text>
+        <path d="M273 119 L227 148" stroke="#D26A3F" stroke-width="1.5"></path>
+        <path d="M307 119 L353 148" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <circle cx="210" cy="164" r="21" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="210" y="170" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">3</text>
+        <circle cx="370" cy="164" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="370" y="170" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+
+        <text x="460" y="48" font-size="11" fill="currentColor" opacity="0.72">Node 3 is smaller than its parent 4, so a</text>
+        <text x="460" y="66" font-size="11" fill="currentColor" opacity="0.72">parent-only check accepts it.</text>
+        <text x="460" y="92" font-size="11" fill="currentColor" opacity="0.72">But 3 sits in the <em>right</em> subtree of 5, so it</text>
+        <text x="460" y="110" font-size="11" fill="currentColor" opacity="0.72">must exceed 5. It does not — the tree is invalid.</text>
+        <text x="460" y="140" font-size="11" fill="currentColor" opacity="0.62">The lower bound 5 was set two levels above and</text>
+        <text x="460" y="158" font-size="11" fill="currentColor" opacity="0.62">carried down. Only the range check sees it.</text>
+
+        <line x1="14" y1="196" x2="866" y2="196" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">VISIT</text>
+        <text x="90" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">NODE</text>
+        <text x="160" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ALLOWED RANGE</text>
+        <text x="330" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">IN RANGE?</text>
+        <text x="440" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">RANGE PASSED TO CHILDREN</text>
+
+        <text x="14" y="240" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="90" y="240" font-size="11" font-family="monospace" fill="currentColor">5</text>
+        <text x="160" y="240" font-size="11" font-family="monospace" fill="currentColor">(−inf, +inf)</text>
+        <text x="330" y="240" font-size="11" fill="#3AA79B">yes</text>
+        <text x="440" y="240" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">left (−inf, 5) · right (5, +inf)</text>
+
+        <text x="14" y="262" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="90" y="262" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="160" y="262" font-size="11" font-family="monospace" fill="currentColor">(−inf, 5)</text>
+        <text x="330" y="262" font-size="11" fill="#3AA79B">yes</text>
+        <text x="440" y="262" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">no children</text>
+
+        <text x="14" y="284" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="90" y="284" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="160" y="284" font-size="11" font-family="monospace" fill="currentColor">(5, +inf)</text>
+        <text x="330" y="284" font-size="11" font-weight="600" fill="#D26A3F">NO — 4 &lt; 5</text>
+        <text x="440" y="284" font-size="11" fill="#D26A3F">reject immediately; the subtree is never visited</text>
+
+        <text x="14" y="310" font-size="10.5" fill="currentColor" opacity="0.62">In this tree the violation is caught at node 4 itself. Had 4 been valid, node 3 would have inherited the range (5, 4) — an empty interval, rejecting everything.</text>
+      </svg>
+    </div>
+    <figcaption>The bound that catches the error was set two levels above. A comparison against the immediate parent has no access to it, which is why the naive check is wrong rather than merely incomplete.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>node</th><th>allowed range</th><th>parent-only check</th><th>range check</th><th>why they differ</th></tr></thead>
+      <tbody>
+        <tr><td class="num">5</td><td class="num">(−∞, +∞)</td><td>passes</td><td>passes</td><td>the root is unconstrained</td></tr>
+        <tr><td class="num">1</td><td class="num">(−∞, 5)</td><td>passes (1 &lt; 5)</td><td>passes</td><td>both agree on a direct child</td></tr>
+        <tr><td class="num">4</td><td class="num">(5, +∞)</td><td>passes (4 &lt; 5 on the right? <b>no</b>)</td><td><b>fails</b></td><td>4 is in the right subtree so it must exceed 5</td></tr>
+        <tr><td class="num">3</td><td class="num">(5, 4)</td><td>passes (3 &lt; 4)</td><td><b>fails</b></td><td>the inherited interval is already empty</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why the bounds must be <code>Long</code>, not <code>int</code></span>Seeding with <code>Integer.MIN_VALUE</code> and <code>Integer.MAX_VALUE</code> breaks when the tree legitimately contains those values — a single node holding <code>Integer.MIN_VALUE</code> is a valid BST, but the check <code>val &gt; MIN_VALUE</code> rejects it. Use <code>Long</code> bounds with <code>null</code> meaning unbounded, or pass <code>Long.MIN_VALUE</code> and <code>Long.MAX_VALUE</code>. LeetCode tests this exact case.</div>
+</section>
+

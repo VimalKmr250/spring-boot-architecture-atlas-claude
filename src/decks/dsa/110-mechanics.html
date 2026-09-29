@@ -1,0 +1,82 @@
+<!-- dsa · pattern 20 · mechanics -->
+<section class="slide" data-sec="20 · Graph BFS / DFS" data-title="Mechanics">
+  <h2>A grid is a graph — and the choice of traversal is the answer</h2>
+  <p class="dek">Every cell has up to four neighbours, which makes a grid an implicit graph with no adjacency list to build. The only real decision is DFS or BFS, and it is forced by the question: <b>DFS for "what is connected"</b>, <b>BFS for "how far"</b>.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The choice, and why it is not a preference</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>DFS</dt><dd>Counting components, measuring a region's size, flood-filling. Order does not matter because you visit everything reachable regardless.</dd>
+        <dt>BFS</dt><dd>Shortest path in an unweighted graph, or elapsed time in a spreading process. BFS reaches every cell in non-decreasing distance order, which is a guarantee DFS cannot make.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Using DFS for a shortest path is not slow — it is <b>wrong</b>. It may reach the target by a long route first and report that length.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">On a large grid, prefer iterative DFS or BFS: recursion on 10⁶ cells overflows the stack.</p>
+    </div>
+    <div class="panel">
+      <h3>Marking visited, and when</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Mark a cell <b>when you enqueue it</b>, never when you dequeue it. Otherwise the same cell is added many times before its first visit, and the queue blows up — the classic BFS memory failure.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">If the grid may be mutated, overwrite the cell itself and skip the extra array entirely. Say out loud that you are modifying the input; it is usually fine and interviewers like the space saving, but it should be a stated choice.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Unlike backtracking, these marks are <b>never undone</b> — a cell belongs to exactly one component, so revisiting it is always waste.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Multi-source BFS expanding in rings from several starting cells simultaneously">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">MULTI-SOURCE BFS — SEED EVERY START, THEN EXPAND ONCE</text>
+
+        <g>
+          <rect x="60" y="30" width="38" height="38" fill="#3AA79B" fill-opacity="0.12" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="98" y="30" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="136" y="30" width="38" height="38" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="174" y="30" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="212" y="30" width="38" height="38" fill="#3AA79B" fill-opacity="0.12" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="60" y="68" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="98" y="68" width="38" height="38" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="136" y="68" width="38" height="38" fill="#D26A3F" fill-opacity="0.65" stroke="#D26A3F" stroke-width="1.6"></rect>
+          <rect x="174" y="68" width="38" height="38" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="212" y="68" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="60" y="106" width="38" height="38" fill="#3AA79B" fill-opacity="0.12" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="98" y="106" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="136" y="106" width="38" height="38" fill="#D26A3F" fill-opacity="0.4" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="174" y="106" width="38" height="38" fill="#3AA79B" fill-opacity="0.24" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="212" y="106" width="38" height="38" fill="#3AA79B" fill-opacity="0.12" stroke="currentColor" stroke-opacity="0.2"></rect>
+        </g>
+        <text x="155" y="92" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">0</text>
+        <text x="117" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="193" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="155" y="54" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="155" y="130" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="79" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="231" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="117" y="54" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="193" y="54" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="117" y="130" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="193" y="130" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+
+        <text x="300" y="48" font-size="11" fill="currentColor" opacity="0.75">Every source goes into the queue <em>before</em> the loop starts.</text>
+        <text x="300" y="68" font-size="11" fill="currentColor" opacity="0.75">Then one ordinary BFS expands them all in lockstep,</text>
+        <text x="300" y="88" font-size="11" fill="currentColor" opacity="0.75">so each cell is reached by its <em>nearest</em> source automatically.</text>
+        <text x="300" y="116" font-size="11" fill="currentColor" opacity="0.62">Running a separate BFS per source would be O(sources × cells).</text>
+        <text x="300" y="136" font-size="11" fill="currentColor" opacity="0.62">Seeding them together is a single O(cells) pass.</text>
+
+        <line x1="14" y1="166" x2="866" y2="166" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="186" font-size="11.5" font-weight="600" fill="#D26A3F">The decision, in one line each</text>
+        <text x="14" y="208" font-size="11" fill="currentColor" opacity="0.75"><tspan font-family="monospace" font-weight="600">"how many islands" · "the largest area" · "fill this region"</tspan>  →  DFS. Order is irrelevant; you visit everything reachable.</text>
+        <text x="14" y="230" font-size="11" fill="currentColor" opacity="0.75"><tspan font-family="monospace" font-weight="600">"the shortest path" · "the minimum minutes" · "how long until all…"</tspan>  →  BFS. Distance order is the guarantee you need.</text>
+        <text x="14" y="248" font-size="10.5" fill="currentColor" opacity="0.55">Using DFS where BFS is required is not a performance issue — it returns a wrong answer.</text>
+      </svg>
+    </div>
+    <figcaption>Multi-source BFS is the move worth internalising. Seeding all starts before the loop makes "distance to the nearest source" fall out of a single ordinary traversal.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Cells or nodes with neighbours, and a question about <b>connectivity</b> or <b>distance</b>. Grids, mazes, spreading processes, and region counting all reduce to this.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Edges carry <b>different weights</b> — BFS assumes every step costs the same, so a weighted shortest path needs a priority queue instead. Also when the order must respect prerequisites, which is a different traversal entirely.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(rows × cols)</b> — every cell is enqueued and dequeued once. Space is <b>O(rows × cols)</b> worst case for the queue or the recursion stack, which for a full grid is the entire grid.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the number of islands"</b> · <b>"the maximum area of an island"</b> · <b>"flood fill"</b> · <b>"the minimum number of minutes until no cell has a fresh orange"</b> · <b>"the length of the shortest clear path"</b> · <b>"a closed island"</b> (surrounded on all four sides — check the border). The word <b>"shortest"</b> or <b>"minimum steps"</b> forces BFS; anything about counting or sizing permits DFS.</div>
+</section>
+

@@ -1,0 +1,36 @@
+<!-- deck 56 -->
+<section class="slide" data-sec="Cross-cutting" data-title="Deployment topology">
+  <h2>What "one deployable" looks like in production</h2>
+  <p class="dek">A modular monolith is not one server. It is one artifact deployed many times — and you can already scale, isolate and protect parts of it before extracting anything.</p>
+
+  <div class="split">
+    <div class="card">
+      <h3>The same jar, three deployments</h3>
+      <dl class="kv">
+        <dt>web</dt><dd>12 pods behind the gateway; handles HTTP only. Kafka listeners disabled by profile.</dd>
+        <dt>worker</dt><dd>6 pods; Kafka consumers, outbox relay, schedulers. No ingress at all.</dd>
+        <dt>batch</dt><dd>2 pods; nightly reconciliation and exports, with their own resource limits.</dd>
+      </dl>
+      <p style="margin-top:8px;font-size:13.5px;color:var(--text-2)">A profile decides which listeners and schedulers start. You now scale request traffic and event traffic independently, and a batch job can never starve checkout of threads — most of the benefit people expect from extracting services, without the distribution.</p>
+<pre style="margin-top:10px"><code class="language-yaml"># worker deployment
+SPRING_PROFILES_ACTIVE: prod,worker
+# order/internal/kafka/OrderPlacedConsumer.java
+@Profile("worker")</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Production hygiene checklist</h3>
+        <ul class="checks tight">
+          <li>Liveness and readiness probes distinct; readiness fails while warming.</li>
+          <li><code>preStop</code> sleep + graceful shutdown (<code>server.shutdown=graceful</code>) so in-flight requests finish.</li>
+          <li>Requests and limits set; <code>-XX:MaxRAMPercentage=75</code> so the JVM respects the container.</li>
+          <li>PodDisruptionBudget, so a node drain does not take the whole service.</li>
+          <li>HPA on a metric that reflects load (RPS or queue depth), not only CPU.</li>
+          <li>Anti-affinity across zones; at least three replicas for anything customer-facing.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">Sequencing a release with a migration</span>Migrate first (expand-only, backwards compatible), then roll the pods. Never run migrations from an init container on every pod — one pod runs them, as a Job, with a lock. Flyway takes the lock for you; the mistake is running the Job concurrently with itself.</div>
+    </div>
+  </div>
+</section>
+

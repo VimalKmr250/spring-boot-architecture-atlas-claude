@@ -1,0 +1,83 @@
+<!-- streams 38 -->
+<section class="slide" data-sec="Parallel streams" data-title="How a parallel stream runs">
+  <h2>Split, work, combine: streams on fork/join</h2>
+  <p class="dek"><code>parallelStream()</code> or <code>.parallel()</code> asks the library to split the source with its spliterator's <code>trySplit</code>, process the pieces as fork/join tasks, and combine the partial results. The tasks run on <code>ForkJoinPool.commonPool()</code>, which is shared by the whole JVM, helped by the thread that called the terminal operation.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="The source of eight elements is split in half by trySplit, then in half again, giving four chunks processed by common-pool workers and the calling thread. The four partial results are combined pairwise back into one result.">
+        <text x="14" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SPLIT · trySplit()</text>
+        <text x="330" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">WORK · one task per chunk</text>
+        <text x="660" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">COMBINE · pairwise</text>
+        <rect x="14" y="104" width="100" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="64" y="129" text-anchor="middle" font-size="12" fill="currentColor">[0 … 7]</text>
+        <rect x="150" y="56" width="90" height="36" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="195" y="79" text-anchor="middle" font-size="12" fill="currentColor">[0 … 3]</text>
+        <rect x="150" y="156" width="90" height="36" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="195" y="179" text-anchor="middle" font-size="12" fill="currentColor">[4 … 7]</text>
+        <line x1="114" y1="118" x2="146" y2="80" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="114" y1="130" x2="146" y2="170" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <g font-size="11.5" fill="currentColor">
+          <rect x="330" y="34" width="200" height="34" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="340" y="56">[0, 1] · caller thread</text>
+          <rect x="330" y="80" width="200" height="34" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="340" y="102">[2, 3] · commonPool-worker-1</text>
+          <rect x="330" y="134" width="200" height="34" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="340" y="156">[4, 5] · commonPool-worker-2</text>
+          <rect x="330" y="180" width="200" height="34" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="340" y="202">[6, 7] · commonPool-worker-3</text>
+        </g>
+        <line x1="240" y1="70" x2="326" y2="51" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="240" y1="78" x2="326" y2="97" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="240" y1="170" x2="326" y2="151" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="240" y1="178" x2="326" y2="197" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="600" y="62" width="110" height="36" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.8"></rect>
+        <text x="655" y="85" text-anchor="middle" font-size="11.5" fill="currentColor">combine</text>
+        <rect x="600" y="152" width="110" height="36" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.8"></rect>
+        <text x="655" y="175" text-anchor="middle" font-size="11.5" fill="currentColor">combine</text>
+        <line x1="530" y1="51" x2="596" y2="76" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="530" y1="97" x2="596" y2="84" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="530" y1="151" x2="596" y2="166" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="530" y1="197" x2="596" y2="174" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <rect x="770" y="106" width="116" height="40" rx="8" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="828" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">result</text>
+        <line x1="710" y1="82" x2="766" y2="118" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="710" y1="170" x2="766" y2="134" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="14" y1="228" x2="886" y2="228" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="244" font-size="10.5" fill="currentColor" opacity="0.62">Combining keeps encounter order: the left chunk's result always comes first, whichever thread finished first.</text>
+      </svg>
+    </div>
+    <figcaption>Copper is per-chunk work, which is where the speed-up comes from. Teal is the combine step: it runs on fewer threads at each level and is pure overhead, which is why cheap-to-combine results parallelise best.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Who does the work, on a 20-core machine running JDK 25</div>
+<pre><code class="language-java">ForkJoinPool.commonPool().getParallelism();     // 19: cores − 1
+Runtime.getRuntime().availableProcessors();     // 20
+
+IntStream.range(0, 10_000).parallel()
+         .mapToObj(i -&gt; Thread.currentThread().getName())
+         .collect(Collectors.toSet());
+// [main, ForkJoinPool.commonPool-worker-1, … -worker-19]: the caller helps
+
+// Sized once for the whole JVM, at startup:
+// -Djava.util.concurrent.ForkJoinPool.common.parallelism=8</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Source</th><th>Splits</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><code>ArrayList</code>, arrays, <code>IntStream.range</code></td><td>Well</td><td>Exact halves by index, sizes known (<code>SUBSIZED</code>)</td></tr>
+          <tr><td><code>HashSet</code>, <code>HashMap</code> views</td><td>Well enough</td><td>By bucket ranges; sizes only estimated</td></tr>
+          <tr><td><code>TreeSet</code>, <code>TreeMap</code> views</td><td>Adequately</td><td>By subtree, which may be unbalanced</td></tr>
+          <tr><td><code>LinkedList</code></td><td>Badly</td><td>Must walk the list to find a split point</td></tr>
+          <tr><td><code>Stream.iterate</code>, <code>BufferedReader.lines</code></td><td>Badly</td><td>Each element depends on the previous, or on reading in order</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">One pool for the whole JVM</span><code>CompletableFuture.supplyAsync</code> without an executor also runs on the common pool. So does every other library's parallel stream. A slow parallel stream in one endpoint therefore delays unrelated work across the service. Running a parallel stream from inside your own <code>ForkJoinPool</code> (<code>pool.submit(() -&gt; list.parallelStream()…).get()</code>) makes it use that pool instead. That behaviour is an implementation detail rather than a documented contract, and many teams rely on it anyway.</div>
+</section>
+

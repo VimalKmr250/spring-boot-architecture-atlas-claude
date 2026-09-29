@@ -1,0 +1,73 @@
+<!-- dsa · pattern 15 · mechanics -->
+<section class="slide" data-sec="15 · Tree DFS" data-title="Mechanics">
+  <h2>Ask each node one question, and trust the recursion</h2>
+  <p class="dek">Tree DFS is the shortest code in this deck and the hardest to reason about, because the recursive call does all the work. The discipline is to define <b>exactly what the function returns</b> for an arbitrary subtree, then write the body assuming the children already answered correctly.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The three-part contract</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Base case.</b> What does a null node return? Almost always the identity for whatever you are combining — 0 for a depth, false for existence, <code>MIN_VALUE</code> for a maximum.</li>
+        <li><b>Recurse.</b> Call on both children. Do not think about what happens inside; assume the contract holds.</li>
+        <li><b>Combine.</b> Produce this node's answer from the two child answers and the node's own value.</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Write the contract as a one-line comment before the body. Almost every wrong tree solution has a contract that changes meaning halfway through the function.</p>
+    </div>
+    <div class="panel">
+      <h3>Return versus record — the distinction that matters</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">In the hardest problems here, what a node <b>returns to its parent</b> is not the same as the <b>answer you are accumulating</b>.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">A path through a node — down one side, up through the node, down the other — cannot be extended by the parent, because the parent can only attach to one branch. So that value is <em>recorded</em> into a field, while the function <em>returns</em> the best single downward branch.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Conflating these two is the single biggest source of wrong answers in this pattern. When a problem mentions a path that "does not need to pass through the root", expect this split.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 262" role="img" aria-label="A node combining two child results, and the distinction between the value returned upward and the value recorded globally">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ONE NODE, TWO DIFFERENT QUANTITIES</text>
+
+        <circle cx="240" cy="62" r="24" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="240" y="68" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">n</text>
+        <path d="M222 80 L166 116" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <path d="M258 80 L314 116" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <circle cx="150" cy="132" r="22" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="150" y="138" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">L</text>
+        <circle cx="330" cy="132" r="22" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="330" y="138" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">R</text>
+
+        <path d="M240 38 L240 20" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2" stroke-dasharray="3 3"></path>
+        <text x="256" y="28" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">parent</text>
+
+        <path d="M172 118 L216 82" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></path>
+        <path d="M308 118 L264 82" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></path>
+
+        <rect x="420" y="34" width="440" height="52" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="434" y="52" font-size="11.5" font-weight="600" fill="currentColor">RETURNED upward — must be extendable by the parent</text>
+        <text x="434" y="70" font-size="11" font-family="monospace" fill="currentColor" opacity="0.78">n.val + max(L, R)   — ONE branch only</text>
+        <text x="434" y="82" font-size="10" fill="currentColor" opacity="0.62">the parent can attach to n through a single child</text>
+
+        <rect x="420" y="96" width="440" height="52" rx="7" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="434" y="114" font-size="11.5" font-weight="600" fill="currentColor">RECORDED globally — a complete answer, not extendable</text>
+        <text x="434" y="132" font-size="11" font-family="monospace" fill="currentColor" opacity="0.78">n.val + L + R       — BOTH branches</text>
+        <text x="434" y="144" font-size="10" fill="currentColor" opacity="0.62">this path bends at n, so no parent can extend it</text>
+
+        <text x="60" y="184" font-size="10.5" fill="currentColor" opacity="0.6">A path that bends at n uses both</text>
+        <text x="60" y="200" font-size="10.5" fill="currentColor" opacity="0.6">children, so it cannot continue upward.</text>
+
+        <line x1="14" y1="216" x2="866" y2="216" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="236" font-size="11" fill="currentColor" opacity="0.75">When the two quantities coincide — depth, inversion, existence — the function is three lines and needs no field at all.</text>
+        <text x="14" y="256" font-size="11" fill="currentColor" opacity="0.75">When they differ — diameter, maximum path sum — you need both: return one thing, accumulate another. Decide which before writing the body.</text>
+      </svg>
+    </div>
+    <figcaption>The split exists because a parent can only reach a node through <em>one</em> of its children. Any answer that consumes both branches is finished at that node and must be banked rather than propagated.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The answer depends on <b>subtree structure</b> — depths, sums, paths, shapes. Any question phrased as "for every node…" or "the best path anywhere in the tree" is this pattern.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>You need <b>level-by-level</b> order, or the shallowest occurrence of something — DFS may find a deep answer first. Those want a breadth-first traversal instead.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time, since each node is visited once. Space is <b>O(h)</b> for the call stack — O(log n) on a balanced tree but <b>O(n)</b> on a degenerate one, which is the case to mention.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the maximum depth"</b> · <b>"root-to-leaf path"</b> · <b>"the diameter"</b> · <b>"any path, not necessarily through the root"</b> (the return/record split) · <b>"invert the tree"</b> · <b>"return all paths that sum to"</b> (backtracking on the path list) · <b>"the number of nodes satisfying…"</b>. The phrase <b>"not necessarily passing through the root"</b> is the strongest signal that you need both a return value and a recorded one.</div>
+</section>
+

@@ -1,0 +1,49 @@
+<!-- deck 46 -->
+<section class="slide" data-sec="Frontend" data-title="Authentication">
+  <h2>Where the token lives decides your threat model</h2>
+  <p class="dek">This is the frontend decision with the largest security consequence, and the one most often made by default rather than deliberately.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Two auth options compared: tokens stored in browser storage are readable by any injected script, versus the BFF pattern where the browser holds only an httpOnly session cookie and tokens never leave the server">
+        <text x="14" y="16" font-size="10.5" font-weight="600" fill="#A22636">OPTION A · access token in the browser (localStorage / memory)</text>
+        <rect x="14" y="26" width="140" height="56" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="84" y="48" text-anchor="middle" font-size="11" fill="currentColor">SPA</text>
+        <text x="84" y="66" text-anchor="middle" font-size="9.5" fill="#A22636">holds JWT + refresh</text>
+        <rect x="246" y="26" width="140" height="56" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="316" y="54" text-anchor="middle" font-size="11" fill="currentColor">API</text>
+        <line x1="156" y1="54" x2="242" y2="54" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="199" y="46" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">Bearer eyJ…</text>
+        <text x="410" y="40" font-size="10.5" fill="#A22636">✕ any injected script (a compromised npm</text>
+        <text x="410" y="55" font-size="10.5" fill="#A22636">dependency, an XSS) can read and exfiltrate it</text>
+        <text x="410" y="70" font-size="10.5" fill="currentColor" opacity="0.7">✓ simplest; fine for internal tools, low-value data</text>
+
+        <line x1="14" y1="100" x2="866" y2="100" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="126" font-size="10.5" font-weight="600" fill="#2C7448">OPTION B · BFF holds the token, browser holds a cookie</text>
+        <rect x="14" y="136" width="140" height="62" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="84" y="160" text-anchor="middle" font-size="11" fill="currentColor">SPA</text>
+        <text x="84" y="178" text-anchor="middle" font-size="9.5" fill="#2C7448">holds nothing readable</text>
+        <rect x="246" y="136" width="150" height="62" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="321" y="160" text-anchor="middle" font-size="11" fill="currentColor">BFF</text>
+        <text x="321" y="178" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">session store → tokens</text>
+        <rect x="488" y="136" width="140" height="62" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="558" y="172" text-anchor="middle" font-size="11" fill="currentColor">API</text>
+        <line x1="156" y1="164" x2="242" y2="164" stroke="#2C7448" stroke-width="1.5" marker-end="url(#arw)"></line>
+        <text x="199" y="150" text-anchor="middle" font-size="9" fill="#2C7448">httpOnly cookie</text>
+        <text x="199" y="184" text-anchor="middle" font-size="9" fill="#2C7448">SameSite=Lax</text>
+        <line x1="398" y1="164" x2="484" y2="164" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="441" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">Bearer</text>
+        <text x="652" y="150" font-size="10.5" fill="#2C7448">✓ token theft via script is off the table</text>
+        <text x="652" y="165" font-size="10.5" fill="#2C7448">✓ refresh and revocation are server-side</text>
+        <text x="652" y="180" font-size="10.5" fill="currentColor" opacity="0.7">✕ costs a stateful hop + CSRF defence</text>
+        <text x="652" y="195" font-size="10.5" fill="currentColor" opacity="0.7">   (SameSite + a double-submit token)</text>
+
+        <text x="14" y="226" font-size="10.5" fill="currentColor" opacity="0.7">Both use OIDC authorization code + PKCE. The difference is only where the resulting tokens are stored — and that difference is the whole</text>
+        <text x="14" y="242" font-size="10.5" fill="currentColor" opacity="0.7">security argument. For anything customer-facing or regulated, B is the current default recommendation.</text>
+      </svg>
+    </div>
+    <figcaption>Note what is identical: the login flow, the identity provider, the scopes. Only the storage location changes — which is why retrofitting B later is a BFF plus an interceptor change, not a re-architecture.</figcaption>
+  </figure>
+</section>
+

@@ -1,0 +1,178 @@
+<!-- dsa · pattern 09 · streams -->
+<section class="slide" data-sec="09 · Monotonic stack" data-title="The six, in streams">
+  <h2>No stack: jump along the answers you have already found</h2>
+  <p class="dek">A monotonic stack is state that every element both reads and changes, and no Java 17 stream stage can hold that. But the stack's contents can be read out of the answer array itself. To find the next warmer day after <code>i</code>, start at <code>i + 1</code> and keep jumping to that day's own next warmer day: every day a jump skips was no warmer than the day it left from. Fill the answers right to left, and each one becomes a short, pure chain over answers already written, with the total work still O(n).</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">739</td><td><a href="https://leetcode.com/problems/daily-temperatures/" target="_blank" rel="noopener">Daily Temperatures</a></td><td>Right to left, <code>next[i]</code> is the end of the jump chain <code>IntStream.iterate(i + 1, j -&gt; next[j])</code>, stopped by <code>filter</code> at the first warmer day.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">496</td><td><a href="https://leetcode.com/problems/next-greater-element-i/" target="_blank" rel="noopener">Next Greater Element I</a></td><td>At most 1000 × 1000: for each query, <code>filter</code> the first greater value to the right of its position.</td><td><span class="tag g">clean</span></td><td class="num">O(m·n) / O(n)</td><td class="num">O(n + m) / O(n)</td></tr>
+        <tr><td class="num">503</td><td><a href="https://leetcode.com/problems/next-greater-element-ii/" target="_blank" rel="noopener">Next Greater Element II</a></td><td>Unroll the circle to 2n positions and run 739's jumps over <code>nums[p % n]</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">901</td><td><a href="https://leetcode.com/problems/online-stock-span/" target="_blank" rel="noopener">Online Stock Span</a></td><td>Each call jumps left along the stored <code>prev</code> answers until it reaches a higher price. The span is the distance.</td><td><span class="tag w">stateful</span></td><td class="num">O(1) amortised</td><td class="num">same</td></tr>
+        <tr><td class="num">84</td><td><a href="https://leetcode.com/problems/largest-rectangle-in-histogram/" target="_blank" rel="noopener">Largest Rectangle in Histogram</a></td><td>Previous-lower and next-lower bars by two jump fills, then <code>max</code> of <code>h[i] × width</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">85</td><td><a href="https://leetcode.com/problems/maximal-rectangle/" target="_blank" rel="noopener">Maximal Rectangle</a></td><td>Row-to-row histograms by <code>Stream.iterate</code>, then 84 on each row.</td><td><span class="tag w">stateful</span></td><td class="num">O(rows·cols) / O(cols)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 739 · Daily Temperatures · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] dailyTemperatures(int[] t) {
+        int n = t.length;
+        int[] next = new int[n];   // next warmer day, or n
+        // Right to left. From i + 1, jump along answers already
+        // found: a jump from j to next[j] skips only days no
+        // warmer than t[j], so none of them can beat t[i].
+        IntStream.iterate(n - 1, i -&gt; i &gt;= 0, i -&gt; i - 1)
+                .forEach(i -&gt; next[i] = IntStream
+                        .iterate(i + 1, j -&gt; next[j])
+                        .filter(j -&gt; j == n || t[j] &gt; t[i])
+                        .findFirst().getAsInt());
+        return IntStream.range(0, n)
+                .map(i -&gt; next[i] == n ? 0 : next[i] - i)
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 496 · Next Greater Element I · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[] nextGreaterElement(int[] nums1, int[] nums2) {
+        int n = nums2.length;
+        Map&lt;Integer, Integer&gt; pos = IntStream.range(0, n)
+                .boxed()
+                .collect(Collectors.toMap(i -&gt; nums2[i],
+                                          i -&gt; i));
+        // At most 1000 × 1000: scan right of each value's
+        // position for the first greater one. O(m·n), and pure.
+        return Arrays.stream(nums1)
+                .map(x -&gt; IntStream.range(pos.get(x) + 1, n)
+                        .map(j -&gt; nums2[j])
+                        .filter(v -&gt; v &gt; x)
+                        .findFirst().orElse(-1))
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 503 · Next Greater Element II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] nextGreaterElements(int[] nums) {
+        int n = nums.length, m = 2 * n;
+        // Unroll the circle: position p holds nums[p % n]. Then
+        // it is 739's jumps over 2n positions, right to left.
+        int[] next = new int[m];   // next greater, or m
+        IntStream.iterate(m - 1, i -&gt; i &gt;= 0, i -&gt; i - 1)
+                .forEach(i -&gt; next[i] = IntStream
+                        .iterate(i + 1, j -&gt; next[j])
+                        .filter(j -&gt; j == m
+                                || nums[j % n] &gt; nums[i % n])
+                        .findFirst().getAsInt());
+        return IntStream.range(0, n)
+                .map(i -&gt; next[i] == m ? -1 : nums[next[i] % n])
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 901 · Online Stock Span · stateful</div>
+<pre><code class="language-java">class StockSpanner {
+    private final List&lt;Integer&gt; price = new ArrayList&lt;&gt;();
+    // prev.get(i) = the last day before i with a higher price
+    private final List&lt;Integer&gt; prev = new ArrayList&lt;&gt;();
+
+    public int next(int p) {
+        int i = price.size();
+        // Jump left along answers already stored. Each day a
+        // jump skips was &lt;= the day it left from, so &lt;= p too.
+        int j = IntStream.iterate(i - 1, k -&gt; prev.get(k))
+                .filter(k -&gt; k &lt; 0 || price.get(k) &gt; p)
+                .findFirst().getAsInt();
+        price.add(p);
+        prev.add(j);
+        return i - j;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 84 · Largest Rectangle in Histogram · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int largestRectangleArea(int[] h) {
+        int n = h.length;
+        int[] left = new int[n];    // previous lower bar, or -1
+        int[] right = new int[n];   // next lower bar, or n
+        // Two jump fills in opposite directions, as in 739.
+        IntStream.range(0, n)
+                .forEach(i -&gt; left[i] = IntStream
+                        .iterate(i - 1, j -&gt; left[j])
+                        .filter(j -&gt; j &lt; 0 || h[j] &lt; h[i])
+                        .findFirst().getAsInt());
+        IntStream.iterate(n - 1, i -&gt; i &gt;= 0, i -&gt; i - 1)
+                .forEach(i -&gt; right[i] = IntStream
+                        .iterate(i + 1, j -&gt; right[j])
+                        .filter(j -&gt; j == n || h[j] &lt; h[i])
+                        .findFirst().getAsInt());
+        // Bar i is the lowest across (left[i], right[i]).
+        return IntStream.range(0, n)
+                .map(i -&gt; h[i] * (right[i] - left[i] - 1))
+                .max().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 85 · Maximal Rectangle · stateful</div>
+<pre><code class="language-java">class Solution {
+    // Column heights of the '1' runs ending at row "row" - 1
+    record Hist(int row, int[] h) {
+        Hist next(char[][] m) {
+            int[] nh = IntStream.range(0, h.length)
+                    .map(c -&gt; m[row][c] == '1' ? h[c] + 1 : 0)
+                    .toArray();
+            return new Hist(row + 1, nh);
+        }
+    }
+
+    public int maximalRectangle(char[][] matrix) {
+        // Each row's histogram is a pure function of the one
+        // above it; then every row is 84 on its own.
+        int cols = matrix[0].length;
+        return Stream.iterate(new Hist(0, new int[cols]),
+                              s -&gt; s.next(matrix))
+                .skip(1)
+                .limit(matrix.length)
+                .mapToInt(s -&gt; largest(s.h()))
+                .max().getAsInt();
+    }
+
+    // 84, unchanged: jump fills for the lower bars either side
+    static int largest(int[] h) {
+        int n = h.length;
+        int[] left = new int[n], right = new int[n];
+        IntStream.range(0, n)
+                .forEach(i -&gt; left[i] = IntStream
+                        .iterate(i - 1, j -&gt; left[j])
+                        .filter(j -&gt; j &lt; 0 || h[j] &lt; h[i])
+                        .findFirst().getAsInt());
+        IntStream.iterate(n - 1, i -&gt; i &gt;= 0, i -&gt; i - 1)
+                .forEach(i -&gt; right[i] = IntStream
+                        .iterate(i + 1, j -&gt; right[j])
+                        .filter(j -&gt; j == n || h[j] &lt; h[i])
+                        .findFirst().getAsInt());
+        return IntStream.range(0, n)
+                .map(i -&gt; h[i] * (right[i] - left[i] - 1))
+                .max().getAsInt();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Why the jumps are still O(n)</span>A jump from <code>j</code> to <code>next[j]</code> skips a block that every later chain skips as well, so no element is walked over twice. It is the stack's amortisation argument, with the answer array playing the stack's part. The fill order is what makes it work: right to left for "next", left to right for "previous". The harness checks sorted, reverse-sorted, flat and sawtooth inputs of 10⁵, and each runs in milliseconds.</div>
+  <div class="note warn"><span class="lbl">Stateful is the honest label</span><code>forEach</code> writes <code>next[i]</code> and later iterations read it. That makes <code>next</code> a memo table, and the order of the outer stream carries the correctness, so never make it parallel. What the jumps buy you is that each answer comes from a pure inner pipeline over finished entries, rather than a <code>while</code> loop mutating a <code>Deque</code> inside a lambda. In the interview, still write the stack: it is the version the interviewer is looking for.</div>
+</section>
+
+

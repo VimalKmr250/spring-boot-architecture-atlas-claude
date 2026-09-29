@@ -1,0 +1,334 @@
+<!-- dsa · pattern 24 · streams -->
+<section class="slide" data-sec="24 · MST / graph greedy" data-title="The six, in streams">
+  <h2>Kruskal is a filter; Prim is a pure step per point</h2>
+  <p class="dek">Kruskal's algorithm reads naturally as a pipeline: sort the edges, keep the ones whose union joins two components, sum what is left. The union-find behind that filter is state, so 1135, 1168, 1489, 778 and 1102 are stateful, and 778 and 1102 simply open grid cells in value order instead of taking edges. 1584 goes the other way. On a complete graph, Prim's step is a pure function of the tree so far, which makes it both clean and faster than sorting all n²/2 edges.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1584</td><td><a href="https://leetcode.com/problems/min-cost-to-connect-all-points/" target="_blank" rel="noopener">Min Cost to Connect All Points</a></td><td>Prim as a fold: each step adds the nearest outside point and returns fresh arrays.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1135</td><td><a href="https://leetcode.com/problems/connecting-cities-with-minimum-cost/" target="_blank" rel="noopener">Connecting Cities With Minimum Cost</a></td><td><code>sorted</code> by cost, then <code>filter(dsu.union(…))</code>. Fewer than n − 1 edges kept means the graph is disconnected.</td><td><span class="tag w">stateful</span></td><td class="num">O(E log E) / O(E)</td><td class="num">O(E log E) / O(n)</td></tr>
+        <tr><td class="num">1168</td><td><a href="https://leetcode.com/problems/optimize-water-distribution-in-a-village/" target="_blank" rel="noopener">Optimize Water Distribution in a Village</a></td><td>Wells become pipes from a virtual house 0; <code>Stream.concat</code> them with the real pipes, then run Kruskal.</td><td><span class="tag w">stateful</span></td><td class="num">O(E log E) / O(E)</td><td class="num">O(E log E) / O(n)</td></tr>
+        <tr><td class="num">1489</td><td><a href="https://leetcode.com/problems/find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree/" target="_blank" rel="noopener">Find Critical and Pseudo-Critical Edges in MST</a></td><td>One Kruskal per edge, each with its own fresh DSU: skip the edge to test "critical", force it first to test "pseudo-critical".</td><td><span class="tag w">stateful</span></td><td class="num">O(E²·log V) / O(V+E)</td><td class="num">O(E²·α) / O(n)</td></tr>
+        <tr><td class="num">778</td><td><a href="https://leetcode.com/problems/swim-in-rising-water/" target="_blank" rel="noopener">Swim in Rising Water</a></td><td>Raise the water one height at a time. Each height opens one cell, and the answer is the first height at which the corners share a root.</td><td><span class="tag w">stateful</span></td><td class="num">O(n² log n) / O(n²)</td><td class="num">same</td></tr>
+        <tr><td class="num">1102</td><td><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/" target="_blank" rel="noopener">Path With Maximum Minimum Value</a></td><td>Open cells from the highest value down. The cell that first joins the corners is the weakest step on the best path.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn log mn) / O(mn)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 1584 · Min Cost to Connect All Points · clean</div>
+<pre><code class="language-java">class Solution {
+    // the tree so far: which points are in, each outside
+    // point's cheapest link into it, and the cost paid
+    record Prim(boolean[] in, int[] link, int cost) {
+        Prim grow(int[][] p) {
+            int n = link.length;
+            IntBinaryOperator nearer = (a, b) -&gt;
+                    link[a] &lt;= link[b] ? a : b;
+            int u = IntStream.range(0, n).filter(v -&gt; !in[v])
+                    .reduce(nearer).getAsInt();
+            boolean[] in2 = in.clone();
+            in2[u] = true;
+            int[] link2 = IntStream.range(0, n)
+                    .map(v -&gt; in2[v] ? link[v]
+                            : Math.min(link[v], dist(p, u, v)))
+                    .toArray();
+            return new Prim(in2, link2, cost + link[u]);
+        }
+    }
+
+    public int minCostConnectPoints(int[][] points) {
+        int n = points.length;
+        int[] link = IntStream.range(0, n)
+                .map(v -&gt; v == 0 ? 0 : Integer.MAX_VALUE)
+                .toArray();
+        // Prim on the complete graph, one pure step per point:
+        // O(n²), where sorting all n²/2 edges is O(n² log n).
+        return Stream.iterate(new Prim(new boolean[n], link, 0),
+                              s -&gt; s.grow(points))
+                .skip(n).findFirst().get().cost();
+    }
+
+    static int dist(int[][] p, int a, int b) {
+        return Math.abs(p[a][0] - p[b][0])
+             + Math.abs(p[a][1] - p[b][1]);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1135 · Connecting Cities With Minimum Cost · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minimumCost(int n, int[][] connections) {
+        DSU dsu = new DSU(n + 1);
+        // Kruskal is a filter: cheapest first, keep an edge
+        // only if it joins two components. The union is state.
+        List&lt;int[]&gt; taken = Arrays.stream(connections)
+                .sorted(Comparator.comparingInt(c -&gt; c[2]))
+                .filter(c -&gt; dsu.union(c[0], c[1]))
+                .toList();
+        return taken.size() &lt; n - 1 ? -1   // still disconnected
+                : taken.stream().mapToInt(c -&gt; c[2]).sum();
+    }
+
+    // ---- the union-find from the union-find slides ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1168 · Optimize Water Distribution in a Village · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minCostToSupplyWater(int n, int[] wells,
+                                    int[][] pipes) {
+        DSU dsu = new DSU(n + 1);
+        // A well at house i is a pipe from a virtual house 0.
+        // After that, it is plain Kruskal.
+        Stream&lt;int[]&gt; wellPipes = IntStream.rangeClosed(1, n)
+                .mapToObj(i -&gt; new int[]{ 0, i, wells[i - 1] });
+        return Stream.concat(wellPipes, Arrays.stream(pipes))
+                .sorted(Comparator.comparingInt(e -&gt; e[2]))
+                .filter(e -&gt; dsu.union(e[0], e[1]))
+                .mapToInt(e -&gt; e[2])
+                .sum();
+    }
+
+    // ---- the union-find from the union-find slides ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1489 · Find Critical and Pseudo-Critical Edges in MST · stateful</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt;
+            findCriticalAndPseudoCriticalEdges(int n,
+                                               int[][] edges) {
+        int m = edges.length;
+        Comparator&lt;Integer&gt; light = Comparator
+                .comparingInt(i -&gt; edges[i][2]);
+        List&lt;Integer&gt; order = IntStream.range(0, m).boxed()
+                .sorted(light).toList();
+        IntBinaryOperator cost = (skip, force) -&gt;
+                mst(n, edges, order, skip, force);
+        int base = cost.applyAsInt(-1, -1);
+        // Critical: the MST gets dearer (or breaks) without it.
+        List&lt;Integer&gt; critical = IntStream.range(0, m)
+                .filter(i -&gt; cost.applyAsInt(i, -1) &gt; base)
+                .boxed().toList();
+        // Pseudo-critical: not critical, yet some MST uses it.
+        List&lt;Integer&gt; pseudo = IntStream.range(0, m)
+                .filter(i -&gt; !critical.contains(i))
+                .filter(i -&gt; cost.applyAsInt(-1, i) == base)
+                .boxed().toList();
+        return List.of(critical, pseudo);
+    }
+
+    // Kruskal without edge skip, taking edge force first. Each
+    // call owns a fresh DSU, so the state stays inside it.
+    static int mst(int n, int[][] e, List&lt;Integer&gt; byWeight,
+                   int skip, int force) {
+        DSU dsu = new DSU(n);
+        IntStream first = force &lt; 0 ? IntStream.empty()
+                                    : IntStream.of(force);
+        int[] taken = IntStream.concat(first, byWeight.stream()
+                        .mapToInt(Integer::intValue)
+                        .filter(i -&gt; i != skip))
+                .filter(i -&gt; dsu.union(e[i][0], e[i][1]))
+                .toArray();
+        return taken.length &lt; n - 1 ? Integer.MAX_VALUE
+                : Arrays.stream(taken).map(i -&gt; e[i][2]).sum();
+    }
+
+    // ---- the union-find from the union-find slides ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 778 · Swim in Rising Water · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int swimInWater(int[][] grid) {
+        int n = grid.length, last = n * n - 1;
+        // at[t] = the cell of height t (heights are 0 .. n*n-1)
+        int[] at = new int[n * n];
+        IntStream.range(0, n * n)
+                .forEach(x -&gt; at[grid[x / n][x % n]] = x);
+        boolean[] open = new boolean[n * n];
+        DSU dsu = new DSU(n * n);
+        // Raise the water one height at a time. Each height
+        // opens one cell and joins it to its open neighbours;
+        // the answer is the first height joining the corners.
+        return IntStream.range(0, n * n).filter(t -&gt; {
+            int x = at[t];
+            open[x] = true;
+            around(x, n, n).filter(y -&gt; open[y])
+                    .forEach(y -&gt; dsu.union(x, y));
+            return dsu.find(0) == dsu.find(last);
+        }).findFirst().getAsInt();
+    }
+
+    // the 4 neighbours of cell x = r * n + c, inside the grid
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // ---- the union-find from the union-find slides ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1102 · Path With Maximum Minimum Value · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maximumMinimumPath(int[][] grid) {
+        int m = grid.length, n = grid[0].length;
+        int last = m * n - 1;
+        boolean[] open = new boolean[m * n];
+        DSU dsu = new DSU(m * n);
+        Comparator&lt;Integer&gt; highFirst = Comparator
+                .comparingInt((Integer x) -&gt; grid[x / n][x % n])
+                .reversed();
+        // Open cells from the highest value down. The cell
+        // whose opening first joins the corners is the weakest
+        // step of the best path, so its value is the answer.
+        return IntStream.range(0, m * n).boxed()
+                .sorted(highFirst)
+                .filter(x -&gt; {
+                    open[x] = true;
+                    around(x, m, n).filter(y -&gt; open[y])
+                            .forEach(y -&gt; dsu.union(x, y));
+                    return dsu.find(0) == dsu.find(last);
+                })
+                .findFirst()
+                .map(x -&gt; grid[x / n][x % n]).get();
+    }
+
+    // the 4 neighbours of cell x = r * n + c, inside the grid
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // ---- the union-find from the union-find slides ----
+    record DSU(int[] parent, int[] size) {
+        DSU(int n) {
+            this(IntStream.range(0, n).toArray(),
+                 IntStream.range(0, n).map(i -&gt; 1).toArray());
+        }
+
+        int find(int x) {
+            return IntStream.iterate(x, y -&gt; parent[y])
+                    .filter(y -&gt; parent[y] == y)
+                    .findFirst().getAsInt();
+        }
+
+        boolean union(int a, int b) {
+            int ra = find(a), rb = find(b);
+            if (ra == rb) return false;
+            int big = size[ra] &gt;= size[rb] ? ra : rb;
+            int small = big == ra ? rb : ra;
+            parent[small] = big;
+            size[big] += size[small];
+            return true;
+        }
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Kruskal reads like its definition</span><code>sorted(byWeight).filter(e -&gt; dsu.union(e[0], e[1]))</code> says exactly what Kruskal's algorithm is: the cheapest edges first, keeping each one that connects something new. The loop version says the same thing with more ceremony. The stateful part is confined to <code>union</code>, and 1489 shows how to keep it contained: each call to <code>mst</code> builds its own DSU, so the outer pipeline over edges shares nothing.</div>
+  <div class="note tip"><span class="lbl">Pick the algorithm that fits the stream</span>On 1584's complete graph, Kruskal would materialise and sort about 500,000 edges. Prim needs only two arrays of n values, and each step is a pure function from one pair of arrays to the next. So the cleaner pipeline is also the asymptotically better algorithm: O(n²) instead of O(n² log n), which ran in 13 ms at n = 1000.</div>
+</section>
+
+

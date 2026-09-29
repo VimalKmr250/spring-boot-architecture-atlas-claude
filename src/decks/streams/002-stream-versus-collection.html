@@ -1,0 +1,82 @@
+<!-- streams 02 -->
+<section class="slide" data-sec="Orientation" data-title="Stream versus collection">
+  <h2>A stream is a recipe, not a container</h2>
+  <p class="dek">A collection holds elements. A stream holds none. It describes work: where the elements come from, what happens to each one, and what to produce at the end. Nothing runs until a terminal operation asks for a result, and then it runs exactly once.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="A pipeline: a source feeds three lazy intermediate operations, filter, map and sorted, which feed one eager terminal operation, collect. Building the intermediate stages runs nothing; calling the terminal operation runs everything once.">
+        <text x="14" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SOURCE</text>
+        <text x="190" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">INTERMEDIATE OPERATIONS · lazy · each returns a new Stream</text>
+        <text x="712" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TERMINAL · eager</text>
+
+        <rect x="14" y="34" width="150" height="62" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="89" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">orders.stream()</text>
+        <text x="89" y="80" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.6">collection · array · I/O</text>
+
+        <line x1="164" y1="65" x2="186" y2="65" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="190" y="34" width="150" height="62" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="265" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">.filter(…)</text>
+        <text x="265" y="80" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.6">stateless</text>
+
+        <line x1="340" y1="65" x2="362" y2="65" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="366" y="34" width="150" height="62" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="441" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">.map(…)</text>
+        <text x="441" y="80" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.6">stateless</text>
+
+        <line x1="516" y1="65" x2="538" y2="65" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="542" y="34" width="150" height="62" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.8"></rect>
+        <text x="617" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">.sorted()</text>
+        <text x="617" y="80" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">stateful · buffers all</text>
+
+        <line x1="692" y1="65" x2="708" y2="65" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <rect x="712" y="34" width="174" height="62" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="799" y="60" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">.toList()</text>
+        <text x="799" y="80" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">pulls, runs, closes</text>
+
+        <path d="M190 116 L190 124 L692 124 L692 116" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="441" y="144" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.75">building these runs nothing: each call records a stage and returns a new Stream object</text>
+        <path d="M712 116 L712 124 L886 124 L886 116" fill="none" stroke="#D26A3F" stroke-opacity="0.8"></path>
+        <text x="799" y="144" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.8">everything runs here</text>
+
+        <line x1="14" y1="172" x2="886" y2="172" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="196" font-size="11.5" fill="currentColor">One-shot: after <tspan font-family="monospace">.toList()</tspan> the stream is spent. Calling any other operation on it throws</text>
+        <text x="14" y="216" font-size="11.5" font-family="monospace" fill="#A22636">IllegalStateException: stream has already been operated upon or closed</text>
+        <text x="14" y="238" font-size="10.5" fill="currentColor" opacity="0.6">The source collection is never modified. The result is a new object.</text>
+      </svg>
+    </div>
+    <figcaption>Copper is the terminal operation, the only call that does work. Teal marks a stateful stage: <code>sorted()</code> must see every element before it can emit the first.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The running example on every API slide</div>
+<pre><code class="language-java">record Line(String sku, int qty, double price) {}
+record Order(String id, String customer, String status,
+             double total, List&lt;Line&gt; lines) {}
+
+List&lt;String&gt; bigSpenders = orders.stream()   // source: nothing copied
+        .filter(o -&gt; o.total() &gt; 500)        // recorded, not run
+        .map(Order::customer)                // recorded, not run
+        .distinct()                          // recorded, not run
+        .sorted()                            // recorded, not run
+        .toList();                           // runs all of the above, once</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th></th><th>Collection</th><th>Stream</th></tr></thead>
+        <tbody>
+          <tr><td>Holds elements</td><td>Yes, in memory</td><td>No. Elements flow through it</td></tr>
+          <tr><td>Work happens</td><td>When you call a method</td><td>Only when a terminal op runs</td></tr>
+          <tr><td>Iteration</td><td>External: you write the loop</td><td>Internal: the library drives it</td></tr>
+          <tr><td>Reusable</td><td>As often as you like</td><td>Once</td></tr>
+          <tr><td>Size</td><td>Finite</td><td>Can be infinite</td></tr>
+          <tr><td>Changes the source</td><td><code>add</code>, <code>remove</code> do</td><td>Never. It builds a new result</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note bad"><span class="lbl">Where the one-shot rule bites</span>Storing a <code>Stream</code> in a field or passing it to two methods. The second consumer throws. Store the collection, or a <code>Supplier&lt;Stream&lt;T&gt;&gt;</code>, and call <code>.stream()</code> each time you need one: a fresh pipeline costs a few small objects.</div>
+</section>
+

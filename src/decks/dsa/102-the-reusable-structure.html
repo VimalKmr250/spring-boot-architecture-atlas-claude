@@ -1,0 +1,99 @@
+<!-- dsa · pattern 18 · structure -->
+<section class="slide" data-sec="18 · Backtracking basics" data-title="The reusable structure">
+  <h2>One skeleton, three parameters, one dedup rule</h2>
+  <p class="dek">The body never changes. Where you record, what you pass as <code>start</code>, and whether you skip duplicates at the same depth — those three decisions cover all six problems.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The skeleton — choose, explore, un-choose</div>
+<pre><code class="language-java">/**
+ * KNOB 1 · where to record   — every node, leaves only, or depth == k
+ * KNOB 2 · the start index   — i+1, i, or 0 with used[]
+ * KNOB 3 · duplicate skip    — needed only when the input has repeats
+ */
+void backtrack(int[] nums, int start, List&lt;Integer&gt; path,
+               List&lt;List&lt;Integer&gt;&gt; out) {
+
+    // KNOB 1 · subsets record EVERY node, so there is no filter here.
+    out.add(new ArrayList&lt;&gt;(path));      // COPY — path keeps mutating
+
+    for (int i = start; i &lt; nums.length; i++) {
+
+        path.add(nums[i]);                          // 1 · choose
+        backtrack(nums, i + 1, path, out);          // 2 · explore  (KNOB 2)
+        path.remove(path.size() - 1);               // 3 · un-choose
+    }
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Knob 2 — the start index, and what it produces</div>
+<pre><code class="language-java">// COMBINATIONS — each element once, order irrelevant (LC 78, 77, 90)
+backtrack(nums, i + 1, ...);
+
+// WITH REUSE — the same element may repeat (LC 39)
+backtrack(nums, i, ...);          // note: i, not i + 1
+
+// PERMUTATIONS — order matters, so every index is reachable
+// at every depth and you must track what is already used.
+for (int i = 0; i &lt; nums.length; i++) {
+    if (used[i]) continue;
+    used[i] = true;
+    path.add(nums[i]);
+
+    backtrack(nums, 0, path, out);    // start is always 0
+
+    path.remove(path.size() - 1);
+    used[i] = false;                  // undo BOTH mutations
+}
+
+// FIXED SIZE k — record at the right depth instead of at every node
+if (path.size() == k) { out.add(new ArrayList&lt;&gt;(path)); return; }</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Knob 3 — the duplicate rule, and why it is written that way</div>
+<pre><code class="language-java">// The input must be SORTED first, so equal values sit adjacent.
+Arrays.sort(nums);
+
+// COMBINATIONS with duplicates (LC 90, 40):
+// skip a repeated value when it is not the FIRST choice at this depth.
+for (int i = start; i &lt; nums.length; i++) {
+    if (i &gt; start &amp;&amp; nums[i] == nums[i - 1]) continue;
+    ...
+}
+// `i &gt; start`, NOT `i &gt; 0`. Using i &gt; 0 would also block the
+// legitimate second copy at a DEEPER level, so [1,1] would vanish.
+
+// PERMUTATIONS with duplicates (LC 47):
+// only let the leftmost unused copy be chosen at each depth.
+for (int i = 0; i &lt; nums.length; i++) {
+    if (used[i]) continue;
+    if (i &gt; 0 &amp;&amp; nums[i] == nums[i - 1] &amp;&amp; !used[i - 1]) continue;
+    ...
+}
+// !used[i-1] means the previous equal copy was already undone at
+// THIS depth — so choosing this one would repeat the same branch.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The three knobs in one table</h3>
+      <div class="tblwrap" style="margin-top:10px">
+        <table class="tbl">
+          <thead><tr><th>Want</th><th>record</th><th>start</th><th>dedup</th></tr></thead>
+          <tbody>
+            <tr><td>all subsets</td><td>every node</td><td class="num">i + 1</td><td>no</td></tr>
+            <tr><td>subsets, dup input</td><td>every node</td><td class="num">i + 1</td><td><code>i &gt; start</code></td></tr>
+            <tr><td>combinations of k</td><td>at depth k</td><td class="num">i + 1</td><td>no</td></tr>
+            <tr><td>sum to target, reuse</td><td>when sum hits 0</td><td class="num">i</td><td>no</td></tr>
+            <tr><td>permutations</td><td>at depth n</td><td class="num">0 + used[]</td><td>no</td></tr>
+            <tr><td>permutations, dup input</td><td>at depth n</td><td class="num">0 + used[]</td><td><code>!used[i-1]</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Adding <code>path</code> instead of a copy</b> — every entry in the output ends up being the same list, empty by the time you return. Always <code>new ArrayList&lt;&gt;(path)</code>. <b>Forgetting to undo</b> — or undoing only one of two mutations in the permutation case, where both <code>path</code> and <code>used[i]</code> must be restored. <b><code>i &gt; 0</code> instead of <code>i &gt; start</code></b> in the combination dedup — this drops legitimate results such as <code>[1,1]</code>, and the failure appears only on inputs with repeats.</div>
+  </div>
+</section>
+

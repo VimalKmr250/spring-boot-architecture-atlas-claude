@@ -1,0 +1,79 @@
+<!-- dsa · pattern 12 · mechanics -->
+<section class="slide" data-sec="12 · Intervals" data-title="Mechanics">
+  <h2>Sort by one end, then a single pass decides everything</h2>
+  <p class="dek">Interval problems are trivial once sorted and near-impossible before. The entire skill is choosing <b>which end to sort by</b> — start or end — because that one decision determines whether the following linear pass is correct.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The two sort keys, and when each is right</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Sort by <b>start</b></dt><dd>When you are <em>building</em> something: merging overlaps, inserting a new interval, counting simultaneous rooms. Processing in start order means each interval arrives exactly when it becomes relevant.</dd>
+        <dt>Sort by <b>end</b></dt><dd>When you are <em>keeping as many as possible</em>: the classic activity-selection greedy. Finishing earliest leaves the most room for everything after it.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Get this backwards and the code still runs, still looks reasonable, and returns a wrong answer on the second test case. It is the only real decision in the pattern.</p>
+    </div>
+    <div class="panel">
+      <h3>The overlap test</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Two intervals <code>a</code> and <code>b</code> overlap when <code>a.start &lt;= b.end</code> and <code>b.start &lt;= a.end</code>. After sorting by start, the first condition is automatic, so the test collapses to <b><code>b.start &lt;= a.end</code></b>.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Whether touching counts as overlapping is problem-specific. <code>[1,2]</code> and <code>[2,3]</code> merge in LC 56 but do <em>not</em> conflict in a meeting-room problem, where a room frees at the moment the meeting ends. That is <code>&lt;=</code> versus <code>&lt;</code>, and it decides correctness.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Read the statement for the word "touching", "adjacent", or an example with shared endpoints, and pick the operator deliberately.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 262" role="img" aria-label="Intervals sorted by start being merged, and the same set sorted by end for maximum retention">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SORTED BY START — MERGING</text>
+
+        <line x1="60" y1="96" x2="560" y2="96" stroke="currentColor" stroke-opacity="0.15"></line>
+        <rect x="80" y="34" width="120" height="16" rx="5" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="140" y="30" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">[1,3]</text>
+        <rect x="150" y="56" width="120" height="16" rx="5" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="210" y="52" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">[2,6]</text>
+        <rect x="320" y="34" width="90" height="16" rx="5" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+        <text x="365" y="30" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">[8,10]</text>
+        <rect x="420" y="56" width="110" height="16" rx="5" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+        <text x="475" y="52" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">[11,15]</text>
+
+        <rect x="80" y="78" width="190" height="14" rx="5" fill="#D26A3F" fill-opacity="0.45" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="320" y="78" width="90" height="14" rx="5" fill="#3AA79B" fill-opacity="0.45" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <rect x="420" y="78" width="110" height="14" rx="5" fill="#3AA79B" fill-opacity="0.45" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="600" y="60" font-size="10.5" fill="currentColor" opacity="0.65">[2,6] starts before [1,3] ends,</text>
+        <text x="600" y="76" font-size="10.5" fill="currentColor" opacity="0.65">so they fuse into [1,6].</text>
+        <text x="600" y="96" font-size="10.5" fill="currentColor" opacity="0.65">[8,10] and [11,15] stay separate.</text>
+        <text x="14" y="88" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">merged</text>
+
+        <line x1="14" y1="118" x2="866" y2="118" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="138" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SORTED BY END — KEEPING AS MANY AS POSSIBLE</text>
+
+        <line x1="60" y1="222" x2="560" y2="222" stroke="currentColor" stroke-opacity="0.15"></line>
+        <rect x="80" y="154" width="100" height="16" rx="5" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="130" y="150" text-anchor="middle" font-size="10" font-family="monospace" fill="#D26A3F">keep — ends first</text>
+        <rect x="120" y="176" width="220" height="16" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="4 3"></rect>
+        <text x="230" y="172" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.45">drop — overlaps, and ends later</text>
+        <rect x="200" y="198" width="120" height="16" rx="5" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="260" y="194" text-anchor="middle" font-size="10" font-family="monospace" fill="#D26A3F">keep</text>
+        <rect x="380" y="154" width="140" height="16" rx="5" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="450" y="150" text-anchor="middle" font-size="10" font-family="monospace" fill="#D26A3F">keep</text>
+
+        <text x="600" y="168" font-size="10.5" fill="currentColor" opacity="0.65">Choosing the earliest finisher leaves</text>
+        <text x="600" y="184" font-size="10.5" fill="currentColor" opacity="0.65">the most room for everything after.</text>
+        <text x="600" y="204" font-size="10.5" fill="currentColor" opacity="0.65">Sorting by START here would pick</text>
+        <text x="600" y="220" font-size="10.5" fill="currentColor" opacity="0.65">the long interval and lose two.</text>
+
+        <line x1="14" y1="236" x2="866" y2="236" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="256" font-size="11" fill="currentColor" opacity="0.72">Building something → sort by <tspan font-weight="600" fill="#D26A3F">start</tspan>.   Keeping as many as possible → sort by <tspan font-weight="600" fill="#3AA79B">end</tspan>.   That one choice is the pattern.</text>
+      </svg>
+    </div>
+    <figcaption>The lower half is the exchange argument: any optimal selection can be rewritten to start with the earliest-finishing interval without losing anything, so the greedy choice is always safe.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The input is a list of <code>[start, end]</code> pairs and the question is about <b>overlap</b> — merging, counting simultaneous, removing the fewest, or fitting the most.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Intervals are inserted and queried dynamically — that wants a <code>TreeMap</code> or an interval tree. Also when you need per-point totals rather than interval structure, which is a range-update problem instead.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n log n)</b>, dominated entirely by the sort; the pass itself is O(n). Space is <b>O(n)</b> for the output, or O(1) beyond it when you can sort in place.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"merge all overlapping intervals"</b> · <b>"insert a new interval and merge"</b> · <b>"can a person attend all meetings"</b> · <b>"the minimum number of conference rooms"</b> · <b>"remove the minimum number of intervals to make the rest non-overlapping"</b> · <b>"the minimum number of arrows"</b>. The last two are the same greedy, and both are activity selection in disguise.</div>
+</section>
+

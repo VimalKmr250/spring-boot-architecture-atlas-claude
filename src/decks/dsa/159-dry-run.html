@@ -1,0 +1,100 @@
+<!-- dsa · pattern 30 · dry run -->
+<section class="slide" data-sec="30 · String / sequence DP" data-title="Dry run">
+  <h2>LC 1143 traced on <code>"abcde"</code> and <code>"ace"</code></h2>
+  <p class="dek">The longest common subsequence is <code>"ace"</code>, length 3. The table is filled row by row; each cell either inherits the diagonal plus one on a match, or carries forward the better of its two neighbours.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 296" role="img" aria-label="The LCS table for abcde against ace, with the matching diagonal steps highlighted">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">dp[i][j] = LCS OF THE FIRST i OF "abcde" AND FIRST j OF "ace"</text>
+
+        <text x="120" y="42" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">""</text>
+        <text x="180" y="42" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">a</text>
+        <text x="240" y="42" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">c</text>
+        <text x="300" y="42" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">e</text>
+
+        <text x="70" y="70" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">""</text>
+        <text x="70" y="106" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">a</text>
+        <text x="70" y="142" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor" opacity="0.6">b</text>
+        <text x="70" y="178" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">c</text>
+        <text x="70" y="214" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor" opacity="0.6">d</text>
+        <text x="70" y="250" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">e</text>
+
+        <g stroke="currentColor" stroke-opacity="0.15" fill="none">
+          <rect x="96" y="52" width="48" height="26"></rect><rect x="156" y="52" width="48" height="26"></rect>
+          <rect x="216" y="52" width="48" height="26"></rect><rect x="276" y="52" width="48" height="26"></rect>
+          <rect x="96" y="88" width="48" height="26"></rect>
+          <rect x="216" y="88" width="48" height="26"></rect><rect x="276" y="88" width="48" height="26"></rect>
+          <rect x="96" y="124" width="48" height="26"></rect><rect x="156" y="124" width="48" height="26"></rect>
+          <rect x="216" y="124" width="48" height="26"></rect><rect x="276" y="124" width="48" height="26"></rect>
+          <rect x="96" y="160" width="48" height="26"></rect><rect x="156" y="160" width="48" height="26"></rect>
+          <rect x="276" y="160" width="48" height="26"></rect>
+          <rect x="96" y="196" width="48" height="26"></rect><rect x="156" y="196" width="48" height="26"></rect>
+          <rect x="216" y="196" width="48" height="26"></rect><rect x="276" y="196" width="48" height="26"></rect>
+          <rect x="96" y="232" width="48" height="26"></rect><rect x="156" y="232" width="48" height="26"></rect>
+          <rect x="216" y="232" width="48" height="26"></rect>
+        </g>
+        <rect x="156" y="88" width="48" height="26" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-width="1.5"></rect>
+        <rect x="216" y="160" width="48" height="26" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-width="1.5"></rect>
+        <rect x="276" y="232" width="48" height="26" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F" stroke-width="1.8"></rect>
+
+        <text x="120" y="70" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="70" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="240" y="70" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="300" y="70" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+
+        <text x="120" y="106" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="106" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">1</text>
+        <text x="240" y="106" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="300" y="106" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+
+        <text x="120" y="142" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="142" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="240" y="142" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="300" y="142" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+
+        <text x="120" y="178" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="178" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="240" y="178" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">2</text>
+        <text x="300" y="178" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+
+        <text x="120" y="214" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="214" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="240" y="214" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="300" y="214" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+
+        <text x="120" y="250" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="180" y="250" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="240" y="250" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="300" y="250" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">3</text>
+
+        <text x="370" y="106" font-size="11" fill="#3AA79B">'a' matches 'a' → diagonal 0, plus 1 = 1</text>
+        <text x="370" y="142" font-size="11" fill="currentColor" opacity="0.6">'b' matches nothing → carry forward the best neighbour</text>
+        <text x="370" y="178" font-size="11" fill="#3AA79B">'c' matches 'c' → diagonal 1, plus 1 = 2</text>
+        <text x="370" y="214" font-size="11" fill="currentColor" opacity="0.6">'d' matches nothing → carry forward</text>
+        <text x="370" y="250" font-size="11" font-weight="600" fill="#D26A3F">'e' matches 'e' → diagonal 2, plus 1 = 3</text>
+
+        <line x1="14" y1="266" x2="866" y2="266" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="288" font-size="10.5" fill="currentColor" opacity="0.62">Three diagonal steps, one per matched character. The rows for 'b' and 'd' are copies of the row above — nothing was gained, and nothing was lost.</text>
+      </svg>
+    </div>
+    <figcaption>The three highlighted cells are the matches, and they lie on a staircase from top-left to bottom-right. Tracing that staircase backwards recovers the subsequence itself, which is how you answer the "return the string" follow-up.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>cell</th><th>chars compared</th><th>branch</th><th>computation</th><th class="num">value</th></tr></thead>
+      <tbody>
+        <tr><td class="num">(1,1)</td><td class="num">'a' vs 'a'</td><td>match</td><td><code>dp[0][0] + 1</code></td><td class="num">1</td></tr>
+        <tr><td class="num">(1,2)</td><td class="num">'a' vs 'c'</td><td>mismatch</td><td><code>max(dp[0][2], dp[1][1]) = max(0,1)</code></td><td class="num">1</td></tr>
+        <tr><td class="num">(2,1)</td><td class="num">'b' vs 'a'</td><td>mismatch</td><td><code>max(dp[1][1], dp[2][0]) = max(1,0)</code></td><td class="num">1</td></tr>
+        <tr><td class="num">(3,2)</td><td class="num">'c' vs 'c'</td><td>match</td><td><code>dp[2][1] + 1 = 1 + 1</code></td><td class="num">2</td></tr>
+        <tr><td class="num">(4,3)</td><td class="num">'d' vs 'e'</td><td>mismatch</td><td><code>max(dp[3][3], dp[4][2]) = max(2,2)</code></td><td class="num">2</td></tr>
+        <tr><td class="num">(5,3)</td><td class="num">'e' vs 'e'</td><td>match</td><td><code>dp[4][2] + 1 = 2 + 1</code></td><td class="num"><b>3</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why a match takes the diagonal and never considers the alternatives</span>When the two characters agree, pairing them is never worse than skipping either one — any subsequence that skips a matched pair can be rewritten to include it without getting shorter. So the maximum is unnecessary and <code>dp[i−1][j−1] + 1</code> is taken unconditionally. That exchange argument is worth being able to state, because interviewers ask why the match branch has no <code>max</code>.</div>
+</section>
+

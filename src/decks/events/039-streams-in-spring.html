@@ -1,0 +1,68 @@
+<!-- events 39 -->
+<section class="slide" data-sec="At scale" data-title="Streams in Spring">
+  <h2>Running and testing Streams inside a Spring Boot app</h2>
+  <p class="dek">Boot starts the topology for you; two features are worth knowing because they change what the application can offer.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Configuration and lifecycle</div>
+<pre><code class="language-java">@Configuration
+@EnableKafkaStreams                       // Boot builds and starts the StreamsBuilder
+class OrderStreamsConfig {                // NOT "StreamsConfig" — that name is taken
+                                          // by org.apache.kafka.streams.StreamsConfig
+    @Bean
+    KStream&lt;String, OrderPlaced&gt; topology(StreamsBuilder builder) { ... }
+}</code></pre>
+<pre style="margin-top:12px"><code class="language-yaml">spring.kafka.streams:
+  application-id: order-enrichment        # = consumer group AND state store namespace
+  properties:
+    processing.guarantee: exactly_once_v2   # EOS for Kafka-to-Kafka
+    num.standby.replicas: 1                 # warm failover for state
+    state.dir: /var/lib/streams             # MUST be a persistent volume
+    commit.interval.ms: 100
+    default.deserialization.exception.handler:
+      org.apache.kafka.streams.errors.LogAndContinueExceptionHandler</code></pre>
+      <div class="codelabel" style="margin-top:14px">Interactive queries — serve the state over HTTP</div>
+<pre><code class="language-java">@RestController
+class CustomerStatsController {
+    private final StreamsBuilderFactoryBean factory;
+
+    @GetMapping("/stats/{customerId}")
+    long orderCount(@PathVariable String customerId) {
+        var store = factory.getKafkaStreams().store(
+            StoreQueryParameters.fromNameAndType("orders-per-customer",
+                                                 QueryableStoreTypes.keyValueStore()));
+        return Optional.ofNullable(store.get(customerId)).orElse(0L);
+    }
+}
+// The state lives in THIS instance for the partitions it owns. For a full API you
+// must route to the instance that owns the key — Streams exposes that metadata.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">TopologyTestDriver — fast, no broker</div>
+<pre><code class="language-java">@Test
+void countsOrdersPerCustomer() {
+    var builder = new StreamsBuilder();
+    new OrderStreamsConfig().topology(builder);   // build the real topology
+
+    try (var driver = new TopologyTestDriver(builder.build(), props)) {
+        var in  = driver.createInputTopic("orders.order.placed.v1",
+                      new StringSerializer(), new JsonSerializer&lt;OrderPlaced&gt;());
+        var out = driver.createOutputTopic("analytics.customer.ordercount.v1",
+                      new StringDeserializer(), new LongDeserializer());
+
+        in.pipeInput("88421", orderFor("c-4410"));
+        in.pipeInput("88422", orderFor("c-4410"));
+
+        assertThat(out.readKeyValuesToMap()).containsEntry("c-4410", 2L);
+    }
+}
+// Milliseconds, deterministic, and it advances event time however you like.</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">State needs a persistent volume</span>Running a stateful Streams app on ephemeral pod storage means every restart rebuilds every store from its changelog. With a large store that is minutes of unavailability on each deploy. Use a StatefulSet with a volume, plus static membership so a rolling restart does not reassign tasks at all.</div>
+      <div class="note tip"><span class="lbl">Interactive queries: know the limit</span>They let a Streams app serve its own aggregates with no database — elegant, and it makes availability depend on the Streams rebalance state. For a customer-facing read API, projecting into PostgreSQL is usually the calmer choice.</div>
+    </div>
+  </div>
+</section>
+

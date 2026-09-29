@@ -1,0 +1,80 @@
+<!-- dsa · pattern 04 · mechanics -->
+<section class="slide" data-sec="04 · Binary search on sorted data" data-title="Mechanics">
+  <h2>Stop searching for a value; search for a boundary</h2>
+  <p class="dek">Most people learn binary search as "find the target, return −1 if absent", then rewrite it badly for every variant. Learn it once as <b>find the first index where a monotone predicate becomes true</b>, and equality, insert position, first occurrence, last occurrence and rotated arrays all become the same eight lines.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant — a half-open range</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Maintain <code>[l, r)</code>: left inclusive, right <b>exclusive</b>. Throughout the loop:</p>
+      <ul class="checks tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li>Every index below <code>l</code> is known <b>false</b>.</li>
+        <li>Every index at or above <code>r</code> is known <b>true</b>.</li>
+        <li>The boundary lies somewhere in <code>[l, r)</code>.</li>
+      </ul>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">When <code>l == r</code> the range is empty and the boundary is pinned: <code>l</code> <em>is</em> the answer. It needs no post-loop adjustment, which is where nearly all binary-search bugs live.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Start with <code>r = n</code>, not <code>n − 1</code>. That is deliberate: <code>n</code> is the legitimate answer meaning "no index satisfies the predicate", and it is exactly the insert position.</p>
+    </div>
+    <div class="panel">
+      <h3>The one precondition — monotonicity</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The predicate applied across the array must read <code>F F F F T T T</code>: once true, true forever. It flips exactly once.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">A sorted array gives this for free with <code>a[i] &gt;= target</code>. But the array is not what matters — the <em>predicate</em> is. That distinction is what lets the same eight lines work on input that is not sorted at all.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Before writing any binary search, state the predicate in words and check that it is monotone. If it is not, the loop will converge confidently on the wrong index.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 244" role="img" aria-label="Binary search as boundary finding: a monotone false-to-true predicate over the array, with the half-open invariant">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE PREDICATE IS MONOTONE — IT FLIPS EXACTLY ONCE</text>
+
+        <rect x="40" y="34" width="72" height="34" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="114" y="34" width="72" height="34" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="188" y="34" width="72" height="34" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="262" y="34" width="72" height="34" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="336" y="34" width="72" height="34" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.7"></rect>
+        <rect x="410" y="34" width="72" height="34" rx="4" fill="#3AA79B" fill-opacity="0.13" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="484" y="34" width="72" height="34" rx="4" fill="#3AA79B" fill-opacity="0.13" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="558" y="34" width="72" height="34" rx="4" fill="#3AA79B" fill-opacity="0.13" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+
+        <text x="76" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor" opacity="0.6">F</text>
+        <text x="150" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor" opacity="0.6">F</text>
+        <text x="224" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor" opacity="0.6">F</text>
+        <text x="298" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor" opacity="0.6">F</text>
+        <text x="372" y="56" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="#D26A3F">T</text>
+        <text x="446" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="#3AA79B">T</text>
+        <text x="520" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="#3AA79B">T</text>
+        <text x="594" y="56" text-anchor="middle" font-size="13" font-family="monospace" fill="#3AA79B">T</text>
+
+        <path d="M372 88 L372 74" stroke="#D26A3F" stroke-width="1.8" marker-end="url(#arwA)"></path>
+        <text x="372" y="106" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">the boundary — this is what we return</text>
+
+        <text x="40" y="132" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">everything here is discarded when mid is F</text>
+        <text x="500" y="132" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">discarded when mid is T — except mid itself</text>
+
+        <line x1="14" y1="148" x2="866" y2="148" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="168" font-size="11.5" font-weight="600" fill="currentColor">The two moves, and why they are asymmetric</text>
+        <rect x="14" y="178" width="420" height="52" rx="7" fill="#3AA79B" fill-opacity="0.09" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="28" y="196" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">predicate(mid) is TRUE  →  r = mid</text>
+        <text x="28" y="212" font-size="10.5" fill="currentColor" opacity="0.7">mid might BE the boundary, so it must stay in range.</text>
+        <text x="28" y="225" font-size="10.5" fill="currentColor" opacity="0.7">Writing r = mid − 1 here is how you lose the answer.</text>
+
+        <rect x="446" y="178" width="420" height="52" rx="7" fill="#D26A3F" fill-opacity="0.09" stroke="#D26A3F" stroke-opacity="0.55"></rect>
+        <text x="460" y="196" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">predicate(mid) is FALSE  →  l = mid + 1</text>
+        <text x="460" y="212" font-size="10.5" fill="currentColor" opacity="0.7">mid is definitively not the boundary, so exclude it.</text>
+        <text x="460" y="225" font-size="10.5" fill="currentColor" opacity="0.7">The +1 is what guarantees the range shrinks — no infinite loop.</text>
+      </svg>
+    </div>
+    <figcaption>The asymmetry is the whole template: <code>r = mid</code> keeps a possible answer, <code>l = mid + 1</code> discards a known non-answer. Every off-by-one in binary search comes from breaking one of these two lines.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The array is sorted, or is <b>locally reconstructible</b> as sorted — a rotated sorted array still has one sorted half at every midpoint, and a mountain array is monotone on each side of the peak.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>The predicate is not monotone. Searching an unsorted array for a value is O(n) with a hash set, not O(log n). Duplicates in a rotated array break the sorted-half test — when both ends and the midpoint are equal you cannot tell which side is ordered, and the worst case degrades to O(n).</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(log n)</b> time — the range halves every iteration, so at most ⌈log₂ n⌉ ≈ 17 steps for n = 10⁵. <b>O(1)</b> space when written iteratively. Always write it iteratively; recursion adds an O(log n) stack for nothing.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"sorted array"</b> plus <b>"O(log n) runtime"</b> (the problem naming the pattern outright) · <b>"first / last position of"</b> · <b>"insert position"</b> · <b>"rotated sorted array"</b> · <b>"find the minimum"</b> on rotated input · <b>"peak element"</b> · <b>"the array is guaranteed to have no duplicates"</b> — that guarantee exists precisely so the sorted-half test stays decidable.</div>
+</section>
+

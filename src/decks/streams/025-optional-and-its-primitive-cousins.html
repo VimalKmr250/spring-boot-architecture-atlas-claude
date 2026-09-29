@@ -1,0 +1,55 @@
+<!-- streams 25 -->
+<section class="slide" data-sec="Optional" data-title="Optional and its primitive cousins">
+  <h2>Optional is a return type that means "maybe nothing"</h2>
+  <p class="dek"><code>findFirst</code>, <code>findAny</code>, <code>min</code>, <code>max</code> and one-argument <code>reduce</code> return an <code>Optional</code>, because an empty stream has no answer. Used as intended, as a return type that makes the caller decide what "empty" means, it removes a class of <code>NullPointerException</code>s. Used as a field type, a parameter or a roundabout null check, it adds noise and new bugs.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The methods worth knowing, in use</div>
+<pre><code class="language-java">String email = customers.stream()
+        .filter(c -&gt; c.id().equals(id))
+        .findFirst()                                  // Optional&lt;Customer&gt;
+        .map(Customer::email)                         // Optional&lt;String&gt;
+        .orElseThrow(() -&gt; new CustomerNotFound(id));
+
+Optional&lt;Order&gt; big = orders.stream().filter(o -&gt; o.total() &gt; 1_000).findFirst();
+big.ifPresentOrElse(this::flag, () -&gt; log.info("no large orders"));   // 9
+
+// orElse always evaluates its argument; orElseGet only when empty
+Order a = big.orElse(repository.loadFallback());      // queries even when present
+Order b = big.orElseGet(repository::loadFallback);    // queries only when empty
+
+Optional&lt;String&gt; code = primary.or(() -&gt; secondary);  // an alternative Optional (9)
+List&lt;Order&gt; found = ids.stream().map(this::find)      // Stream&lt;Optional&lt;Order&gt;&gt;
+        .flatMap(Optional::stream).toList();           // keep the present ones (9)</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Group</th><th>Methods</th></tr></thead>
+        <tbody>
+          <tr><td>Create</td><td><code>of(x)</code> (throws on null) · <code>ofNullable(x)</code> · <code>empty()</code></td></tr>
+          <tr><td>Test</td><td><code>isPresent()</code> · <code>isEmpty()</code> <span class="tag a">11</span></td></tr>
+          <tr><td>Unwrap</td><td><code>get()</code> · <code>orElseThrow()</code> <span class="tag a">10</span> · <code>orElseThrow(supplier)</code> · <code>orElse(v)</code> · <code>orElseGet(supplier)</code></td></tr>
+          <tr><td>Act</td><td><code>ifPresent(consumer)</code> · <code>ifPresentOrElse(consumer, runnable)</code> <span class="tag a">9</span></td></tr>
+          <tr><td>Transform</td><td><code>map(f)</code> · <code>flatMap(f)</code> · <code>filter(p)</code> · <code>or(supplier)</code> <span class="tag a">9</span> · <code>stream()</code> <span class="tag a">9</span></td></tr>
+          <tr><td><code>OptionalInt</code> · <code>Long</code> · <code>Double</code></td><td><code>getAsInt()</code> and friends. No <code>map</code>, <code>flatMap</code>, <code>filter</code> or <code>or</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Mistake</th><th>What happens</th><th>Write instead</th></tr></thead>
+      <tbody>
+        <tr><td><code>opt.get()</code> with no check</td><td><code>NoSuchElementException: No value present</code></td><td><code>orElseThrow(() -&gt; new …(id))</code> with a message</td></tr>
+        <tr><td><code>Optional.of(maybeNull)</code></td><td><code>NullPointerException</code> on the null it was meant to handle</td><td><code>Optional.ofNullable</code></td></tr>
+        <tr><td><code>orElse(expensiveCall())</code></td><td>The call runs even when a value is present</td><td><code>orElseGet(this::expensiveCall)</code></td></tr>
+        <tr><td><code>if (opt.isPresent()) use(opt.get());</code></td><td>A null check with extra steps</td><td><code>opt.ifPresent(this::use)</code>, or <code>map</code> then <code>orElse</code></td></tr>
+        <tr><td>A method declared <code>Optional</code> that returns <code>null</code></td><td>Callers get the NPE that <code>Optional</code> promised they would not</td><td><code>return Optional.empty();</code></td></tr>
+        <tr><td><code>Optional</code> as a field, a parameter, or inside a collection</td><td>Not <code>Serializable</code>, an extra object per value, and a third state (null) besides present and empty</td><td>Nullable inside the class; <code>Optional</code> only as a return type</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

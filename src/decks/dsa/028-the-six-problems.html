@@ -1,0 +1,117 @@
+<!-- dsa · pattern 03 · problems -->
+<section class="slide" data-sec="03 · Fast/slow pointers" data-title="The six problems">
+  <h2>Six lists, four skeletons, one shared constraint</h2>
+  <p class="dek">Every one of these has an easy O(n)-space solution with a <code>HashSet</code> or an <code>ArrayList</code>. Say that solution out loud first — it shows you see the trade-off — then give the O(1)-space pointer version, which is what the problem is actually testing.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Skeleton</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">876</td><td><a href="https://leetcode.com/problems/middle-of-the-linked-list/" target="_blank" rel="noopener">Middle of the Linked List</a></td><td><span class="tag g">Easy</span></td><td>The bare two-speed loop. Start here.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">141</td><td><a href="https://leetcode.com/problems/linked-list-cycle/" target="_blank" rel="noopener">Linked List Cycle</a></td><td><span class="tag g">Easy</span></td><td>Same loop, but compare the two pointers after each move.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">142</td><td><a href="https://leetcode.com/problems/linked-list-cycle-ii/" target="_blank" rel="noopener">Linked List Cycle II</a></td><td><span class="tag w">Medium</span></td><td>Phase 2 and the identity <code>L = nC − k</code>. The meeting point is not the answer.</td><td>A + reset</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">19</td><td><a href="https://leetcode.com/problems/remove-nth-node-from-end-of-list/" target="_blank" rel="noopener">Remove Nth Node From End of List</a></td><td><span class="tag w">Medium</span></td><td>Fixed gap, not two speeds. The dummy node removes the edge case.</td><td>B</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">160</td><td><a href="https://leetcode.com/problems/intersection-of-two-linked-lists/" target="_blank" rel="noopener">Intersection of Two Linked Lists</a></td><td><span class="tag g">Easy</span></td><td>Swap heads at the end to cancel the length difference.</td><td>C</td><td class="num">O(n+m) / O(1)</td></tr>
+        <tr><td class="num">234</td><td><a href="https://leetcode.com/problems/palindrome-linked-list/" target="_blank" rel="noopener">Palindrome Linked List</a></td><td><span class="tag g">Easy</span></td><td>Composite: find the middle, reverse the tail, compare. Easy tag, Medium content.</td><td>A + D</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 142 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Walk the list putting every node into a <code>HashSet</code>; the first node already present is the entrance. O(n) time, O(n) space, and completely correct — offer it first.</dd>
+          <dt>The constraint</dt><dd>The follow-up asks for O(1) space, which rules the set out and forces the pointer argument.</dd>
+          <dt>Phase 1</dt><dd>Two speeds guarantee a meeting somewhere inside the cycle. That point depends on L and C and is <em>not</em> the entrance.</dd>
+          <dt>Phase 2</dt><dd>From <code>2(L + k) = L + k + nC</code> you get <code>L = nC − k</code>: the head-to-entrance distance equals the meeting-point-to-entrance distance. Walk both at speed one and they collide there.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 142 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public ListNode detectCycle(ListNode head) {
+        ListNode slow = head, fast = head;
+
+        while (fast != null &amp;&amp; fast.next != null) {
+            slow = slow.next;
+            fast = fast.next.next;
+
+            if (slow == fast) {          // PHASE 1 · a meeting exists
+                ListNode p = head;
+
+                // PHASE 2 · L = nC - k, so both walk L steps
+                // and land together on the entrance.
+                while (p != slow) {
+                    p = p.next;
+                    slow = slow.next;
+                }
+                return p;
+            }
+        }
+        return null;                     // fast ran off the end: no cycle
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 234 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Copy the values into an <code>ArrayList</code> and check it with two pointers. O(n) time, O(n) space, three lines. Always say this first.</dd>
+          <dt>The constraint</dt><dd>O(1) space. You cannot index a list, and you cannot walk it backwards — so make a piece of it point backwards.</dd>
+          <dt>The decomposition</dt><dd>Three known sub-procedures, in order: find the middle (skeleton A), reverse from the middle (skeleton D), then walk the two halves in step. Naming the three parts before coding is what makes this tractable under pressure.</dd>
+          <dt>Why the odd case is free</dt><dd>With an odd length the middle node ends up in both halves, and comparing it against itself always succeeds. No special case is needed — which surprises most people.</dd>
+          <dt>The professional touch</dt><dd>Mention that this mutates the input, and that a production version would reverse the second half back before returning. Interviewers notice.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 234 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public boolean isPalindrome(ListNode head) {
+        // 1 · middle — skeleton A
+        ListNode slow = head, fast = head;
+        while (fast != null &amp;&amp; fast.next != null) {
+            slow = slow.next;
+            fast = fast.next.next;
+        }
+
+        // 2 · reverse from the middle onwards — skeleton D
+        ListNode prev = null;
+        while (slow != null) {
+            ListNode next = slow.next;
+            slow.next = prev;
+            prev = slow;
+            slow = next;
+        }
+
+        // 3 · walk both halves. `prev` heads the reversed tail,
+        //     which is the SHORTER half, so it controls the loop.
+        ListNode a = head, b = prev;
+        while (b != null) {
+            if (a.val != b.val) return false;
+            a = a.next;
+            b = b.next;
+        }
+        return true;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>876 · Middle of the Linked List <span class="tag a">skeleton A</span></h4><p><b>Path:</b> the obvious solution counts the length, then walks half of it — two passes. The two-speed loop does it in one without ever knowing the length.</p><p><b>Delta:</b> skeleton A verbatim, returning <code>slow</code>. The problem asks for the <em>second</em> middle on even lengths, which is exactly what <code>fast = head</code> gives; starting <code>fast = head.next</code> would give the first.</p><p><b>Watch for:</b> this is the sub-procedure inside 234, and inside any routine that has to split a list in half. Make it automatic.</p></div>
+
+    <div class="card"><h4>141 · Linked List Cycle <span class="tag a">skeleton A</span></h4><p><b>Path:</b> a <code>HashSet</code> of visited nodes is the natural first answer, O(n) space. The follow-up forces O(1).</p><p><b>Delta:</b> skeleton A with an identity comparison after each move. Compare with <code>==</code> on references, not <code>.val</code> — two distinct nodes can hold the same value.</p><p><b>Watch for:</b> the loop guard must test <code>fast</code> before <code>fast.next</code>. Reversing those two terms throws on any list of even length with no cycle.</p></div>
+
+    <div class="card"><h4>19 · Remove Nth Node From End <span class="tag a">skeleton B</span></h4><p><b>Path:</b> the two-pass version measures the length, then walks <code>len − n</code> nodes. Perfectly correct; the follow-up asks for one pass, which is the fixed-gap idea.</p><p><b>Delta:</b> gap, not speed. Advance <code>fast</code> by <code>n</code>, then move both until <code>fast.next == null</code>, leaving <code>slow</code> on the node <em>before</em> the target.</p><p><b>Watch for:</b> without the dummy, removing the head needs its own branch. With it, the code is uniform — and you must return <code>dummy.next</code>, not <code>head</code>.</p></div>
+
+    <div class="card"><h4>160 · Intersection of Two Linked Lists <span class="tag a">skeleton C</span></h4><p><b>Path:</b> the explicit version measures both lengths, advances the longer list by the difference, then walks in step. Correct, and worth describing — the head-swap is just that idea written in four lines.</p><p><b>Delta:</b> when a pointer runs off its list, send it to the <em>other</em> head. Both then cover <code>lenA + lenB</code> and arrive together.</p><p><b>Watch for:</b> the no-intersection case terminates because both hit <code>null</code> on the same step and <code>null == null</code> ends the loop. Do not add a guard for it — the guard is what breaks it.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>142</b> and <b>234</b>. 142 is the one piece of algebra here, and phase 2 is the half people get backwards; 234 is the composite that proves you can chain three list procedures without losing a pointer.</div>
+</section>
+

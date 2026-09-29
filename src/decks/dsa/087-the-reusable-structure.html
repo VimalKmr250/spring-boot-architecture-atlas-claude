@@ -1,0 +1,113 @@
+<!-- dsa · pattern 15 · structure -->
+<section class="slide" data-sec="15 · Tree DFS" data-title="The reusable structure">
+  <h2>Three shapes: pure return, return plus record, and path backtracking</h2>
+  <p class="dek">Decide which shape the problem needs before writing anything. The choice is forced by one question — can the parent extend this answer, or is it complete at this node?</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Shape A · pure return (LC 104, 226, 112)</div>
+<pre><code class="language-java">// The returned value IS the answer for that subtree, so there is
+// no field and no accumulation. Three lines: base, recurse, combine.
+
+// CONTRACT: the height of the subtree rooted here.
+int maxDepth(TreeNode node) {
+    if (node == null) return 0;                       // identity for max
+    return 1 + Math.max(maxDepth(node.left), maxDepth(node.right));
+}
+
+// CONTRACT: this subtree, mirrored, and returns its new root.
+TreeNode invert(TreeNode node) {
+    if (node == null) return null;
+    TreeNode l = invert(node.left);
+    node.left  = invert(node.right);
+    node.right = l;                                   // save before overwrite
+    return node;
+}
+
+// CONTRACT: does a root-to-LEAF path from here sum to `target`?
+boolean hasPathSum(TreeNode node, int target) {
+    if (node == null) return false;                   // NOT a leaf — false
+
+    // A leaf has no children. Testing node == null instead would
+    // accept a single-child node as if it were a leaf.
+    if (node.left == null &amp;&amp; node.right == null) return target == node.val;
+
+    int rest = target - node.val;
+    return hasPathSum(node.left, rest) || hasPathSum(node.right, rest);
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Shape B · return one thing, record another (LC 124, 543)</div>
+<pre><code class="language-java">// Used whenever a path may BEND at a node. The bent path is complete
+// there, so it is banked in a field; the function returns the best
+// single downward branch, which the parent can still extend.
+private int best;
+
+int maxPathSum(TreeNode root) {
+    best = Integer.MIN_VALUE;     // values may all be negative
+    gain(root);
+    return best;
+}
+
+/** CONTRACT: the best sum of a path going DOWN from node, or 0. */
+private int gain(TreeNode node) {
+    if (node == null) return 0;
+
+    // Clamp at 0: a negative branch is better left unused.
+    int l = Math.max(0, gain(node.left));
+    int r = Math.max(0, gain(node.right));
+
+    // RECORD the path that bends here — it uses BOTH branches,
+    // so no parent can extend it.
+    best = Math.max(best, node.val + l + r);
+
+    // RETURN a single branch, which the parent CAN extend.
+    return node.val + Math.max(l, r);
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Shape C · path backtracking (LC 113)</div>
+<pre><code class="language-java">// When the problem wants the paths themselves, carry a mutable
+// list down the recursion and UNDO the addition on the way out.
+List&lt;List&lt;Integer&gt;&gt; pathSum(TreeNode root, int target) {
+    List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+    dfs(root, target, new ArrayList&lt;&gt;(), out);
+    return out;
+}
+
+private void dfs(TreeNode node, int remaining,
+                 List&lt;Integer&gt; path, List&lt;List&lt;Integer&gt;&gt; out) {
+    if (node == null) return;
+
+    path.add(node.val);                       // choose
+
+    if (node.left == null &amp;&amp; node.right == null &amp;&amp; remaining == node.val) {
+        // COPY — `path` keeps mutating after this call returns.
+        out.add(new ArrayList&lt;&gt;(path));
+    } else {
+        dfs(node.left,  remaining - node.val, path, out);
+        dfs(node.right, remaining - node.val, path, out);
+    }
+
+    path.remove(path.size() - 1);             // UNDO — the whole trick
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Choosing the shape</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Ask first</dt><dd>"Can my parent use what I return?" If yes, shape A. If the answer might bend at this node, shape B. If you need the path contents, shape C.</dd>
+          <dt>Base case</dt><dd>The identity of your combine operation: 0 for sums and depths, <code>false</code> for existence, <code>null</code> for structure.</dd>
+          <dt>Leaf test</dt><dd><code>node.left == null &amp;&amp; node.right == null</code>. A null check alone is <em>not</em> a leaf test, and that confusion is what breaks LC 112 on single-child chains.</dd>
+          <dt>Field or parameter</dt><dd>A field is simplest for the recorded value. An <code>int[1]</code> works too if you dislike fields — Java has no by-reference ints.</dd>
+          <dt>Copy on collect</dt><dd>Always <code>new ArrayList&lt;&gt;(path)</code>. Adding the live list stores a reference that keeps changing.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Returning the bent path</b> — the parent then builds an invalid path that visits a node twice, and the answer comes out too large. <b>Treating null as a leaf</b> — a node with one child looks like a leaf, so LC 112 accepts paths that stop mid-tree. <b>Forgetting to undo in shape C</b> — the path list grows without bound and every collected result is wrong.</div>
+    </div>
+  </div>
+</section>
+

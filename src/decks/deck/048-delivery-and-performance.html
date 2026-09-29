@@ -1,0 +1,40 @@
+<!-- deck 48 -->
+<section class="slide" data-sec="Frontend" data-title="Delivery and performance">
+  <h2>Delivery: the parts users actually feel</h2>
+  <p class="dek">Enterprise frontends are rarely slow because of framework choice. They are slow because of bundle discipline, waterfalls and cache headers — all of which are architecture decisions, not tuning.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Caching strategy, in two lines of config</h3>
+<pre style="margin-top:6px"><code class="language-yaml">/index.html        Cache-Control: no-cache          # always revalidated
+/*.[contenthash].js Cache-Control: public, max-age=31536000, immutable</code></pre>
+      <p>Hashed assets are immutable and cached for a year; the tiny HTML entry point is revalidated on every load. A deploy is then instantly live with zero stale-bundle incidents.</p>
+    </div>
+    <div class="card">
+      <h3>Kill the waterfall</h3>
+      <p>The classic enterprise pattern — load shell, then call <code>/me</code>, then call <code>/permissions</code>, then call the page data — costs four sequential round trips before anything renders. On a 200 ms RTT that is 800 ms of blank screen.</p>
+      <p>Fix: the BFF returns bootstrap data with the first request, and route resolvers fire in parallel.</p>
+    </div>
+    <div class="card">
+      <h3>Budgets, enforced in CI</h3>
+<pre style="margin-top:6px"><code class="language-json">"budgets": [
+  { "type": "initial", "maximumError": "500kb" },
+  { "type": "anyComponentStyle", "maximumError": "8kb" }
+]</code></pre>
+      <p>A budget that fails the build is the only thing that stops gradual bundle creep. Add a Lighthouse CI check on the three routes that matter.</p>
+    </div>
+    <div class="card">
+      <h3>What to measure</h3>
+      <dl class="kv">
+        <dt>LCP</dt><dd>largest content painted — target &lt; 2.5 s at p75, on real user data</dd>
+        <dt>INP</dt><dd>responsiveness to interaction — &lt; 200 ms; where heavy tables fail</dd>
+        <dt>CLS</dt><dd>layout shift — reserve space for images and async content</dd>
+        <dt>TTFB</dt><dd>your BFF's p95; the part your backend actually controls</dd>
+      </dl>
+      <p style="margin-top:2px">Collect from real users (RUM), not only from lab runs on a developer laptop.</p>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Accessibility is not a phase</span>In enterprise procurement it is a contractual requirement (WCAG 2.2 AA, VPAT). Retrofitting it into a finished component library costs several times what building it in does: keyboard paths, focus management on route change, labelled controls, live regions for async results, and contrast that survives your dark theme.</div>
+</section>
+

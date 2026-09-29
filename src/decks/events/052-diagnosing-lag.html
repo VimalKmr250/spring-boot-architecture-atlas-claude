@@ -1,0 +1,43 @@
+<!-- events 52 -->
+<section class="slide" data-sec="Operations" data-title="Diagnosing lag">
+  <h2>Consumer lag is climbing — the diagnostic order</h2>
+  <p class="dek">Six checks, cheapest first. The mistake is scaling consumers before knowing which of these it is, which usually makes the problem worse by triggering a rebalance.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Check</th><th>If yes</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Is lag on <b>all</b> partitions or one?</td><td>One → hot key or a stuck consumer. Do not scale; find that partition</td></tr>
+        <tr><td>2</td><td>Did producer volume jump?</td><td>A legitimate spike — scale out, or let the buffer absorb it if time-to-drain is acceptable</td></tr>
+        <tr><td>3</td><td>Is the rebalance rate elevated?</td><td>The group is thrashing. Look at <code>max.poll.interval</code> vs handler duration, and pod restarts</td></tr>
+        <tr><td>4</td><td>Has handler latency risen?</td><td>A downstream dependency slowed. Fix there; the consumer is a symptom</td></tr>
+        <tr><td>5</td><td>Are consumers at the partition count already?</td><td>You cannot scale further without adding partitions — make handling cheaper instead</td></tr>
+        <tr><td>6</td><td>Are errors and retries up?</td><td>Retries multiply effective processing time. Check the DLT and the retry topics</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The commands to run first</div>
+<pre><code class="language-yaml"># Lag per partition — the single most useful command
+kafka-consumer-groups.sh --bootstrap-server $B --describe --group inventory
+#  TOPIC   PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG   CONSUMER-ID
+#  orders  0          918224          918230          6     consumer-1-a3f…
+#  orders  7          901003          962847          61844 consumer-4-9cd…   ← here
+
+# Is anything consuming at all?
+kafka-consumer-groups.sh --bootstrap-server $B --describe --group inventory --members
+
+# What is that consumer's thread actually doing?
+curl -s localhost:8081/actuator/threaddump | jq '.threads[]
+  | select(.threadName | contains("KafkaConsumer")) | {threadName, threadState}'</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">A consumer with no member id</span>If <code>--describe</code> shows lag but the CONSUMER-ID column is empty, nothing is consuming that partition — the group has no live member for it. That is a dead or unstarted consumer, not a slow one, and scaling will not help.</div>
+      <div class="note tip"><span class="lbl">The fastest real fix, usually</span>Switch to a <b>batch listener with a bulk write</b>. Five hundred individual inserts become one statement, and a consumer that handled 2,000/s handles 20,000/s with no new infrastructure and no partition change. Check this before adding pods.</div>
+      <div class="note bad"><span class="lbl">Do not raise <code>max.poll.interval.ms</code> to stop rebalances</span>It hides a slow handler and delays detection of genuinely dead consumers. Reduce <code>max.poll.records</code> so a poll's work finishes quickly instead.</div>
+    </div>
+  </div>
+</section>
+

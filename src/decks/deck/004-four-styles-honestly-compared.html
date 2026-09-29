@@ -1,0 +1,35 @@
+<!-- deck 04 -->
+<section class="slide" data-sec="Foundations" data-title="Four styles, honestly compared">
+  <h2>The four styles that actually ship</h2>
+  <p class="dek">Everything else is a variation. The question is never "which is best" — it is which failure you would rather have: a tangled codebase, or a distributed system you cannot debug.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Style</th><th>Boundaries enforced by</th><th>Wins when</th><th>Breaks when</th></tr></thead>
+      <tbody>
+        <tr><td>Layered monolith</td><td>Convention only</td><td>&lt; 8 engineers, one domain, speed beats structure</td><td>Two teams edit the same service class daily</td></tr>
+        <tr><td>Modular monolith</td><td>Compiler + ArchUnit + Modulith</td><td>10–60 engineers, one domain, one release train</td><td>Modules need genuinely different scaling or SLAs</td></tr>
+        <tr><td>Service-based</td><td>Network, shared database</td><td>You need independent scaling before independent data</td><td>The shared schema becomes the coupling everyone fights</td></tr>
+        <tr><td>Microservices</td><td>Network + private data store</td><td>Many teams, divergent SLAs, real autonomy needed</td><td>Domain is still moving, or you lack platform engineering</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card accent">
+      <h3>The default recommendation</h3>
+      <p>Start as a modular monolith with genuinely enforced boundaries. It gives you the one thing microservices cannot: <b>cheap boundary changes</b>. Getting a boundary wrong is normal; getting it wrong across a network costs a quarter.</p>
+    </div>
+    <div class="card">
+      <h3>Extract a service when you can name the reason</h3>
+      <ul class="tight">
+        <li><b>Scaling:</b> one module needs 20× the instances of the rest.</li>
+        <li><b>SLA:</b> checkout must stay up while reporting is being redeployed.</li>
+        <li><b>Team:</b> a team with its own release cadence is blocked by the train.</li>
+        <li><b>Compliance:</b> PCI or PII scope you want physically isolated.</li>
+      </ul>
+      <p style="margin-top:2px">"It felt too big" is not on this list.</p>
+    </div>
+  </div>
+</section>
+

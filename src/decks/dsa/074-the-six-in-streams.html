@@ -1,0 +1,168 @@
+<!-- dsa · pattern 12 · streams -->
+<section class="slide" data-sec="12 · Intervals" data-title="The six, in streams">
+  <h2>Sort once; after that, a merge is a collect and a greedy is a fold</h2>
+  <p class="dek">Every interval problem starts with a sort, and <code>sorted()</code> handles that. What follows is one of two things. A merge (56) either appends or extends, which is a mutable reduction, and its combiner is the same rule, so it is even safe in parallel. A greedy walk (253, 435, 452) carries one end point, which <code>Stream.iterate</code> folds over the sorted array. 57 needs no sort at all: three filters split the list around the new interval.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">56</td><td><a href="https://leetcode.com/problems/merge-intervals/" target="_blank" rel="noopener">Merge Intervals</a></td><td>Sort by start, then <code>collect</code> into a list where each interval extends the last one or starts a new one. The combiner applies the same rule.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">57</td><td><a href="https://leetcode.com/problems/insert-interval/" target="_blank" rel="noopener">Insert Interval</a></td><td>Three filters: the intervals entirely left, the overlapping ones collapsed into one min/max interval, and those entirely right.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">252</td><td><a href="https://leetcode.com/problems/meeting-rooms/" target="_blank" rel="noopener">Meeting Rooms</a></td><td>Sort, then <code>allMatch</code> each meeting against the one before it.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log n) / O(1)</td></tr>
+        <tr><td class="num">253</td><td><a href="https://leetcode.com/problems/meeting-rooms-ii/" target="_blank" rel="noopener">Meeting Rooms II</a></td><td>Sorted starts and ends, walked in time order by an <code>(i, j, rooms)</code> record.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">435</td><td><a href="https://leetcode.com/problems/non-overlapping-intervals/" target="_blank" rel="noopener">Non-overlapping Intervals</a></td><td>Sort by end, then fold an <code>(end, kept)</code> record: keep whatever starts at or after the last kept end.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log n) / O(1)</td></tr>
+        <tr><td class="num">452</td><td><a href="https://leetcode.com/problems/minimum-number-of-arrows-to-burst-balloons/" target="_blank" rel="noopener">Minimum Number of Arrows to Burst Balloons</a></td><td>The same fold with <code>&gt;</code>, since touching balloons share an arrow, and a <code>long</code> end so that −2³¹ is safe.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 56 · Merge Intervals · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[][] merge(int[][] intervals) {
+        // Sort by start, then collect: each interval extends
+        // the last one or starts a new one. The combiner is the
+        // same rule applied to a whole list: parallel-safe.
+        return Arrays.stream(intervals)
+                .sorted(Comparator.comparingInt(iv -&gt; iv[0]))
+                .collect(ArrayList&lt;int[]&gt;::new, Solution::add,
+                         (a, b) -&gt; b.forEach(iv -&gt; add(a, iv)))
+                .toArray(int[][]::new);
+    }
+
+    static void add(List&lt;int[]&gt; out, int[] iv) {
+        int[] last = out.isEmpty() ? null
+                                   : out.get(out.size() - 1);
+        if (last != null &amp;&amp; iv[0] &lt;= last[1])
+            last[1] = Math.max(last[1], iv[1]);
+        else
+            out.add(new int[]{ iv[0], iv[1] });   // a copy
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 57 · Insert Interval · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[][] insert(int[][] intervals,
+                          int[] newInterval) {
+        int s = newInterval[0], e = newInterval[1];
+        // No sort: the list is already sorted. Everything that
+        // touches [s, e] collapses into one interval.
+        IntSummaryStatistics lo = Arrays.stream(intervals)
+                .filter(iv -&gt; iv[1] &gt;= s &amp;&amp; iv[0] &lt;= e)
+                .mapToInt(iv -&gt; iv[0]).summaryStatistics();
+        IntSummaryStatistics hi = Arrays.stream(intervals)
+                .filter(iv -&gt; iv[1] &gt;= s &amp;&amp; iv[0] &lt;= e)
+                .mapToInt(iv -&gt; iv[1]).summaryStatistics();
+        int[] merged = { Math.min(s, lo.getMin()),
+                         Math.max(e, hi.getMax()) };
+        // Entirely left, the merged one, entirely right.
+        return Stream.of(
+                    Arrays.stream(intervals)
+                            .filter(iv -&gt; iv[1] &lt; s),
+                    Stream.of(merged),
+                    Arrays.stream(intervals)
+                            .filter(iv -&gt; iv[0] &gt; e))
+                .flatMap(part -&gt; part)
+                .toArray(int[][]::new);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 252 · Meeting Rooms · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean canAttendMeetings(int[][] intervals) {
+        int[][] s = Arrays.stream(intervals)
+                .sorted(Comparator.comparingInt(iv -&gt; iv[0]))
+                .toArray(int[][]::new);
+        // Sorted by start, only neighbours can clash.
+        return IntStream.range(1, s.length)
+                .allMatch(i -&gt; s[i - 1][1] &lt;= s[i][0]);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 253 · Meeting Rooms II · clean</div>
+<pre><code class="language-java">class Solution {
+    // starts and ends consumed so far; the most rooms in use
+    record Sweep(int i, int j, int rooms) {}
+
+    public int minMeetingRooms(int[][] intervals) {
+        int n = intervals.length;
+        int[] start = Arrays.stream(intervals)
+                .mapToInt(iv -&gt; iv[0]).sorted().toArray();
+        int[] end = Arrays.stream(intervals)
+                .mapToInt(iv -&gt; iv[1]).sorted().toArray();
+        // Walk both lists in time order. An end at or before
+        // the next start frees its room, so it goes first.
+        return Stream.iterate(new Sweep(0, 0, 0), s -&gt;
+                        s.j() &lt; n &amp;&amp; end[s.j()] &lt;= start[s.i()]
+                        ? new Sweep(s.i(), s.j() + 1, s.rooms())
+                        : new Sweep(s.i() + 1, s.j(), Math.max(
+                                s.rooms(), s.i() + 1 - s.j())))
+                .filter(s -&gt; s.i() == n)
+                .findFirst().get().rooms();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 435 · Non-overlapping Intervals · clean</div>
+<pre><code class="language-java">class Solution {
+    // the greedy's whole state: index, last kept end, kept
+    record Keep(int i, int end, int kept) {
+        Keep next(int[] iv) {
+            return iv[0] &gt;= end
+                    ? new Keep(i + 1, iv[1], kept + 1)
+                    : new Keep(i + 1, end, kept);
+        }
+    }
+
+    public int eraseOverlapIntervals(int[][] intervals) {
+        // Earliest end first leaves the most room for the rest.
+        int[][] byEnd = Arrays.stream(intervals)
+                .sorted(Comparator.comparingInt(iv -&gt; iv[1]))
+                .toArray(int[][]::new);
+        Keep seed = new Keep(0, Integer.MIN_VALUE, 0);
+        int kept = Stream.iterate(seed,
+                                  k -&gt; k.next(byEnd[k.i()]))
+                .skip(byEnd.length)          // exactly n steps
+                .findFirst().get().kept();
+        return intervals.length - kept;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 452 · Minimum Number of Arrows to Burst Balloons · clean</div>
+<pre><code class="language-java">class Solution {
+    // index, where the last arrow went, arrows so far
+    record Shot(int i, long at, int arrows) {
+        Shot next(int[] b) {
+            return b[0] &gt; at              // touching still pops
+                    ? new Shot(i + 1, b[1], arrows + 1)
+                    : new Shot(i + 1, at, arrows);
+        }
+    }
+
+    public int findMinArrowShots(int[][] points) {
+        // Shoot at each balloon's end, in order of end. The
+        // seed is long: a balloon may start at -2^31 itself.
+        int[][] byEnd = Arrays.stream(points)
+                .sorted(Comparator.comparingInt(p -&gt; p[1]))
+                .toArray(int[][]::new);
+        return Stream.iterate(new Shot(0, Long.MIN_VALUE, 0),
+                              s -&gt; s.next(byEnd[s.i()]))
+                .skip(byEnd.length)
+                .findFirst().get().arrows();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">A merge has a real combiner</span>The rule that folds one interval into a merged list also folds a whole merged list into another: add each of <code>b</code>'s intervals to <code>a</code> in turn. That makes 56's <code>collect</code> a genuine mutable reduction, correct even in parallel, and the harness checks it with <code>.parallel()</code>. It is the rare case where the stream version is strictly more general than the loop.</div>
+  <div class="note warn"><span class="lbl">Sorting a copy costs O(n) space</span><code>Arrays.stream(intervals).sorted(…)</code> sorts a copy. That is why the space column says O(n) where the loop says O(1): the loop sorts the input in place. Say so if space comes up, or call <code>Arrays.sort</code> in place first and stream the array that is already sorted.</div>
+</section>
+
+

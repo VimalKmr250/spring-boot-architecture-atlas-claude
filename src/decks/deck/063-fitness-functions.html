@@ -1,0 +1,39 @@
+<!-- deck 63 -->
+<section class="slide" data-sec="Scale &amp; governance" data-title="Fitness functions">
+  <h2>Evolutionary architecture: make the rules executable</h2>
+  <p class="dek">A fitness function is any automated check that an architectural property still holds. It is the difference between architecture as a decision and architecture as a description of what the code happened to become.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Property you care about</th><th>Fitness function</th><th>Runs</th></tr></thead>
+      <tbody>
+        <tr><td>Modules do not reach into each other's internals</td><td>ArchUnit slice rules + <code>ApplicationModules.verify()</code></td><td>Every build</td></tr>
+        <tr><td>The domain stays framework-free</td><td>ArchUnit: no Spring or JPA imports under <code>..domain..</code></td><td>Every build</td></tr>
+        <tr><td>No module reads another's tables</td><td>A database role per module, granted only its own schema</td><td>Every integration test</td></tr>
+        <tr><td>The API does not break consumers</td><td><code>oasdiff</code> against main; schema-registry BACKWARD compatibility</td><td>Every PR</td></tr>
+        <tr><td>Hot endpoints stay free of N+1</td><td>Query-count assertions on the top three endpoints</td><td>Every build</td></tr>
+        <tr><td>Checkout stays within its latency budget</td><td>A performance test with a p95 threshold that fails the pipeline</td><td>Nightly</td></tr>
+        <tr><td>No known-vulnerable dependencies ship</td><td>CVE scan with a severity gate</td><td>Every build</td></tr>
+        <tr><td>Startup stays fast enough to roll back quickly</td><td>Assert boot time under a threshold in an integration test</td><td>Nightly</td></tr>
+        <tr><td>Nothing writes personal data to logs</td><td>A test scanning log output for <code>@Pii</code>-annotated field values</td><td>Every build</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>How to introduce them into an existing codebase</h3>
+      <ol class="tight">
+        <li><b>Baseline, do not block.</b> Record today's violations in a file; fail the build only on <em>new</em> ones.</li>
+        <li><b>Ratchet.</b> Every sprint, remove a few from the baseline. The number only ever goes down.</li>
+        <li><b>Add one per repeated review comment.</b> If a reviewer catches the same mistake twice, that is a missing fitness function, not a missing reviewer.</li>
+      </ol>
+      <p style="margin-top:4px">A big-bang "turn on all the rules" attempt produces 400 failures on day one and gets disabled by day three.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note good"><span class="lbl">The reframing worth carrying</span>Architecture is not the diagram — it is the set of properties you are defending. A property nobody measures is a preference. A property with a failing build behind it is a constraint, and constraints are what actually survive delivery pressure.</div>
+      <div class="note tip"><span class="lbl">Good interview material</span>"How do you stop a modular monolith degrading?" answered with three named, executable checks and a ratcheting strategy is a much stronger answer than "code reviews and discipline" — because the interviewer has watched discipline lose to a deadline before.</div>
+    </div>
+  </div>
+</section>
+

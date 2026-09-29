@@ -1,0 +1,36 @@
+<!-- events 04 -->
+<section class="slide" data-sec="Foundations" data-title="Event shapes">
+  <h2>Three event shapes — thin, fat, and delta</h2>
+  <p class="dek">The single most consequential design choice per topic. It decides whether consumers can work independently, how much your payloads cost, and how badly a schema change hurts.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">1 · Notification (thin) — "something happened, go look"</div>
+<pre><code class="language-json">{ "eventId": "9c1f…", "type": "OrderPlaced", "orderId": "88421",
+  "occurredAt": "2026-09-16T01:12:04Z" }</code></pre>
+      <div class="codelabel" style="margin-top:12px">2 · Event-carried state transfer (fat) — "here is what it looks like now"</div>
+<pre><code class="language-json">{ "eventId": "9c1f…", "type": "OrderPlaced", "version": 1,
+  "orderId": "88421", "customerId": "c-4410",
+  "lines": [ { "sku": "SKU-8842", "qty": 2, "unitMinor": 1999 } ],
+  "totalMinor": 3998, "currency": "GBP",
+  "shipTo": { "country": "GB", "postcode": "EC2…" },
+  "occurredAt": "2026-09-16T01:12:04Z" }</code></pre>
+      <div class="codelabel" style="margin-top:12px">3 · Delta — "this is what changed"</div>
+<pre><code class="language-json">{ "eventId": "a71b…", "type": "OrderAddressChanged", "orderId": "88421",
+  "changed": { "shipTo.postcode": { "from": "EC2A 1AA", "to": "EC1V 9BW" } } }</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Which to choose</h3>
+        <dl class="kv">
+          <dt>Thin</dt><dd>Small, stable, leaks nothing. But every consumer calls back to the producer — so the producer's availability and rate limits become everyone's problem, and you have reinvented request-response with extra steps.</dd>
+          <dt>Fat</dt><dd><b>The enterprise default.</b> Consumers are genuinely independent and can be replayed. Costs payload size, and the schema is now a contract with people you cannot name.</dd>
+          <dt>Delta</dt><dd>Compact and precise, but consumers must have seen every prior event to make sense of it — ordering and completeness become mandatory rather than desirable.</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">The fat-event tax</span>Everything in the payload is now a published contract. Put a field in because one consumer asked, and you can never remove it. Publish only what the <em>event</em> means, not a database row dump — and never include fields a consumer should not see: a fat event is a data-sharing decision as much as a technical one.</div>
+      <div class="note tip"><span class="lbl">The hybrid that works</span>Fat event with the fields consumers actually need, plus a <code>self</code> link for the full resource. Common consumers stay independent; the rare one that needs everything can fetch it.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,53 @@
+<!-- springboot 46 -->
+<section class="slide" data-sec="Production" data-title="Metrics">
+  <h2>Micrometer: four instrument types, one cardinality rule</h2>
+  <p class="dek">Boot instruments HTTP, JDBC, Hikari, Kafka and the JVM automatically. What you add is business measurement — and the failure mode of adding it carelessly is taking down your monitoring stack.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The instruments, and when each is right</div>
+<pre><code class="language-java">@Service
+class OrderMetrics {
+    private final Counter placed;
+    private final Timer   checkout;
+    private final DistributionSummary basketSize;
+
+    OrderMetrics(MeterRegistry registry, OrderRepository orders) {
+        // COUNTER — monotonically increasing events
+        placed = Counter.builder("orders.placed")
+                .description("Orders successfully placed")
+                .tag("channel", "web")
+                .register(registry);
+
+        // TIMER — duration + count + percentiles
+        checkout = Timer.builder("orders.checkout.duration")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()      // enables server-side aggregation
+                .register(registry);
+
+        // GAUGE — a value sampled now. Holds a weak reference: keep the object alive.
+        Gauge.builder("orders.pending", orders, OrderRepository::countPending)
+                .register(registry);
+
+        // DISTRIBUTION SUMMARY — non-time distributions
+        basketSize = DistributionSummary.builder("orders.basket.lines").register(registry);
+    }
+
+    void recordPlaced(Order o, Duration took) {
+        placed.increment();
+        checkout.record(took);
+        basketSize.record(o.lines().size());
+    }
+}
+
+@Timed(value = "tax.calculate", percentiles = { 0.95, 0.99 })   // annotation form
+Tax calculate(Basket b) { ... }</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Cardinality is the way monitoring dies</span>Every distinct combination of tag values is a separate time series. A tag of <code>orderId</code> on a service doing 1.2M orders a month creates 1.2M series a month — Prometheus falls over, and the bill if you are on a hosted product is memorable. <b>Tags must be bounded and small</b>: status, endpoint, channel, outcome, module. Ten values, not ten thousand.</div>
+      <div class="note warn"><span class="lbl">URI templating</span>Boot tags HTTP metrics with the <em>template</em> (<code>/api/orders/{id}</code>), not the actual path — deliberately. If you build metric names by hand from request paths, you reintroduce exactly the cardinality problem Boot avoided.</div>
+      <div class="note good"><span class="lbl">What to measure</span>RED per endpoint (rate, errors, duration) comes free. Add the handful of <b>business</b> counters that tell you the product is working: orders placed, payments authorised, events consumed. Those are the ones that page you when a deploy silently breaks a flow that still returns 200.</div>
+    </div>
+  </div>
+</section>
+

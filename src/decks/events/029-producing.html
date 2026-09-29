@@ -1,0 +1,47 @@
+<!-- events 29 -->
+<section class="slide" data-sec="Spring" data-title="Producing">
+  <h2>Producing from Spring, with the failure handled</h2>
+  <p class="dek"><code>send()</code> returns a future. Ignoring it is the single most common way to lose events in a Spring application, because nothing fails visibly — the code looks correct and the record never arrives.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">order/internal/kafka/OrderEventPublisher.java</div>
+<pre><code class="language-java">@Component
+class OrderEventPublisher {
+
+    private final KafkaTemplate&lt;String, OrderPlaced&gt; kafka;
+    private final MeterRegistry meters;
+
+    void publish(OrderPlaced event) {
+        var record = new ProducerRecord&lt;&gt;(
+                "orders.order.placed.v1",
+                null,                                   // let the partitioner decide
+                event.orderId(),                        // KEY — gives per-order ordering
+                event);
+        record.headers()
+              .add("eventId",   event.eventId().getBytes(UTF_8))
+              .add("eventType", "OrderPlaced".getBytes(UTF_8))
+              .add("version",   "1".getBytes(UTF_8));   // routing and dedupe without
+                                                        // deserialising the payload
+        kafka.send(record).whenComplete((result, ex) -&gt; {
+            if (ex != null) {
+                meters.counter("events.publish.failed", "topic", record.topic()).increment();
+                log.error("publish failed for order {}", event.orderId(), ex);
+                outbox.markUnsent(event.eventId());     // it stays in the outbox, retried
+            } else {
+                var md = result.getRecordMetadata();
+                log.debug("published {} to {}-{}@{}", event.eventId(),
+                          md.topic(), md.partition(), md.offset());
+            }
+        });
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">The silent loss</span><code>kafka.send(topic, key, event);</code> with no callback. The broker is down, the buffer fills, the send eventually times out — and your code has long since returned 201 to the customer. Nothing in the logs says an order was never published.</div>
+      <div class="note tip"><span class="lbl">Headers earn their keep</span>Put <code>eventId</code>, <code>eventType</code>, <code>version</code> and the tracing context in headers. A consumer can then route, dedupe and filter without deserialising the payload — which matters when it is a 4 KB Avro record it may not even want.</div>
+      <div class="note warn"><span class="lbl">Do not publish inside a database transaction</span>A send from within <code>@Transactional</code> either happens before the commit (publishing something that may roll back) or blocks the transaction on a network call. This is the dual-write problem — use the outbox, and let this publisher be the relay rather than the business code.</div>
+    </div>
+  </div>
+</section>
+

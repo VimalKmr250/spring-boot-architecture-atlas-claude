@@ -1,0 +1,52 @@
+<!-- deck 15 -->
+<section class="slide" data-sec="Modular monolith" data-title="The strangler fig">
+  <h2>Strangling a legacy system, concretely</h2>
+  <p class="dek">"Strangler fig" is quoted constantly and implemented rarely. The whole pattern is one component — a router at the edge — plus the discipline to migrate by capability rather than by table.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="A facade router in front of the legacy system sends most traffic to it and a growing share to new services; a synchronisation path keeps data consistent during the transition until the legacy system is retired">
+        <rect x="14" y="70" width="128" height="52" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="78" y="94" text-anchor="middle" font-size="11.5" fill="currentColor">Clients</text>
+        <text x="78" y="110" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">unchanged throughout</text>
+
+        <rect x="190" y="64" width="140" height="64" rx="9" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="260" y="88" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Facade / router</text>
+        <text x="260" y="105" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">routes per capability,</text>
+        <text x="260" y="118" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">switchable by flag</text>
+        <line x1="144" y1="96" x2="186" y2="96" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="400" y="20" width="170" height="60" rx="8" fill="#2C7448" fill-opacity="0.10" stroke="#2C7448"></rect>
+        <text x="485" y="44" text-anchor="middle" font-size="11.5" fill="currentColor">New: order capability</text>
+        <text x="485" y="61" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">own schema, own tests</text>
+
+        <rect x="400" y="112" width="170" height="60" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="485" y="136" text-anchor="middle" font-size="11.5" fill="currentColor">Legacy system</text>
+        <text x="485" y="153" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">everything not yet moved</text>
+
+        <line x1="332" y1="86" x2="396" y2="52" stroke="#2C7448" stroke-width="1.6" marker-end="url(#arw)"></line>
+        <text x="362" y="62" text-anchor="middle" font-size="9" fill="#2C7448">15%</text>
+        <line x1="332" y1="106" x2="396" y2="138" stroke="#8A94A3" stroke-width="1.6" marker-end="url(#arw)"></line>
+        <text x="362" y="132" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">85%</text>
+
+        <path d="M486 82 C540 94 540 100 486 110" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arwB)"></path>
+        <text x="600" y="92" font-size="10" fill="#3AA79B">Sync while both are live — events or CDC.</text>
+        <text x="600" y="108" font-size="10" fill="#3AA79B">One side OWNS each field; the other</text>
+        <text x="600" y="124" font-size="10" fill="#3AA79B">is a read-only copy. Never both.</text>
+
+        <line x1="14" y1="192" x2="866" y2="192" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="212" font-size="10.5" fill="currentColor" opacity="0.8">Migrate by <tspan font-weight="600">capability</tspan>, not by table: "place an order" moves whole, with its rules and its data. Moving a table at a time leaves</text>
+        <text x="14" y="229" font-size="10.5" fill="currentColor" opacity="0.8">logic on one side and data on the other — the state most failed migrations get permanently stuck in.</text>
+        <text x="14" y="246" font-size="10.5" fill="#D26A3F">Done when the legacy box is deleted. A strangler that never finishes is just two systems, forever.</text>
+      </svg>
+    </div>
+    <figcaption>The router is the only new infrastructure. Everything else is ordinary delivery — which is why this pattern succeeds where big-bang rewrites do not: every step ships, and every step is reversible with a flag.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Pick the first capability carefully</h4><p>High enough value to justify the router, low enough risk to survive being wrong, and with data you can genuinely separate. A read-only reporting view is a common, sensible first cut.</p></div>
+    <div class="card"><h4>Branch by abstraction, inside the code</h4><p>When the seam is a class rather than an HTTP route: introduce an interface, implement it twice, switch with a flag, delete the old one. Same shape as the router, no infrastructure at all.</p></div>
+    <div class="card"><h4>Budget for the double-run</h4><p>Running both systems, reconciling them and fixing the differences is real work that appears in no estimate. Plan for it explicitly or the migration stalls at 70% and stays there.</p></div>
+  </div>
+</section>
+

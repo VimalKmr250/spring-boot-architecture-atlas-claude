@@ -1,0 +1,108 @@
+<!-- dsa · pattern 25 · structure -->
+<section class="slide" data-sec="25 · Trie" data-title="The reusable structure">
+  <h2>One node class, and the three operations that follow from it</h2>
+  <p class="dek">Write the node and the insert once. Search, prefix-search and wildcard-search are all the same walk with a different stopping condition.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The node and the three core operations (LC 208)</div>
+<pre><code class="language-java">class TrieNode {
+    // Letters live on the EDGES, so a node stores only structure.
+    TrieNode[] children = new TrieNode[26];
+    boolean isWord;                  // a word ENDS here — it may still have children
+}
+
+class Trie {
+    private final TrieNode root = new TrieNode();
+
+    void insert(String word) {
+        TrieNode cur = root;
+        for (char c : word.toCharArray()) {
+            int i = c - 'a';
+            if (cur.children[i] == null) cur.children[i] = new TrieNode();
+            cur = cur.children[i];
+        }
+        cur.isWord = true;           // without this, "car" and "car"-as-prefix are identical
+    }
+
+    boolean search(String word)      { TrieNode n = walk(word); return n != null &amp;&amp; n.isWord; }
+    boolean startsWith(String pre)   { return walk(pre) != null; }
+
+    /** The node reached by spelling s, or null if the path breaks. */
+    private TrieNode walk(String s) {
+        TrieNode cur = root;
+        for (char c : s.toCharArray()) {
+            cur = cur.children[c - 'a'];
+            if (cur == null) return null;
+        }
+        return cur;
+    }
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Wildcards — a dot branches into every child (LC 211)</div>
+<pre><code class="language-java">// '.' matches any letter, so the walk becomes a RECURSION: at a dot
+// you must try all 26 children rather than following one link.
+boolean search(String word) { return dfs(word, 0, root); }
+
+private boolean dfs(String w, int i, TrieNode node) {
+    if (node == null) return false;
+    if (i == w.length()) return node.isWord;
+
+    char c = w.charAt(i);
+
+    if (c != '.') {
+        return dfs(w, i + 1, node.children[c - 'a']);
+    }
+
+    // Wildcard: any child that leads to a match will do.
+    for (TrieNode child : node.children) {
+        if (dfs(w, i + 1, child)) return true;
+    }
+    return false;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Trie plus grid backtracking (LC 212)</div>
+<pre><code class="language-java">// The trie walks in step with the board, so ALL words are searched
+// in one traversal and a dead prefix is rejected by one null check.
+private void dfs(char[][] b, int r, int c, TrieNode node, List&lt;String&gt; out) {
+    if (r &lt; 0 || r &gt;= b.length || c &lt; 0 || c &gt;= b[0].length) return;
+
+    char ch = b[r][c];
+    if (ch == '#') return;                       // already on this path
+
+    TrieNode next = node.children[ch - 'a'];
+    if (next == null) return;                    // NO word continues here — prune
+
+    if (next.word != null) {
+        out.add(next.word);
+        next.word = null;                        // collect once, never again
+    }
+
+    b[r][c] = '#';
+    for (int[] d : DIRS) dfs(b, r + d[0], c + d[1], next, out);
+    b[r][c] = ch;                                // restore
+
+    // Shrink the trie: a node with no children and no word is dead.
+    if (isLeafAndEmpty(next)) node.children[ch - 'a'] = null;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>What the node stores</dt><dd><code>boolean isWord</code> for membership; the <b>whole word string</b> when you will need to emit it (LC 212); an <code>int value</code> for key-value tries (LC 677).</dd>
+        <dt>Children container</dt><dd><code>TrieNode[26]</code> for lowercase — fastest. A <code>HashMap</code> when the alphabet is large or sparse.</dd>
+        <dt>Traversal</dt><dd>Iterative for a plain walk; recursive once wildcards or a second structure such as a grid are involved.</dd>
+        <dt>Ordering</dt><dd>Iterating children from index 0 to 25 emits words alphabetically, which is what LC 1268 needs — no sorting step.</dd>
+        <dt>Pruning</dt><dd>Null out exhausted branches during a grid search. It is what makes LC 212 fast rather than merely correct.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Omitting <code>isWord</code></b> — <code>search("app")</code> then returns true merely because <code>"apple"</code> was inserted, since the path exists. <b>Forgetting the null check mid-walk</b> — following a missing child throws rather than returning false, and the crash only happens on absent prefixes. <b>Collecting duplicates in LC 212</b> — the same word is reachable by several paths; nulling the stored word after collecting it is simpler and faster than filtering the result afterwards.</div>
+  </div>
+</section>
+

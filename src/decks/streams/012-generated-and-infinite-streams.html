@@ -1,0 +1,41 @@
+<!-- streams 12 -->
+<section class="slide" data-sec="Creating streams" data-title="Generated and infinite streams">
+  <h2>Streams that make their own elements</h2>
+  <p class="dek">Some factories compute their elements instead of reading them. <code>iterate</code> and <code>generate</code> are infinite, so something downstream must short-circuit. The three-argument <code>iterate</code> and <code>range</code> are finite, and they replace the classic counting <code>for</code> loop.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Factory</th><th>Produces</th><th>Size</th><th>Since</th></tr></thead>
+      <tbody>
+        <tr><td><code>Stream.iterate(seed, f)</code></td><td><code>seed</code>, <code>f(seed)</code>, <code>f(f(seed))</code>, … each built from the previous</td><td>Infinite, ordered</td><td>8</td></tr>
+        <tr><td><code>Stream.iterate(seed, hasNext, next)</code></td><td>The <code>for (t = seed; hasNext(t); t = next(t))</code> loop</td><td>Finite</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>Stream.generate(supplier)</code></td><td>Independent values: ids, random numbers, a constant</td><td>Infinite, unordered</td><td>8</td></tr>
+        <tr><td><code>IntStream.range(a, b)</code> · <code>rangeClosed(a, b)</code></td><td><code>a</code> up to <code>b</code>, excluding or including <code>b</code>. <code>LongStream</code> has both too</td><td>Finite</td><td>8</td></tr>
+        <tr><td><code>IntStream.iterate</code> · <code>generate</code> and friends</td><td>The same four, without boxing</td><td>As above</td><td>8 · <span class="tag a">9</span></td></tr>
+        <tr><td><code>random.ints()</code> · <code>ints(n)</code> · <code>ints(n, lo, hi)</code> · <code>longs</code> · <code>doubles</code></td><td>Random numbers from <code>Random</code>, <code>SplittableRandom</code>, <code>ThreadLocalRandom</code> or any <code>RandomGenerator</code> (17)</td><td>Infinite unless n is given</td><td>8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Each with its output on JDK 25</div>
+<pre><code class="language-java">Stream.iterate(1, n -&gt; n * 2).limit(5).toList();         // [1, 2, 4, 8, 16]
+Stream.iterate(1, n -&gt; n &lt;= 100, n -&gt; n * 3).toList();   // [1, 3, 9, 27, 81]
+
+Stream.iterate(LocalDate.of(2026, 1, 1), d -&gt; d.plusMonths(1))
+      .limit(3)
+      .toList();                         // [2026-01-01, 2026-02-01, 2026-03-01]
+
+Stream.generate(UUID::randomUUID).limit(3).toList();     // three random ids
+IntStream.range(0, 5).boxed().toList();                   // [0, 1, 2, 3, 4]
+IntStream.rangeClosed(1, 5).sum();                        // 15
+new Random(42).ints(3, 0, 10).boxed().toList();           // [0, 3, 8]</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">The filter that never ends</span><code>Stream.iterate(1, n -&gt; n * 3).filter(n -&gt; n &lt;= 100).toList()</code> never returns. You know the values only grow; <code>filter</code> does not, and it is not short-circuiting, so it keeps reading the infinite source. Use the three-argument <code>iterate</code>, or <code>takeWhile(n -&gt; n &lt;= 100)</code>, which stops at the first failure.</div>
+      <div class="note tip"><span class="lbl">iterate or generate?</span>If each value depends on the one before, it is <code>iterate</code>. If each is independent, it is <code>generate</code>. <code>generate</code> is unordered, so a parallel <code>generate(…).limit(n)</code> may call the supplier from several threads at once. Give it a supplier that is safe to share.</div>
+    </div>
+  </div>
+</section>
+

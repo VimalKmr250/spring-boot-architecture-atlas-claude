@@ -1,0 +1,32 @@
+<!-- streams 39 -->
+<section class="slide" data-sec="Parallel streams" data-title="When parallel helps, and when it hurts">
+  <h2>Parallel pays only when there is enough work to split</h2>
+  <p class="dek">Splitting, scheduling and combining all cost something. Parallel wins when there is a lot of CPU work in total, a source that splits cleanly, and a cheap combine step. Most request-handling code has none of the three.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The N × Q rule of thumb</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">N is the number of elements and Q the work per element. The heuristic often quoted by the JDK's own stream authors is that N × Q needs to be in the order of <b>10,000 simple operations or more</b> before parallelism has a chance. Summing a thousand integers (Q ≈ 1) is far below it. Rendering a thousand PDF pages is far above it. Everything in between: measure it.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Measure with JMH, not a <code>System.nanoTime()</code> loop: JIT warm-up, dead-code elimination and GC pauses make hand-rolled timings misleading in both directions.</p>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Helps</th><th>Hurts</th></tr></thead>
+        <tbody>
+          <tr><td>Large N, and CPU-heavy work per element: parsing, image work, cryptography, simulation</td><td>Small collections: the 50 lines of one order</td></tr>
+          <tr><td>Arrays, <code>ArrayList</code>, <code>range</code></td><td><code>LinkedList</code>, <code>iterate</code>, I/O-backed sources</td></tr>
+          <tr><td>Stateless steps, unordered endings: <code>findAny</code>, <code>toSet</code>, <code>sum</code></td><td>Order-bound steps: <code>sorted</code>, <code>distinct</code>, <code>limit</code>, <code>findFirst</code>, <code>forEachOrdered</code></td></tr>
+          <tr><td>Primitive streams</td><td>Boxed values: memory traffic, not CPU, is then the limit</td></tr>
+          <tr><td>Cheap merges, such as sums</td><td>Expensive merges, such as big maps (<code>groupingByConcurrent</code> helps)</td></tr>
+          <tr><td>Batch jobs with cores to spare</td><td>Web servers, where concurrent requests already use every core</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">Blocking I/O in a parallel stream</span><code>ids.parallelStream().map(restClient::fetch).toList()</code> parks common-pool threads on network calls. With 19 of them, 19 slow calls stall every parallel stream and default <code>CompletableFuture</code> in the JVM. For I/O fan-out, use <code>Gatherers.mapConcurrent</code> (Java 24) or an executor of virtual threads, both of which bound concurrency explicitly and leave the common pool alone.</div>
+    <div class="note tip"><span class="lbl">Say this in the interview</span>"Parallel streams are for CPU-bound work over large, easily split data. I'd prove the gain with JMH first, because in a web service the requests already keep the cores busy. And I'd never put blocking calls in one: the common pool is shared by the whole JVM."</div>
+  </div>
+</section>
+

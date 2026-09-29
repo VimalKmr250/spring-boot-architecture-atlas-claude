@@ -1,0 +1,41 @@
+<!-- events 49 -->
+<section class="slide" data-sec="Operations" data-title="Security">
+  <h2>Securing an event platform</h2>
+  <p class="dek">Four layers, and the one that gets skipped is authorisation — a cluster where every application can read every topic is a data-governance finding waiting to be written.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Layer</th><th>Mechanism</th><th>Protects against</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Encryption in transit</td><td>TLS on every listener</td><td>Network interception</td><td>Table stakes. Costs some CPU unless offloaded</td></tr>
+        <tr><td>Authentication</td><td>mTLS, SASL/OAUTHBEARER, SASL/SCRAM</td><td>Unknown clients</td><td>OAuth aligns Kafka with your existing IdP — Kafka 4.1 added <code>jwt-bearer</code></td></tr>
+        <tr><td>Authorisation</td><td>ACLs per principal, topic and operation</td><td><b>Known clients reading what they should not</b></td><td>The layer most often left wide open</td></tr>
+        <tr><td>Encryption at rest</td><td>Disk encryption, or field-level in the payload</td><td>Stolen disks; broker operators</td><td>Field-level is the only one that protects data <em>from</em> the platform team</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ACLs: least privilege, per application</div>
+<pre><code class="language-yaml"># inventory service: read orders, write its own events, use its own group
+kafka-acls --add --allow-principal User:inventory-service \
+  --operation Read --topic orders.order.placed.v1
+kafka-acls --add --allow-principal User:inventory-service \
+  --operation Read --group inventory-order-reservation
+kafka-acls --add --allow-principal User:inventory-service \
+  --operation Write --topic inventory.stock.reserved.v1
+
+# Deny by default at the cluster level:
+#   allow.everyone.if.no.acl.found = false
+# Anything not explicitly granted is refused — the setting that makes ACLs mean something.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Personal data in events is forever</span>A customer's name and address in a topic with 90-day retention exists in 90 days of segments, in every consumer's local copy, in the lake, and in every backup. A deletion request cannot reach any of it.
+      <p style="margin-top:8px">Two defences: <b>minimise</b> — put ids in events and let consumers look up what they are entitled to — or <b>crypto-shred</b>: encrypt personal fields with a per-subject key and delete the key. The events remain; their contents become unreadable.</p></div>
+      <div class="note warn"><span class="lbl">The quiet risk of a shared cluster</span>A topic with no ACL on a permissive cluster is readable by every application in the estate, including ones from other departments with different data-handling obligations. In a bank that is a control failure, not a configuration preference — and it is invisible until an audit.</div>
+      <div class="note tip"><span class="lbl">Principals from the platform</span>Use mTLS certificates issued by a service mesh or a workload-identity system rather than long-lived SCRAM passwords in config. Rotation stops being a project, and a compromised credential expires on its own.</div>
+    </div>
+  </div>
+</section>
+

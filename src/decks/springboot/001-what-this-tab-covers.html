@@ -1,0 +1,30 @@
+<!-- springboot 01 -->
+<section class="slide" data-sec="Architecture" data-title="What this tab covers">
+  <h2>Spring Boot, from the container up</h2>
+  <p class="lede">Eight topics, in the order they build on each other: how Boot is put together, what happens between <code>main()</code> and your first request, the starters an enterprise actually pulls in, and three annotation catalogues — core, JPA and security — covering the ones you meet in real code, each with the failure it causes when used wrongly.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">3.x</span><p>Code targets Spring Boot 3.4/3.5 — Jakarta EE, Spring Security 6, Hibernate 6. What enterprise codebases actually run.</p></div>
+    <div class="card lift"><span class="bignum">4.0</span><p>Boxes marked <span class="tag a">Boot 4</span> flag what changed in Spring Boot 4 / Framework 7, so you can speak to both.</p></div>
+    <div class="card lift"><span class="bignum">56</span><p>slides. Same e-commerce order domain as the architecture deck, so the examples line up.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The nine sections</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Architecture</dt><dd>the layer cake, auto-configuration, the <code>@Conditional</code> family, how to override it</dd>
+        <dt>Lifecycle</dt><dd>application startup · bean · HTTP request · transaction and persistence context</dd>
+        <dt>Starters</dt><dd>what a starter is, and the ones enterprises pull: core, messaging, batch, cloud</dd>
+        <dt>Core annotations</dt><dd>stereotypes, wiring, config, web, validation, async, testing</dd>
+        <dt>JPA</dt><dd>entities, keys, relationships, fetching, inheritance, auditing, queries</dd>
+        <dt>Security</dt><dd>filter chain, method security, OAuth2, enterprise SSO, mTLS, tenancy</dd>
+        <dt>Internals</dt><dd>AOP, transaction propagation and isolation, Jackson, Spring Data patterns, SpEL</dd>
+        <dt>Production</dt><dd>Actuator, metrics, logging, JVM memory, GC, profiling, leaks, load tests</dd>
+        <dt>Reference</dt><dd>the Spring Boot 3 → 4 delta, as one table you can answer questions from</dd>
+      </dl>
+    </div>
+    <div class="note tip"><span class="lbl">How the annotation slides are written</span>Every entry gets three things: <b>what it does</b>, <b>a real line of code</b>, and <b>the failure it causes when it is wrong</b>. The third one is the reason to read a reference rather than the Javadoc — the Javadoc tells you what an attribute means, not what happens at 2am when you set it badly.</div>
+  </div>
+</section>
+
