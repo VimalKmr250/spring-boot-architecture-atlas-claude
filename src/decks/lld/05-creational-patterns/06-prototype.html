@@ -1,0 +1,76 @@
+<section class="slide" data-sec="Creational patterns" data-title="Prototype">
+  <h2>Prototype: copy a configured object, and copy it deeply enough</h2>
+  <p class="dek">Create new objects by copying one that is already set up: a board in its opening position, a document template, a default configuration. The pattern is simple. The hard part is the copy: a shallow copy shares its mutable insides, so changing the copy changes the original. Chess engines hit this when they copy the board to try a move.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">PrototypeDemo.java · a shallow copy leaks, a deep copy does not</div>
+<pre><code class="language-java">import java.util.*;
+
+final class Board {
+    private final char[][] cells;
+    private Board(char[][] cells) { this.cells = cells; }
+
+    static Board parse(String... rows) {
+        char[][] c = new char[rows.length][];
+        for (int i = 0; i &lt; rows.length; i++) c[i] = rows[i].toCharArray();
+        return new Board(c);
+    }
+
+    Board shallowCopy() {                  // new Board, same arrays
+        return new Board(cells.clone());   // clone() on 2-D copies row refs
+    }
+
+    Board deepCopy() {                     // copy constructor semantics
+        char[][] c = new char[cells.length][];
+        for (int i = 0; i &lt; cells.length; i++) c[i] = cells[i].clone();
+        return new Board(c);
+    }
+
+    void move(int r1, int c1, int r2, int c2) {
+        cells[r2][c2] = cells[r1][c1];
+        cells[r1][c1] = '.';
+    }
+
+    String row(int r) { return new String(cells[r]); }
+}
+
+public class PrototypeDemo {
+    public static void main(String[] args) {
+        Map&lt;String, Board&gt; prototypes = new LinkedHashMap&lt;&gt;();   // registry
+        prototypes.put("mini", Board.parse("rnbk", "pppp", "....", "PPPP", "RNBK"));
+
+        Board original = prototypes.get("mini");
+        Board shallow = original.shallowCopy();
+        shallow.move(3, 0, 2, 0);          // try a pawn move on the copy
+        System.out.println("after shallow try, original row 3: " + original.row(3));
+
+        Board fresh = Board.parse("rnbk", "pppp", "....", "PPPP", "RNBK");
+        Board deep = fresh.deepCopy();
+        deep.move(3, 0, 2, 0);
+        System.out.println("after deep try,    original row 3: " + fresh.row(3));
+        System.out.println("                   copy row 3:     " + deep.row(3));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · PrototypeDemo.java</div>
+<pre><code class="language-plaintext">after shallow try, original row 3: .PPP
+after deep try,    original row 3: PPPP
+                   copy row 3:     .PPP</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Ways to copy</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td><code>Cloneable</code> + <code>clone()</code></td><td>Avoid. Shallow by default, bypasses constructors, clashes with <code>final</code> fields, and throws a checked exception.</td></tr>
+            <tr><td>Copy constructor or <code>copy()</code> method</td><td>Preferred. You decide what is deep, and it can keep fields final.</td></tr>
+            <tr><td>Immutable objects</td><td>Best of all: nothing to copy. A new board per move, sharing the unchanged rows, is how persistent data structures work.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Where it appears in LLD</span>Chess move validation (try the move on a copy, then ask "is my king in check?"), undo by snapshot (see <a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">memento</a>), and seat-map templates that each show copies of. Say "deep copy" out loud, and say which fields are deep.</div>
+    </div>
+  </div>
+</section>

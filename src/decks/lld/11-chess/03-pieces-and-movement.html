@@ -1,0 +1,141 @@
+<section class="slide" data-sec="Chess" data-title="Chess · pieces and movement">
+  <h2>Chess: six pieces, two shared loops, and the pawn on its own</h2>
+  <p class="dek">The sliding loop walks each direction until it leaves the board or hits a piece, which it may capture if it is an enemy. The stepping loop tries each offset once. A queen, rook or bishop is then only a letter and a list of directions; a king or knight is a letter and a list of offsets. The pawn's rules match neither loop, so it implements <code>targets</code> directly.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChessDemo.java · 1 of 3 · positions and pieces</div>
+<pre><code class="language-java">import java.util.*;
+
+enum Color {
+    WHITE, BLACK;
+    Color opposite() { return this == WHITE ? BLACK : WHITE; }
+}
+
+enum Status { ACTIVE, CHECK, CHECKMATE, STALEMATE }
+
+record Position(int file, int rank) {           // file a..h = 0..7, rank 1..8 = 0..7
+    static Position of(String s) {
+        Position p = s.length() == 2 ? new Position(s.charAt(0) - 'a', s.charAt(1) - '1') : null;
+        if (p == null || !p.onBoard()) throw new IllegalArgumentException("no square " + s);
+        return p;
+    }
+    boolean onBoard() { return file &gt;= 0 &amp;&amp; file &lt; 8 &amp;&amp; rank &gt;= 0 &amp;&amp; rank &lt; 8; }
+    Position plus(int df, int dr) { return new Position(file + df, rank + dr); }
+    @Override public String toString() { return "" + (char) ('a' + file) + (rank + 1); }
+}
+
+abstract sealed class Piece permits SlidingPiece, SteppingPiece, Pawn {
+    final Color color;
+    Piece(Color color) { this.color = color; }
+    abstract char letter();                      // K Q R B N P
+    char symbol() { return color == Color.WHITE ? letter() : Character.toLowerCase(letter()); }
+    abstract List&lt;Position&gt; targets(Board b, Position from);    // ignores check
+    boolean attacks(Board b, Position from, Position square) {  // pawn overrides
+        return targets(b, from).contains(square);
+    }
+    boolean isEnemy(Piece other) { return other != null &amp;&amp; other.color != color; }
+}
+
+abstract sealed class SlidingPiece extends Piece permits Queen, Rook, Bishop {
+    static final int[][] STRAIGHT = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
+    static final int[][] DIAGONAL = { {1, 1}, {1, -1}, {-1, 1}, {-1, -1} };
+    SlidingPiece(Color c) { super(c); }
+    abstract int[][] directions();
+
+    final List&lt;Position&gt; targets(Board b, Position from) {      // template method
+        List&lt;Position&gt; out = new ArrayList&lt;&gt;();
+        for (int[] d : directions()) {
+            for (Position p = from.plus(d[0], d[1]); p.onBoard(); p = p.plus(d[0], d[1])) {
+                if (b.at(p) == null) { out.add(p); continue; }
+                if (isEnemy(b.at(p))) out.add(p);               // capture, then stop
+                break;
+            }
+        }
+        return out;
+    }
+}
+
+final class Queen extends SlidingPiece {
+    Queen(Color c) { super(c); }
+    char letter() { return 'Q'; }
+    int[][] directions() {
+        int[][] all = Arrays.copyOf(STRAIGHT, 8);
+        System.arraycopy(DIAGONAL, 0, all, 4, 4);
+        return all;
+    }
+}
+final class Rook extends SlidingPiece {
+    Rook(Color c) { super(c); }
+    char letter() { return 'R'; }
+    int[][] directions() { return STRAIGHT; }
+}
+final class Bishop extends SlidingPiece {
+    Bishop(Color c) { super(c); }
+    char letter() { return 'B'; }
+    int[][] directions() { return DIAGONAL; }
+}
+
+abstract sealed class SteppingPiece extends Piece permits King, Knight {
+    SteppingPiece(Color c) { super(c); }
+    abstract int[][] offsets();
+    final List&lt;Position&gt; targets(Board b, Position from) {      // template method
+        List&lt;Position&gt; out = new ArrayList&lt;&gt;();
+        for (int[] o : offsets()) {
+            Position p = from.plus(o[0], o[1]);
+            if (p.onBoard() &amp;&amp; (b.at(p) == null || isEnemy(b.at(p)))) out.add(p);
+        }
+        return out;
+    }
+}
+
+final class King extends SteppingPiece {
+    King(Color c) { super(c); }
+    char letter() { return 'K'; }
+    int[][] offsets() {
+        return new int[][] { {1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1} };
+    }
+}
+final class Knight extends SteppingPiece {
+    Knight(Color c) { super(c); }
+    char letter() { return 'N'; }
+    int[][] offsets() {
+        return new int[][] { {1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2} };
+    }
+}
+
+final class Pawn extends Piece {
+    Pawn(Color c) { super(c); }
+    char letter() { return 'P'; }
+    int forward() { return color == Color.WHITE ? 1 : -1; }
+
+    List&lt;Position&gt; targets(Board b, Position from) {
+        List&lt;Position&gt; out = new ArrayList&lt;&gt;();
+        Position one = from.plus(0, forward());
+        if (one.onBoard() &amp;&amp; b.at(one) == null) {
+            out.add(one);
+            Position two = from.plus(0, 2 * forward());
+            boolean home = from.rank() == (color == Color.WHITE ? 1 : 6);
+            if (home &amp;&amp; b.at(two) == null) out.add(two);
+        }
+        for (int df : new int[] { -1, 1 }) {
+            Position diagonal = from.plus(df, forward());
+            if (diagonal.onBoard() &amp;&amp; isEnemy(b.at(diagonal))) out.add(diagonal);
+        }
+        return out;
+    }
+
+    @Override boolean attacks(Board b, Position from, Position square) {
+        return square.rank() == from.rank() + forward()
+            &amp;&amp; Math.abs(square.file() - from.file()) == 1;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">Template method, twice</span><code>SlidingPiece.targets</code> and <code>SteppingPiece.targets</code> are <code>final</code>: the loop is fixed, and a subclass can change only its directions or offsets. Adding a fairy-chess "camel" that steps (1, 3) would be one tiny class. See <a data-deck="lld" data-slide="Template method">Template method</a>.</div>
+      <div class="note"><span class="lbl">What the pieces do not know</span>Whose turn it is, whether the king is in check, or what happened on earlier moves. That keeps them simple and stateless apart from their colour. The cost shows up with castling and en passant, which depend on history; the <a data-deck="lld" data-slide="Chess · decisions and follow-ups">decisions slide</a> covers where that goes.</div>
+      <div class="note tip"><span class="lbl">If you are short of time</span>Write <code>Piece</code>, <code>SlidingPiece</code> and one sliding piece in full, and <code>Knight</code>. Say the rest are "the same with different directions". The interviewer is scoring the structure, and the structure is visible from those four.</div>
+      <div class="note warn"><span class="lbl">Arrays inside a record</span><code>Position</code> uses two ints rather than an <code>int[]</code>, because a record's generated <code>equals</code> compares arrays by reference. <code>targets(...).contains(square)</code> only works because <code>Position</code> equality is by value.</div>
+    </div>
+  </div>
+</section>

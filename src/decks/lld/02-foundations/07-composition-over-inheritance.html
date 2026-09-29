@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Foundations" data-title="Composition over inheritance; interface or abstract class">
+  <h2>Inherit from a class only when you control it and it was designed for it</h2>
+  <p class="dek">A subclass depends on how its parent is implemented, not just on what it promises. In the classic example below, the parent's <code>addAll</code> calls <code>add</code> internally, so a subclass that counts in both methods counts every element twice. Wrapping the set instead of extending it removes that dependency.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CountingSet.java · extending against wrapping</div>
+<pre><code class="language-java">import java.util.*;
+
+@SuppressWarnings("serial")
+class InstrumentedHashSet&lt;E&gt; extends HashSet&lt;E&gt; {   // inheritance
+    private int addCount;
+    @Override public boolean add(E e) {
+        addCount++;
+        return super.add(e);
+    }
+    @Override public boolean addAll(Collection&lt;? extends E&gt; c) {
+        addCount += c.size();
+        return super.addAll(c);     // HashSet inherits addAll, which calls add()
+    }
+    int addCount() { return addCount; }
+}
+
+final class WrappingSet&lt;E&gt; {                        // composition
+    private final Set&lt;E&gt; inner;
+    private int addCount;
+    WrappingSet(Set&lt;E&gt; inner) { this.inner = inner; }
+    boolean add(E e) { addCount++; return inner.add(e); }
+    boolean addAll(Collection&lt;? extends E&gt; c) {
+        addCount += c.size();
+        return inner.addAll(c);     // inner's add() is not ours: no double count
+    }
+    int addCount() { return addCount; }
+}
+
+public class CountingSet {
+    public static void main(String[] args) {
+        var inherited = new InstrumentedHashSet&lt;String&gt;();
+        inherited.addAll(List.of("a", "b", "c"));
+        var wrapped = new WrappingSet&lt;String&gt;(new HashSet&lt;&gt;());
+        wrapped.addAll(List.of("a", "b", "c"));
+        System.out.println("extends HashSet: " + inherited.addCount());
+        System.out.println("wraps a Set:     " + wrapped.addCount());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · CountingSet.java</div>
+<pre><code class="language-plaintext">extends HashSet: 6
+wraps a Set:     3</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Use</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>Interface</td><td>The default for a point of variation. A class can implement many. Default methods can share small helpers.</td></tr>
+            <tr><td>Abstract class</td><td>Subtypes share state or a fixed algorithm with steps to fill in (<a data-deck="lld" data-slide="Template method">template method</a>). A class can extend only one.</td></tr>
+            <tr><td>Sealed interface</td><td>The set of subtypes is closed and known, and you want exhaustive <code>switch</code>. Records make good permitted types.</td></tr>
+            <tr><td>Composition</td><td>You want to reuse behaviour from a class you do not own, or switch it at runtime.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">The rule of thumb</span>Inheritance is fine for a genuine "is-a" inside one module you control: <code>Bishop</code> extends <code>Piece</code>. Across a boundary, or just to reuse code, compose. A good line to say in the interview: "I'd rather hold a <code>PricingStrategy</code> than be one, so it can change at runtime."</div>
+</section>

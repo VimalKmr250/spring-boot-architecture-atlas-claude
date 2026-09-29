@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Elevator" data-title="Elevator · the model">
+  <h2>Elevator: a car that runs LOOK on its own stops, one tick at a time</h2>
+  <p class="dek">Each tick a car does one thing. If the current floor is a stop, it opens its doors and tells the listener. Otherwise it keeps its direction while there is a stop ahead, reverses when there is not, and moves one floor. That is the whole LOOK algorithm, in one <code>switch</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ElevatorDemo.java · 1 of 3 · the car</div>
+<pre><code class="language-java">import java.util.*;
+
+enum Direction { UP, DOWN, IDLE }
+
+record HallCall(int floor, Direction direction) {
+    HallCall {
+        if (direction == Direction.IDLE)
+            throw new IllegalArgumentException("a hall call goes UP or DOWN");
+    }
+}
+
+@FunctionalInterface
+interface ArrivalListener { void stopped(int tick, String car, int floor); }
+
+final class ElevatorCar {
+    private final String id;
+    private int floor;
+    private Direction direction = Direction.IDLE;
+    private final NavigableSet&lt;Integer&gt; stops = new TreeSet&lt;&gt;();
+
+    ElevatorCar(String id, int floor) { this.id = id; this.floor = floor; }
+    String id() { return id; }
+    int floor() { return floor; }
+    Direction direction() { return direction; }
+    boolean hasStops() { return !stops.isEmpty(); }
+    void addStop(int f) { stops.add(f); }
+
+    int furthestStop() {                         // where the current run ends
+        return direction == Direction.DOWN ? stops.first() : stops.last();
+    }
+
+    void step(int tick, ArrivalListener listener) {
+        if (stops.remove(floor)) {               // a stop here: doors open
+            listener.stopped(tick, id, floor);
+            if (stops.isEmpty()) direction = Direction.IDLE;
+            return;
+        }
+        if (stops.isEmpty()) { direction = Direction.IDLE; return; }
+        boolean above = stops.higher(floor) != null;
+        boolean below = stops.lower(floor) != null;
+        direction = switch (direction) {         // LOOK: keep going while
+            case UP   -&gt; above ? Direction.UP : Direction.DOWN;    // there is
+            case DOWN -&gt; below ? Direction.DOWN : Direction.UP;    // work ahead
+            case IDLE -&gt; above ? Direction.UP : Direction.DOWN;
+        };
+        floor += direction == Direction.UP ? 1 : -1;
+    }
+
+    @Override public String toString() { return id + "@" + floor + " " + direction; }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">LOOK, car at 2 going UP, stops {3, 6, 1}</span>
+  t  floor  stops      action
+  1    2    1 3 6      3 above: keep UP, move to 3
+  2    3    1 3 6      stop: doors open at 3
+  3    3    1 6        6 above: move to 4
+  4    4    1 6        move to 5
+  5    5    1 6        move to 6
+  6    6    1 6        stop at 6
+  7    6    1          nothing above: turn DOWN
+  …                    down to 1, stop, IDLE</div>
+      <div class="note"><span class="lbl">Why the car does not know about hall-call directions</span>A real controller would skip a "going down" call at floor 4 while travelling up and come back for it. This model treats every assigned floor as a stop, and lets the dispatcher avoid giving a car a call it would have to reverse for. That keeps the car simple and puts the directional logic in one place: the dispatcher's cost function.</div>
+      <div class="note warn"><span class="lbl">Starvation</span>LOOK serves the current direction first, so a floor just behind a busy car can wait a whole cycle. That wait is bounded by one round trip, unlike shortest-seek-first, which can starve a distant floor forever. Being able to say which algorithms can starve a request is often the follow-up.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,81 @@
+<section class="slide" data-sec="Structural patterns" data-title="Proxy">
+  <h2>Proxy: a stand-in with the same interface that controls access to the real object</h2>
+  <p class="dek">A proxy looks exactly like the real object to its callers but decides when, whether and how the real one is reached. The common kinds are <b>caching</b> (skip a slow call), <b>virtual</b> (create the real object lazily), <b>protection</b> (check permissions first) and <b>remote</b> (hide the network). Java can generate a proxy for any interface at runtime, which is how Spring adds <code>@Transactional</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProxyDemo.java · a caching proxy, wrapped in a dynamic logging proxy</div>
+<pre><code class="language-java">import java.lang.reflect.Proxy;
+import java.util.*;
+
+interface SeatMapService { List&lt;String&gt; freeSeats(String showId); }
+
+final class RemoteSeatMapService implements SeatMapService {
+    int calls;                                   // stands in for a slow call
+    public List&lt;String&gt; freeSeats(String showId) {
+        calls++;
+        return showId.equals("S1") ? List.of("A1", "A2", "B7") : List.of("C3");
+    }
+}
+
+final class CachingSeatMap implements SeatMapService {    // caching proxy
+    private final SeatMapService target;
+    private final Map&lt;String, List&lt;String&gt;&gt; cache = new HashMap&lt;&gt;();
+    CachingSeatMap(SeatMapService target) { this.target = target; }
+    public List&lt;String&gt; freeSeats(String showId) {
+        return cache.computeIfAbsent(showId, target::freeSeats);
+    }
+    void invalidate(String showId) { cache.remove(showId); }  // on booking
+}
+
+public class ProxyDemo {
+    static &lt;T&gt; T logging(T target, Class&lt;T&gt; type, List&lt;String&gt; log) {
+        Object proxy = Proxy.newProxyInstance(type.getClassLoader(),
+                new Class&lt;?&gt;[] { type },
+                (p, method, args) -&gt; {           // runs for every call
+                    log.add("-&gt; " + method.getName() + Arrays.toString(args));
+                    Object result = method.invoke(target, args);
+                    log.add("&lt;- " + result);
+                    return result;
+                });
+        return type.cast(proxy);
+    }
+
+    public static void main(String[] args) {
+        var remote = new RemoteSeatMapService();
+        var cached = new CachingSeatMap(remote);
+        List&lt;String&gt; log = new ArrayList&lt;&gt;();
+        SeatMapService seats = logging(cached, SeatMapService.class, log);
+
+        seats.freeSeats("S1");
+        seats.freeSeats("S1");
+        seats.freeSeats("S2");
+        cached.invalidate("S1");
+        seats.freeSeats("S1");
+
+        log.forEach(System.out::println);
+        System.out.println("calls that reached the remote service: " + remote.calls);
+        System.out.println("proxy class is generated: "
+                + Proxy.isProxyClass(seats.getClass()));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ProxyDemo.java</div>
+<pre><code class="language-plaintext">-&gt; freeSeats[S1]
+&lt;- [A1, A2, B7]
+-&gt; freeSeats[S1]
+&lt;- [A1, A2, B7]
+-&gt; freeSeats[S2]
+&lt;- [C3]
+-&gt; freeSeats[S1]
+&lt;- [A1, A2, B7]
+calls that reached the remote service: 3
+proxy class is generated: true</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Proxy, decorator or adapter?</span>All three wrap an object. An <b>adapter</b> changes the interface. A <b>decorator</b> keeps it and adds behaviour the caller asked for, stacked by the client. A <b>proxy</b> keeps it and controls access, usually without the caller knowing, and usually creates or owns the real object itself.</div>
+      <div class="note warn"><span class="lbl">The Spring self-invocation trap</span>Spring's <code>@Transactional</code> and <code>@Cacheable</code> are proxies like the one above. A call from one method of a bean to another method on <code>this</code> never goes through the proxy, so the annotation on the second method is silently ignored. The Spring Boot tab covers it on <a data-deck="sb" data-slide="AOP limits">AOP limits</a>.</div>
+    </div>
+  </div>
+</section>

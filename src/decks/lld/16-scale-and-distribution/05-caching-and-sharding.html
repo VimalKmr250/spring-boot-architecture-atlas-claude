@@ -1,0 +1,26 @@
+<section class="slide" data-sec="Scale and distribution" data-title="Caching and sharding the LLD models">
+  <h2>Caching and sharding: find the natural partition key, and cache only what can be stale</h2>
+  <p class="dek">Every LLD problem has an aggregate that transactions never cross: a parking lot, a show, a Splitwise group, a building's elevators. That is the shard key, because every invariant lives inside one of them. Caching is then a question of which reads may be a few seconds old. The seat map may be; the seat claim may not.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Problem</th><th>Shard by</th><th>Safe to cache</th><th>Never from cache</th><th>Hot spot</th></tr></thead>
+      <tbody>
+        <tr><td>Parking lot</td><td>Lot id</td><td>Free-spot counts for displays</td><td>Claiming a spot</td><td>A stadium lot at kick-off</td></tr>
+        <tr><td>Library</td><td>Branch id</td><td>Catalogue search, book details</td><td>Copy status at checkout</td><td>A newly released bestseller's waiting list</td></tr>
+        <tr><td>ATM</td><td>Account id (at the bank)</td><td>Nothing about money</td><td>Balance before a debit</td><td>Payday withdrawals</td></tr>
+        <tr><td>Movie booking</td><td>Show id</td><td>Movie details, the seat map read model</td><td>Seat claims, confirmation</td><td>A blockbuster's opening night: one show, 10,000 users</td></tr>
+        <tr><td>Elevator</td><td>Building id</td><td>Car positions for displays</td><td>Dispatch decisions</td><td>Morning lobby traffic</td></tr>
+        <tr><td>Splitwise</td><td>Group id</td><td>Simplified-debts view</td><td>Recording an expense</td><td>A large trip group</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>A hot key cannot be sharded away</h4><p>One show is one shard, however many servers there are. Spread the load in front of it: a waiting room that admits users in batches (a <a data-deck="lld" data-slide="Token-bucket rate limiter">rate limiter</a>), per-seat keys instead of one show row, and a read model for the map.</p></div>
+    <div class="card"><h4>Cache-aside, with invalidation on write</h4><p>Read: cache, then database, then fill the cache. Write: database, then delete the cache entry, so the next read refills it. Expiry (TTL) is the safety net for invalidations that get lost.</p></div>
+    <div class="card"><h4>Consistent hashing, in one line</h4><p>Put shards and keys on a ring; a key belongs to the next shard clockwise. Adding a shard moves only about 1/<i>n</i> of the keys, instead of nearly all of them as with <code>hash % n</code>.</p></div>
+  </div>
+
+  <div class="note"><span class="lbl">How much to say in an LLD round</span>Two or three sentences: the shard key and why, what is cached and why it may be stale, and where the hot spot is. The rest belongs to a system-design round, and the <a data-deck="deck" data-slide="What this atlas is">Reference deck</a> covers it.</div>
+</section>

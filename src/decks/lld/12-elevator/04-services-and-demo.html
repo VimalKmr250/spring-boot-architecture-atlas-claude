@@ -1,0 +1,141 @@
+<section class="slide" data-sec="Elevator" data-title="Elevator · services and demo">
+  <h2>Elevator: two dispatch strategies, the controller, and a run with riders</h2>
+  <p class="dek">The nearest-car dispatcher costs each car: the plain distance if it is idle or the call is on its way in the same direction, or the length of its detour (to the end of its run and back) if not. The zoned dispatcher ignores position entirely. The controller swaps them at runtime without touching a car.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ElevatorDemo.java · 2 of 3 · dispatch and the controller</div>
+<pre><code class="language-java">interface Dispatcher {
+    ElevatorCar choose(List&lt;ElevatorCar&gt; cars, HallCall call);
+}
+
+final class NearestCarDispatcher implements Dispatcher {
+    public ElevatorCar choose(List&lt;ElevatorCar&gt; cars, HallCall call) {
+        return cars.stream()
+                .min(Comparator.comparingInt((ElevatorCar c) -&gt; cost(c, call))
+                        .thenComparing(ElevatorCar::id))          // ties: stable
+                .orElseThrow();
+    }
+
+    static int cost(ElevatorCar c, HallCall call) {
+        int gap = call.floor() - c.floor();
+        return switch (c.direction()) {
+            case IDLE -&gt; Math.abs(gap);
+            case UP   -&gt; gap &gt;= 0 &amp;&amp; call.direction() == Direction.UP ? gap : detour(c, call);
+            case DOWN -&gt; gap &lt;= 0 &amp;&amp; call.direction() == Direction.DOWN ? -gap : detour(c, call);
+        };
+    }
+
+    private static int detour(ElevatorCar c, HallCall call) {
+        int turn = c.furthestStop();                 // finish the run, come back
+        return Math.abs(turn - c.floor()) + Math.abs(turn - call.floor());
+    }
+}
+
+record ZonedDispatcher(int floorsPerCar) implements Dispatcher {
+    public ElevatorCar choose(List&lt;ElevatorCar&gt; cars, HallCall call) {
+        return cars.get(Math.min(call.floor() / floorsPerCar, cars.size() - 1));
+    }
+}
+
+final class ElevatorSystem {
+    private final int floors;
+    private final List&lt;ElevatorCar&gt; cars;
+    private final List&lt;ArrivalListener&gt; listeners = new ArrayList&lt;&gt;();
+    private Dispatcher dispatcher;
+    private int tick;
+
+    ElevatorSystem(int floors, List&lt;ElevatorCar&gt; cars, Dispatcher dispatcher) {
+        this.floors = floors;
+        this.cars = List.copyOf(cars);
+        this.dispatcher = dispatcher;
+    }
+
+    synchronized void subscribe(ArrivalListener l) { listeners.add(l); }
+    synchronized void useDispatcher(Dispatcher d) { dispatcher = Objects.requireNonNull(d); }
+
+    synchronized String hallCall(int floor, Direction direction) {
+        checkFloor(floor);
+        ElevatorCar car = dispatcher.choose(cars, new HallCall(floor, direction));
+        car.addStop(floor);
+        return car.id();
+    }
+
+    synchronized void carCall(String carId, int floor) {
+        checkFloor(floor);
+        cars.stream().filter(c -&gt; c.id().equals(carId)).findFirst()
+            .orElseThrow(() -&gt; new IllegalArgumentException("no car " + carId))
+            .addStop(floor);
+    }
+
+    synchronized void tick() {
+        tick++;
+        for (ElevatorCar c : cars)
+            c.step(tick, (t, car, f) -&gt; listeners.forEach(l -&gt; l.stopped(t, car, f)));
+    }
+
+    synchronized boolean idle() { return cars.stream().noneMatch(ElevatorCar::hasStops); }
+    synchronized List&lt;ElevatorCar&gt; cars() { return cars; }
+
+    private void checkFloor(int floor) {
+        if (floor &lt; 0 || floor &gt;= floors) throw new IllegalArgumentException("no floor " + floor);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">ElevatorDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class ElevatorDemo {
+    public static void main(String[] args) {
+        var sys = new ElevatorSystem(10,
+                List.of(new ElevatorCar("A", 0), new ElevatorCar("B", 9)),
+                new NearestCarDispatcher());
+        Map&lt;String, Integer&gt; riders = new HashMap&lt;&gt;(Map.of("A@3", 8, "B@4", 0));
+        sys.subscribe((t, car, floor) -&gt; {
+            System.out.printf("t%-2d %s stops at %d%n", t, car, floor);
+            Integer to = riders.remove(car + "@" + floor);    // a rider gets in
+            if (to != null) {
+                System.out.println("    rider in " + car + " presses " + to);
+                sys.carCall(car, to);
+            }
+        });
+
+        sys.carCall("A", 6);
+        sys.tick();
+        sys.tick();
+        System.out.println("now " + sys.cars());
+        System.out.println("hall 4 DOWN -&gt; " + sys.hallCall(4, Direction.DOWN));
+        System.out.println("hall 3 UP   -&gt; " + sys.hallCall(3, Direction.UP));
+        while (!sys.idle()) sys.tick();
+        System.out.println("now " + sys.cars());
+
+        System.out.println("nearest: hall 7 DOWN -&gt; " + sys.hallCall(7, Direction.DOWN));
+        sys.useDispatcher(new ZonedDispatcher(5));
+        System.out.println("zoned:   hall 1 UP   -&gt; " + sys.hallCall(1, Direction.UP));
+        while (!sys.idle()) sys.tick();
+        System.out.println("now " + sys.cars());
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ElevatorDemo.java</div>
+<pre><code class="language-plaintext">now [A@2 UP, B@9 IDLE]
+hall 4 DOWN -&gt; B
+hall 3 UP   -&gt; A
+t4  A stops at 3
+    rider in A presses 8
+t8  A stops at 6
+t8  B stops at 4
+    rider in B presses 0
+t11 A stops at 8
+t13 B stops at 0
+now [A@8 IDLE, B@0 IDLE]
+nearest: hall 7 DOWN -&gt; A
+zoned:   hall 1 UP   -&gt; A
+t15 A stops at 7
+t22 A stops at 1
+now [A@1 IDLE, B@0 IDLE]</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

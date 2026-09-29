@@ -1,0 +1,41 @@
+<section class="slide" data-sec="ATM" data-title="ATM · requirements">
+  <h2>ATM: a machine whose allowed actions depend on what has happened so far</h2>
+  <p class="dek">You cannot withdraw before entering a PIN, enter a PIN before inserting a card, or insert a card while another is inside. The ATM problem tests whether you model that with a state machine instead of flags checked in every method. It also tests money handling across two systems: the machine holds the cash, the bank holds the balance, and the two can disagree.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>A customer <b>inserts a card</b>, then <b>enters a PIN</b>. After 3 wrong PINs the ATM <b>keeps the card</b>.</li>
+        <li>Once authenticated, the customer can check the <b>balance</b> and <b>withdraw</b> cash, several times, then <b>eject</b> the card.</li>
+        <li>Withdrawals are multiples of 100, at most 10,000 per transaction.</li>
+        <li>The ATM holds <b>₹500, ₹200 and ₹100 notes</b> in limited numbers. It refuses an amount it cannot make exactly, <b>before</b> touching the account.</li>
+        <li>The <b>bank</b> verifies PINs, holds balances and approves debits. The ATM never sees a balance it did not ask for.</li>
+        <li>If the dispenser <b>fails after the debit</b>, the debit is <b>reversed</b>. A customer is never charged for cash they did not get.</li>
+        <li>When the ATM runs out of cash it goes <b>out of service</b> and refuses cards.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Deposits, transfers?</dt><dd>Not now. The state machine must make them easy to add.</dd>
+          <dt>Which bank?</dt><dd>One bank behind an interface. The network switch between banks is out of scope.</dd>
+          <dt>Daily limits?</dt><dd>The bank's rule, applied in <code>debit</code>. The ATM has only its per-transaction limit.</dd>
+          <dt>Receipts?</dt><dd>A message on screen; a printer is another device behind an interface.</dd>
+          <dt>Concurrency?</dt><dd>One customer at a machine. The bank is shared by many ATMs, so it must be safe.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">Atm · context</span><span class="tag a">AtmState · 4 states</span><span class="tag a">CashDispenser</span><span class="tag a">NoteSlot · chain</span>
+          <span class="tag s">Card · record</span><span class="tag">Bank · interface</span><span class="tag">InMemoryBank</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes here: <i>screen</i>, <i>keypad</i>, <i>card reader</i> (devices that call the <code>Atm</code>), <i>account</i> (private to the bank).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The ordering question to raise yourself</span>"Do we debit first or dispense first?" Dispense first and a failed debit hands out free money. Debit first and a jammed dispenser charges for nothing, unless the debit is reversed. Debit first plus a reversal is the standard answer, and saying it before you are asked is a senior signal.</div>
+</section>

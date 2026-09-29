@@ -1,0 +1,98 @@
+<section class="slide" data-sec="Creational patterns" data-title="Factory method">
+  <h2>Factory method: one place decides which class to create</h2>
+  <p class="dek">Callers ask for "a notifier for this channel" and never name the concrete class. There are two forms. A <b>static factory</b> is a method that picks the class from its input, and it is what LLD answers use most. The <b>GoF factory method</b> is an abstract method that a subclass overrides to choose the class used inside a fixed algorithm.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FactoryDemo.java · a static factory, and the GoF factory method</div>
+<pre><code class="language-java">import java.util.List;
+
+enum Channel { EMAIL, SMS, PUSH }
+
+interface Notifier { String send(String to, String message); }
+
+record EmailNotifier() implements Notifier {
+    public String send(String to, String m) { return "email " + to + ": " + m; }
+}
+record SmsNotifier(int maxLength) implements Notifier {
+    public String send(String to, String m) {
+        String body = m.length() &lt;= maxLength ? m : m.substring(0, maxLength - 3) + "...";
+        return "sms   " + to + ": " + body;
+    }
+}
+record PushNotifier() implements Notifier {
+    public String send(String to, String m) { return "push  " + to + ": " + m; }
+}
+
+final class Notifiers {                    // static factory: the only code
+    private Notifiers() {}                 // that names concrete classes
+    static Notifier forChannel(Channel c) {
+        return switch (c) {                // exhaustive over the enum
+            case EMAIL -&gt; new EmailNotifier();
+            case SMS   -&gt; new SmsNotifier(20);
+            case PUSH  -&gt; new PushNotifier();
+        };
+    }
+}
+
+interface RowFormat { String header(); String join(List&lt;String&gt; cells); }
+
+abstract class ReportExporter {            // GoF factory method
+    final String export(List&lt;List&lt;String&gt;&gt; rows) {  // the fixed algorithm
+        RowFormat f = createFormat();      // the subclass picks the class
+        StringBuilder out = new StringBuilder(f.header());
+        rows.forEach(r -&gt; out.append(f.join(r)).append('\n'));
+        return out.toString();
+    }
+    protected abstract RowFormat createFormat();   // the factory method
+}
+
+final class CsvExporter extends ReportExporter {
+    protected RowFormat createFormat() {
+        return new RowFormat() {
+            public String header() { return ""; }
+            public String join(List&lt;String&gt; c) { return String.join(",", c); }
+        };
+    }
+}
+
+final class MarkdownExporter extends ReportExporter {
+    protected RowFormat createFormat() {
+        return new RowFormat() {
+            public String header() { return "| plate | fee |\n|---|---|\n"; }
+            public String join(List&lt;String&gt; c) { return "| " + String.join(" | ", c) + " |"; }
+        };
+    }
+}
+
+public class FactoryDemo {
+    public static void main(String[] args) {
+        for (Channel c : Channel.values())
+            System.out.println(Notifiers.forChannel(c)
+                    .send("ana", "Your car is ready at gate B"));
+
+        var rows = List.of(List.of("KA-01", "120"), List.of("KA-02", "80"));
+        System.out.print(new CsvExporter().export(rows));
+        System.out.print(new MarkdownExporter().export(rows));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · FactoryDemo.java</div>
+<pre><code class="language-plaintext">email ana: Your car is ready at gate B
+sms   ana: Your car is ready...
+push  ana: Your car is ready at gate B
+KA-01,120
+KA-02,80
+| plate | fee |
+|---|---|
+| KA-01 | 120 |
+| KA-02 | 80 |</code></pre>
+      </div>
+      <div class="note"><span class="lbl">What it buys you</span>Only <code>Notifiers</code> names the concrete classes. Adding <code>WHATSAPP</code> touches the enum and the factory, and the exhaustive <code>switch</code> will not compile until you add the case. No caller changes.</div>
+      <div class="note warn"><span class="lbl">Where people overdo it</span>A factory that wraps a single <code>new</code> with no choice in it is noise. So is a <code>VehicleFactory</code> interface with one implementation. Add the factory when there is a real decision to make, or when construction needs rules the caller should not know.</div>
+      <div class="note tip"><span class="lbl">In the problems</span>The chess setup builds pieces from a layout string through a factory, and Splitwise builds the right <code>Split</code> from the request type. In both cases the parsing code never names a concrete class.</div>
+    </div>
+  </div>
+</section>

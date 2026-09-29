@@ -1,0 +1,26 @@
+<section class="slide" data-sec="Scale and distribution" data-title="From one JVM to many">
+  <h2>From one JVM to many: every in-memory guarantee needs a new owner</h2>
+  <p class="dek">An LLD answer lives in one process: a <code>synchronized</code> method, a <code>ConcurrentHashMap</code>, an <code>AtomicInteger</code> for ids. Run three copies behind a load balancer and each of those guarantees silently covers only a third of the traffic. The scale follow-up is asking one thing: for each guarantee, what now enforces it?</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>In one JVM</th><th>Across many</th><th>In this tab's problems</th></tr></thead>
+      <tbody>
+        <tr><td><code>synchronized</code> check-then-act</td><td>A conditional write the database checks: <code>UPDATE … WHERE state = 'FREE'</code>, a unique constraint, or a version column</td><td>Claiming a parking spot; debiting an account</td></tr>
+        <tr><td><code>ConcurrentHashMap.putIfAbsent</code></td><td><code>INSERT</code> with a unique key; Redis <code>SET … NX</code></td><td>Seat claims; one active ticket per plate</td></tr>
+        <tr><td><code>AtomicInteger</code> ids</td><td>A database sequence, a UUID, or a time-ordered id (UUIDv7, Snowflake-style)</td><td>Ticket, booking and transaction ids</td></tr>
+        <tr><td>An in-memory map as the source of truth</td><td>A table, with the JVM holding at most a cache</td><td>Active tickets, loans, the Splitwise ledger</td></tr>
+        <tr><td>In-process observer</td><td>A message broker, fed by an outbox table</td><td>Hold-ready notifications, arrival displays</td></tr>
+        <tr><td><code>Clock</code> from the JVM</td><td>Database time for anything compared across servers; clocks drift</td><td>Hold expiry; parking fees</td></tr>
+        <tr><td>A per-process rate limiter</td><td>A shared counter (Redis), or a per-instance share of the limit</td><td>API rate limits; the booking waiting room</td></tr>
+        <tr><td>A singleton</td><td>One per instance. If only one must run (a sweeper job), use leader election or a lease</td><td>Hold-expiry and overdue-reminder jobs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Keep the model</h4><p>The classes do not change. <code>ParkingSpot.occupy</code> still validates; the repository behind it now saves with a condition. The domain model survives; only its guardians move.</p></div>
+    <div class="card"><h4>Push the invariant down</h4><p>The database is the one thing all servers share. An invariant it enforces (a unique key, a check constraint, a conditional update) cannot be bypassed by a server with stale memory.</p></div>
+    <div class="card"><h4>Say what becomes eventual</h4><p>Seat maps, free-spot displays and balances shown to other users can lag by a second. Claims, debits and bookings cannot. Name which is which.</p></div>
+  </div>
+</section>

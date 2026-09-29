@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Scale and distribution" data-title="Events, outbox and sagas">
+  <h2>When one use case spans services: publish through an outbox, coordinate with a saga</h2>
+  <p class="dek">In one JVM, the booking facade holds seats, charges the card and sends the email in one method, and compensates on failure. Split into a booking service, a payment service and a notification service, that method becomes a <b>saga</b>: a sequence of local transactions, each publishing an event, with a compensating step for each. The events must be published reliably, and that is the outbox's job.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">The dual-write problem</span>
+  tx: UPDATE booking SET status='HELD'   <span class="g">commits</span>
+  kafka.send(BookingHeld)                <span class="c">crashes before this</span>
+  <span class="c">→ the booking exists; nobody heard about it</span>
+
+<span class="h">The outbox fix</span>
+  tx: UPDATE booking SET status='HELD'
+      INSERT INTO outbox(event) VALUES ('BookingHeld')
+  <span class="g">one commit: both or neither</span>
+  relay: read outbox → publish → mark sent   <span class="c">at least once</span>
+  consumers: dedupe by event id               <span class="c">idempotent</span></div>
+<div class="tree"><span class="h">Booking saga, choreographed</span>
+  booking   HELD            ──BookingHeld──>
+  payment   charge          ──PaymentSucceeded──>  booking CONFIRMED
+                            ──PaymentFailed────>   booking CANCELLED
+                                                   seats released  <span class="c">compensation</span>
+  notify    on BookingConfirmed: send ticket</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Choreography</th><th>Orchestration</th></tr></thead>
+          <tbody>
+            <tr><td>Who drives</td><td>Each service reacts to events</td><td>One orchestrator sends commands and tracks state</td></tr>
+            <tr><td>Good for</td><td>Two or three steps</td><td>Many steps, timeouts, visible progress</td></tr>
+            <tr><td>Risk</td><td>The flow is spread over services; hard to see</td><td>The orchestrator becomes a god service</td></tr>
+            <tr><td>LLD shape</td><td>Observers</td><td>A state machine (the <a data-deck="lld" data-slide="State">State</a> pattern) persisted per saga</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Compensation is not rollback</span>A refund is a new transaction, visible on the card statement, not an undo. Every step needs a compensating action designed up front, and some steps (an email already sent) cannot be compensated, so they go last.</div>
+      <div class="note tip"><span class="lbl">Elsewhere in the atlas</span>The Event-driven tab covers these in depth: <a data-deck="ed" data-slide="The dual-write problem">the dual-write problem</a>, <a data-deck="ed" data-slide="Sagas with events">sagas with events</a> and <a data-deck="ed" data-slide="Delivery semantics">delivery semantics</a>.</div>
+    </div>
+  </div>
+</section>

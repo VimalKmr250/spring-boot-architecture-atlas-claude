@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Parking lot" data-title="Parking lot · class diagram">
+  <h2>Parking lot: four classes with state, two enums, one strategy</h2>
+  <p class="dek">The lot coordinates, each floor manages its own free spots, and a spot guards its own occupancy. The fee rule sits behind an interface because the requirements say it changes. Everything else is concrete, because nothing else was said to vary.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">ParkingLot</span>                        <span class="c">the service: entry and exit</span>
+  - floors : Map&lt;Integer, ParkingFloor&gt;
+  - pricing : PricingStrategy       <span class="c">volatile: swapped at runtime</span>
+  - active : Map&lt;String, Ticket&gt;     <span class="c">ticket id → ticket</span>
+  - platesInside : Set&lt;String&gt;
+  - clock : Clock
+  + park(Vehicle) : Optional&lt;Ticket&gt;
+  + leave(ticketId) : Receipt
+  + changePricing(PricingStrategy)
+  + availability() : List&lt;String&gt;
+  ◆── 1..* ParkingFloor
+  ──> 1    PricingStrategy
+  ◇── *    Ticket
+
+<span class="h">ParkingFloor</span>
+  - free : EnumMap&lt;SpotSize, Deque&lt;ParkingSpot&gt;&gt;
+  + claim(Vehicle) : Optional&lt;ParkingSpot&gt;   <span class="c">synchronized</span>
+  + release(spotId)                         <span class="c">synchronized</span>
+  ◆── 1..* ParkingSpot
+
+<span class="h">ParkingSpot</span>
+  - id : String   - size : SpotSize   - vehicle : Vehicle (0..1)
+  + occupy(Vehicle)   + vacate()
+
+<span class="h">«record» Ticket</span>  id, vehicle, floor, spotId, entry, pricing
+<span class="h">«record» Receipt</span> ticketId, plate, spotId, stayed, fee
+<span class="h">«record» Vehicle</span> plate, type ──> VehicleType
+
+<span class="h">«enum» VehicleType</span> MOTORBIKE, CAR, TRUCK   <span class="c">each needs a SpotSize</span>
+<span class="h">«enum» SpotSize</span>    SMALL &lt; MEDIUM &lt; LARGE  <span class="c">declaration order = size</span>
+
+<span class="h">«interface» PricingStrategy</span>
+  + fee(VehicleType, Duration) : long
+  ┄┄▷ HourlyPricing     <span class="c">rate per type, started hours</span>
+  ┄┄▷ FlatPricing       <span class="c">event days</span></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td><code>ParkingLot</code></td><td>Which floor to try, issuing and redeeming tickets, one plate inside at a time</td></tr>
+            <tr><td><code>ParkingFloor</code></td><td>Which of its free spots to hand out; keeping the free lists consistent</td></tr>
+            <tr><td><code>ParkingSpot</code></td><td>Whether it is free, and whether a vehicle fits</td></tr>
+            <tr><td><code>PricingStrategy</code></td><td>What a stay costs</td></tr>
+            <tr><td><code>Ticket</code></td><td>Nothing: an immutable record of the entry, including the pricing in force</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Free lists, not a scan</span>Each floor keeps a queue of free spots per size, so finding a spot is a few queue polls rather than a loop over every spot. With 2,000 spots per floor and a busy morning, that is the difference the interviewer asks about when they say "can it be faster?"</div>
+      <div class="note tip"><span class="lbl">No singleton</span>There is one lot, but it is created in <code>main</code> and passed in, so a test can build a lot with three spots. See <a data-deck="lld" data-slide="Singleton: how it breaks">Singleton: how it breaks</a>.</div>
+    </div>
+  </div>
+</section>

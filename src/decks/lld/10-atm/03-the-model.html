@@ -1,0 +1,118 @@
+<section class="slide" data-sec="ATM" data-title="ATM · the model">
+  <h2>ATM: the bank behind an interface, and a note chain that backs off when greedy fails</h2>
+  <p class="dek">Each <code>NoteSlot</code> tries to cover the amount with as many of its own notes as it can, and hands the rest to the next slot. With limited notes that greedy choice can fail when another split would work: ₹600 from one ₹500 and three ₹200s. So a slot that gets "impossible" back tries one note fewer. Planning never changes the counts; only <code>dispense</code> does.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">AtmDemo.java · 1 of 3 · the bank and the dispenser</div>
+<pre><code class="language-java">import java.util.*;
+
+record Card(String number) {}
+
+interface Bank {
+    boolean verifyPin(Card card, String pin);
+    long balance(Card card);
+    String debit(Card card, long amount);        // txn id, or throws
+    void reverse(String txnId);
+}
+
+final class InMemoryBank implements Bank {
+    private static final class Account {
+        final String pin;
+        long balance;
+        Account(String pin, long balance) { this.pin = pin; this.balance = balance; }
+    }
+    private record Debit(String card, long amount) {}
+
+    private final Map&lt;String, Account&gt; accounts = new HashMap&lt;&gt;();
+    private final Map&lt;String, Debit&gt; debits = new HashMap&lt;&gt;();
+    private int nextTxn = 1;
+
+    void open(Card card, String pin, long balance) {
+        accounts.put(card.number(), new Account(pin, balance));
+    }
+    public synchronized boolean verifyPin(Card c, String pin) {
+        return account(c).pin.equals(pin);
+    }
+    public synchronized long balance(Card c) { return account(c).balance; }
+    public synchronized String debit(Card c, long amount) {
+        Account a = account(c);
+        if (a.balance &lt; amount) throw new IllegalStateException("insufficient funds");
+        a.balance -= amount;
+        String id = "TX" + nextTxn++;
+        debits.put(id, new Debit(c.number(), amount));
+        return id;
+    }
+    public synchronized void reverse(String txnId) {
+        Debit d = debits.remove(txnId);            // remove: reverse at most once
+        if (d != null) accounts.get(d.card()).balance += d.amount();
+    }
+    private Account account(Card c) {
+        Account a = accounts.get(c.number());
+        if (a == null) throw new IllegalArgumentException("unknown card");
+        return a;
+    }
+}
+
+final class NoteSlot {                           // one link in the chain
+    final int denomination;
+    int count;
+    private final NoteSlot next;
+    NoteSlot(int denomination, int count, NoteSlot next) {
+        this.denomination = denomination; this.count = count; this.next = next;
+    }
+
+    Optional&lt;SortedMap&lt;Integer, Integer&gt;&gt; plan(int amount) {
+        for (int k = Math.min(amount / denomination, count); k &gt;= 0; k--) {
+            int rest = amount - k * denomination;
+            Optional&lt;SortedMap&lt;Integer, Integer&gt;&gt; tail =
+                    rest == 0 ? Optional.of(new TreeMap&lt;&gt;(Comparator.reverseOrder()))
+                  : next == null ? Optional.empty()
+                  : next.plan(rest);              // pass the remainder on
+            if (tail.isPresent()) {
+                if (k &gt; 0) tail.get().put(denomination, k);
+                return tail;
+            }                                     // else back off: one note fewer
+        }
+        return Optional.empty();
+    }
+}
+
+final class CashDispenser {
+    private final Map&lt;Integer, NoteSlot&gt; slots = new LinkedHashMap&lt;&gt;();
+    private final NoteSlot head;
+    private boolean jamNext;                      // simulates a hardware fault
+
+    CashDispenser(int fives, int twos, int ones) {
+        NoteSlot n100 = new NoteSlot(100, ones, null);
+        NoteSlot n200 = new NoteSlot(200, twos, n100);
+        head = new NoteSlot(500, fives, n200);
+        for (NoteSlot s : List.of(head, n200, n100)) slots.put(s.denomination, s);
+    }
+
+    Optional&lt;SortedMap&lt;Integer, Integer&gt;&gt; plan(int amount) { return head.plan(amount); }
+
+    void dispense(SortedMap&lt;Integer, Integer&gt; plan) {
+        if (jamNext) { jamNext = false; throw new IllegalStateException("dispenser jammed"); }
+        plan.forEach((note, k) -&gt; slots.get(note).count -= k);
+    }
+
+    void jamNextDispense() { jamNext = true; }
+    boolean isEmpty() { return slots.values().stream().allMatch(s -&gt; s.count == 0); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">plan(600) with 500×1, 200×3, 100×0</span>
+  500: try 1  → 200 gets 100
+       200: try 0 → 100 gets 100
+            100: try 0 → nothing left  <span class="c">fail</span>
+       <span class="c">fail</span>
+  500: try 0  → 200 gets 600
+       200: try 3 → rest 0             <span class="g">ok</span>
+  plan = {200=3}</div>
+      <div class="note"><span class="lbl">Why the chain backs off</span>Pure greedy is correct only when every slot has unlimited notes. ATMs always have limited notes, so the classic "each handler takes what it can" answer refuses some amounts it could serve. With three slots the back-off tries at most a few dozen combinations, which is nothing. Mention that with many note values it becomes a bounded knapsack, and a small DP would replace it.</div>
+      <div class="note"><span class="lbl">Why the bank remembers debits</span><code>reverse</code> needs to know what to undo, and removing the entry makes a second reversal of the same transaction do nothing. A retried reversal after a timeout cannot refund twice. That is idempotency in miniature.</div>
+      <div class="note warn"><span class="lbl">The account is private to the bank</span>The ATM never holds a balance. It asks, and it asks to debit. Two ATMs using the same account both go through the bank's lock, so they cannot both spend the last ₹500.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,164 @@
+<section class="slide" data-sec="Library" data-title="Library · services and demo">
+  <h2>Library: borrowing, returning into the waiting list, and the notification</h2>
+  <p class="dek">All the cross-object rules live in <code>Library</code>. Its public methods share one lock, which is enough for one branch: a library does a few operations a second, not a few thousand. On return it computes the fine, then gives the copy to the first member waiting for that title and tells the listeners.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LibraryDemo.java · 2 of 3 · the library service</div>
+<pre><code class="language-java">final class Library {
+    private static final int HOLD_DAYS = 3;
+    private final Map&lt;String, Book&gt; books = new LinkedHashMap&lt;&gt;();       // isbn
+    private final Map&lt;String, Copy&gt; copies = new HashMap&lt;&gt;();            // barcode
+    private final Map&lt;String, List&lt;Copy&gt;&gt; copiesOf = new HashMap&lt;&gt;();    // isbn
+    private final Map&lt;String, Member&gt; members = new HashMap&lt;&gt;();
+    private final Map&lt;String, Loan&gt; loans = new HashMap&lt;&gt;();             // barcode
+    private final Map&lt;String, Deque&lt;String&gt;&gt; waitlists = new HashMap&lt;&gt;(); // isbn
+    private final List&lt;LibraryListener&gt; listeners = new ArrayList&lt;&gt;();
+    private final FinePolicy fines;
+    private final Clock clock;
+
+    Library(FinePolicy fines, Clock clock) { this.fines = fines; this.clock = clock; }
+
+    synchronized void subscribe(LibraryListener l) { listeners.add(l); }
+    synchronized void addMember(Member m) { members.put(m.id(), m); }
+    synchronized void addCopy(Book b, String barcode, boolean referenceOnly) {
+        books.putIfAbsent(b.isbn(), b);
+        var copy = new Copy(barcode, b, referenceOnly);
+        copies.put(barcode, copy);
+        copiesOf.computeIfAbsent(b.isbn(), k -&gt; new ArrayList&lt;&gt;()).add(copy);
+    }
+
+    synchronized Loan borrow(String memberId, String barcode) {
+        Member m = get(members, memberId);
+        Copy c = get(copies, barcode);
+        m.checkCanBorrow();                     // checks that can throw first
+        c.lendTo(memberId);
+        m.loanStarted();
+        LocalDate today = LocalDate.now(clock);
+        var loan = new Loan(barcode, memberId, today, today.plusDays(m.tier().loanDays));
+        loans.put(barcode, loan);
+        return loan;
+    }
+
+    synchronized long giveBack(String barcode) {
+        Loan loan = loans.remove(barcode);
+        if (loan == null) throw new IllegalStateException(barcode + " is not on loan");
+        Copy c = copies.get(barcode);
+        c.returned();
+        LocalDate today = LocalDate.now(clock);
+        long daysLate = Math.max(0, ChronoUnit.DAYS.between(loan.due(), today));
+        long fine = daysLate == 0 ? 0 : fines.fineFor(daysLate);
+        get(members, loan.memberId()).loanEnded(fine);
+
+        String next = waitlists.getOrDefault(c.book().isbn(), new ArrayDeque&lt;&gt;()).pollFirst();
+        if (next != null) {                     // first in line gets it
+            LocalDate until = today.plusDays(HOLD_DAYS);
+            c.holdFor(next, until);
+            Member m = get(members, next);
+            listeners.forEach(l -&gt; l.holdReady(m, c.book(), until));
+        }
+        return fine;
+    }
+
+    synchronized int reserve(String memberId, String isbn) {
+        get(members, memberId);
+        Book b = get(books, isbn);
+        if (copiesOf.get(isbn).stream().anyMatch(c -&gt; c.status() == CopyStatus.AVAILABLE))
+            throw new IllegalStateException("a copy of " + b.title() + " is on the shelf");
+        Deque&lt;String&gt; queue = waitlists.computeIfAbsent(isbn, k -&gt; new ArrayDeque&lt;&gt;());
+        if (queue.contains(memberId)) throw new IllegalStateException(memberId + " is already waiting");
+        queue.addLast(memberId);
+        return queue.size();                    // position in line
+    }
+
+    synchronized void payFines(String memberId) { get(members, memberId).payFines(); }
+
+    synchronized List&lt;Book&gt; search(String text) {
+        return books.values().stream().filter(b -&gt; b.matches(text)).toList();
+    }
+
+    private static &lt;T&gt; T get(Map&lt;String, T&gt; map, String key) {
+        T value = map.get(key);
+        if (value == null) throw new NoSuchElementException("unknown " + key);
+        return value;
+    }
+}
+
+final class MutableClock extends Clock {
+    private Instant now;
+    MutableClock(Instant start) { now = start; }
+    void advanceDays(long days) { now = now.plus(Duration.ofDays(days)); }
+    @Override public Instant instant() { return now; }
+    @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+    @Override public Clock withZone(ZoneId zone) { throw new UnsupportedOperationException(); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">LibraryDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class LibraryDemo {
+    static void attempt(String what, Supplier&lt;?&gt; action) {
+        try {
+            System.out.println(what + ": " + action.get());
+        } catch (IllegalStateException e) {
+            System.out.println(what + ": refused, " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        var clock = new MutableClock(Instant.parse("2026-10-01T10:00:00Z"));
+        var lib = new Library(daysLate -&gt; Math.min(10 * daysLate, 500), clock);
+        lib.subscribe((m, b, until) -&gt; System.out.println(
+                "  notify " + m.id() + ": '" + b.title() + "' is held until " + until));
+
+        var ej = new Book("978-0134685991", "Effective Java", List.of("Joshua Bloch"));
+        var dp = new Book("978-0201633610", "Design Patterns",
+                List.of("Erich Gamma", "Richard Helm", "Ralph Johnson", "John Vlissides"));
+        lib.addCopy(ej, "EJ-1", false);
+        lib.addCopy(ej, "EJ-2", false);
+        lib.addCopy(dp, "DP-1", false);
+        lib.addCopy(dp, "DP-R", true);
+        lib.addMember(new Member("ana", Tier.STANDARD));
+        lib.addMember(new Member("bo", Tier.PREMIUM));
+        lib.addMember(new Member("cy", Tier.STANDARD));
+
+        attempt("ana borrows DP-1", () -&gt; "due " + lib.borrow("ana", "DP-1").due());
+        attempt("bo borrows DP-R", () -&gt; lib.borrow("bo", "DP-R"));
+        attempt("bo reserves DP", () -&gt; "position " + lib.reserve("bo", dp.isbn()));
+        attempt("cy reserves DP", () -&gt; "position " + lib.reserve("cy", dp.isbn()));
+        attempt("ana reserves EJ", () -&gt; lib.reserve("ana", ej.isbn()));
+
+        clock.advanceDays(17);
+        System.out.println("ana returns DP-1, 3 days late");
+        System.out.println("  fine " + lib.giveBack("DP-1"));
+        attempt("ana borrows EJ-1", () -&gt; lib.borrow("ana", "EJ-1"));
+        lib.payFines("ana");
+        attempt("ana borrows EJ-1", () -&gt; "due " + lib.borrow("ana", "EJ-1").due());
+        attempt("cy borrows DP-1", () -&gt; lib.borrow("cy", "DP-1"));
+        attempt("bo borrows DP-1", () -&gt; "due " + lib.borrow("bo", "DP-1").due());
+
+        System.out.println("search 'gamma': " + lib.search("gamma").stream().map(Book::title).toList());
+        System.out.println("search 'JAVA':  " + lib.search("JAVA").stream().map(Book::title).toList());
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · LibraryDemo.java</div>
+<pre><code class="language-plaintext">ana borrows DP-1: due 2026-10-15
+bo borrows DP-R: refused, DP-R is reference only
+bo reserves DP: position 1
+cy reserves DP: position 2
+ana reserves EJ: refused, a copy of Effective Java is on the shelf
+ana returns DP-1, 3 days late
+  notify bo: 'Design Patterns' is held until 2026-10-21
+  fine 30
+ana borrows EJ-1: refused, ana owes 30
+ana borrows EJ-1: due 2026-11-01
+cy borrows DP-1: refused, DP-1 is on hold for bo
+bo borrows DP-1: due 2026-11-15
+search 'gamma': [Design Patterns]
+search 'JAVA':  [Effective Java]</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

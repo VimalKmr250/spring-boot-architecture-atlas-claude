@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Interview strategy" data-title="From nouns to classes">
+  <h2>From nouns to classes: underline the nouns, then throw half of them away</h2>
+  <p class="dek">Noun extraction is the classic technique: the nouns in the requirements are candidate classes and the verbs are candidate methods. The skill is in the filtering. Some nouns are attributes, some are actors outside the system, some are the same thing under two names, and some are values that deserve a record rather than a class.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>A noun that is…</th><th>Becomes</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>A thing with identity and changing state</td><td>A class (an entity)</td><td><code>ParkingSpot</code>, <code>Copy</code>, <code>Booking</code></td></tr>
+          <tr><td>A value, equal by its fields</td><td>A record</td><td><code>Position</code>, <code>Money</code>, <code>Ticket</code></td></tr>
+          <tr><td>A fixed set of options with data</td><td>An enum</td><td><code>VehicleType</code>, <code>Tier</code>, <code>SeatCategory</code></td></tr>
+          <tr><td>A rule that varies</td><td>An interface with implementations</td><td><code>PricingStrategy</code>, <code>Dispatcher</code></td></tr>
+          <tr><td>A property of something else</td><td>A field</td><td>colour, licence plate, due date</td></tr>
+          <tr><td>A person or system outside</td><td>A caller, not a class</td><td>attendant, gate, librarian</td></tr>
+          <tr><td>A process, not a thing</td><td>A method, or a service class</td><td>"checkout", "settlement"</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Then assign every verb to one class</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Information expert:</b> give the method to the class that holds the data it needs. "Does it fit?" goes on the spot.</li>
+          <li><b>Creator:</b> the class that contains a thing creates it. The floor creates its spots.</li>
+          <li><b>Controller:</b> each use case enters through a thin service method that coordinates.</li>
+          <li>If a verb needs data from three classes, it goes in the service, and the three classes each answer one question.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">CRC cards, in your head</span>For each class, one line: its <b>C</b>lass name, its <b>R</b>esponsibilities, and its <b>C</b>ollaborators. If a class has no responsibility beyond holding fields, merge it or make it a record. If it has more than three, split it. It takes thirty seconds per class and prevents the god class.</div>
+      <div class="note warn"><span class="lbl">The anaemic model</span>Classes with only getters and setters, and a <code>Manager</code> that does everything with them, is the most common LLD failure. Interviewers read it as procedural code in class-shaped files. Behaviour belongs next to its data.</div>
+    </div>
+  </div>
+</section>

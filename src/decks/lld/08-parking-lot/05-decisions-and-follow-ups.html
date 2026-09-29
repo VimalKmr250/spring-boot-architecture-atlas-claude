@@ -1,0 +1,37 @@
+<section class="slide" data-sec="Parking lot" data-title="Parking lot · decisions and follow-ups">
+  <h2>Parking lot: the choices to defend, and the follow-ups to expect</h2>
+  <p class="dek">An interviewer spends the last fifteen minutes here. They pick one decision and ask why, then add a requirement and watch how much of the design moves. For each follow-up below, the answer names the classes that change. If the answer is "just one", the design is doing its job.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>Vehicle type as an enum</td><td>Types differ only in data. A sealed interface if they start to behave differently.</td></tr>
+          <tr><td>Free queues per size</td><td>Claiming is O(number of sizes), not O(spots). The alternative, scanning, is fine for 50 spots and wrong for 5,000.</td></tr>
+          <tr><td>Lock per floor</td><td>Gates on different floors do not contend. One lot-wide lock is simpler and also correct.</td></tr>
+          <tr><td><code>Optional</code> for "full"</td><td>A full lot is a normal outcome, not an error. A duplicate plate or a used ticket <b>is</b> an error, so those throw.</td></tr>
+          <tr><td>Pricing captured on the ticket</td><td>A price change never surprises a driver already inside. The alternative, price at exit, needs the lot to say so at the gate.</td></tr>
+          <tr><td>Injected <code>Clock</code></td><td>Fees are testable without sleeping, and the demo is deterministic.</td></tr>
+          <tr><td>Ticket removed before release</td><td><code>ConcurrentHashMap.remove</code> is atomic, so two exit gates cannot both redeem a ticket.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">"Two cars grab the last spot at once"</span>The most common concurrency follow-up. Here it is safe: <code>claim</code> is <code>synchronized</code>, so polling the free queue and occupying the spot is one atomic step, and the second car sees an empty queue. The plate check uses <code>Set.add</code>, which is atomic on a concurrent set, rather than a <code>contains</code> followed by an <code>add</code>, which would race. With a database behind it, the same guarantee comes from a conditional update (<code>UPDATE spot SET vehicle=? WHERE id=? AND vehicle IS NULL</code>) and checking that one row changed. See <a data-deck="lld" data-slide="Idempotency and optimistic locking">optimistic locking</a>.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>EV charging spots</td><td>A <code>charger</code> flag on <code>ParkingSpot</code> and on <code>Vehicle</code>; the floor keeps charger queues per size and tries them first for EVs. Pricing adds an energy charge as a decorator.</td></tr>
+        <tr><td>"Nearest to the lift" or "fill top floors first"</td><td>Extract the floor order and spot choice into a <code>SpotSelectionStrategy</code>. The lot asks it instead of looping in order.</td></tr>
+        <tr><td>Entrance display boards</td><td>Floors publish "spot freed/taken" events; boards subscribe (observer). The lot does not know boards exist.</td></tr>
+        <tr><td>Reservations</td><td>A <code>Reservation</code> holds a spot for a time window; <code>claim</code> skips reserved spots. It becomes the movie-booking hold problem.</td></tr>
+        <tr><td>Lost ticket</td><td>Look up the active ticket by plate (the lot already tracks plates) and charge a daily maximum.</td></tr>
+        <tr><td>Weekend or night rates</td><td>A new <code>PricingStrategy</code>, or decorators around the hourly one. No other class changes.</td></tr>
+        <tr><td>200 lots, one app</td><td>The model is per lot; state moves to a database keyed by lot id, and the lock becomes a conditional update. See <a data-deck="lld" data-slide="From one JVM to many">Scale and distribution</a>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

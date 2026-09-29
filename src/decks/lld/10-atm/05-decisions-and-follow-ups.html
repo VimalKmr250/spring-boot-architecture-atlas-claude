@@ -1,0 +1,35 @@
+<section class="slide" data-sec="ATM" data-title="ATM · decisions and follow-ups">
+  <h2>ATM: the choices to defend, and the follow-ups to expect</h2>
+  <p class="dek">ATM follow-ups split into two kinds. New features (deposits, transfers, PIN change) test whether the state machine absorbs them. Failures (a timeout from the bank, power loss mid-dispense) test whether you think about money in two places. Have one answer ready for each kind.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>State classes</td><td>Each state handles every event in one place, and illegal actions fall to a safe default. An enum with a <code>switch</code> in five methods is the alternative, and it grows badly.</td></tr>
+          <tr><td>States return the next state</td><td>Transitions are visible where they happen. The alternative, <code>atm.setState(...)</code> from inside a state, hides them in side effects.</td></tr>
+          <tr><td>Plan, debit, dispense, or reverse</td><td>Cheap checks first; the debit before the cash; a compensating reversal if the cash fails. Never dispense before a successful debit.</td></tr>
+          <tr><td>Backing-off note chain</td><td>Correct with limited notes where greedy is not. The chain is still extensible: a ₹2,000 slot is one more link.</td></tr>
+          <tr><td><code>Bank</code> interface</td><td>Tests use an in-memory bank; production uses a network client. The ATM code is identical.</td></tr>
+          <tr><td>Reversal is idempotent</td><td>A retried reversal cannot refund twice, because the bank forgets a debit once it is reversed.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">"The cash came out but the bank never heard back"</span>The debit request timed out, so the ATM does not know whether it succeeded. Retrying could charge twice; not retrying could give free cash. The real answer: every debit carries a <b>request id</b> the ATM generates, and the bank treats a repeat of the same id as the same debit. The ATM retries until it gets an answer, and a nightly reconciliation compares the ATM's journal (what it dispensed) with the bank's ledger. See <a data-deck="lld" data-slide="Idempotency and optimistic locking">idempotency</a>.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>Deposits</td><td>A <code>deposit</code> event on <code>AtmState</code> (default: refuse), handled in <code>Authenticated</code>. Cash is counted before crediting; the credit is pending until the notes are verified.</td></tr>
+        <tr><td>Transfers, PIN change, mini-statement</td><td>One event each on <code>Authenticated</code>, each a call to a new <code>Bank</code> method. No other state changes, because the defaults already refuse.</td></tr>
+        <tr><td>Session timeout</td><td>A timer calls <code>atm.timeout()</code>; <code>CardInserted</code> and <code>Authenticated</code> return the card and go to <code>Idle</code>. Some banks keep the card instead.</td></tr>
+        <tr><td>Maintenance: refill cash</td><td>A separate <code>MaintenanceOps</code> interface on the ATM, used only by the operator's panel, allowed only in <code>Idle</code> or <code>OutOfService</code>. See <a data-deck="lld" data-slide="Interface segregation">ISP</a>.</td></tr>
+        <tr><td>Audit trail</td><td>Every event becomes a command object appended to a journal before it runs, so the machine's history can be replayed after a crash. See <a data-deck="lld" data-slide="Command">Command</a>.</td></tr>
+        <tr><td>Many banks</td><td>A <code>BankRouter</code> implements <code>Bank</code> and picks the issuing bank from the card number. The ATM still sees one <code>Bank</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

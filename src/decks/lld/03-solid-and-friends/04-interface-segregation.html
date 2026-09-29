@@ -1,0 +1,51 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Interface segregation">
+  <h2>I · No client should depend on methods it does not use</h2>
+  <p class="dek">A fat interface forces every implementer to provide methods it cannot support, and every caller to depend on methods it never calls. Split interfaces by client, the way each caller uses them. It is LSP's partner: most <code>UnsupportedOperationException</code>s mean an interface is too wide.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Before · one interface for every machine</div>
+<pre><code class="language-java">interface OfficeMachine {
+    void print(Document d);
+    void scan(Document d);
+    void fax(Document d, String number);
+}
+
+final class BasicPrinter implements OfficeMachine {
+    public void print(Document d) { /* works */ }
+    public void scan(Document d) {
+        throw new UnsupportedOperationException();   // LSP broken too
+    }
+    public void fax(Document d, String n) {
+        throw new UnsupportedOperationException();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">After · one role per interface</div>
+<pre><code class="language-java">interface Printer { void print(Document d); }
+interface Scanner { void scan(Document d); }
+interface Fax     { void fax(Document d, String number); }
+
+final class BasicPrinter implements Printer {
+    public void print(Document d) { /* works */ }
+}
+final class MultiFunctionDevice implements Printer, Scanner, Fax {
+    public void print(Document d) { }
+    public void scan(Document d) { }
+    public void fax(Document d, String number) { }
+}
+
+final class PayslipJob {             // needs printing and nothing else
+    private final Printer printer;
+    PayslipJob(Printer printer) { this.printer = printer; }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>In the library problem</h4><p>A reference book can be read but not borrowed. Give the catalogue item a <code>Borrowable</code> role instead of a <code>borrow()</code> that throws for reference books.</p></div>
+    <div class="card"><h4>In the ATM problem</h4><p>The customer screen and the maintenance panel use the same machine through different interfaces: <code>CustomerSession</code> and <code>MaintenanceOps</code>. A customer can never reach <code>refillCash</code>.</p></div>
+    <div class="card"><h4>How narrow is too narrow</h4><p>One interface per method is rarely right. Group methods that the same client always uses together. <code>Comparable</code> has one method and is perfect; <code>Collection</code> has fifteen and is fine because its callers use them together.</p></div>
+  </div>
+</section>
