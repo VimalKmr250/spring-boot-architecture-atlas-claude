@@ -1,0 +1,44 @@
+<section class="slide" data-sec="Guarantees" data-title="Delivery semantics">
+  <h2>At-most-once, at-least-once, and the exactly-once conversation</h2>
+  <p class="dek">The most common interview question in this area, and the one most often answered wrongly with confidence. The precise answer is short and the reasoning behind it is what is being tested.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Semantic</th><th>How you get it</th><th>You may lose</th><th>You may duplicate</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td>At-most-once</td><td>Commit the offset <em>before</em> processing; <code>acks=0</code></td><td class="num">yes</td><td class="num">no</td><td>Metrics, telemetry, anything where loss is cheaper than a duplicate</td></tr>
+        <tr><td>At-least-once</td><td>Commit the offset <em>after</em> processing; <code>acks=all</code></td><td class="num">no</td><td class="num">yes</td><td><b>Almost everything.</b> The default you should design for</td></tr>
+        <tr><td>Exactly-once (within Kafka)</td><td>Transactional producer + <code>isolation.level=read_committed</code></td><td class="num">no</td><td class="num">no*</td><td>Kafka-to-Kafka processing: Streams, read-process-write</td></tr>
+        <tr><td>Exactly-once <em>effects</em></td><td>At-least-once delivery into an <b>idempotent</b> handler</td><td class="num">no</td><td class="num">no observable effect</td><td>Any external side effect: a database write, a payment, an email</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note bad"><span class="lbl">Where "exactly-once" stops</span>Kafka's EOS covers <b>Kafka to Kafka</b> — consume, transform, produce, commit offsets, all in one transaction. The moment your handler writes to PostgreSQL or calls a payment gateway, that external system is outside the transaction and the guarantee ends there.
+    <p style="margin-top:8px">So the correct sentence is: <em>"exactly-once processing within Kafka, and exactly-once effects elsewhere by making the handler idempotent."</em></p></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">The settings behind each guarantee</div>
+<pre><code class="language-yaml"># Producer — do not lose writes
+acks: all                       # client default SINCE KAFKA 3.0 (was 1 before).
+                                # Pin it: acks=1 acknowledges on the leader alone,
+                                # so a failover before replication loses the write.
+enable.idempotence: true        # nominally default true in 3.0, but a config-validation
+                                # bug (KAFKA-13598) meant it only took effect from
+                                # 3.0.1/3.1.1/3.2.0 — so pin it. Requires acks=all,
+                                # and de-duplicates producer retries in a session
+min.insync.replicas: 2          # TOPIC setting; with acks=all and RF=3 this is
+                                # what actually makes the durability promise real
+
+# Consumer — do not lose messages
+enable.auto.commit: false       # RAW-CLIENT default is true, committing on a timer
+                                # regardless of success. Spring's container already
+                                # forces false — set it anyway so it is visible.
+isolation.level: read_committed # skip records from aborted transactions</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl"><code>acks=all</code> alone is not enough</span>With replication factor 3 and <code>min.insync.replicas=1</code>, "all" can mean "the leader only" when the followers are lagging. The pair that makes a real durability promise is <b>RF=3 and min.insync.replicas=2</b>: the write survives losing one broker, and the partition goes read-only rather than silently accepting unsafe writes when two are down.</div>
+    </div>
+  </div>
+</section>
+

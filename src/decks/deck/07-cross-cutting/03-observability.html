@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Cross-cutting" data-title="Observability">
+  <h2>Observability: one trace id, end to end, across the async hop</h2>
+  <p class="dek">Logs, metrics and traces are not three tools — they are three views joined by shared identifiers. The join is the whole value, and the place it usually breaks is the message queue.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 190" role="img" aria-label="A single trace id propagates from the browser through gateway, BFF and the order module via HTTP headers, then across Kafka via message headers into the inventory consumer, joining logs metrics and traces">
+        <rect x="14" y="44" width="110" height="44" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="69" y="70" text-anchor="middle" font-size="11" fill="currentColor">Browser</text>
+        <rect x="158" y="44" width="110" height="44" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="213" y="70" text-anchor="middle" font-size="11" fill="currentColor">Gateway</text>
+        <rect x="302" y="44" width="110" height="44" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="357" y="70" text-anchor="middle" font-size="11" fill="currentColor">order module</text>
+        <rect x="446" y="44" width="110" height="44" rx="7" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="501" y="70" text-anchor="middle" font-size="11" fill="currentColor">Kafka</text>
+        <rect x="590" y="44" width="130" height="44" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="655" y="70" text-anchor="middle" font-size="11" fill="currentColor">inventory consumer</text>
+
+        <line x1="126" y1="66" x2="154" y2="66" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="270" y1="66" x2="298" y2="66" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="414" y1="66" x2="442" y2="66" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="558" y1="66" x2="586" y2="66" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+
+        <text x="213" y="30" text-anchor="middle" font-size="9.5" fill="#D26A3F">traceparent: header</text>
+        <text x="501" y="30" text-anchor="middle" font-size="9.5" fill="#D26A3F">message header —</text>
+        <text x="501" y="18" text-anchor="middle" font-size="9.5" fill="#D26A3F">the hop teams forget</text>
+
+        <line x1="14" y1="110" x2="866" y2="110" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="132" font-size="11" fill="currentColor" opacity="0.8">Every log line on this path carries <tspan font-family="monospace" fill="#D26A3F">trace_id=4bf92f3577b34da6</tspan> · every span carries it · every error metric is exemplar-linked to it</text>
+        <text x="14" y="154" font-size="11" fill="currentColor" opacity="0.8">Support ticket → customer quotes the trace id from the error page → you have the whole journey, including the async tail, in one query.</text>
+        <text x="14" y="176" font-size="11" fill="#A22636">Without propagation across the Kafka hop, the trace ends at "published" and the consumer's failure looks unrelated to the order it came from.</text>
+      </svg>
+    </div>
+    <figcaption>Spring Boot's Micrometer integration instruments the HTTP hops automatically; the Kafka hop needs the observation-enabled template and container, which is a two-line config change and the difference between a complete trace and a dead end.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">application.yaml — the observability baseline</div>
+<pre><code class="language-yaml">management:
+  endpoints.web.exposure.include: health,info,prometheus,metrics
+  endpoint.health.probes.enabled: true      # /readiness and /liveness, separately
+  metrics.tags.application: ${spring.application.name}
+  tracing.sampling.probability: 0.1
+  otlp.tracing.endpoint: http://collector:4318/v1/traces
+
+spring:
+  kafka:
+    template.observation-enabled: true      # producer spans
+    listener.observation-enabled: true      # consumer spans — joins the trace
+logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
+    </div>
+    <div class="note tip"><span class="lbl">Cardinality kills</span>A metric tagged with <code>orderId</code> or <code>customerId</code> creates millions of time series and takes your monitoring stack down. Tags are for bounded dimensions — endpoint, status, module, outcome. High-cardinality identifiers belong in logs and traces, joined by trace id.
+    <p style="margin-top:10px">Separate <b>liveness</b> (restart me) from <b>readiness</b> (send me traffic). Conflating them means a slow dependency triggers a restart loop across the whole fleet.</p></div>
+  </div>
+</section>
+

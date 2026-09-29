@@ -1,0 +1,118 @@
+<section class="slide" data-sec="28 · Knapsack / subset DP" data-title="The reusable structure">
+  <h2>One array, and two loop decisions</h2>
+  <p class="dek">The body barely changes between problems. What changes is the direction of the capacity loop and, when counting, which loop sits outside — and those two choices define four different problems.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">0/1 knapsack — each item at most once</div>
+<pre><code class="language-java">/**
+ * dp[c] = the best value achievable with capacity exactly c
+ *         (or "is c reachable", for the boolean form).
+ *
+ * The capacity loop runs BACKWARDS. Reading dp[c - w] before it is
+ * overwritten means reading the PREVIOUS row — so this item has not
+ * yet been used, and cannot be used twice.
+ */
+boolean canPartition(int[] nums) {
+    int total = 0;
+    for (int v : nums) total += v;
+
+    // Two equal halves need an even total. Cheap impossibility test.
+    if (total % 2 != 0) return false;
+    int target = total / 2;
+
+    boolean[] dp = new boolean[target + 1];
+    dp[0] = true;                       // the empty subset sums to 0
+
+    for (int v : nums) {
+        // BACKWARDS. Forwards would let one item be counted repeatedly.
+        for (int c = target; c &gt;= v; c--) {
+            dp[c] |= dp[c - v];
+        }
+    }
+    return dp[target];
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Unbounded, and the counting loop order (LC 518)</div>
+<pre><code class="language-java">// UNBOUNDED: capacity FORWARDS, so dp[c - coin] may already
+// include this coin — which is exactly reuse.
+//
+// COMBINATIONS vs PERMUTATIONS is a SEPARATE decision, made by
+// which loop is on the outside:
+
+// items OUTER  ->  COMBINATIONS. Each coin is fully considered
+// before the next, so 1+2 and 2+1 are the same single way.
+int change(int amount, int[] coins) {
+    int[] dp = new int[amount + 1];
+    dp[0] = 1;                          // one way to make zero: take nothing
+
+    for (int coin : coins) {            // items outside
+        for (int c = coin; c &lt;= amount; c++) {   // capacity forwards
+            dp[c] += dp[c - coin];
+        }
+    }
+    return dp[amount];
+}
+
+// capacity OUTER  ->  PERMUTATIONS. Every coin is reconsidered at
+// every amount, so 1+2 and 2+1 count separately. That is LC 377,
+// a different problem with almost identical code.
+// for (int c = 1; c &lt;= amount; c++)
+//     for (int coin : coins)
+//         if (coin &lt;= c) dp[c] += dp[c - coin];</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Reframing a problem into a knapsack (LC 494, 1049)</div>
+<pre><code class="language-java">// LC 494 — assign + or - to every number so the total is `target`.
+// Let P be the positives and N the negatives:
+//     P - N = target   and   P + N = total
+//  => P = (total + target) / 2
+// So it becomes: COUNT the subsets summing to that value.
+int findTargetSumWays(int[] nums, int target) {
+    int total = 0;
+    for (int v : nums) total += v;
+
+    // Impossible if out of range, or if the split is not an integer.
+    if (Math.abs(target) &gt; total || (total + target) % 2 != 0) return 0;
+    int subsetSum = (total + target) / 2;
+
+    int[] dp = new int[subsetSum + 1];
+    dp[0] = 1;
+
+    for (int v : nums)
+        for (int c = subsetSum; c &gt;= v; c--)   // 0/1, so BACKWARDS
+            dp[c] += dp[c - v];
+
+    return dp[subsetSum];
+}
+
+// LC 1049 — smash stones pairwise, minimise the remainder.
+// The result is |P - N| where P + N = total, so minimising it
+// means getting P as close to total/2 as possible: a 0/1 knapsack
+// maximising the reachable sum under total/2.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The decision table</h3>
+      <div class="tblwrap" style="margin-top:10px">
+        <table class="tbl">
+          <thead><tr><th>Want</th><th>capacity loop</th><th>outer loop</th><th>cell op</th></tr></thead>
+          <tbody>
+            <tr><td>subset exists</td><td>backwards</td><td>items</td><td><code>|=</code></td></tr>
+            <tr><td>count subsets</td><td>backwards</td><td>items</td><td><code>+=</code></td></tr>
+            <tr><td>best value, one use</td><td>backwards</td><td>items</td><td><code>max</code></td></tr>
+            <tr><td>count combinations</td><td>forwards</td><td>items</td><td><code>+=</code></td></tr>
+            <tr><td>count permutations</td><td>forwards</td><td>capacity</td><td><code>+=</code></td></tr>
+            <tr><td>fewest items</td><td>forwards</td><td>either</td><td><code>min</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Capacity loop forwards in a 0/1 problem</b> — items get reused and the answer is too large. On <code>[1,1]</code> with target 2 it reports true from a single 1. <b>Loop order wrong when counting</b> — combinations become permutations, so LC 518 returns a much larger number that still looks plausible. <b><code>dp[0]</code> left at zero</b> — the empty subset is a genuine way to make 0, and omitting it makes every count zero.</div>
+  </div>
+</section>
+

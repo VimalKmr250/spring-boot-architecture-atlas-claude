@@ -1,0 +1,55 @@
+<section class="slide" data-sec="Foundations" data-title="Choreography vs orchestration">
+  <h2>Choreography vs orchestration</h2>
+  <p class="dek">Two ways to get a multi-step business process done with events. The choice is usually made by accident and regretted at step five.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Choreography: each service reacts to the previous service's event in a chain with no central coordinator. Orchestration: a central saga issues commands to each service and receives replies, holding the process state">
+        <text x="14" y="16" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">CHOREOGRAPHY — each service reacts; nobody owns the flow</text>
+        <rect x="14" y="30" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="62" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">order</text>
+        <rect x="178" y="30" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="226" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">payment</text>
+        <rect x="342" y="30" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="390" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">inventory</text>
+        <rect x="506" y="30" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="554" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">fulfilment</text>
+        <line x1="112" y1="50" x2="174" y2="50" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="143" y="43" text-anchor="middle" font-size="8" fill="#3AA79B">OrderPlaced</text>
+        <line x1="276" y1="50" x2="338" y2="50" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="307" y="43" text-anchor="middle" font-size="8" fill="#3AA79B">PaymentTaken</text>
+        <line x1="440" y1="50" x2="502" y2="50" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="471" y="43" text-anchor="middle" font-size="8" fill="#3AA79B">StockReserved</text>
+        <text x="626" y="42" font-size="10" fill="currentColor" opacity="0.75">✓ no coordinator, lowest coupling</text>
+        <text x="626" y="58" font-size="10" fill="#A22636">✕ "where is order 88421 stuck?" has</text>
+        <text x="626" y="72" font-size="10" fill="#A22636">no owner and no single answer</text>
+
+        <line x1="14" y1="104" x2="866" y2="104" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="126" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">ORCHESTRATION — one component owns the process and its state</text>
+        <rect x="300" y="140" width="150" height="54" rx="8" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="375" y="162" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">OrderSaga</text>
+        <text x="375" y="180" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">persisted state + timeouts</text>
+        <rect x="26" y="146" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="74" y="171" text-anchor="middle" font-size="10.5" fill="currentColor">payment</text>
+        <rect x="160" y="210" width="96" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="208" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">inventory</text>
+        <rect x="494" y="210" width="96" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="542" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">fulfilment</text>
+        <rect x="628" y="146" width="96" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="676" y="171" text-anchor="middle" font-size="10.5" fill="currentColor">notification</text>
+        <line x1="296" y1="160" x2="126" y2="164" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)" marker-start="url(#arwA)"></line>
+        <line x1="330" y1="196" x2="240" y2="212" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)" marker-start="url(#arwA)"></line>
+        <line x1="424" y1="196" x2="508" y2="212" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)" marker-start="url(#arwA)"></line>
+        <line x1="454" y1="162" x2="624" y2="164" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)" marker-start="url(#arwA)"></line>
+        <text x="742" y="212" font-size="10" fill="currentColor" opacity="0.75">✓ one place to query,</text>
+        <text x="742" y="226" font-size="10" fill="currentColor" opacity="0.75">one place for timeouts</text>
+        <text x="736" y="242" font-size="10" fill="currentColor" opacity="0.6">✕ knows every step</text>
+      </svg>
+    </div>
+    <figcaption>A useful middle: choreograph <em>within</em> a bounded context where the chain is two or three steps and one team owns it all; orchestrate <em>across</em> contexts, where the flow crosses ownership and someone will be asked where an order is stuck.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The rule of five</span>Past about four steps, choreography stops being cheaper. The flow exists only in people's heads and in traces; onboarding takes weeks; and a change to the order of steps requires coordinating four teams who each own one arrow. For enterprise processes with money in them, orchestrate.</div>
+</section>
+

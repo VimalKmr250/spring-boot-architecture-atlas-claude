@@ -1,0 +1,78 @@
+<section class="slide" data-sec="02 · Two pointers" data-title="Mechanics">
+  <h2>Start at both ends and prove one side is useless</h2>
+  <p class="dek">A sliding window walks two pointers in the same direction. Two pointers walks them <b>towards each other</b>, and the pattern lives or dies on one argument: at every step you must be able to prove that one of the two ends can never participate in a better answer, so discarding it is safe.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The optimal answer always lies within <code>[l, r]</code>. Each step either records a candidate or strictly narrows the range — never both pointers at once, unless the step is provably neutral.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">That invariant is only maintainable when the data is <b>ordered</b> — either literally sorted, or ordered by some property such as height or distance. Sorting first is not a preprocessing detail; it is what creates the ordering the discard argument depends on.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Total movement is bounded by <code>n</code>, so the scan is O(n) and the sort dominates at O(n log n).</p>
+    </div>
+    <div class="panel">
+      <h3>The discard argument, in two shapes</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Sum target</dt><dd>Array is sorted. If <code>a[l] + a[r] &lt; target</code>, then <code>a[l]</code> paired with <em>anything</em> still in range is also too small — <code>a[r]</code> was its best remaining partner. So <code>l</code> can never be part of a solution: advance it. Symmetrically for too large.</dd>
+        <dt>Bounded by the weaker end</dt><dd>Container and rain-water problems. The value is capped by <code>min(h[l], h[r])</code> and the width only shrinks, so keeping the <em>shorter</em> side can never beat what you already recorded. Discard the shorter.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">If you cannot state one of these two arguments for your problem, two pointers is the wrong pattern and you will get a subtly wrong answer rather than a slow one.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 226" role="img" aria-label="Two pointers converging from both ends, with the discard rule for sum-target and for weakest-end problems">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">CONVERGING FROM BOTH ENDS</text>
+
+        <rect x="60" y="34" width="60" height="32" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <rect x="122" y="34" width="60" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="184" y="34" width="60" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="246" y="34" width="60" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="308" y="34" width="60" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="370" y="34" width="60" height="32" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="90" y="55" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">a[l]</text>
+        <text x="400" y="55" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">a[r]</text>
+        <text x="245" y="55" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.45">still in play</text>
+
+        <path d="M96 84 L96 72" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <text x="96" y="100" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">l</text>
+        <path d="M394 84 L394 72" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <text x="394" y="100" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">r</text>
+
+        <path d="M110 112 L180 112" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></path>
+        <path d="M380 112 L310 112" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></path>
+        <text x="245" y="116" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">they only ever converge</text>
+
+        <text x="60" y="142" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">sorted, so everything between l and r lies between a[l] and a[r]</text>
+
+        <!-- the two discard rules -->
+        <line x1="470" y1="28" x2="470" y2="150" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <rect x="500" y="30" width="366" height="52" rx="7" fill="#D26A3F" fill-opacity="0.09" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="514" y="48" font-size="11.5" font-weight="600" fill="currentColor">Rule A · sum target</text>
+        <text x="514" y="64" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.75">sum &lt; target → l++   ·   sum &gt; target → r--</text>
+        <text x="514" y="77" font-size="10" fill="currentColor" opacity="0.6">a[r] was already a[l]'s best partner left, so a[l] is finished</text>
+
+        <rect x="500" y="92" width="366" height="52" rx="7" fill="#3AA79B" fill-opacity="0.09" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="514" y="110" font-size="11.5" font-weight="600" fill="currentColor">Rule B · bounded by the weaker end</text>
+        <text x="514" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.75">h[l] &lt; h[r] → l++   ·   otherwise → r--</text>
+        <text x="514" y="139" font-size="10" fill="currentColor" opacity="0.6">width only shrinks, so keeping the shorter side cannot help</text>
+
+        <line x1="14" y1="162" x2="866" y2="162" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="180" font-size="11.5" font-weight="600" fill="#D26A3F">The k-sum reduction</text>
+        <text x="14" y="197" font-size="10.5" fill="currentColor" opacity="0.68">2Sum on a sorted array is O(n). Fix one element and you have 3Sum in O(n²). Fix two and you have 4Sum in O(n³).</text>
+        <text x="14" y="212" font-size="10.5" fill="currentColor" opacity="0.68">Every k-sum is "sort once, then k−2 nested loops around the same two-pointer core" — one idea, four problems.</text>
+      </svg>
+    </div>
+    <figcaption>Rule A and Rule B are the only two discard arguments in this family. Naming which one you are using, out loud, is how you avoid writing a converging loop that quietly skips the optimum.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The data is sorted (or you may sort it), and you are looking for a <b>pair, triple or k-tuple</b>, or for a value bounded by the weaker of two ends. Also the in-place variant: a read pointer and a write pointer moving the same way.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Order matters to the answer — sorting destroys the original indices, so a problem that asks you to <em>return indices</em> from unsorted input rules this out. Also when you need every subarray rather than every pair.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n log n)</b> dominated by the sort, or <b>O(n)</b> if the input arrives sorted. k-sum costs <b>O(n<sup>k−1</sup>)</b>. Space is <b>O(1)</b> beyond the output and the sort's own working memory.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the array is sorted in non-decreasing order"</b> (an explicit invitation) · <b>"find two/three/four numbers such that…"</b> · <b>"return the indices of the two numbers"</b> · <b>"closest to target"</b> · <b>"container / area / trapped"</b> · <b>"remove duplicates in place"</b> · <b>"without using extra space"</b>. That last phrase is decisive: O(1) space on an array problem almost always means pointers, not a map.</div>
+</section>
+

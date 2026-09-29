@@ -1,0 +1,75 @@
+<section class="slide" data-sec="10 · Monotonic deque" data-title="Mechanics">
+  <h2>A sorted spine that can also drop its oldest element</h2>
+  <p class="dek">A monotonic stack discards what is dominated. A monotonic <b>deque</b> does that too, but adds a second eviction rule: elements that have fallen out of the window are removed from the <em>front</em>. Two eviction rules, two ends, and the maximum of every window becomes available in O(1).</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The deque holds indices whose values are <b>decreasing</b> from front to back. Two consequences follow, and both are used on every step:</p>
+      <ul class="checks tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li>The <b>front is always the maximum</b> of the current window — no scan needed.</li>
+        <li>Anything smaller than an arriving element is useless forever, because the newcomer is both larger <em>and</em> stays in the window longer.</li>
+      </ul>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">That second point is the whole justification. A smaller, older element can never be the answer again — so it is not merely delayed, it is dead.</p>
+    </div>
+    <div class="panel">
+      <h3>Three moves, always in this order</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Expire the front</b> while it has fallen outside the window. This is the rule a stack cannot express.</li>
+        <li><b>Evict the back</b> while it is dominated by the arriving value, then push the new index.</li>
+        <li><b>Read the front</b> — that is the window's answer.</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Each index is pushed once and removed once, from one end or the other, so the total work is <b>2n</b> — amortised O(1) per element despite two inner loops.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Store indices, never values: the expiry test needs positions.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="A monotonic deque with expiry at the front and domination eviction at the back">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TWO EVICTION RULES, ONE AT EACH END</text>
+
+        <rect x="150" y="60" width="480" height="54" rx="8" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <text x="390" y="50" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">the deque — values decrease front to back</text>
+
+        <rect x="170" y="72" width="80" height="30" rx="5" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="210" y="92" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">9</text>
+        <rect x="258" y="72" width="80" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="298" y="92" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <rect x="346" y="72" width="80" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="386" y="92" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">4</text>
+        <rect x="434" y="72" width="80" height="30" rx="5" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+        <text x="474" y="92" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">2</text>
+
+        <text x="210" y="124" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#D26A3F">front = the answer</text>
+        <text x="474" y="124" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">back</text>
+
+        <path d="M144 87 L100 87" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></path>
+        <text x="14" y="82" font-size="11" font-weight="600" fill="#D26A3F">1 · expire</text>
+        <text x="14" y="98" font-size="10" fill="currentColor" opacity="0.65">index too old</text>
+        <text x="14" y="111" font-size="10" fill="currentColor" opacity="0.65">for the window</text>
+
+        <path d="M640 87 L690 87" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></path>
+        <text x="700" y="82" font-size="11" font-weight="600" fill="#3AA79B">2 · evict</text>
+        <text x="700" y="98" font-size="10" fill="currentColor" opacity="0.65">smaller than the</text>
+        <text x="700" y="111" font-size="10" fill="currentColor" opacity="0.65">arriving value</text>
+
+        <line x1="14" y1="146" x2="866" y2="146" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="168" font-size="11.5" font-weight="600" fill="currentColor">Why a smaller, older element is dead — not merely waiting</text>
+        <text x="14" y="190" font-size="11" fill="currentColor" opacity="0.75">Suppose <tspan font-family="monospace">a[j] &gt;= a[i]</tspan> and <tspan font-family="monospace">j &gt; i</tspan>. Then <tspan font-family="monospace">j</tspan> is larger, and it also survives in the window strictly longer than <tspan font-family="monospace">i</tspan> does.</text>
+        <text x="14" y="210" font-size="11" fill="currentColor" opacity="0.75">So every future window containing <tspan font-family="monospace">i</tspan> also contains <tspan font-family="monospace">j</tspan>, and <tspan font-family="monospace">j</tspan> beats it. Nothing is lost by deleting <tspan font-family="monospace">i</tspan> permanently.</text>
+        <text x="14" y="234" font-size="11" fill="currentColor" opacity="0.72">That is the argument a heap cannot exploit: a heap keeps the stale entries and pays <tspan font-family="monospace">log n</tspan> to skip them later.</text>
+      </svg>
+    </div>
+    <figcaption>The front eviction is what separates this from a monotonic stack. A stack can only remove from the end it pushes to, so it has no way to say "this element is now too old to count".</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>You need the max or min over a <b>sliding range</b>, or a DP transition of the form <code>dp[i] = a[i] + max(dp[j])</code> over a moving band of <code>j</code>. The deque replaces the inner max with an O(1) read.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Arbitrary elements are removed, or you need the k-th largest rather than the largest — those want a heap or a balanced tree. Also when the range is not contiguous.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time by push-once, remove-once, and <b>O(k)</b> space for a window of width k. A heap-based solution is O(n log n) / O(n) — say that first, then beat it.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the max sliding window"</b> · <b>"for each window of size k"</b> · <b>"the absolute difference between any two elements is at most limit"</b> (needs two deques, one for max and one for min) · <b>"at most k steps forward"</b> in a DP · <b>"the shortest subarray with sum at least k"</b> where negatives rule out a plain window. The signal is a <b>max or min over a moving range</b>, evaluated at every position.</div>
+</section>
+

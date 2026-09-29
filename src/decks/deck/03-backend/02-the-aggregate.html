@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Backend" data-title="The aggregate">
+  <h2>The aggregate: where invariants actually live</h2>
+  <p class="dek">An anaemic <code>Order</code> with getters and setters pushes every rule into a service, where it gets duplicated. Put the rules on the object that owns the data, and make illegal states unrepresentable.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">order/internal/domain/Order.java — the consistency boundary</div>
+<pre><code class="language-java">public final class Order {
+
+    private final OrderId id;
+    private final CustomerId customerId;
+    private final List&lt;OrderLine&gt; lines;
+    private OrderStatus status;
+    private Money total;
+    private long version;                    // optimistic lock, see the concurrency slide
+
+    /** Factory carries the creation rules; no public constructor, no setters. */
+    public static Order place(CustomerId customer, List&lt;OrderLine&gt; lines, Money quotedTotal) {
+        if (lines.isEmpty())                 throw new EmptyOrderException();
+        if (lines.size() &gt; MAX_LINES)        throw new OrderTooLargeException(lines.size());
+        if (!quotedTotal.equals(sum(lines))) throw new PriceMismatchException();
+        return new Order(OrderId.generate(), customer, List.copyOf(lines), PLACED, quotedTotal);
+    }
+
+    /** State transitions are methods, and each guards its own precondition. */
+    public void markPaid(PaymentReference ref) {
+        if (status != PLACED) throw new IllegalTransition(status, PAID);
+        this.status = PAID;
+        this.paymentRef = ref;
+    }
+
+    public void cancel(CancellationReason reason) {
+        if (status == SHIPPED || status == DELIVERED)
+            throw new OrderAlreadyShipped(id);   // the rule the business actually cares about
+        this.status = CANCELLED;
+    }
+
+    public Money total() { return total; }                       // no getters that leak mutability
+    public List&lt;OrderLine&gt; lines() { return List.copyOf(lines); }
+}</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Aggregate = transaction boundary</h4><p>One aggregate, one transaction, one optimistic lock. If two aggregates must change atomically, you have drawn the boundary wrong — or you need a saga.</p></div>
+    <div class="card"><h4>Reference other aggregates by ID</h4><p><code>CustomerId</code>, not <code>Customer</code>. An object graph that spans aggregates is the N+1 generator and the reason nothing can be extracted later.</p></div>
+    <div class="card"><h4>Value objects earn their keep</h4><p><code>Money</code> with a currency prevents the class of bug that <code>BigDecimal</code> plus a comment does not. Same for <code>OrderId</code> vs <code>UUID</code>.</p></div>
+  </div>
+</section>
+

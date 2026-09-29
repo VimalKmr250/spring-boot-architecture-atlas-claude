@@ -10,7 +10,7 @@
         <p class="deeper"><b>Data:</b> PostgreSQL, schema per module, no cross-schema joins. <code>order_summary</code> read model for history, maintained by events. Redis for the price cache and rate limits. OpenSearch for search, fed by events. Partition the orders table by month once it passes tens of millions of rows.</p>
         <p class="deeper"><b>Scale the bottleneck:</b> "The bottleneck at 40× is the orders write path and the inventory hot rows." Queue the non-critical work; optimistic locking plus reservation TTL on inventory; scale workers separately from web; pre-warm and raise the cache TTL for the sale window; shed load at the gateway before the database gets there.</p>
         <p class="deeper"><b>Failure and ops:</b> Payment gateway down → circuit breaker, order accepted as <code>PAYMENT_PENDING</code> with a retry job, customer told honestly. WMS down → events queue, fulfilment lags, nothing lost. Kafka down → outbox rows accumulate, the database still serves checkout. SLO 99.9% on place-order with burn-rate alerts; trace id end to end; DLT depth and consumer lag alerted.</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="System context (C4 L1)" href="#deck">Deck · System context</a><a data-deck="deck" data-slide="The whole picture" href="#deck">Deck · The whole picture</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="System context (C4 L1)">Deck · System context</a><a data-deck="deck" data-slide="The whole picture">Deck · The whole picture</a></p>
       </div></div>
 
       <div class="q"><header><i>W2</i><h3>"We have a five-year-old monolith with 400 tables. Modernise it."</h3></header><div class="qb">
@@ -21,7 +21,7 @@
         <p class="deeper"><b>Split the data:</b> schema per module, one role per module, cross-schema joins replaced by API calls or read models. Run this way for a while. "If I can't split the data, I definitely can't split the service."</p>
         <p class="deeper"><b>Then extract, one module, on evidence:</b> pick the one with a named trigger — usually the one with a different scaling profile or a compliance boundary. Interface stays, adapter swaps, feature flag, cut over, delete. Measure whether it helped before doing a second one.</p>
         <p class="deeper"><b>Close with the business framing:</b> "Each phase ships value on its own — the tracing pays for itself in incident time, the modularisation in change lead time. Nothing here requires a two-year programme with no deliverable until the end." That sentence is often what the question was really probing.</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The strangler fig" href="#deck">Deck · The strangler fig</a><a data-deck="deck" data-slide="Fitness functions" href="#deck">Deck · Fitness functions</a><a data-deck="deck" data-slide="First 90 days" href="#deck">Deck · First 90 days</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="The strangler fig">Deck · The strangler fig</a><a data-deck="deck" data-slide="Fitness functions">Deck · Fitness functions</a><a data-deck="deck" data-slide="First 90 days">Deck · First 90 days</a></p>
       </div></div>
 
       <div class="q"><header><i>W3</i><h3>"Design rate limiting for our public partner API"</h3></header><div class="qb">
@@ -32,7 +32,7 @@
         <p class="deeper"><b>Response:</b> <code>429 Too Many Requests</code> with <code>Retry-After</code>, plus remaining-quota headers (the common <code>X-RateLimit-*</code> convention, or the IETF RateLimit header fields draft), so well-behaved clients slow down before they hit the wall.</p>
         <p class="deeper"><b>Failure:</b> Decide deliberately what happens when Redis is down. For a protective limit, fail open to a coarse in-memory limiter on each instance (the limit divided by the instance count), so the limiter's store failing does not take the API down with it. For a contractual limit, you might fail closed. Across regions, give each region its share of the budget rather than making a synchronous cross-region check on every request.</p>
         <p class="deeper"><b>Operate it:</b> Keep limits in configuration, changeable without a deploy. Graph 429s per partner and alert when a top partner starts being limited, because that is often an incident on their side, or a bug on ours. Close with: "Partners should be able to see their own limits and usage. A rate limiter is part of the product, not only a defence."</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Gateway configuration" href="#deck">Deck · Gateway configuration</a><a data-deck="deck" data-slide="Resilience" href="#deck">Deck · Resilience</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Gateway configuration">Deck · Gateway configuration</a><a data-deck="deck" data-slide="Resilience">Deck · Resilience</a></p>
       </div></div>
 
       <div class="q"><header><i>W4</i><h3>"Design a flash sale: 10,000 units, 500,000 people, starting at noon"</h3></header><div class="qb">
@@ -43,7 +43,7 @@
         <p class="deeper"><b>Idempotency and abuse:</b> A unique constraint on (customer, sale) and an idempotency key on the purchase request, so double clicks and retries cannot take two units. Limits per account and per device at the edge. Optionally, allow only accounts created before the sale was announced.</p>
         <p class="deeper"><b>Payment and failure:</b> Payment follows the reservation. If it fails or times out, the reservation is released back to the pool. When stock runs out, flip one flag that the CDN serves, so the sold-out page never touches the origin. Shed load at the gateway with a queue page rather than letting the database become the queue. Load-test at twice the forecast the week before, and have a kill switch.</p>
         <p class="deeper"><b>Close with the invariant:</b> "Every 'no' comes from the edge or from Redis in milliseconds. Only the ten thousand winners ever touch the database."</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck">Deck · Concurrency and idempotency</a><a data-deck="deck" data-slide="Caching" href="#deck">Deck · Caching</a><a data-deck="sb" data-slide="Load testing" href="#springboot">Boot · Load testing</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency">Deck · Concurrency and idempotency</a><a data-deck="deck" data-slide="Caching">Deck · Caching</a><a data-deck="sb" data-slide="Load testing">Boot · Load testing</a></p>
       </div></div>
 
       <div class="q"><header><i>W5</i><h3>"Checkout errors spiked ten minutes ago. You're on call. Talk me through it."</h3></header><div class="qb">
@@ -54,7 +54,7 @@
         <p class="deeper"><b>Diagnose, if no change explains it or the rollback did not help:</b> The RED dashboard shows which endpoint and which status codes. Are they 5xx errors or timeouts? Trace one failing request. Check the dependency dashboard: is a breaker open, has the gateway's latency jumped? Check pool saturation, then the logs filtered by trace id.</p>
         <p class="deeper"><b>Confirm recovery:</b> The error rate is back inside the SLO, consumer lag is draining, and nothing is stuck. Orders left in <code>PAYMENT_PENDING</code> get retried, and a reconciliation run finds anything that needs repair, such as duplicates or half-processed orders.</p>
         <p class="deeper"><b>Postmortem:</b> Blameless, with a timeline, contributing factors (usually several, not one root cause), what slowed detection and mitigation, and action items with owners. The permanent change is the part interviewers want to hear.</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="SLOs and alerting" href="#deck">Deck · SLOs and alerting</a><a data-deck="ed" data-slide="Failure scenarios" href="#events">Events · Failure scenarios</a><a data-deck="ed" data-slide="Replay playbook" href="#events">Events · Replay playbook</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="SLOs and alerting">Deck · SLOs and alerting</a><a data-deck="ed" data-slide="Failure scenarios">Events · Failure scenarios</a><a data-deck="ed" data-slide="Replay playbook">Events · Replay playbook</a></p>
       </div></div>
     </section>
 

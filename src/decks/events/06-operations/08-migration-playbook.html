@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Operations" data-title="Migration playbook">
+  <h2>Moving an existing system to events</h2>
+  <p class="dek">You almost never build event-driven from scratch — you convert something. Six phases, each shipping value on its own, none requiring a big bang.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="tag a">1–2</span> Prepare</h3>
+      <ul class="checks tight">
+        <li><b>Map the synchronous calls</b> and classify each: must succeed now, or a reaction? Only the second group moves.</li>
+        <li><b>Add the outbox</b> to the producing service and publish events <em>alongside</em> the existing calls. Nothing consumes them yet.</li>
+        <li>Verify the event stream matches reality — counts, totals, timing — before anyone depends on it.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">3–4</span> Shift one consumer</h3>
+      <ul class="checks tight">
+        <li>Pick the <b>least critical</b> reaction — search indexing, analytics, notifications.</li>
+        <li>Build the consumer; run it in parallel with the synchronous call, writing to a shadow table.</li>
+        <li>Compare outputs for a week. Then switch with a flag and remove the synchronous call.</li>
+        <li>Repeat for the next consumer. One at a time.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">5</span> Harden</h3>
+      <ul class="checks tight">
+        <li>Idempotency and a DLT on every consumer before the second one goes live, not after.</li>
+        <li>Trace propagation across the hop — you will need it during phase 6.</li>
+        <li>Reconciliation job comparing source of truth to every consumer's state.</li>
+        <li>Runbook and alerts per flow.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">6</span> Only then, the interesting parts</h3>
+      <ul class="checks tight">
+        <li>Projections and read models, once the stream is trusted.</li>
+        <li>A saga, once more than one service reacts and someone asks where things are stuck.</li>
+        <li>Streams, once you have a genuine stateful or windowed requirement.</li>
+      </ul>
+      <p style="color:var(--text-3)">Teams that start at phase 6 are the ones that end up with an event-driven system they cannot debug.</p>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The parallel-run is the whole safety mechanism</span>Running the event path and the synchronous path together, comparing outputs, and only then switching is what makes this reversible at every step. It costs double processing for a few weeks. That is far cheaper than discovering in production that your event carries a subtly different meaning from the call it replaced.</div>
+</section>
+

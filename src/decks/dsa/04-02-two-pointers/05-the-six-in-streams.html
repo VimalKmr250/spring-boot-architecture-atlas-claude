@@ -1,0 +1,197 @@
+<section class="slide" data-sec="02 · Two pointers" data-title="The six, in streams">
+  <h2>Two pointers are a state machine, and <code>Stream.iterate</code> runs state machines</h2>
+  <p class="dek">Everything the loop carries fits in a small record: the pair <code>(l, r)</code>, plus a water line for 42. <code>Stream.iterate(seed, hasNext, next)</code> steps it with a pure function, and the rest of the pipeline reads the states it emits: <code>filter</code> for a hit, <code>mapToInt</code> for a score, then <code>max</code>, <code>min</code> or <code>sum</code>. All six are clean and keep the loop's time bound. The only price is one small allocation per step.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">167</td><td><a href="https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/" target="_blank" rel="noopener">Two Sum II — Input Array Is Sorted</a></td><td><code>Stream.iterate</code> over <code>(l, r)</code>; <code>filter</code> and <code>findFirst</code> stop at the hit.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">15</td><td><a href="https://leetcode.com/problems/3sum/" target="_blank" rel="noopener">3Sum</a></td><td>Fix the first value and <code>flatMap</code> every hit of its scan. <code>distinct()</code> replaces the three duplicate-skipping loops.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(out)</td><td class="num">O(n²) / O(1)</td></tr>
+        <tr><td class="num">16</td><td><a href="https://leetcode.com/problems/3sum-closest/" target="_blank" rel="noopener">3Sum Closest</a></td><td>Every sum that any scan visits, then <code>min</code> by distance to the target.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">18</td><td><a href="https://leetcode.com/problems/4sum/" target="_blank" rel="noopener">4Sum</a></td><td>Two nested <code>flatMap</code> calls fix a pair; the scan finishes in <code>long</code> arithmetic.</td><td><span class="tag g">clean</span></td><td class="num">O(n³) / O(out)</td><td class="num">O(n³) / O(1)</td></tr>
+        <tr><td class="num">11</td><td><a href="https://leetcode.com/problems/container-with-most-water/" target="_blank" rel="noopener">Container With Most Water</a></td><td>Each state of the <code>(l, r)</code> machine is a container: score it with <code>mapToInt</code>, keep the <code>max</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">42</td><td><a href="https://leetcode.com/problems/trapping-rain-water/" target="_blank" rel="noopener">Trapping Rain Water</a></td><td>A record <code>(l, r, level)</code>: each state settles the lower end bar and reports the water above it.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 167 · Two Sum II — Input Array Is Sorted · clean</div>
+<pre><code class="language-java">class Solution {
+    record Pair(int l, int r) {
+        int sum(int[] a) { return a[l] + a[r]; }
+    }
+
+    public int[] twoSum(int[] numbers, int target) {
+        // A two-pointer loop is a state machine on (l, r).
+        // Stream.iterate runs it; findFirst stops at the hit.
+        return Stream.iterate(new Pair(0, numbers.length - 1),
+                        p -&gt; p.sum(numbers) &lt; target
+                                ? new Pair(p.l() + 1, p.r())
+                                : new Pair(p.l(), p.r() - 1))
+                .filter(p -&gt; p.sum(numbers) == target)
+                .findFirst()
+                .map(p -&gt; new int[]{ p.l() + 1, p.r() + 1 })
+                .orElseThrow();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 15 · 3Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    // (l, r) closes in on a[l] + a[r] == want; a hit moves both
+    record Pair(int l, int r) {
+        Pair next(int[] a, int want) {
+            int s = a[l] + a[r];
+            return new Pair(s &lt;= want ? l + 1 : l,
+                            s &gt;= want ? r - 1 : r);
+        }
+    }
+
+    public List&lt;List&lt;Integer&gt;&gt; threeSum(int[] nums) {
+        Arrays.sort(nums);
+        // Fix the first value; keep every hit of the (l, r)
+        // scan. distinct() replaces the duplicate-skip loops.
+        return IntStream.range(0, nums.length - 2).boxed()
+                .flatMap(i -&gt; triplets(nums, i))
+                .distinct()
+                .toList();
+    }
+
+    static Stream&lt;List&lt;Integer&gt;&gt; triplets(int[] a, int i) {
+        return Stream.iterate(new Pair(i + 1, a.length - 1),
+                        p -&gt; p.l() &lt; p.r(),
+                        p -&gt; p.next(a, -a[i]))
+                .filter(p -&gt; a[p.l()] + a[p.r()] == -a[i])
+                .map(p -&gt; List.of(a[i], a[p.l()], a[p.r()]));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 16 · 3Sum Closest · clean</div>
+<pre><code class="language-java">class Solution {
+    // One inner scan: first index i, then l and r closing in
+    record Scan(int i, int l, int r) {
+        int sum(int[] a) { return a[i] + a[l] + a[r]; }
+        Scan next(int[] a, int target) {
+            return sum(a) &lt; target ? new Scan(i, l + 1, r)
+                                   : new Scan(i, l, r - 1);
+        }
+    }
+
+    public int threeSumClosest(int[] nums, int target) {
+        Arrays.sort(nums);
+        Comparator&lt;Integer&gt; byGap = Comparator.comparingInt(
+                x -&gt; Math.abs(x - target));
+        // Every sum any scan visits; the answer is the nearest.
+        return IntStream.range(0, nums.length - 2).boxed()
+                .flatMap(i -&gt; scan(nums, i, target))
+                .map(s -&gt; s.sum(nums))
+                .min(byGap)
+                .orElseThrow();
+    }
+
+    static Stream&lt;Scan&gt; scan(int[] a, int i, int target) {
+        return Stream.iterate(new Scan(i, i + 1, a.length - 1),
+                s -&gt; s.l() &lt; s.r(), s -&gt; s.next(a, target));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 18 · 4Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    // (l, r) closes in on a[l] + a[r] == want; a hit moves both
+    record Pair(int l, int r) {
+        Pair next(int[] a, long want) {
+            long s = (long) a[l] + a[r];
+            return new Pair(s &lt;= want ? l + 1 : l,
+                            s &gt;= want ? r - 1 : r);
+        }
+    }
+
+    public List&lt;List&lt;Integer&gt;&gt; fourSum(int[] nums, int target) {
+        Arrays.sort(nums);
+        int n = nums.length;
+        // Two flatMaps fix a pair of values; the (l, r) scan
+        // finds the rest. Sums are long: 4 × 10⁹ overflows int.
+        return IntStream.range(0, n).boxed()
+                .flatMap(i -&gt; IntStream.range(i + 1, n).boxed()
+                        .flatMap(j -&gt; rest(nums, i, j, target)))
+                .distinct()
+                .toList();
+    }
+
+    // every a[i], a[j], a[l], a[r] summing to target, j &lt; l &lt; r
+    static Stream&lt;List&lt;Integer&gt;&gt; rest(int[] a, int i, int j,
+                                      long target) {
+        long want = target - a[i] - a[j];
+        return Stream.iterate(new Pair(j + 1, a.length - 1),
+                        p -&gt; p.l() &lt; p.r(),
+                        p -&gt; p.next(a, want))
+                .filter(p -&gt; (long) a[p.l()] + a[p.r()] == want)
+                .map(p -&gt; List.of(a[i], a[j],
+                                  a[p.l()], a[p.r()]));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 11 · Container With Most Water · clean</div>
+<pre><code class="language-java">class Solution {
+    record Pair(int l, int r) {}
+
+    public int maxArea(int[] height) {
+        // Start at both ends. The shorter wall moves in: no
+        // container still using it can be any better. Every
+        // state is a candidate, so score each and keep the max.
+        return Stream.iterate(new Pair(0, height.length - 1),
+                        p -&gt; p.l() &lt; p.r(),
+                        p -&gt; height[p.l()] &lt; height[p.r()]
+                                ? new Pair(p.l() + 1, p.r())
+                                : new Pair(p.l(), p.r() - 1))
+                .mapToInt(p -&gt; (p.r() - p.l()) * Math.min(
+                        height[p.l()], height[p.r()]))
+                .max().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 42 · Trapping Rain Water · clean</div>
+<pre><code class="language-java">class Solution {
+    // l, r close in; level = the water line reached so far
+    record State(int l, int r, int level) {
+        int lower(int[] h) { return Math.min(h[l], h[r]); }
+
+        // water above the bar this state is about to settle
+        int water(int[] h) {
+            return Math.max(level, lower(h)) - lower(h);
+        }
+
+        State next(int[] h) {
+            int lv = Math.max(level, lower(h));
+            return h[l] &lt; h[r] ? new State(l + 1, r, lv)
+                               : new State(l, r - 1, lv);
+        }
+    }
+
+    public int trap(int[] height) {
+        // Each state settles the lower of its two end bars. The
+        // water line only rises, so it is one running maximum.
+        int n = height.length;
+        return Stream.iterate(new State(0, n - 1, 0),
+                              s -&gt; s.l() &lt;= s.r(),
+                              s -&gt; s.next(height))
+                .mapToInt(s -&gt; s.water(height))
+                .sum();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">The idiom worth keeping</span><code>Stream.iterate(seed, hasNext, next)</code> is the pure way to run any loop whose state fits in a record. Put the step on the record as a method, as every solution here does, and the pipeline reads like the loop's specification: the states, which ones to keep, what to compute from them. The same shape runs binary search, fast and slow pointers, and rolling DP later in this deck.</div>
+  <div class="note warn"><span class="lbl">The one trap</span>The three-argument <code>iterate</code> calls <code>next</code> once more on the last state it emits, and only then does <code>hasNext</code> reject the result. That is harmless here, because <code>next</code> reads <code>a[l]</code> and <code>a[r]</code> of a state that already passed the test. When a step reads one index past its state, as a fold over an array does, use <code>Stream.iterate(seed, f).skip(n).findFirst()</code> instead: it applies <code>f</code> exactly n times.</div>
+</section>
+
+

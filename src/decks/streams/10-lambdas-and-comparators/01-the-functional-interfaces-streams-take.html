@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Lambdas and comparators" data-title="The functional interfaces streams take">
+  <h2>Nine shapes of lambda, and how to read a stream signature</h2>
+  <p class="dek">Every stream method takes an interface from <code>java.util.function</code>, or a <code>Comparator</code>. Know the shape — what goes in, what comes out — and every signature on these slides reads at a glance. It also answers "what is a <code>Predicate</code>?" in five seconds.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Interface</th><th>Method</th><th>Shape</th><th>Stream methods that take it</th></tr></thead>
+        <tbody>
+          <tr><td><code>Predicate&lt;T&gt;</code></td><td><code>test</code></td><td>T → boolean</td><td><code>filter</code>, <code>anyMatch</code>, <code>takeWhile</code>, <code>partitioningBy</code></td></tr>
+          <tr><td><code>Function&lt;T, R&gt;</code></td><td><code>apply</code></td><td>T → R</td><td><code>map</code>, <code>flatMap</code>, <code>groupingBy</code>, <code>toMap</code></td></tr>
+          <tr><td><code>UnaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>T → T</td><td><code>iterate</code></td></tr>
+          <tr><td><code>BinaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>(T, T) → T</td><td><code>reduce</code>, <code>toMap</code> merge, combiners</td></tr>
+          <tr><td><code>BiFunction&lt;T, U, R&gt;</code></td><td><code>apply</code></td><td>(T, U) → R</td><td>3-argument <code>reduce</code>, <code>teeing</code>, <code>fold</code>, <code>scan</code></td></tr>
+          <tr><td><code>Consumer&lt;T&gt;</code></td><td><code>accept</code></td><td>T → nothing</td><td><code>forEach</code>, <code>peek</code>, <code>ifPresent</code></td></tr>
+          <tr><td><code>BiConsumer&lt;T, U&gt;</code></td><td><code>accept</code></td><td>(T, U) → nothing</td><td><code>collect</code> accumulator, <code>mapMulti</code>, <code>Map.forEach</code></td></tr>
+          <tr><td><code>Supplier&lt;T&gt;</code></td><td><code>get</code></td><td>nothing → T</td><td><code>generate</code>, <code>collect</code>, <code>toCollection</code>, <code>orElseGet</code></td></tr>
+          <tr><td><code>Comparator&lt;T&gt;</code></td><td><code>compare</code></td><td>(T, T) → int</td><td><code>sorted</code>, <code>min</code>, <code>max</code>, <code>maxBy</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>The primitive variants</h3>
+        <p style="color:var(--text-2);font-size:14px;margin-top:8px">They exist so primitive streams never box. <code>IntPredicate</code>, <code>IntFunction&lt;R&gt;</code>, <code>ToIntFunction&lt;T&gt;</code>, <code>IntUnaryOperator</code>, <code>IntBinaryOperator</code>, <code>IntConsumer</code>, <code>IntSupplier</code>, <code>ObjIntConsumer&lt;T&gt;</code>, <code>IntToLongFunction</code>, <code>IntToDoubleFunction</code>, and the same again for <code>Long</code> and <code>Double</code>. The naming rule: <code>ToInt…</code> means it <em>returns</em> an int, <code>Int…</code> means it <em>takes</em> one.</p>
+      </div>
+      <div class="panel">
+        <h3>Composition, without writing a lambda</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Predicate</dt><dd><code>and</code>, <code>or</code>, <code>negate</code>, <code>Predicate.not(p)</code> <span class="tag a">11</span>, <code>Predicate.isEqual(x)</code></dd>
+          <dt>Function</dt><dd><code>andThen</code>, <code>compose</code>, <code>Function.identity()</code></dd>
+          <dt>Consumer</dt><dd><code>andThen</code></dd>
+          <dt>BinaryOperator</dt><dd><code>BinaryOperator.minBy(cmp)</code>, <code>maxBy(cmp)</code></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Composition, and the effectively-final rule</div>
+<pre><code class="language-java">Predicate&lt;Order&gt; paid  = o -&gt; "PAID".equals(o.status());
+Predicate&lt;Order&gt; large = o -&gt; o.total() &gt; 500;
+orders.stream().filter(paid.and(large.negate()));         // paid and small
+
+Stream.of("a", "", "b").filter(Predicate.not(String::isEmpty)).toList();   // [a, b]
+
+Function&lt;Order, Integer&gt; nameLength =
+        ((Function&lt;Order, String&gt;) Order::customer).andThen(String::length);
+
+int threshold = 500;
+orders.stream().filter(o -&gt; o.total() &gt; threshold);      // reads a local: fine
+// threshold++;  would make the lambda above a compile error</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">"local variables referenced from a lambda expression must be final or effectively final"</span>So <code>int count = 0; orders.forEach(o -&gt; count++);</code> does not compile. The usual workaround, an <code>int[] count = {0}</code> or an <code>AtomicInteger</code>, compiles and brings back the shared mutable state that the side-effects slide warns about. The idiomatic answer is almost always <code>count()</code> or a collector. A <code>@FunctionalInterface</code> is any interface with exactly one abstract method; <code>default</code> methods and methods inherited from <code>Object</code> do not count.</div>
+  </div>
+</section>
+

@@ -1,0 +1,92 @@
+<section class="slide" data-sec="29 · Grid DP" data-title="The reusable structure">
+  <h2>A double loop, and where the base cases go</h2>
+  <p class="dek">The body is one line. The engineering is in handling the first row and column — either explicitly, or by padding the table so they stop being special.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Path counting, with padding (LC 62, 63)</div>
+<pre><code class="language-java">// PADDING: an extra row and column of zeros means every real cell
+// has both neighbours, so the main loop needs no boundary checks.
+int uniquePaths(int rows, int cols) {
+    // dp[r][c] corresponds to grid cell (r-1, c-1)
+    int[][] dp = new int[rows + 1][cols + 1];
+
+    // One seed to start the accumulation. Placing it here makes
+    // dp[1][1] come out as 1, which is correct for the start cell.
+    dp[0][1] = 1;
+
+    for (int r = 1; r &lt;= rows; r++)
+        for (int c = 1; c &lt;= cols; c++)
+            dp[r][c] = dp[r - 1][c] + dp[r][c - 1];
+
+    return dp[rows][cols];
+}
+
+// With OBSTACLES (LC 63), a blocked cell is simply unreachable:
+// set it to 0 and everything downstream adjusts automatically.
+if (grid[r - 1][c - 1] == 1) dp[r][c] = 0;
+else                         dp[r][c] = dp[r - 1][c] + dp[r][c - 1];</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Minimum cost, with explicit base cases (LC 64)</div>
+<pre><code class="language-java">// Without padding, fill the first row and column first — there is
+// no choice to make there, only accumulation.
+int minPathSum(int[][] grid) {
+    int rows = grid.length, cols = grid[0].length;
+    int[][] dp = new int[rows][cols];
+
+    dp[0][0] = grid[0][0];
+
+    // Top row: reachable only from the left.
+    for (int c = 1; c &lt; cols; c++) dp[0][c] = dp[0][c - 1] + grid[0][c];
+
+    // Left column: reachable only from above.
+    for (int r = 1; r &lt; rows; r++) dp[r][0] = dp[r - 1][0] + grid[r][0];
+
+    for (int r = 1; r &lt; rows; r++)
+        for (int c = 1; c &lt; cols; c++)
+            dp[r][c] = grid[r][c] + Math.min(dp[r - 1][c], dp[r][c - 1]);
+
+    return dp[rows - 1][cols - 1];
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Two variants that are not path problems</div>
+<pre><code class="language-java">// LC 221 — the largest square of 1s.
+// dp[r][c] = the side length of the largest square whose BOTTOM-RIGHT
+// corner is (r, c). A square of side k+1 needs three squares of side
+// k meeting at this corner, so the MINIMUM of the three limits it.
+if (matrix[r][c] == '1') {
+    dp[r][c] = 1 + Math.min(dp[r - 1][c - 1],                    // diagonal
+                   Math.min(dp[r - 1][c], dp[r][c - 1]));        // up, left
+    best = Math.max(best, dp[r][c]);
+}
+// The answer is the AREA, so square the side: best * best.
+
+// LC 120 / 931 — falling paths. Moving DOWNWARD only, but to any of
+// several cells below, so the transition widens rather than changes.
+// Working BOTTOM-UP removes the need to scan the last row at the end.
+for (int r = rows - 2; r &gt;= 0; r--)
+    for (int c = 0; c &lt; cols; c++)
+        dp[c] = grid[r][c] + Math.min(dp[c], dp[c + 1]);   // triangle: two options
+return dp[0];</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>The knobs</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Combining operation</dt><dd><code>+</code> to count paths, <code>min</code> for a cheapest path, <code>1 + min(three)</code> for the largest square.</dd>
+          <dt>Base cases</dt><dd>Pad when the sentinel is natural — 0 for counting or summing. Fill explicitly when it is not, as with a minimum where 0 would win incorrectly.</dd>
+          <dt>Direction</dt><dd>Top-down for start-to-end problems; bottom-up when the destination is any cell of the last row, which avoids a final scan.</dd>
+          <dt>Answer cell</dt><dd><code>dp[rows−1][cols−1]</code> for paths, <code>max(dp)</code> for the largest square, <code>dp[0]</code> after a bottom-up fill.</dd>
+          <dt>Space</dt><dd>One rolling row of width <code>cols</code>, or overwrite the input grid when mutation is allowed — say so before doing it.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Padding a minimisation with zeros</b> — the sentinel then wins every <code>min</code> and every path costs nothing. Pad with a large value, or fill the base cases explicitly. <b>Reading <code>dp[r][c−1]</code> after overwriting it</b> in the rolling form — the two reads must happen before the write, which is why order matters there. <b>Returning the side length in LC 221</b> — the question asks for the <em>area</em>, so square it.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,134 @@
+<section class="slide" data-sec="06 · Hashing / frequency maps" data-title="The six, in streams">
+  <h2>Hashing is what collectors were built for</h2>
+  <p class="dek">Every problem here is a membership test, a count or a grouping, and each of those is one collector: <code>distinct</code>, <code>groupingBy</code> with <code>counting()</code>, or <code>toMap</code> with a merge function. These are the six where a pipeline reads as well as the loop, often better, and none of them pays for it in time.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">217</td><td><a href="https://leetcode.com/problems/contains-duplicate/" target="_blank" rel="noopener">Contains Duplicate</a></td><td><code>distinct().count()</code> against the length. Unlike the loop, it cannot stop at the first repeat.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">242</td><td><a href="https://leetcode.com/problems/valid-anagram/" target="_blank" rel="noopener">Valid Anagram</a></td><td>Two <code>groupingBy(counting())</code> maps over <code>codePoints()</code>, compared with <code>equals</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(k)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">1</td><td><a href="https://leetcode.com/problems/two-sum/" target="_blank" rel="noopener">Two Sum</a></td><td><code>toMap</code> keeps the last index per value; a second pass finds the first <code>i</code> whose partner is another index.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">49</td><td><a href="https://leetcode.com/problems/group-anagrams/" target="_blank" rel="noopener">Group Anagrams</a></td><td><code>groupingBy</code> a count-vector key; <code>Arrays.toString</code> keeps the separators.</td><td><span class="tag g">clean</span></td><td class="num">O(n·L) / O(n·L)</td><td class="num">same</td></tr>
+        <tr><td class="num">347</td><td><a href="https://leetcode.com/problems/top-k-frequent-elements/" target="_blank" rel="noopener">Top K Frequent Elements</a></td><td>Count, invert to frequency → values, then read the buckets down from n with <code>limit(k)</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">128</td><td><a href="https://leetcode.com/problems/longest-consecutive-sequence/" target="_blank" rel="noopener">Longest Consecutive Sequence</a></td><td><code>filter</code> the run heads, then <code>IntStream.iterate(v, set::contains, x -&gt; x + 1)</code> walks each run once.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 217 · Contains Duplicate · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean containsDuplicate(int[] nums) {
+        // distinct() keeps a hidden HashSet: the loop's O(n) /
+        // O(n), minus the early exit on the first repeat.
+        return Arrays.stream(nums).distinct().count()
+                &lt; nums.length;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 242 · Valid Anagram · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean isAnagram(String s, String t) {
+        // Equal letter counts. codePoints() also answers the
+        // Unicode follow-up: a char is not a code point.
+        return counts(s).equals(counts(t));
+    }
+
+    private static Map&lt;Integer, Long&gt; counts(String s) {
+        return s.codePoints().boxed()
+                .collect(Collectors.groupingBy(
+                        c -&gt; c, Collectors.counting()));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1 · Two Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        int n = nums.length;
+        // value -&gt; the LAST index holding it. Two passes, so
+        // the probe-before-insert trap cannot happen: on [3,3]
+        // the first 3 finds the second 3's index, not its own.
+        Map&lt;Integer, Integer&gt; last = IntStream.range(0, n)
+                .boxed()
+                .collect(Collectors.toMap(i -&gt; nums[i], i -&gt; i,
+                                          (a, b) -&gt; b));
+        // the partner's index, or i itself when there is none
+        IntUnaryOperator mate =
+                i -&gt; last.getOrDefault(target - nums[i], i);
+        int i = IntStream.range(0, n)
+                .filter(k -&gt; mate.applyAsInt(k) != k)
+                .findFirst().getAsInt();
+        return new int[]{ i, mate.applyAsInt(i) };
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 49 · Group Anagrams · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;String&gt;&gt; groupAnagrams(String[] strs) {
+        // All the work is the key; groupingBy does the rest.
+        return new ArrayList&lt;&gt;(Arrays.stream(strs)
+                .collect(Collectors.groupingBy(Solution::key))
+                .values());
+    }
+
+    // A 26-slot count vector: O(L), where sorting is O(L log L)
+    private static String key(String s) {
+        int[] c = s.chars().collect(() -&gt; new int[26],
+                (a, ch) -&gt; a[ch - 'a']++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        return Arrays.toString(c);  // "1,11" ≠ "11,1"
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 347 · Top K Frequent Elements · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[] topKFrequent(int[] nums, int k) {
+        Map&lt;Integer, Long&gt; freq = Arrays.stream(nums).boxed()
+                .collect(Collectors.groupingBy(
+                        v -&gt; v, Collectors.counting()));
+        // Invert: frequency -&gt; the values that have it
+        Map&lt;Long, List&lt;Integer&gt;&gt; byFreq = freq.keySet().stream()
+                .collect(Collectors.groupingBy(freq::get));
+        // Read the buckets from n down: no comparator, no sort.
+        return LongStream.iterate(nums.length, f -&gt; f &gt; 0,
+                                  f -&gt; f - 1)
+                .mapToObj(f -&gt; byFreq.getOrDefault(f,
+                                                   List.of()))
+                .flatMap(List::stream)
+                .limit(k)
+                .mapToInt(Integer::intValue)
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 128 · Longest Consecutive Sequence · clean</div>
+<pre><code class="language-java">class Solution {
+    public int longestConsecutive(int[] nums) {
+        Set&lt;Integer&gt; set = Arrays.stream(nums).boxed()
+                .collect(Collectors.toSet());
+        // Walk only from run heads (v - 1 absent): every value
+        // is then walked exactly once, so the total is O(n).
+        return set.stream()
+                .filter(v -&gt; !set.contains(v - 1))
+                .mapToInt(v -&gt; (int) IntStream
+                        .iterate(v, set::contains, x -&gt; x + 1)
+                        .count())
+                .max().orElse(0);
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Why all six are clean</span>A collector is a mutable reduction whose container the stream owns. The <code>HashMap</code> inside <code>groupingBy</code> is created, filled and handed back by the pipeline, and nothing outside it ever sees it half-built. That is the whole difference from a lambda writing into an outer map. It is also why hashing is the pattern where streams are the idiomatic answer rather than a trick.</div>
+  <div class="note warn"><span class="lbl">The one thing the loop does better</span>Short-circuiting. The loop for 217 returns at the first repeat, while <code>distinct().count()</code> reads everything. When that matters, <code>!Arrays.stream(nums).allMatch(seen::add)</code> stops early, but <code>seen</code> then lives outside the pipeline, which makes the solution stateful. The same trade-off, early exit against purity, comes back in almost every pattern after this one.</div>
+</section>
+
+

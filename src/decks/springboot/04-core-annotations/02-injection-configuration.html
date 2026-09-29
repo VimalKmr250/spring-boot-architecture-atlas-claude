@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Core annotations" data-title="Injection & configuration">
+  <h2>Wiring and externalised configuration</h2>
+  <p class="dek">Constructor injection is the only form worth using. Everything else on this slide exists to disambiguate, defer or configure it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Injection</div>
+<pre><code class="language-java">@Service
+class PlaceOrderUseCase {
+    private final OrderRepository orders;          // final = immutable, testable
+    private final PaymentGateway payments;
+
+    // No @Autowired needed — a single constructor is autowired since Spring 4.3
+    PlaceOrderUseCase(OrderRepository orders, PaymentGateway payments) { ... }
+}
+
+@Qualifier("primaryGateway")      // pick between several beans of a type
+@Primary                          // the default choice when ambiguous
+@Lazy                             // create on first use — a circular-dep stopgap
+@Scope("prototype")               // new instance per lookup
+ObjectProvider&lt;Foo&gt; provider;     // optional / lazy / multiple, without @Lazy tricks
+@Order(10)                        // ordering within an injected List&lt;Handler&gt;</code></pre>
+      <div class="codelabel" style="margin-top:14px">Configuration binding</div>
+<pre><code class="language-java">@Value("${shop.order.max-lines:100}")   // single value + default. Avoid at scale.
+private int maxLines;
+
+// Prefer this: typed, validated at startup, documented, IDE-completable
+@ConfigurationProperties("shop.order")
+@Validated
+public record OrderProperties(
+        @Min(1) @Max(500) int maxLines,
+        @NotNull Duration reservationTtl,
+        @NotBlank String currency) { }
+
+@EnableConfigurationProperties(OrderProperties.class)   // or @ConfigurationPropertiesScan</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Never field injection</span><code>@Autowired private OrderRepository repo;</code> hides dependencies from the constructor, makes the class untestable without Spring, permits circular dependencies that should have failed, and cannot be <code>final</code>. If a class has eight constructor parameters that is a signal, not a reason to switch to fields.</div>
+      <div class="card">
+        <h3>Why <code>@ConfigurationProperties</code> beats <code>@Value</code></h3>
+        <ul class="tight">
+          <li>Validated at <b>startup</b>, not on first read — a typo fails the boot, not a 3am payment.</li>
+          <li>Relaxed binding: <code>max-lines</code>, <code>maxLines</code>, <code>MAX_LINES</code> all bind, so an env var Just Works.</li>
+          <li>Type conversion for <code>Duration</code>, <code>DataSize</code>, <code>List</code>, nested records.</li>
+          <li>With <code>spring-boot-configuration-processor</code>, your properties get IDE autocomplete and docs.</li>
+        </ul>
+        <p style="margin-top:2px">Records get constructor binding with no <code>@ConstructorBinding</code> needed since Boot 3.</p>
+      </div>
+      <div class="note tip"><span class="lbl">Profiles</span><code>@Profile("worker")</code> on a bean, <code>application-worker.yaml</code> for its config, <code>SPRING_PROFILES_ACTIVE=prod,worker</code> at runtime. This is the mechanism behind "one artifact, three deployments" in the architecture deck. Keep profiles about <b>role</b> (web/worker/batch), not about environment secrets.</div>
+    </div>
+  </div>
+</section>
+

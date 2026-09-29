@@ -1,0 +1,50 @@
+<section class="slide" data-sec="Internals" data-title="Jackson essentials">
+  <h2>Jackson: the annotations that shape your API's JSON</h2>
+  <p class="dek">Your wire contract is decided here. Every one of these is a public-API decision, so they belong on DTOs — never on entities, where they couple your database schema to your consumers.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The set you actually use</div>
+<pre><code class="language-java">@JsonInclude(JsonInclude.Include.NON_NULL)          // omit nulls — class or field level
+record OrderView(
+
+    @JsonProperty("order_id")                       // rename on the wire
+    UUID id,
+
+    @JsonFormat(shape = STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    Instant placedAt,
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING)    // BigDecimal as a string —
+    BigDecimal total,                               // stops JS clients losing precision
+
+    @JsonAlias({ "customerId", "customer_id" })     // accept both on the way IN
+    UUID customerId,
+
+    @JsonIgnore                                     // never serialised
+    String internalNote,
+
+    @JsonProperty(access = READ_ONLY)               // serialised out, ignored on input
+    OrderStatus status,
+
+    @JsonProperty(access = WRITE_ONLY)              // accepted in, never echoed back
+    String idempotencyKey,
+
+    // @JsonUnwrapped flattens a nested object into the parent — but it does
+    // NOT work on a record component: Jackson cannot unwrap into a creator
+    // parameter, so writing works and reading fails. Flatten it by hand.
+    long amountMinor,
+    String currency
+) { }
+
+// Deserialisation entry points
+@JsonCreator                                        // explicit constructor for non-records
+@JsonAnySetter                                      // catch-all for unmapped fields
+@JsonNaming(SnakeCaseStrategy.class)                // rename the whole class at once</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>@JsonIgnore</code> is not security</h4><p>It stops a field being serialised — it does not stop it being <em>deserialised</em> unless you also block that. A client can still POST <code>{"role":"ADMIN"}</code> into a field you thought was hidden. Use <code>access = READ_ONLY</code>, or better, a separate request DTO that simply has no such field.</p></div>
+    <div class="card"><h4>Money as a string</h4><p>JSON numbers become IEEE doubles in JavaScript. <code>99999999.99</code> survives; a long enough decimal does not. Serialise money as a string, or as minor units in a <code>long</code>. Financial clients will ask you for this eventually — ship it first.</p></div>
+    <div class="card"><h4>Be a tolerant reader</h4><p><code>FAIL_ON_UNKNOWN_PROPERTIES=false</code> (Boot's default) is what lets a producer add a field without breaking you. Turning it on to "catch typos" makes every additive upstream change a production incident.</p></div>
+  </div>
+</section>
+

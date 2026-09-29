@@ -1,0 +1,85 @@
+<section class="slide" data-sec="01 · Sliding window" data-title="Mechanics">
+  <h2>Two indices that never go backwards</h2>
+  <p class="dek">A sliding window answers questions about <b>contiguous</b> runs in one pass. The whole pattern rests on Fact 2 from two slides back: once the window <code>[l, r]</code> is invalid, stretching it further right never makes it valid again — so <code>l</code> never has a reason to move back. That one fact is what turns O(n²) into O(n).</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">At the <em>bottom</em> of every iteration, the window <code>[l, r]</code> is valid. The loop body has exactly three moves, always in this order:</p>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Admit</b> <code>a[r]</code> into the window state — the window may now be invalid.</li>
+        <li><b>Restore</b> validity by evicting from the left, one element at a time.</li>
+        <li><b>Record</b> the answer, now that the invariant holds again.</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Getting step 3 before step 2 is the single most common bug in the pattern: you measure a window that was never legal.</p>
+    </div>
+    <div class="panel">
+      <h3>Why it is O(n), not O(n²)</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The inner <code>while</code> loop looks like it makes the whole thing quadratic. It does not, and the argument is worth being able to say out loud:</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px"><code>l</code> only ever increases, and it is bounded by <code>n</code>. So across the <em>entire</em> run, the inner loop executes at most <code>n</code> times in total — not <code>n</code> times per iteration. Each index enters the window once through <code>r</code> and leaves it at most once through <code>l</code>: <b>2n</b> operations, amortised O(1) per step.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Being able to say that out loud is what turns "I think it is linear" into an answer an interviewer accepts.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 208" role="img" aria-label="The three moves of a sliding window: admit the right element, evict from the left until valid, then record">
+        <text x="14" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE WINDOW FRAME</text>
+
+        <!-- the array -->
+        <g>
+          <rect x="60" y="46" width="52" height="34" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.22"></rect>
+          <rect x="114" y="46" width="52" height="34" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.22"></rect>
+          <rect x="168" y="46" width="52" height="34" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+          <rect x="222" y="46" width="52" height="34" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+          <rect x="276" y="46" width="52" height="34" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+          <rect x="330" y="46" width="52" height="34" rx="4" fill="#D26A3F" fill-opacity="0.13" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+          <rect x="384" y="46" width="52" height="34" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.22"></rect>
+          <rect x="438" y="46" width="52" height="34" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.22"></rect>
+        </g>
+        <text x="86" y="68" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.4">settled</text>
+        <text x="463" y="68" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.4">unseen</text>
+        <text x="275" y="68" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">the window [l, r]</text>
+
+        <!-- pointers -->
+        <path d="M194 96 L194 84" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <text x="194" y="112" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">l</text>
+        <path d="M356 96 L356 84" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <text x="356" y="112" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">r</text>
+
+        <!-- movement arrows -->
+        <path d="M200 126 L268 126" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></path>
+        <text x="234" y="121" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">evict</text>
+        <path d="M362 126 L430 126" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></path>
+        <text x="396" y="121" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.6">admit</text>
+        <text x="60" y="130" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">both pointers move right only —</text>
+        <text x="60" y="144" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">that is the entire reason this is linear</text>
+
+        <!-- state box -->
+        <rect x="540" y="40" width="326" height="46" rx="7" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.65"></rect>
+        <text x="554" y="59" font-size="11.5" font-weight="600" fill="currentColor">window state</text>
+        <text x="554" y="76" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.72">counts · sum · distinct · maxFreq</text>
+        <path d="M494 63 L534 63" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></path>
+
+        <!-- three steps -->
+        <line x1="14" y1="160" x2="866" y2="160" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="180" font-size="11.5" font-weight="600" fill="#D26A3F">1 · admit a[r]</text>
+        <text x="14" y="196" font-size="10.5" fill="currentColor" opacity="0.65">update state; window may now be invalid</text>
+        <text x="300" y="180" font-size="11.5" font-weight="600" fill="#D26A3F">2 · evict while invalid</text>
+        <text x="300" y="196" font-size="10.5" fill="currentColor" opacity="0.65">undo state for a[l], l++ — the exact mirror of step 1</text>
+        <text x="640" y="180" font-size="11.5" font-weight="600" fill="#D26A3F">3 · record</text>
+        <text x="640" y="196" font-size="10.5" fill="currentColor" opacity="0.65">the invariant holds again, so the length is legal</text>
+      </svg>
+    </div>
+    <figcaption>Step 2 is the mirror image of step 1 — whatever you did to the state when admitting, you undo when evicting. Keeping those two lines symmetric eliminates most window bugs before they happen.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The answer is a <b>contiguous</b> subarray or substring, and validity is <b>monotone</b> — once a window is invalid, extending it right cannot make it valid again.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Values can be negative and you are summing — extending the window may help <em>or</em> hurt, so no valid shrink rule exists. Also when the chosen elements need not be adjacent, since a window can only ever describe a contiguous run.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time, since each index is admitted once and evicted at most once. <b>O(k)</b> space for the window state, where k is the alphabet or distinct-value count — O(1) for a fixed <code>int[128]</code>.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"longest / shortest substring or subarray such that…"</b> · <b>"contains at most K distinct"</b> · <b>"minimum window containing all of…"</b> · <b>"of size exactly k"</b> · <b>"after at most k replacements"</b> · <b>"the longest run you can make by…"</b>. If the words <em>contiguous</em> or <em>substring</em> appear alongside an optimisation word, open with a window and only abandon it if the monotonicity test fails.</div>
+</section>
+

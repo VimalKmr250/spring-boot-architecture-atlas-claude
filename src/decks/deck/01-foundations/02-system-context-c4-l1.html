@@ -1,0 +1,61 @@
+<section class="slide" data-sec="Foundations" data-title="System context (C4 L1)">
+  <h2>Start at the boundary, not the beans</h2>
+  <p class="dek">Before any layering decision, draw who talks to the system and what it depends on. Every integration on this diagram becomes a failure mode, a timeout budget and an on-call page later.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 340" role="img" aria-label="System context: web, mobile and CSR clients call the order platform, which integrates with payment gateway, tax engine, carriers, ERP and warehouse management">
+        <!-- actors -->
+        <rect x="14" y="40" width="120" height="44" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="67" text-anchor="middle" font-size="12.5" fill="currentColor">Web storefront</text>
+        <rect x="14" y="106" width="120" height="44" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="133" text-anchor="middle" font-size="12.5" fill="currentColor">Mobile app</text>
+        <rect x="14" y="172" width="120" height="44" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="199" text-anchor="middle" font-size="12.5" fill="currentColor">CSR console</text>
+        <rect x="14" y="238" width="120" height="44" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="265" text-anchor="middle" font-size="12.5" fill="currentColor">Partner API</text>
+
+        <!-- core -->
+        <rect x="330" y="88" width="230" height="146" rx="12" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="445" y="132" text-anchor="middle" font-size="15" font-weight="600" fill="currentColor">Order Platform</text>
+        <text x="445" y="154" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">modular monolith</text>
+        <text x="445" y="176" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">8 modules · 1 deployable</text>
+        <text x="445" y="200" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">PostgreSQL · Kafka · Redis</text>
+
+        <!-- inbound arrows -->
+        <line x1="134" y1="62" x2="326" y2="120" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="134" y1="128" x2="326" y2="142" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="134" y1="194" x2="326" y2="172" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="134" y1="260" x2="326" y2="204" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="228" y="86" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">HTTPS / JSON</text>
+
+        <!-- externals -->
+        <rect x="700" y="18" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="43" text-anchor="middle" font-size="12" fill="currentColor">Payment gateway</text>
+        <rect x="700" y="72" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="97" text-anchor="middle" font-size="12" fill="currentColor">Tax engine</text>
+        <rect x="700" y="126" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="151" text-anchor="middle" font-size="12" fill="currentColor">Carrier APIs (3)</text>
+        <rect x="700" y="180" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="205" text-anchor="middle" font-size="12" fill="currentColor">ERP (SAP)</text>
+        <rect x="700" y="234" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="259" text-anchor="middle" font-size="12" fill="currentColor">WMS</text>
+        <rect x="700" y="288" width="186" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="793" y="313" text-anchor="middle" font-size="12" fill="currentColor">Marketing automation</text>
+
+        <line x1="562" y1="120" x2="696" y2="40" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="562" y1="134" x2="696" y2="94" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="562" y1="152" x2="696" y2="148" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="562" y1="176" x2="696" y2="200" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="562" y1="196" x2="696" y2="254" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="562" y1="214" x2="696" y2="306" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="634" y="70" text-anchor="middle" font-size="10" fill="#D26A3F">sync, in checkout</text>
+        <text x="640" y="290" text-anchor="middle" font-size="10" fill="#3AA79B">async, event-driven</text>
+      </svg>
+    </div>
+    <figcaption>Copper edges sit inside the customer's checkout latency budget and therefore need timeouts, retries and a fallback. Dashed teal edges are fire-and-forget: they may lag minutes without a customer noticing, which is what makes them safe to move off the request thread.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The move that pays for itself</span>Classify every external dependency as <b>in the request path</b> or <b>not</b> on day one. Everything not in the path goes through an event and an outbox — that single rule keeps checkout availability at 99.95% while five downstream systems average 99.5%.</div>
+</section>
+

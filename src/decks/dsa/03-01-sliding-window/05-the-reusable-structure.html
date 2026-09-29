@@ -1,0 +1,111 @@
+<section class="slide" data-sec="01 · Sliding window" data-title="The reusable structure">
+  <h2>One skeleton, five knobs, six problems</h2>
+  <p class="dek">Every variable-size window problem in this family is the same twelve lines. Memorise the skeleton, then learn which of the five marked knobs each problem turns — that is far less to carry than six separate solutions.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The canonical variable-size window · longest-valid form</div>
+<pre><code class="language-java">/**
+ * Longest window satisfying some monotone predicate.
+ * Invariant: at the bottom of every iteration, [l, r] is a VALID window.
+ * Each index is admitted once via r and evicted at most once via l  ->  O(n).
+ */
+int longestValidWindow(int[] a) {
+    Map&lt;Integer, Integer&gt; win = new HashMap&lt;&gt;();   // KNOB 1 · the window state
+    int l = 0, best = 0;
+
+    for (int r = 0; r &lt; a.length; r++) {
+
+        win.merge(a[r], 1, Integer::sum);          // KNOB 2 · admit a[r]
+
+        while (win.size() &gt; 2) {                   // KNOB 3 · "the window is invalid"
+            int out = a[l++];                      // KNOB 4 · evict a[l] — the exact mirror of KNOB 2
+            if (win.merge(out, -1, Integer::sum) == 0) win.remove(out);
+        }
+
+        best = Math.max(best, r - l + 1);          // KNOB 5 · record, AFTER validity is restored
+    }
+    return best;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Variant B · shortest valid window (LC 209, 76)</div>
+<pre><code class="language-java">// Two changes, and they always come together:
+//   the while condition is inverted   (while VALID, not while invalid)
+//   the record moves INSIDE the loop  (every shrink is a candidate)
+int shortestValidWindow(int[] a, int target) {
+    int l = 0, sum = 0, best = Integer.MAX_VALUE;
+
+    for (int r = 0; r &lt; a.length; r++) {
+        sum += a[r];
+
+        while (sum &gt;= target) {                 // while VALID
+            best = Math.min(best, r - l + 1);   // record here
+            sum -= a[l++];
+        }
+    }
+    return best == Integer.MAX_VALUE ? 0 : best;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Variant C · fixed size k (LC 567)</div>
+<pre><code class="language-java">// The window grows by exactly one per step, so the shrink
+// is an `if`, never a `while` — it can only ever be off by one.
+int fixedWindow(int[] a, int k) {
+    int l = 0, sum = 0, best = Integer.MIN_VALUE;
+
+    for (int r = 0; r &lt; a.length; r++) {
+        sum += a[r];
+
+        if (r - l + 1 &gt; k) sum -= a[l++];       // `if`, not `while`
+
+        if (r - l + 1 == k) best = Math.max(best, sum);
+    }
+    return best;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Variant D · counting with "exactly K"</div>
+<pre><code class="language-java">// You cannot window "exactly K" directly — validity is not monotone.
+// But "at most K" IS monotone, and:
+//        exactly(K)  ==  atMost(K) - atMost(K - 1)
+// Inside atMost, every window ending at r contributes (r - l + 1)
+// subarrays, because every suffix of a valid window is valid too.
+int exactlyK(int[] a, int k) {
+    return atMost(a, k) - atMost(a, k - 1);
+}
+
+long atMost(int[] a, int k) {
+    Map&lt;Integer, Integer&gt; win = new HashMap&lt;&gt;();
+    long count = 0;
+    for (int l = 0, r = 0; r &lt; a.length; r++) {
+        win.merge(a[r], 1, Integer::sum);
+        while (win.size() &gt; k) {
+            int out = a[l++];
+            if (win.merge(out, -1, Integer::sum) == 0) win.remove(out);
+        }
+        count += r - l + 1;                     // all windows ending at r
+    }
+    return count;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>The five knobs, and nothing else</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>1 · state</dt><dd><code>int[128]</code> for characters, <code>HashMap</code> for arbitrary ints, a plain <code>sum</code> or <code>distinct</code> counter when that is all you need. Prefer the array: it is faster and has no boxing.</dd>
+          <dt>2 · admit</dt><dd>One line. Whatever it does, knob 4 must undo precisely this.</dd>
+          <dt>3 · invalid</dt><dd>The only genuinely problem-specific line. Write it as a positive statement of what "broken" means, then negate nothing.</dd>
+          <dt>4 · evict</dt><dd>Write it immediately after knob 2, by copying that line and flipping the sign. Never write it later from memory.</dd>
+          <dt>5 · record</dt><dd><code>max</code> after the loop for longest; <code>min</code> inside the loop for shortest; <code>count += r - l + 1</code> for counting.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Recording before shrinking</b> — you measure a window that was never valid, and the answer comes out too large. <b>Forgetting <code>win.remove</code> at zero</b> — a count of zero still occupies a key, so <code>win.size()</code> lies and the window never shrinks enough. <b><code>if</code> where <code>while</code> belongs</b> — at <code>r=6</code> in the trace, <code>l</code> had to move twice in one step; an <code>if</code> silently returns a wrong answer on exactly that input.</div>
+    </div>
+  </div>
+</section>
+

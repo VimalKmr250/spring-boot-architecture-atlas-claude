@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Pitfalls and performance" data-title="Checked exceptions and debugging">
+  <h2>Checked exceptions, and seeing inside a pipeline</h2>
+  <p class="dek">No interface in <code>java.util.function</code> declares a checked exception, so a lambda that calls a throwing method does not compile. There are four ways out, each with a cost. And a pipeline has no loop variable to watch, so debugging it needs different habits.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Four ways to handle IOException in a stream</div>
+<pre><code class="language-java">// 1 · Wrap in an unchecked exception, and unwrap at the edge
+List&lt;String&gt; contents = paths.stream()
+        .map(p -&gt; {
+            try { return Files.readString(p); }
+            catch (IOException e) { throw new UncheckedIOException(e); }
+        })
+        .toList();
+
+// 2 · The same, moved into a named helper so the pipeline stays readable
+List&lt;String&gt; contents2 = paths.stream().map(this::readOrThrow).toList();
+
+// 3 · Keep failures as data, and decide afterwards
+record Attempt(Path path, String content, IOException error) {}
+Map&lt;Boolean, List&lt;Attempt&gt;&gt; outcome = paths.stream()
+        .map(this::tryRead)                                   // never throws
+        .collect(Collectors.partitioningBy(a -&gt; a.error() == null));
+
+// 4 · A plain loop, where "throws IOException" just works
+for (Path p : paths) contents3.add(Files.readString(p));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Option</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>1 · Wrap</td><td>Callers must know to catch <code>UncheckedIOException</code>; the first failure aborts the rest</td></tr>
+            <tr><td>2 · Helper</td><td>Same behaviour, far more readable</td></tr>
+            <tr><td>3 · Failures as data</td><td>More code, but one bad file no longer hides the other results</td></tr>
+            <tr><td>4 · Loop</td><td>None, when the exception should simply propagate</td></tr>
+            <tr><td>"Sneaky throw" tricks</td><td>Hide a checked exception from the compiler, so nobody is forced to handle it. Avoid</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h3>Debugging a pipeline</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li>Insert <code>.peek(x -&gt; log.debug("after filter: {}", x))</code> between stages, then remove it.</li>
+          <li>IntelliJ IDEA's <b>Trace Current Stream Chain</b> shows every element at every stage, in the debugger.</li>
+          <li>Split a long pipeline into named <code>Predicate</code>s and methods. A stack trace full of <code>lambda$process$3</code> tells you nothing; <code>isOverdue</code> does.</li>
+          <li>Exceptions thrown inside a stage surface from the terminal operation, even in parallel, where they are rethrown on the calling thread.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,157 @@
+<section class="slide" data-sec="25 · Trie" data-title="The six problems">
+  <h2>Six prefix problems</h2>
+  <p class="dek">208 is the structure itself. 211 adds wildcards, 677 adds values, 648 walks for the shortest match, 1268 exploits alphabetical child order. 212 combines the trie with grid backtracking and is the one worth real time.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Node holds</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">208</td><td><a href="https://leetcode.com/problems/implement-trie-prefix-tree/" target="_blank" rel="noopener">Implement Trie (Prefix Tree)</a></td><td><span class="tag w">Medium</span></td><td>The structure itself. Write it from memory.</td><td><code>isWord</code></td><td class="num">O(L) per op</td></tr>
+        <tr><td class="num">211</td><td><a href="https://leetcode.com/problems/design-add-and-search-words-data-structure/" target="_blank" rel="noopener">Design Add and Search Words Data Structure</a></td><td><span class="tag w">Medium</span></td><td>A dot branches into all 26 children, so the walk recurses.</td><td><code>isWord</code></td><td class="num">O(26^dots · L)</td></tr>
+        <tr><td class="num">648</td><td><a href="https://leetcode.com/problems/replace-words/" target="_blank" rel="noopener">Replace Words</a></td><td><span class="tag w">Medium</span></td><td>Walk until the first <code>isWord</code> — that is the shortest root.</td><td><code>isWord</code></td><td class="num">O(total chars)</td></tr>
+        <tr><td class="num">677</td><td><a href="https://leetcode.com/problems/map-sum-pairs/" target="_blank" rel="noopener">Map Sum Pairs</a></td><td><span class="tag w">Medium</span></td><td>Sum a whole subtree, and handle key overwrites.</td><td><code>int value</code></td><td class="num">O(L) insert</td></tr>
+        <tr><td class="num">1268</td><td><a href="https://leetcode.com/problems/search-suggestions-system/" target="_blank" rel="noopener">Search Suggestions System</a></td><td><span class="tag w">Medium</span></td><td>Children in index order give alphabetical output for free.</td><td><code>isWord</code></td><td class="num">O(total chars)</td></tr>
+        <tr><td class="num">212</td><td><a href="https://leetcode.com/problems/word-search-ii/" target="_blank" rel="noopener">Word Search II</a></td><td><span class="tag b">Hard</span></td><td>One board traversal for the whole dictionary, with pruning.</td><td>the word string</td><td class="num">O(mn·4^L)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 208 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Why not a hash set</dt><dd><code>insert</code> and <code>search</code> would be O(1), but <code>startsWith</code> would have to scan every stored word. The prefix operation is what forces the structure.</dd>
+          <dt>The shape</dt><dd>A 26-way tree where the <b>edges</b> carry letters. Spelling a word walks a path; a shared prefix walks shared nodes.</dd>
+          <dt>The flag</dt><dd><code>isWord</code> distinguishes "a word ends here" from "this is merely on the way to one". Without it, <code>search("app")</code> returns true after inserting only <code>"apple"</code>.</dd>
+          <dt>Why search and startsWith share a walk</dt><dd>Both follow the same path; they differ only in what they check at the end. <code>startsWith</code> asks whether the node exists, <code>search</code> asks whether it is flagged.</dd>
+          <dt>Array over map</dt><dd>Input is lowercase only, so <code>TrieNode[26]</code> avoids hashing entirely and the null check <em>is</em> the membership test.</dd>
+          <dt>Edge case</dt><dd>The empty string is a valid prefix of everything and returns true from <code>startsWith</code> — the walk simply makes no steps.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 208 · O(L) per operation, O(total chars × 26) space</div>
+<pre><code class="language-java">class Trie {
+    private static class Node {
+        Node[] children = new Node[26];
+        boolean isWord;
+    }
+
+    private final Node root = new Node();
+
+    public void insert(String word) {
+        Node cur = root;
+        for (char c : word.toCharArray()) {
+            int i = c - 'a';
+            if (cur.children[i] == null) cur.children[i] = new Node();
+            cur = cur.children[i];
+        }
+        // Without this flag, "app" would appear present merely
+        // because "apple" laid down the path.
+        cur.isWord = true;
+    }
+
+    public boolean search(String word) {
+        Node n = walk(word);
+        return n != null &amp;&amp; n.isWord;       // the path AND the flag
+    }
+
+    public boolean startsWith(String prefix) {
+        return walk(prefix) != null;        // the path alone
+    }
+
+    private Node walk(String s) {
+        Node cur = root;
+        for (char c : s.toCharArray()) {
+            cur = cur.children[c - 'a'];
+            if (cur == null) return null;   // check BEFORE the next step
+        }
+        return cur;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 212 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Run a single-word grid search once per dictionary word. With 3×10⁴ words that is 3×10⁴ full board traversals — far too slow.</dd>
+          <dt>What is wasted</dt><dd>Every one of those searches re-walks the same board cells. Words sharing a prefix repeat identical work.</dd>
+          <dt>The inversion</dt><dd>Traverse the <b>board once</b>, carrying a trie pointer alongside the position. The trie answers "does any word continue this way?" with a single null check.</dd>
+          <dt>Why that prunes so well</dt><dd>A path dies as soon as no dictionary word shares its prefix — often at depth 1. Most of the board is rejected almost immediately.</dd>
+          <dt>Store the word, not a flag</dt><dd>Keeping the whole string at its terminal node means you can emit it directly, with no need to reconstruct the path.</dd>
+          <dt>Two optimisations</dt><dd>Null the stored word after collecting it, so duplicates are impossible. And null out exhausted child links so the trie shrinks as the search proceeds — that is what makes the large tests pass.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 212 · O(mn·4^L) worst case, O(total chars) space</div>
+<pre><code class="language-java">class Solution {
+    private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
+
+    private static class Node {
+        Node[] children = new Node[26];
+        String word;                 // the whole word, not just a flag
+    }
+
+    public List&lt;String&gt; findWords(char[][] board, String[] words) {
+        Node root = new Node();
+        for (String w : words) {     // build the trie
+            Node cur = root;
+            for (char c : w.toCharArray()) {
+                int i = c - 'a';
+                if (cur.children[i] == null) cur.children[i] = new Node();
+                cur = cur.children[i];
+            }
+            cur.word = w;
+        }
+
+        List&lt;String&gt; out = new ArrayList&lt;&gt;();
+        for (int r = 0; r &lt; board.length; r++)
+            for (int c = 0; c &lt; board[0].length; c++)
+                dfs(board, r, c, root, out);
+        return out;
+    }
+
+    private void dfs(char[][] b, int r, int c, Node node, List&lt;String&gt; out) {
+        if (r &lt; 0 || r &gt;= b.length || c &lt; 0 || c &gt;= b[0].length) return;
+
+        char ch = b[r][c];
+        if (ch == '#') return;                  // already on this path
+
+        Node next = node.children[ch - 'a'];
+        if (next == null) return;               // no word continues — PRUNE
+
+        if (next.word != null) {
+            out.add(next.word);
+            next.word = null;                   // collect exactly once
+        }
+
+        b[r][c] = '#';
+        for (int[] d : DIRS) dfs(b, r + d[0], c + d[1], next, out);
+        b[r][c] = ch;                           // restore
+
+        // Dead branch: no words left below it. Cutting it shrinks the
+        // trie as the search runs, which is what makes this fast.
+        boolean empty = true;
+        for (Node child : next.children) if (child != null) { empty = false; break; }
+        if (empty &amp;&amp; next.word == null) node.children[ch - 'a'] = null;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>211 · Add and Search Words <span class="tag a">wildcard</span></h4><p><b>Path:</b> ordinary insert; the search is what changes, because <code>.</code> matches any letter.</p><p><b>Delta:</b> the walk becomes a recursion. On a concrete letter, follow that one child. On a dot, try all 26 and return true if any succeeds.</p><p><b>Watch for:</b> the recursion must check <code>node == null</code> at entry, since a dot branch will hand it null children. A word of all dots costs O(26^L), which the constraints bound at length 3 — worth saying aloud.</p></div>
+
+    <div class="card"><h4>648 · Replace Words <span class="tag a">shortest root</span></h4><p><b>Path:</b> for each word in the sentence, find the shortest dictionary root that prefixes it.</p><p><b>Delta:</b> walk the word letter by letter and stop at the <b>first</b> node with <code>isWord</code> set — because you walk in increasing length, the first hit is the shortest root. If the walk breaks or no flag is found, keep the original word.</p><p><b>Watch for:</b> returning at the first flag is what makes it the <em>shortest</em>. Walking to the end and taking the last flag gives the longest root, which is the wrong answer.</p></div>
+
+    <div class="card"><h4>677 · Map Sum Pairs <span class="tag a">values</span></h4><p><b>Path:</b> store an integer per key, and sum the values of every key sharing a prefix.</p><p><b>Delta:</b> nodes hold an <code>int value</code>. <code>sum(prefix)</code> walks to the prefix node and then totals its whole subtree with a DFS.</p><p><b>Watch for:</b> inserting an existing key <b>replaces</b> its value rather than adding. If you instead keep a running sum on each node for speed, you must propagate the <em>delta</em> — new value minus old — or repeated inserts inflate the totals.</p></div>
+
+    <div class="card"><h4>1268 · Search Suggestions System <span class="tag a">ordered children</span></h4><p><b>Path:</b> after each typed character, suggest up to three matching products in lexicographic order.</p><p><b>Delta:</b> walk to the prefix node, then DFS its subtree visiting children from index 0 to 25 — that order <em>is</em> alphabetical, so the first three words found are the answer with no sorting.</p><p><b>Watch for:</b> sorting the product list and binary searching for the prefix range is an equally valid O(n log n) solution and is shorter to write. Offer both; the trie is the better answer when queries are repeated.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>208</b> and <b>212</b>. 208 fixes the node shape and the <code>isWord</code> distinction that every other problem here depends on. 212 teaches the inversion that defines the pattern — traversing the search space once while the trie tells you when to stop — plus the two pruning tricks that turn a correct solution into a fast one.</div>
+</section>
+

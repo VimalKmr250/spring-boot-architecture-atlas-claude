@@ -1,0 +1,127 @@
+<section class="slide" data-sec="18 · Backtracking basics" data-title="The six problems">
+  <h2>Six enumerations, one skeleton</h2>
+  <p class="dek">78 and 77 differ by where you record. 39 changes the start index to allow reuse. 46 switches to a used array. 90 and 47 add the two dedup rules — which are different from each other, and that difference is the point.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Knobs</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">78</td><td><a href="https://leetcode.com/problems/subsets/" target="_blank" rel="noopener">Subsets</a></td><td><span class="tag w">Medium</span></td><td>The baseline. Every node is an answer.</td><td>record all · <code>i+1</code></td><td class="num">O(n·2ⁿ)</td></tr>
+        <tr><td class="num">77</td><td><a href="https://leetcode.com/problems/combinations/" target="_blank" rel="noopener">Combinations</a></td><td><span class="tag w">Medium</span></td><td>Record only at depth k. Prune when too few remain.</td><td>record at k · <code>i+1</code></td><td class="num">O(k·C(n,k))</td></tr>
+        <tr><td class="num">39</td><td><a href="https://leetcode.com/problems/combination-sum/" target="_blank" rel="noopener">Combination Sum</a></td><td><span class="tag w">Medium</span></td><td>Reuse allowed, so recurse with <code>i</code> rather than <code>i+1</code>.</td><td>record at 0 · <code>i</code></td><td class="num">O(n^(T/min))</td></tr>
+        <tr><td class="num">46</td><td><a href="https://leetcode.com/problems/permutations/" target="_blank" rel="noopener">Permutations</a></td><td><span class="tag w">Medium</span></td><td>Order matters, so every index is reachable at every depth.</td><td>record at n · <code>used[]</code></td><td class="num">O(n·n!)</td></tr>
+        <tr><td class="num">90</td><td><a href="https://leetcode.com/problems/subsets-ii/" target="_blank" rel="noopener">Subsets II</a></td><td><span class="tag w">Medium</span></td><td>Sort, then skip repeats that are not first at this depth.</td><td><code>i &gt; start</code></td><td class="num">O(n·2ⁿ)</td></tr>
+        <tr><td class="num">47</td><td><a href="https://leetcode.com/problems/permutations-ii/" target="_blank" rel="noopener">Permutations II</a></td><td><span class="tag w">Medium</span></td><td>A <em>different</em> dedup rule — only the leftmost unused copy may go.</td><td><code>!used[i-1]</code></td><td class="num">O(n·n!)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 78 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The bitmask alternative</dt><dd>For <code>n ≤ 20</code>, loop a mask from 0 to <code>2ⁿ − 1</code> and include element <code>j</code> when bit <code>j</code> is set. Iterative, no recursion, and a genuinely good answer — offer it.</dd>
+          <dt>The recursive view</dt><dd>At each element there are two choices: include it or not. That binary tree has <code>2ⁿ</code> leaves, one per subset.</dd>
+          <dt>The loop formulation</dt><dd>Rather than an explicit include/exclude branch, loop over the remaining candidates. Each iteration <em>is</em> the include branch; moving to the next iteration is the exclude branch.</dd>
+          <dt>Why every node counts</dt><dd>Each partial path is itself a valid subset, so record on entry rather than at leaves. That is what makes subsets simpler than combinations.</dd>
+          <dt>Why order is not duplicated</dt><dd><code>start = i + 1</code> means the sweep only ever moves right, so <code>[2,1]</code> is unreachable. No sorting or set is needed for distinct input.</dd>
+          <dt>Edge case</dt><dd>The empty subset is included automatically — it is the very first recorded value, at the root.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 78 · O(n·2ⁿ) time, O(n) space beyond the output</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; subsets(int[] nums) {
+        List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+        backtrack(nums, 0, new ArrayList&lt;&gt;(), out);
+        return out;
+    }
+
+    private void backtrack(int[] nums, int start,
+                           List&lt;Integer&gt; path, List&lt;List&lt;Integer&gt;&gt; out) {
+        // EVERY node is a valid subset, including the empty one,
+        // so record on entry with no filter at all.
+        out.add(new ArrayList&lt;&gt;(path));    // COPY, not the live list
+
+        for (int i = start; i &lt; nums.length; i++) {
+
+            path.add(nums[i]);                          // choose
+
+            // i + 1: the sweep only moves right, so [2,1] can never
+            // be generated and no de-duplication is needed.
+            backtrack(nums, i + 1, path, out);          // explore
+
+            path.remove(path.size() - 1);               // un-choose
+        }
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 47 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The lazy fix</dt><dd>Generate all <code>n!</code> permutations and push them through a <code>HashSet</code>. Correct, but it does the full exponential work and then discards most of it. Say it, then do better.</dd>
+          <dt>The right approach</dt><dd>Prune duplicate <em>branches</em> before exploring them, so the identical work is never done.</dd>
+          <dt>The rule</dt><dd>Sort first so equal values are adjacent. Then at each depth, among a run of equal values, allow only the <b>leftmost unused</b> copy to be chosen.</dd>
+          <dt>Why <code>!used[i-1]</code></dt><dd>If the previous equal copy is <em>currently in use</em>, we are deeper in a branch that already took it — so this copy is a legitimate second occurrence. If it is <em>not</em> in use, it was already tried and undone at this depth, so choosing this copy would repeat an identical branch.</dd>
+          <dt>Why the other rule does not work here</dt><dd>The combination rule <code>i &gt; start</code> relies on a left-to-right sweep. Permutations revisit every index at every depth, so there is no <code>start</code> to compare against — hence a different test.</dd>
+          <dt>Edge case</dt><dd>The sort is mandatory. Without it, equal values are not adjacent and the rule silently does nothing.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 47 · O(n·n!) worst case, O(n) space beyond the output</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; permuteUnique(int[] nums) {
+        Arrays.sort(nums);                 // MANDATORY: equal values adjacent
+
+        List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+        backtrack(nums, new boolean[nums.length], new ArrayList&lt;&gt;(), out);
+        return out;
+    }
+
+    private void backtrack(int[] nums, boolean[] used,
+                           List&lt;Integer&gt; path, List&lt;List&lt;Integer&gt;&gt; out) {
+        if (path.size() == nums.length) {
+            out.add(new ArrayList&lt;&gt;(path));
+            return;
+        }
+
+        for (int i = 0; i &lt; nums.length; i++) {
+            if (used[i]) continue;
+
+            // Among equal values, only the LEFTMOST unused copy may be
+            // chosen at this depth. If nums[i-1] is not used, it was
+            // already tried and undone here — taking nums[i] now would
+            // repeat an identical branch.
+            if (i &gt; 0 &amp;&amp; nums[i] == nums[i - 1] &amp;&amp; !used[i - 1]) continue;
+
+            used[i] = true;
+            path.add(nums[i]);
+
+            backtrack(nums, used, path, out);
+
+            path.remove(path.size() - 1);      // undo BOTH mutations
+            used[i] = false;
+        }
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>77 · Combinations <span class="tag a">record at depth k</span></h4><p><b>Path:</b> the same tree as subsets, but only nodes at depth <code>k</code> are answers.</p><p><b>Delta:</b> move the record into a base case — <code>if (path.size() == k) { collect; return; }</code>.</p><p><b>Watch for:</b> the pruning is worth adding. If fewer than <code>k − path.size()</code> candidates remain, the branch cannot complete, so bound the loop at <code>n - (k - path.size()) + 1</code>. It converts a slow solution into a fast one on the larger inputs.</p></div>
+
+    <div class="card"><h4>39 · Combination Sum <span class="tag a">start = i</span></h4><p><b>Path:</b> candidates are distinct but each may be reused without limit, and the target bounds the depth.</p><p><b>Delta:</b> recurse with <code>i</code> instead of <code>i + 1</code>, which permits reuse while still forbidding reorderings. Record when the remaining target reaches exactly 0, and abandon the branch when it goes negative.</p><p><b>Watch for:</b> sorting first lets you <code>break</code> rather than <code>continue</code> once a candidate exceeds the remainder — every later candidate is larger, so the whole rest of the loop is dead.</p></div>
+
+    <div class="card"><h4>46 · Permutations <span class="tag a">used[]</span></h4><p><b>Path:</b> order matters, so the left-to-right sweep no longer applies — every unused index is a candidate at every depth.</p><p><b>Delta:</b> drop <code>start</code> entirely, loop from 0, and guard with a <code>boolean[] used</code>. Record at depth <code>n</code>.</p><p><b>Watch for:</b> there are now <b>two</b> mutations to undo — the path entry and the <code>used</code> flag. Restoring only one is the classic failure, and it produces too few permutations rather than an obvious crash.</p></div>
+
+    <div class="card"><h4>90 · Subsets II <span class="tag a">i &gt; start</span></h4><p><b>Path:</b> subsets of an input with repeats. Collecting into a set works but does the full work first.</p><p><b>Delta:</b> sort, then <code>if (i &gt; start &amp;&amp; nums[i] == nums[i-1]) continue;</code>. This lets the first copy at a given depth through and blocks the rest.</p><p><b>Watch for:</b> <code>i &gt; start</code>, not <code>i &gt; 0</code>. With <code>i &gt; 0</code> the second copy is blocked even one level deeper, so <code>[1,1]</code> never appears — and the answer is missing entries rather than having extra ones.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>78</b> and <b>47</b>. 78 fixes the skeleton and the copy-on-record habit that every problem here depends on. 47 is where the two dedup rules become distinguishable — being able to explain why combinations use <code>i &gt; start</code> while permutations use <code>!used[i-1]</code> is the difference between remembering two lines and understanding them.</div>
+</section>
+

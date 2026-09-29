@@ -1,0 +1,36 @@
+<section class="slide" data-sec="Scale &amp; governance" data-title="Governance without bottlenecks">
+  <h2>Governance that speeds teams up</h2>
+  <p class="dek">Enterprise architecture functions fail in one of two ways: a review board everyone routes around, or no standards at all and forty incompatible services. The way out is to make the compliant path the easy path.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="tag b">The bottleneck model</span></h3>
+      <ul class="tight">
+        <li>Every design goes to a weekly board; the queue is three weeks.</li>
+        <li>Standards are a 90-page document nobody has read.</li>
+        <li>Compliance is checked by a human, late, at a gate.</li>
+        <li>Architects are separate from delivery and have not run anything in production for years.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">Result: teams either wait and resent it, or ship first and seek forgiveness. Both damage the architecture, and the board sees neither.</p>
+    </div>
+    <div class="card accent">
+      <h3><span class="tag g">The paved road model</span></h3>
+      <ul class="tight">
+        <li>A <b>service template</b> that already has observability, security, CI, health checks and the error model wired in — a new service starts compliant.</li>
+        <li><b>Shared starters</b> the platform team owns, so a change to the logging standard is a version bump.</li>
+        <li><b>Fitness functions</b> enforce the rules in the pipeline, not in a meeting.</li>
+        <li><b>ADRs</b> for anything off the road, reviewed asynchronously in the PR.</li>
+        <li><b>Architects embedded</b> in delivery, writing some of the code.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">Leaving the paved road stays possible — it just requires writing down why.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="note tip"><span class="lbl">What a review is actually for</span>Not approving designs — catching the level 1–4 decisions from the hierarchy slide, and spotting the same problem being solved separately by three teams. Review the decisions that are expensive to reverse; let teams own the rest. A board that debates library choices has no time left for the boundary that will cost a quarter.</div>
+      <div class="note good"><span class="lbl">Measure the function, not the artefacts</span>Lead time for a new service to reach production. Number of teams on the current template version. Percentage of services meeting the observability baseline. Those tell you whether governance is working. "Number of designs reviewed" tells you only how busy the board was.</div>
+  </div>
+
+  <div class="note"><span class="lbl">Where this leaves the atlas</span>Everything in this deck is one of three things: a <b>decision</b> (recorded in an ADR), a <b>property</b> (defended by a fitness function), or a <b>default</b> (encoded in the template). Anything that is none of the three is an opinion, and opinions do not survive contact with a delivery deadline.</div>
+</section>
+

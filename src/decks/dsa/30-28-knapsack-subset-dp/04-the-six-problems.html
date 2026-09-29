@@ -1,0 +1,115 @@
+<section class="slide" data-sec="28 · Knapsack / subset DP" data-title="The six problems">
+  <h2>Six subsets, two loop rules</h2>
+  <p class="dek">416 and 1049 are reachability and its optimisation form. 494 counts subsets after an algebraic reframing. 518 is the combinations-versus-permutations problem. 474 and 879 add a second capacity dimension.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The reframing</th><th>Loops</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">416</td><td><a href="https://leetcode.com/problems/partition-equal-subset-sum/" target="_blank" rel="noopener">Partition Equal Subset Sum</a></td><td><span class="tag w">Medium</span></td><td>Is a subset summing to <code>total/2</code> reachable?</td><td>0/1, backwards</td><td class="num">O(n·sum) / O(sum)</td></tr>
+        <tr><td class="num">494</td><td><a href="https://leetcode.com/problems/target-sum/" target="_blank" rel="noopener">Target Sum</a></td><td><span class="tag w">Medium</span></td><td>Signs become a subset sum of <code>(total+target)/2</code>.</td><td>0/1, backwards</td><td class="num">O(n·sum) / O(sum)</td></tr>
+        <tr><td class="num">1049</td><td><a href="https://leetcode.com/problems/last-stone-weight-ii/" target="_blank" rel="noopener">Last Stone Weight II</a></td><td><span class="tag w">Medium</span></td><td>Minimise <code>|P−N|</code>: get as close to <code>total/2</code> as possible.</td><td>0/1, backwards</td><td class="num">O(n·sum) / O(sum)</td></tr>
+        <tr><td class="num">518</td><td><a href="https://leetcode.com/problems/coin-change-ii/" target="_blank" rel="noopener">Coin Change II</a></td><td><span class="tag w">Medium</span></td><td>Unbounded and counting — both loop rules at once.</td><td>unbounded, items outer</td><td class="num">O(n·amount) / O(amount)</td></tr>
+        <tr><td class="num">474</td><td><a href="https://leetcode.com/problems/ones-and-zeroes/" target="_blank" rel="noopener">Ones and Zeroes</a></td><td><span class="tag w">Medium</span></td><td>Two capacities, so a 2D table iterated backwards in both.</td><td>0/1, 2D backwards</td><td class="num">O(len·m·n) / O(m·n)</td></tr>
+        <tr><td class="num">879</td><td><a href="https://leetcode.com/problems/profitable-schemes/" target="_blank" rel="noopener">Profitable Schemes</a></td><td><span class="tag b">Hard</span></td><td>Two dimensions, one of which <em>saturates</em> rather than caps.</td><td>0/1, 2D backwards</td><td class="num">O(len·n·minProfit)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 416 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Enumerate all <code>2ⁿ</code> subsets and check each sum. At <code>n = 200</code> that is impossible.</dd>
+          <dt>The reframing</dt><dd>If the two halves are equal, each is <code>total / 2</code>. So the question collapses to: <b>is there a subset summing to exactly <code>total/2</code>?</b> — classic subset-sum.</dd>
+          <dt>The free rejection</dt><dd>An odd total cannot split, so return false immediately. One line, and it eliminates the whole computation on half the inputs.</dd>
+          <dt>The state</dt><dd><code>dp[c]</code> = "is sum <code>c</code> reachable using the items seen so far?" Boolean, because the question is existence rather than an optimum.</dd>
+          <dt>The transition</dt><dd><code>dp[c] |= dp[c − v]</code>. Sum <code>c</code> becomes reachable if <code>c − v</code> already was and you now add item <code>v</code>.</dd>
+          <dt>The direction</dt><dd><b>Backwards.</b> Reading <code>dp[c − v]</code> from the previous row keeps each item to one use. Forwards would let a single 1 build 1, 2, 3, … and report true for impossible inputs.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 416 · O(n·sum) time, O(sum) space</div>
+<pre><code class="language-java">class Solution {
+    public boolean canPartition(int[] nums) {
+        int total = 0;
+        for (int v : nums) total += v;
+
+        // Equal halves require an even total — reject for free.
+        if (total % 2 != 0) return false;
+        int target = total / 2;
+
+        // dp[c] = "can the items seen so far sum to exactly c?"
+        boolean[] dp = new boolean[target + 1];
+        dp[0] = true;                      // the empty subset makes 0
+
+        for (int v : nums) {
+            // BACKWARDS: dp[c - v] is still the PREVIOUS row, so this
+            // item cannot be used twice. Forwards would allow reuse
+            // and report true for [1,1] with target 2 from one 1.
+            for (int c = target; c &gt;= v; c--) {
+                dp[c] |= dp[c - v];
+            }
+        }
+        return dp[target];
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 518 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The question</dt><dd>How many distinct <b>combinations</b> of coins make the amount, with unlimited supply. Order does not matter: 1+2 and 2+1 are one way.</dd>
+          <dt>Two decisions, not one</dt><dd>Coins are reusable, so the capacity loop runs <b>forwards</b>. And combinations rather than permutations means the <b>items loop is outside</b>. These are independent choices and both must be right.</dd>
+          <dt>Why items outside gives combinations</dt><dd>Each coin is fully processed before the next is considered, so a combination is only ever built in <b>non-decreasing coin order</b>. There is exactly one such ordering per multiset, so each is counted once.</dd>
+          <dt>Why capacity outside gives permutations</dt><dd>Every coin is reconsidered at every amount, so 1-then-2 and 2-then-1 are built along different paths and counted separately. That is LC 377 — same code, loops swapped, different problem.</dd>
+          <dt>The base case</dt><dd><code>dp[0] = 1</code>. There is exactly one way to make zero: take nothing. Leaving it at 0 makes every count zero.</dd>
+          <dt>Edge case</dt><dd><code>amount = 0</code> returns 1, not 0 — which falls out of the base case with no special handling.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 518 · O(coins·amount) time, O(amount) space</div>
+<pre><code class="language-java">class Solution {
+    public int change(int amount, int[] coins) {
+        // dp[c] = the number of COMBINATIONS making amount c.
+        int[] dp = new int[amount + 1];
+        dp[0] = 1;                 // exactly one way to make 0: take nothing
+
+        // ITEMS OUTER -> combinations. Each coin is fully considered
+        // before the next, so every combination is built in
+        // non-decreasing coin order and counted exactly once.
+        //
+        // Swapping these two loops would count 1+2 and 2+1 separately,
+        // which is LC 377 — a different problem with the same body.
+        for (int coin : coins) {
+
+            // CAPACITY FORWARDS -> unbounded. dp[c - coin] may already
+            // include this coin, which is exactly what reuse means.
+            for (int c = coin; c &lt;= amount; c++) {
+                dp[c] += dp[c - coin];
+            }
+        }
+        return dp[amount];
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>494 · Target Sum <span class="tag a">0/1 counting</span></h4><p><b>Path:</b> assigning + or − to every element looks like enumeration, and the <code>2ⁿ</code> backtracking solution does pass at <code>n = 20</code>. The algebra is better.</p><p><b>Delta:</b> with positives <code>P</code> and negatives <code>N</code>, <code>P − N = target</code> and <code>P + N = total</code>, so <code>P = (total + target) / 2</code>. Count the subsets summing to that — a 0/1 knapsack with <code>+=</code>.</p><p><b>Watch for:</b> two impossibility checks first — <code>|target| &gt; total</code>, and <code>(total + target)</code> odd. Without them the array size goes negative or the answer is silently wrong.</p></div>
+
+    <div class="card"><h4>1049 · Last Stone Weight II <span class="tag a">0/1 optimisation</span></h4><p><b>Path:</b> simulating smashes greedily with a heap is a different problem and gives the wrong answer. The insight is that every smash sequence amounts to assigning each stone a + or a −.</p><p><b>Delta:</b> the remainder is <code>|P − N|</code>, minimised by making <code>P</code> as close to <code>total/2</code> as possible. So find the largest reachable sum at or below <code>total/2</code>, and the answer is <code>total − 2·best</code>.</p><p><b>Watch for:</b> the table only needs to reach <code>total/2</code> — the symmetric half is redundant, which halves both the memory and the time.</p></div>
+
+    <div class="card"><h4>474 · Ones and Zeroes <span class="tag a">two capacities</span></h4><p><b>Path:</b> each string consumes two budgets at once — a number of zeros and a number of ones — so a single capacity cannot express the constraint.</p><p><b>Delta:</b> <code>dp[zeros][ones]</code> = the largest subset fitting those budgets. Iterate <b>both</b> dimensions backwards, for the same reason the 1D version does.</p><p><b>Watch for:</b> count the zeros and ones of each string once, before the DP loops. Recounting inside the inner loop multiplies the running time by the string length for nothing.</p></div>
+
+    <div class="card"><h4>879 · Profitable Schemes <span class="tag a">saturating dimension</span></h4><p><b>Path:</b> two dimensions again — members used, and profit earned. But profit behaves differently from a capacity.</p><p><b>Delta:</b> profit <b>saturates</b>: once you have met <code>minProfit</code>, more profit does not create a new state. So the index is <code>min(p + profit[i], minProfit)</code>, which keeps the table bounded regardless of how large the profits are.</p><p><b>Watch for:</b> that clamp is the whole trick. Without it the table would need a dimension the size of the total profit. Take the count modulo 10⁹+7 at every addition.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>416</b> and <b>518</b>. 416 fixes the backwards-capacity rule that governs every 0/1 problem here. 518 is the one that forces you to hold <em>two</em> independent loop decisions at once — direction for reuse, order for combinations — and being able to state why each is right is what makes the rest of this family mechanical.</div>
+</section>
+
+

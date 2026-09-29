@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Kafka internals" data-title="Replication & ISR">
+  <h2>Replication, ISR, and what <code>acks=all</code> really promises</h2>
+  <p class="dek">Durability in Kafka is the interaction of three settings across two places. Getting any one of them wrong turns a promise into a probability.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 244" role="img" aria-label="A partition with replication factor three: a leader on broker one and followers on brokers two and three forming the in-sync replica set; the producer with acks=all waits for min.insync.replicas before the write is acknowledged">
+        <rect x="14" y="40" width="150" height="56" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="89" y="62" text-anchor="middle" font-size="11" fill="currentColor">producer</text>
+        <text x="89" y="80" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">acks=all</text>
+
+        <rect x="234" y="30" width="150" height="46" rx="8" fill="#2C7448" fill-opacity="0.12" stroke="#2C7448"></rect>
+        <text x="309" y="50" text-anchor="middle" font-size="10.5" fill="currentColor">broker 1 — LEADER</text>
+        <text x="309" y="66" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">all reads and writes go here</text>
+        <rect x="234" y="86" width="150" height="40" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="309" y="104" text-anchor="middle" font-size="10.5" fill="currentColor">broker 2 — follower</text>
+        <text x="309" y="119" text-anchor="middle" font-size="9" fill="#2C7448">in sync</text>
+        <rect x="234" y="136" width="150" height="40" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="309" y="154" text-anchor="middle" font-size="10.5" fill="currentColor">broker 3 — follower</text>
+        <text x="309" y="169" text-anchor="middle" font-size="9" fill="#8E6200">lagging → drops out of ISR</text>
+
+        <line x1="166" y1="60" x2="230" y2="52" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="310" y1="78" x2="310" y2="84" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <line x1="310" y1="128" x2="310" y2="134" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <path d="M232 60 C200 90 200 110 228 106" stroke="#2C7448" stroke-width="1.4" fill="none" marker-end="url(#arw)"></path>
+        <text x="180" y="112" font-size="8.5" fill="#2C7448">ack when</text>
+        <text x="180" y="124" font-size="8.5" fill="#2C7448">ISR ≥ min</text>
+
+        <rect x="420" y="30" width="200" height="146" rx="9" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.22"></rect>
+        <text x="436" y="52" font-size="11" font-weight="600" fill="currentColor">ISR — in-sync replicas</text>
+        <text x="436" y="74" font-size="9.5" fill="currentColor" opacity="0.75">Replicas that have caught up within</text>
+        <text x="436" y="88" font-size="9.5" fill="currentColor" opacity="0.75">replica.lag.time.max.ms.</text>
+        <text x="436" y="110" font-size="9.5" fill="currentColor" opacity="0.75">A slow follower is REMOVED from the</text>
+        <text x="436" y="124" font-size="9.5" fill="currentColor" opacity="0.75">ISR — so acks=all then means "all of</text>
+        <text x="436" y="138" font-size="9.5" fill="currentColor" opacity="0.75">the ones still keeping up", which can</text>
+        <text x="436" y="152" font-size="9.5" fill="#A22636">be just the leader.</text>
+        <text x="436" y="170" font-size="9.5" fill="#D26A3F">min.insync.replicas closes that gap.</text>
+
+        <rect x="652" y="30" width="214" height="146" rx="9" fill="#D26A3F" fill-opacity="0.07" stroke="#D26A3F"></rect>
+        <text x="668" y="52" font-size="11" font-weight="600" fill="currentColor">The safe combination</text>
+        <text x="668" y="76" font-size="10" font-family="monospace" fill="currentColor">replication.factor = 3</text>
+        <text x="668" y="94" font-size="10" font-family="monospace" fill="currentColor">min.insync.replicas = 2</text>
+        <text x="668" y="112" font-size="10" font-family="monospace" fill="currentColor">acks = all</text>
+        <text x="668" y="136" font-size="9.5" fill="currentColor" opacity="0.75">Survives losing one broker.</text>
+        <text x="668" y="150" font-size="9.5" fill="currentColor" opacity="0.75">Lose two and the partition goes</text>
+        <text x="668" y="164" font-size="9.5" fill="currentColor" opacity="0.75">read-only — availability traded</text>
+        <text x="668" y="178" font-size="9.5" fill="currentColor" opacity="0.75">for not silently losing writes.</text>
+
+        <line x1="14" y1="200" x2="866" y2="200" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="220" font-size="10.5" fill="#A22636">unclean.leader.election.enable=true lets an out-of-sync replica become leader to restore availability — at the price of</text>
+        <text x="14" y="234" font-size="10.5" fill="#A22636">silently discarding acknowledged writes. Leave it false for anything with money in it.</text>
+      </svg>
+    </div>
+    <figcaption>Followers replicate; they do not serve reads by default (rack-aware follower fetching is an option for cross-AZ cost, not for throughput). Replication buys durability and failover, not read scaling — read scaling comes from partitions.</figcaption>
+  </figure>
+</section>
+

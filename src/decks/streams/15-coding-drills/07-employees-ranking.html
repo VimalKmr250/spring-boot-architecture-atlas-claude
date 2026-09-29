@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Coding drills" data-title="Employees: ranking">
+  <h2>Employees: highest, second highest, top N</h2>
+  <p class="dek">The ranking questions are where interviewers probe ties and the difference between "second highest salary" and "the second person in a sorted list". Remember that Emeka and Farah tie at 81,000.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Drills 59–64</div>
+<pre><code class="language-java">// 59 · Highest paid employee
+employees.stream().max(Comparator.comparingDouble(Employee::salary))
+         .map(Employee::name);                               // Optional[Asha]
+
+// 60 · Highest paid in each department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+        collectingAndThen(maxBy(Comparator.comparingDouble(Employee::salary)),
+                          o -&gt; o.get().name())));
+// {Engineering=Asha, Finance=Goran, Sales=Emeka, Support=Jia}
+
+// 61 · Second highest salary, and who earns it
+Optional&lt;Double&gt; second = employees.stream().map(Employee::salary).distinct()
+        .sorted(Comparator.reverseOrder()).skip(1).findFirst();   // Optional[118000.0]
+employees.stream().filter(e -&gt; second.isPresent() &amp;&amp; e.salary() == second.get())
+         .map(Employee::name).toList();                      // [Bruno]
+
+// 62 · Nth highest salary, n = 3
+employees.stream().map(Employee::salary).distinct()
+         .sorted(Comparator.reverseOrder()).skip(n - 1).findFirst();   // Optional[98000.0]
+
+// 63 · Second highest salary in each department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+        collectingAndThen(toList(), list -&gt; list.stream().map(Employee::salary).distinct()
+                .sorted(Comparator.reverseOrder()).skip(1).findFirst())));
+// {Engineering=Optional[118000.0], Finance=Optional[88000.0],
+//  Sales=Optional[72000.0], Support=Optional[54000.0]}
+
+// 64 · Top two earners in each department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+        collectingAndThen(toList(), list -&gt; list.stream()
+                .sorted(Comparator.comparingDouble(Employee::salary).reversed())
+                .limit(2).map(Employee::name).toList())));
+// {Engineering=[Asha, Bruno], Finance=[Goran, Hana], Sales=[Emeka, Farah], Support=[Jia, Ivo]}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Drills 65–69</div>
+<pre><code class="language-java">// 65 · Earning more than their department's average (two passes)
+Map&lt;String, Double&gt; avg = employees.stream()
+        .collect(groupingBy(Employee::dept, averagingDouble(Employee::salary)));
+employees.stream().filter(e -&gt; e.salary() &gt; avg.get(e.dept()))
+         .map(Employee::name).toList();
+// [Asha, Bruno, Emeka, Farah, Goran, Jia]
+
+// 66 · Youngest in each department
+employees.stream().collect(groupingBy(Employee::dept, TreeMap::new,
+        collectingAndThen(minBy(Comparator.comparingInt(Employee::age)),
+                          o -&gt; o.get().name())));
+// {Engineering=Chen, Finance=Hana, Sales=Dara, Support=Ivo}
+
+// 67 · Sort by salary, highest first, then by name
+employees.stream()
+         .sorted(Comparator.comparingDouble(Employee::salary).reversed()
+                           .thenComparing(Employee::name))
+         .map(Employee::name).toList();
+// [Asha, Bruno, Chen, Goran, Hana, Emeka, Farah, Dara, Kofi, Jia, Ivo]
+
+// 68 · Oldest employee
+employees.stream().max(Comparator.comparingInt(Employee::age))
+         .map(Employee::name);                               // Optional[Goran]
+
+// 69 · Give Support a 10% raise; records are immutable, so map to new ones
+employees.stream()
+         .map(e -&gt; e.dept().equals("Support")
+                 ? new Employee(e.id(), e.name(), e.dept(), e.salary() * 1.10,
+                                e.age(), e.gender(), e.city())
+                 : e)
+         .toList();
+// Ivo's new salary prints as 59400.00000000001</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>The follow-up they ask</th><th>What to say</th></tr></thead>
+      <tbody>
+        <tr><td class="num">60</td><td>Emeka and Farah both earn 81,000. Why Emeka?</td><td><code>maxBy</code> keeps the first of equal elements, in encounter order. If the answer should be "both", find each department's maximum, then filter everyone equal to it.</td></tr>
+        <tr><td class="num">60</td><td>Can you avoid the <code>Optional</code>?</td><td><code>toMap(Employee::dept, e -&gt; e, BinaryOperator.maxBy(cmp))</code> gives <code>Map&lt;String, Employee&gt;</code> directly. The <code>o.get()</code> above is safe because a group is never empty.</td></tr>
+        <tr><td class="num">61</td><td>Why <code>distinct()</code> before <code>skip(1)</code>?</td><td>Two people on the top salary would otherwise make the "second highest" equal to the highest. This is exactly what the SQL version, with <code>DENSE_RANK</code>, does.</td></tr>
+        <tr><td class="num">69</td><td>Why does Ivo get 59400.00000000001?</td><td>Because 1.10 cannot be represented exactly as a <code>double</code>. Money belongs in <code>BigDecimal</code> or <code>long</code> cents, and this output is the argument for it.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

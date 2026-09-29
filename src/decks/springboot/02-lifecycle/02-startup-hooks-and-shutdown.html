@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Lifecycle" data-title="Startup hooks and shutdown">
+  <h2>Startup hooks, failure analysis, and dying gracefully</h2>
+  <p class="dek">Shutdown gets far less attention than startup and causes more customer-visible errors — every rolling deploy exercises it, several times an hour.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Startup hooks, in the order they fire</div>
+<pre><code class="language-java">@Component
+class WarmUpRunner implements ApplicationRunner {
+    @Override public void run(ApplicationArguments args) {
+        catalogCache.preload();        // context up, server listening
+    }
+}
+
+@Component
+class RegisterOnReady {
+    @EventListener(ApplicationReadyEvent.class)   // after runners, truly ready
+    void onReady() { discovery.register(); }
+}
+
+@Component
+class OrderMetrics {
+    @PostConstruct void init() { ... }   // this bean only; no ordering guarantees
+    @PreDestroy   void close() { ... }   // on graceful shutdown
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">Graceful shutdown — three settings that matter</div>
+<pre><code class="language-yaml">server.shutdown: graceful           # stop accepting, finish in-flight requests
+spring.lifecycle.timeout-per-shutdown-phase: 30s
+# Kubernetes: a preStop sleep of ~5s so the endpoint is removed from the
+# Service BEFORE the JVM stops accepting — otherwise the last few requests
+# are routed to a pod that has already closed its connector.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Shutdown order, and the one that bites</h3>
+        <ol class="tight">
+          <li>SIGTERM arrives; <code>ContextClosedEvent</code> is published.</li>
+          <li>Web connector stops accepting <b>new</b> requests; in-flight ones finish.</li>
+          <li><code>SmartLifecycle.stop()</code> runs in reverse phase order — Kafka listener containers stop here.</li>
+          <li>Singletons destroyed in reverse dependency order; <code>@PreDestroy</code> then <code>DisposableBean</code>.</li>
+        </ol>
+        <p style="margin-top:4px">The bite: a Kafka consumer that has read a batch but not committed offsets when the JVM is killed will reprocess it on the next pod. That is normal and correct — and it is why every consumer must be idempotent.</p>
+      </div>
+      <div class="note good"><span class="lbl">Failure analysers</span>When startup fails, Boot's <code>FailureAnalyzer</code>s turn a 400-line stack trace into a readable block — "Web server failed to start. Port 8080 was already in use." You can register your own for in-house starters, and it is one of the highest-goodwill things a platform team can ship.</div>
+      <div class="note warn"><span class="lbl">Don't do work in a constructor</span>A bean constructor that calls a database or an HTTP endpoint makes startup depend on that system being up. Boot will fail to start, the pod will crash-loop, and a dependency's blip becomes your outage. Constructors wire; <code>ApplicationReadyEvent</code> works.</div>
+    </div>
+  </div>
+</section>
+

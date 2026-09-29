@@ -1,0 +1,27 @@
+<section class="slide" data-sec="Operations" data-title="Anti-patterns">
+  <h2>Twelve event-driven anti-patterns</h2>
+  <p class="dek">Each of these is common, was reasonable when it was introduced, and is expensive to unwind. Recognising them by symptom is more useful than knowing the names.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Anti-pattern</th><th>What you see</th><th>What it costs</th></tr></thead>
+      <tbody>
+        <tr><td>Commands disguised as events</td><td><code>SendEmail</code> on a topic, one consumer, producer knows the outcome</td><td>Coupling with no owner for failures. Fan-out you can never use</td></tr>
+        <tr><td>Database change feed as a "domain event"</td><td>CDC straight off tables into a shared topic</td><td>Thirty teams coupled to your schema; you can never refactor</td></tr>
+        <tr><td>Dual write</td><td><code>save(); kafka.send();</code></td><td>Silent loss on crash. Found weeks later by reconciliation</td></tr>
+        <tr><td>Non-idempotent consumer</td><td>A counter increment in a handler</td><td>Every rebalance, retry and replay corrupts data a little</td></tr>
+        <tr><td>Unbounded retries</td><td>Retry forever, no DLT</td><td>One bad record blocks its partition and everything behind it</td></tr>
+        <tr><td>Event chains as workflow</td><td>Six services each reacting to the last, no coordinator</td><td>Nobody can answer "where is order 88421 stuck"</td></tr>
+        <tr><td>Event sourcing by accident</td><td>Rebuilding current state by replaying a topic on every read</td><td>All the cost of event sourcing, none of the tooling</td></tr>
+        <tr><td>Shared consumer group</td><td>Two applications, one group id</td><td>Each sees half the events. Nobody notices for weeks</td></tr>
+        <tr><td>No schema governance</td><td>JSON, no registry, "we'll be careful"</td><td>A breaking change reaches production and fails asynchronously</td></tr>
+        <tr><td>Fat events as data dumps</td><td>Every column of the row in the payload</td><td>A published contract you can never shrink, plus a PII exposure</td></tr>
+        <tr><td>Synchronous call inside a consumer</td><td>Handler calls three services and waits</td><td>Consumer throughput now equals the slowest dependency's latency</td></tr>
+        <tr><td>Events for everything</td><td>The whole request path made async</td><td>Every screen must model "not yet"; debugging cost with no availability gain</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The pattern behind them</span>Nine of the twelve come from treating the broker as the architecture. Kafka does not make a system event-driven any more than a database makes it well-modelled. The architecture is the <b>event design</b> — what is a fact, who owns it, what it means — and the broker is how it travels.</div>
+</section>
+

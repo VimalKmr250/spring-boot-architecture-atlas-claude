@@ -1,0 +1,160 @@
+<section class="slide" data-sec="01 · Sliding window" data-title="Dry run">
+  <h2>LC 3 traced by hand on <code>"abcabcbb"</code></h2>
+  <p class="dek">Longest substring without repeating characters. The window state is a character count; the window is invalid exactly when the character we just admitted appears twice. Watch <code>l</code>: it moves seven times in total across the whole run, never backwards — the amortisation argument made concrete.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 330" role="img" aria-label="Step by step trace of the sliding window over the string abcabcbb, showing l, r, the window contents and the best length at each step">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">STEP</text>
+        <text x="70" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">a  b  c  a  b  c  b  b</text>
+        <text x="348" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">WINDOW</text>
+        <text x="440" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ACTION</text>
+        <text x="800" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">BEST</text>
+        <line x1="14" y1="22" x2="866" y2="22" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <!-- r=0 -->
+        <text x="14" y="52" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=0</text>
+        <rect x="68" y="31" width="33" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="118" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="151" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="184" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="217" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="48" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="48" font-size="11.5" font-family="monospace" fill="currentColor">a</text>
+        <text x="440" y="48" font-size="11.5" fill="currentColor" opacity="0.72">admit 'a' — still unique</text>
+        <text x="806" y="48" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">1</text>
+
+        <!-- r=1 -->
+        <text x="14" y="86" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=1</text>
+        <rect x="68" y="65" width="66" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="118" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="151" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="184" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="217" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="82" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="82" font-size="11.5" font-family="monospace" fill="currentColor">ab</text>
+        <text x="440" y="82" font-size="11.5" fill="currentColor" opacity="0.72">admit 'b' — still unique</text>
+        <text x="806" y="82" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">2</text>
+
+        <!-- r=2 -->
+        <text x="14" y="120" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=2</text>
+        <rect x="68" y="99" width="99" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="118" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="151" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="184" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="217" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="116" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="116" font-size="11.5" font-family="monospace" fill="currentColor">abc</text>
+        <text x="440" y="116" font-size="11.5" fill="currentColor" opacity="0.72">admit 'c' — the answer is found here</text>
+        <text x="806" y="116" font-size="12" font-family="monospace" font-weight="600" fill="#D26A3F">3</text>
+
+        <!-- r=3 -->
+        <text x="14" y="154" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=3</text>
+        <rect x="101" y="133" width="99" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="118" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="151" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="184" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="217" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="150" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="150" font-size="11.5" font-family="monospace" fill="currentColor">bca</text>
+        <text x="440" y="150" font-size="11.5" fill="#3AA79B">dup 'a' → evict index 0, l: 0→1</text>
+        <text x="806" y="150" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
+
+        <!-- r=4 -->
+        <text x="14" y="188" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=4</text>
+        <rect x="134" y="167" width="99" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="118" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="151" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="184" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="217" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="250" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="184" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="184" font-size="11.5" font-family="monospace" fill="currentColor">cab</text>
+        <text x="440" y="184" font-size="11.5" fill="#3AA79B">dup 'b' → evict index 1, l: 1→2</text>
+        <text x="806" y="184" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
+
+        <!-- r=5 -->
+        <text x="14" y="222" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=5</text>
+        <rect x="167" y="201" width="99" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="118" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="151" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="184" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">a</text>
+        <text x="217" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="250" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="283" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="218" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="218" font-size="11.5" font-family="monospace" fill="currentColor">abc</text>
+        <text x="440" y="218" font-size="11.5" fill="#3AA79B">dup 'c' → evict index 2, l: 2→3</text>
+        <text x="806" y="218" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
+
+        <!-- r=6 -->
+        <text x="14" y="256" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=6</text>
+        <rect x="233" y="235" width="66" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="118" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="151" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="184" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="217" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">c</text>
+        <text x="283" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="316" y="252" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="348" y="252" font-size="11.5" font-family="monospace" fill="currentColor">cb</text>
+        <text x="440" y="252" font-size="11.5" fill="#3AA79B">dup 'b' → evict twice, l: 3→5</text>
+        <text x="806" y="252" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
+
+        <!-- r=7 -->
+        <text x="14" y="290" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">r=7</text>
+        <rect x="299" y="269" width="33" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="85" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="118" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="151" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="184" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">a</text>
+        <text x="217" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="250" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">c</text>
+        <text x="283" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor" opacity="0.3">b</text>
+        <text x="316" y="286" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">b</text>
+        <text x="348" y="286" font-size="11.5" font-family="monospace" fill="currentColor">b</text>
+        <text x="440" y="286" font-size="11.5" fill="#3AA79B">dup 'b' → evict twice, l: 5→7</text>
+        <text x="806" y="286" font-size="12" font-family="monospace" fill="currentColor" opacity="0.55">3</text>
+
+        <line x1="14" y1="304" x2="866" y2="304" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="322" font-size="10.5" fill="currentColor" opacity="0.62">Eight moves of r and seven of l — fifteen across the whole run, not eight per step. That is why this is O(n) and not O(n²).</text>
+      </svg>
+    </div>
+    <figcaption>Copper marks the live window; teal marks a step where the left pointer had to move. The window never shrinks for free — every eviction is forced by the character just admitted.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">r</th><th>char</th><th class="num">l</th><th>window state (counts)</th><th>action</th><th class="num">len</th><th class="num">best</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><td>a</td><td class="num">0</td><td>a:1</td><td>admit — valid</td><td class="num">1</td><td class="num">1</td></tr>
+        <tr><td class="num">1</td><td>b</td><td class="num">0</td><td>a:1 b:1</td><td>admit — valid</td><td class="num">2</td><td class="num">2</td></tr>
+        <tr><td class="num">2</td><td>c</td><td class="num">0</td><td>a:1 b:1 c:1</td><td>admit — valid</td><td class="num">3</td><td class="num">3</td></tr>
+        <tr><td class="num">3</td><td>a</td><td class="num">1</td><td>b:1 c:1 a:1</td><td>a:2 invalid → evict a</td><td class="num">3</td><td class="num">3</td></tr>
+        <tr><td class="num">4</td><td>b</td><td class="num">2</td><td>c:1 a:1 b:1</td><td>b:2 invalid → evict b</td><td class="num">3</td><td class="num">3</td></tr>
+        <tr><td class="num">5</td><td>c</td><td class="num">3</td><td>a:1 b:1 c:1</td><td>c:2 invalid → evict c</td><td class="num">3</td><td class="num">3</td></tr>
+        <tr><td class="num">6</td><td>b</td><td class="num">5</td><td>c:1 b:1</td><td>b:2 invalid → evict a, then b</td><td class="num">2</td><td class="num">3</td></tr>
+        <tr><td class="num">7</td><td>b</td><td class="num">7</td><td>b:1</td><td>b:2 invalid → evict c, then b</td><td class="num">1</td><td class="num">3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Where brute force would have redone the work</span>At <code>r=6</code> the naive solution restarts from <code>l=4</code> and re-scans <code>"bcb"</code> from scratch, having already established at <code>r=5</code> that <code>"abc"</code> was clean. The window never re-reads a settled prefix: the count map already remembers everything the rescan would have recomputed. On a string of 10⁵ characters that is the difference between 10⁵ and 10¹⁰ operations.</div>
+</section>
+

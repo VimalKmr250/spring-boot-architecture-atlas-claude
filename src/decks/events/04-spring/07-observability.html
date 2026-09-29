@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Spring" data-title="Observability">
+  <h2>Making an event flow observable</h2>
+  <p class="dek">The hardest part of running event-driven systems is answering "what happened to order 88421". Three mechanisms make that a query instead of an investigation.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">1 · Trace propagation across the async hop — two lines</div>
+<pre><code class="language-yaml">spring.kafka:
+  template.observation-enabled: true      # producer span, injects traceparent header
+  listener.observation-enabled: true      # consumer span, continues the SAME trace
+management.tracing.sampling.probability: 0.1</code></pre>
+      <div class="codelabel" style="margin-top:14px">2 · The metrics that matter</div>
+<pre><code class="language-yaml"># Exposed by Micrometer's Kafka binders, plus your own:
+kafka_consumer_fetch_manager_records_lag_max   # per partition — the key SLI
+kafka_consumer_coordinator_rebalance_total     # rising = instability
+spring_kafka_listener_seconds{result="failure"} # handler latency + error rate
+events_staleness_seconds                        # now() - event.occurredAt, a histogram
+outbox_oldest_unsent_seconds                    # producer-side health
+dlt_depth{topic="..."}                          # must be zero</code></pre>
+      <div class="codelabel" style="margin-top:14px">3 · Correlation in the payload, not just the headers</div>
+<pre><code class="language-java">// correlationId = the user action that started everything
+// causationId   = the event that directly caused this one
+// Together they let you reconstruct the whole causal tree from a log query,
+// even for events that crossed a system with no tracing.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">The four dashboards for an event system</span><b>Flow</b> — throughput and staleness per topic, end to end. <b>Lag</b> — per consumer group, per partition. <b>Errors</b> — retry rate and DLT depth per consumer. <b>Broker</b> — under-replicated partitions, ISR shrinks, disk. More than four and nobody opens any of them during an incident.</div>
+      <div class="note warn"><span class="lbl">Lag per partition, never per topic</span>The topic average hides a single hot or stuck partition completely. A group showing 200 average lag might have eleven partitions at zero and one at 2,400 — and that one is the customer complaint.</div>
+      <div class="note good"><span class="lbl">The question to design for</span>"What happened to order 88421?" should be one query. Trace id in every log line, event id in every record, correlation id in every payload, and a UI or saved query that joins them. Build it before the first incident, not during.</div>
+    </div>
+  </div>
+</section>
+

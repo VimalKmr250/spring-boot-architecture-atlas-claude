@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Collectors" data-title="Concurrent collectors and custom Collectors">
+  <h2>How a Collector works, and writing your own</h2>
+  <p class="dek">A <code>Collector</code> is four functions and a set of flags. Knowing them explains how <code>collect</code> runs in parallel, what the concurrent collectors change, and how to write the collector the library lacks.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Part of <code>Collector&lt;T, A, R&gt;</code></th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>supplier()</code></td><td>A new, empty mutable container <code>A</code></td></tr>
+          <tr><td><code>accumulator()</code></td><td>Adds one element <code>T</code> to a container</td></tr>
+          <tr><td><code>combiner()</code></td><td>Merges two containers. Only used in parallel, and so only tested there</td></tr>
+          <tr><td><code>finisher()</code></td><td>Turns the container into the result <code>R</code></td></tr>
+          <tr><td><code>IDENTITY_FINISH</code></td><td>The container is the result; the finisher is skipped</td></tr>
+          <tr><td><code>UNORDERED</code></td><td>The result does not depend on encounter order</td></tr>
+          <tr><td><code>CONCURRENT</code></td><td>One container can take elements from several threads at once</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Parallel collect, in three moves</h3>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li>Each chunk of the split stream gets its <b>own</b> container from <code>supplier()</code>, so no locking is needed.</li>
+        <li>Each thread runs <code>accumulator()</code> on its chunk.</li>
+        <li><code>combiner()</code> merges the containers pairwise, in encounter order, then <code>finisher()</code> runs once.</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">The concurrent collectors, <code>groupingByConcurrent</code> and <code>toConcurrentMap</code>, are <code>CONCURRENT</code> and <code>UNORDERED</code>. On a parallel stream every thread writes into one <code>ConcurrentHashMap</code> and step 3 disappears. The price is that the elements inside each group lose their encounter order.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A top-N collector: O(n log k) time and O(k) memory</div>
+<pre><code class="language-java">static &lt;T&gt; Collector&lt;T, ?, List&lt;T&gt;&gt; topN(int n, Comparator&lt;? super T&gt; cmp) {
+    return Collector.of(
+        () -&gt; new PriorityQueue&lt;T&gt;(cmp),                  // a min-heap of the best n
+        (heap, t) -&gt; { heap.add(t); if (heap.size() &gt; n) heap.poll(); },
+        (a, b) -&gt; { for (T t : b) { a.add(t); if (a.size() &gt; n) a.poll(); } return a; },
+        heap -&gt; heap.stream().sorted(cmp.reversed()).toList());   // best first
+}
+
+List&lt;Order&gt; top3 = orders.stream()
+        .collect(topN(3, Comparator.comparingDouble(Order::total)));</code></pre>
+    </div>
+    <div class="note bad"><span class="lbl">The combiner nobody ran</span>A custom collector whose combiner is <code>(a, b) -&gt; a</code> passes every sequential test, because sequential streams never call it. The first time someone adds <code>.parallel()</code>, every chunk but one is silently thrown away. Test custom collectors with a parallel stream, and compare the result with the sequential one. <code>sorted().limit(n)</code> would give the same top three, but it holds every element in memory and sorts them all.</div>
+  </div>
+</section>
+

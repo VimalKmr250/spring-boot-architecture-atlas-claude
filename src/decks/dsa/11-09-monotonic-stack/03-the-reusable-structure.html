@@ -1,0 +1,111 @@
+<section class="slide" data-sec="09 · Monotonic stack" data-title="The reusable structure">
+  <h2>One loop, four questions, two places to record</h2>
+  <p class="dek">Flip the comparison to switch between greater and smaller. Record on pop for "next", record from <code>peek()</code> before pushing for "previous". That is the entire configuration space.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The template — next greater element, by index</div>
+<pre><code class="language-java">/**
+ * For each i, the index of the first j &gt; i with a[j] &gt; a[i].
+ * Stack holds INDICES whose answer is still unknown, and their
+ * values are strictly DECREASING from bottom to top.
+ *
+ * Each index is pushed once and popped at most once  ->  O(n).
+ */
+int[] nextGreater(int[] a) {
+    int n = a.length;
+    int[] ans = new int[n];
+    Arrays.fill(ans, -1);                  // default when nothing is ever greater
+
+    Deque&lt;Integer&gt; stack = new ArrayDeque&lt;&gt;();   // ArrayDeque, never java.util.Stack
+
+    for (int i = 0; i &lt; n; i++) {
+
+        // a[i] dominates the top, so the top's wait is over.
+        while (!stack.isEmpty() &amp;&amp; a[stack.peek()] &lt; a[i]) {
+            ans[stack.pop()] = i;          // settle it ON THE WAY OUT
+        }
+
+        stack.push(i);                     // now i waits its turn
+    }
+    // Anything still on the stack never found a greater element,
+    // and keeps the -1 default.
+    return ans;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The four configurations</div>
+<pre><code class="language-java">// NEXT greater  — settle on pop, decreasing stack
+while (!st.isEmpty() &amp;&amp; a[st.peek()] &lt; a[i]) ans[st.pop()] = i;
+st.push(i);
+
+// NEXT smaller  — same shape, comparison flipped
+while (!st.isEmpty() &amp;&amp; a[st.peek()] &gt; a[i]) ans[st.pop()] = i;
+st.push(i);
+
+// PREVIOUS greater — read peek() BEFORE pushing
+while (!st.isEmpty() &amp;&amp; a[st.peek()] &lt;= a[i]) st.pop();
+ans[i] = st.isEmpty() ? -1 : st.peek();
+st.push(i);
+
+// PREVIOUS smaller — same, comparison flipped
+while (!st.isEmpty() &amp;&amp; a[st.peek()] &gt;= a[i]) st.pop();
+ans[i] = st.isEmpty() ? -1 : st.peek();
+st.push(i);
+
+// CIRCULAR (the array wraps) — walk 2n and take i % n.
+// Push only during the first pass, so nothing is settled twice.
+for (int i = 0; i &lt; 2 * n; i++) {
+    int j = i % n;
+    while (!st.isEmpty() &amp;&amp; a[st.peek()] &lt; a[j]) ans[st.pop()] = a[j];
+    if (i &lt; n) st.push(j);
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">The rectangle variant — both boundaries at once (LC 84)</div>
+<pre><code class="language-java">// A bar of height h extends left until the first SHORTER bar and
+// right until the next shorter bar. The pop moment gives you both:
+// the new element is the right boundary, and the item beneath the
+// popped one is the left boundary.
+int largestRectangleArea(int[] h) {
+    Deque&lt;Integer&gt; st = new ArrayDeque&lt;&gt;();
+    int best = 0, n = h.length;
+
+    for (int i = 0; i &lt;= n; i++) {
+        // A virtual bar of height 0 at index n forces the stack
+        // to drain, so no case needs separate handling afterwards.
+        int cur = (i == n) ? 0 : h[i];
+
+        while (!st.isEmpty() &amp;&amp; h[st.peek()] &gt;= cur) {
+            int height = h[st.pop()];
+
+            // Left boundary is the item now on top; if the stack is
+            // empty this bar reached all the way to index 0.
+            int left  = st.isEmpty() ? -1 : st.peek();
+            int width = i - left - 1;
+
+            best = Math.max(best, height * width);
+        }
+        st.push(i);
+    }
+    return best;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Direction of the stack</dt><dd>Decreasing for "greater" questions, increasing for "smaller". Get this backwards and the stack drains immediately, giving every element the same wrong answer.</dd>
+        <dt>Where you record</dt><dd>On <code>pop</code> for "next"; from <code>peek()</code> just before <code>push</code> for "previous".</dd>
+        <dt>Strict or not</dt><dd><code>&lt;</code> versus <code>&lt;=</code> decides how equal values are treated. For rectangles it does not change the maximum — an equal-height bar is handled by its twin — but for "strictly greater" questions it does.</dd>
+        <dt>Sentinel</dt><dd>Iterating to <code>n</code> inclusive with a virtual 0 drains the stack automatically and removes the post-loop cleanup entirely.</dd>
+        <dt>Index or value</dt><dd>Push indices. You can always read the value, and only the index gives you the width.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Using <code>java.util.Stack</code></b> — it is synchronised, slower, and iterates bottom-to-top which is the reverse of what you expect; use <code>ArrayDeque</code>. <b>Pushing values instead of indices</b> — then the width <code>i − left − 1</code> is uncomputable and the rectangle problems become impossible. <b>Forgetting the empty-stack case for the left boundary</b> — when the stack empties, the bar reaches index 0, so the left boundary is <code>−1</code> and the width is <code>i</code>, not <code>i − 1</code>.</div>
+  </div>
+</section>
+

@@ -1,0 +1,80 @@
+<section class="slide" data-sec="21 · Topological sort" data-title="Mechanics">
+  <h2>Repeatedly take whatever has nothing left blocking it</h2>
+  <p class="dek">Given tasks with prerequisites, produce an order in which every task comes after everything it depends on. The algorithm is one sentence: <b>keep a set of tasks with zero remaining prerequisites, take any of them, and decrement its dependents</b>. If you run out before finishing, there is a cycle.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Kahn's algorithm — the invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px"><code>indegree[v]</code> counts how many prerequisites of <code>v</code> are still unprocessed. The queue holds exactly those nodes whose count has reached <b>zero</b>.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Processing a node decrements each of its dependents; any that hit zero join the queue. Each edge is examined once, so the whole thing is O(V + E).</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Cycle detection is free: if fewer than <code>V</code> nodes were emitted, the remainder form a cycle — every one of them is still waiting on another, so none can ever reach zero.</p>
+    </div>
+    <div class="panel">
+      <h3>Edge direction is the thing to get right</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The input usually reads <code>[a, b]</code> meaning "to take <code>a</code> you must first take <code>b</code>". That is an edge <b>from b to a</b> — the prerequisite points at what it unlocks — and <code>indegree[a]</code> is what increments.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Building it backwards produces a perfectly plausible order that is exactly reversed. Write one concrete example on paper before coding: it takes ten seconds and prevents the most common failure in this pattern.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">The DFS alternative uses three colours and produces the order <em>reversed</em> on the way out. Kahn's is easier to reason about and gives cycle detection without extra state.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 254" role="img" aria-label="A dependency graph with indegree counts, processed in waves by Kahn's algorithm">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">EDGE b → a MEANS "b UNLOCKS a", SO indegree[a] COUNTS ITS BLOCKERS</text>
+
+        <circle cx="80" cy="76" r="22" fill="#3AA79B" fill-opacity="0.22" stroke="#3AA79B" stroke-width="1.7"></circle>
+        <text x="80" y="82" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">0</text>
+        <text x="80" y="112" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">indeg 0</text>
+
+        <path d="M103 68 L177 50" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></path>
+        <path d="M103 86 L177 104" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></path>
+
+        <circle cx="200" cy="44" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="200" y="50" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">1</text>
+        <text x="200" y="20" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">indeg 1</text>
+
+        <circle cx="200" cy="112" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="200" y="118" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">2</text>
+        <text x="200" y="148" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">indeg 1</text>
+
+        <path d="M222 52 L296 70" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></path>
+        <path d="M222 104 L296 86" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></path>
+
+        <circle cx="320" cy="78" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="320" y="84" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="320" y="114" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#D26A3F">indeg 2 — needs BOTH</text>
+
+        <line x1="400" y1="24" x2="400" y2="160" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="436" y="44" font-size="11.5" font-weight="600" fill="currentColor">Processed in waves</text>
+        <rect x="436" y="56" width="120" height="30" rx="6" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="496" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">[0]</text>
+        <path d="M560 71 L588 71" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <rect x="596" y="56" width="120" height="30" rx="6" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="656" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">[1, 2]</text>
+        <path d="M720 71 L748 71" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <rect x="756" y="56" width="100" height="30" rx="6" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="806" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">[3]</text>
+
+        <text x="436" y="112" font-size="11" fill="currentColor" opacity="0.7">Node 3 waits for BOTH 1 and 2. Its count</text>
+        <text x="436" y="130" font-size="11" fill="currentColor" opacity="0.7">drops 2 → 1 → 0, and only then does it enter.</text>
+        <text x="436" y="152" font-size="11" fill="currentColor" opacity="0.62">Both [0,1,2,3] and [0,2,1,3] are valid answers.</text>
+
+        <line x1="14" y1="182" x2="866" y2="182" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="202" font-size="11.5" font-weight="600" fill="#D26A3F">Cycle detection comes free</text>
+        <text x="14" y="222" font-size="11" fill="currentColor" opacity="0.75">If the loop ends having emitted fewer than V nodes, every node left over is still waiting on another one —</text>
+        <text x="14" y="242" font-size="11" fill="currentColor" opacity="0.75">which is precisely a cycle. No extra bookkeeping, no second pass. Just compare the count.</text>
+      </svg>
+    </div>
+    <figcaption>Node 3's indegree of 2 is what encodes "needs both". Decrementing rather than removing is what lets a node with several prerequisites wait for all of them without any special handling.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Directed dependencies and a question about <b>ordering</b> or <b>feasibility</b> — course schedules, build systems, recipe ingredients, task graphs. Also for detecting a cycle in a directed graph.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>The graph is undirected — "cycle" means something different there, and union-find is the tool. Also when edges have weights and you want a shortest path rather than an order.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(V + E)</b> time: each node is enqueued once and each edge relaxed once. Space is <b>O(V + E)</b> for the adjacency list plus <b>O(V)</b> for the indegree array and queue.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"prerequisites[i] = [a, b] means you must take b before a"</b> · <b>"can you finish all courses"</b> (feasibility, so only the count matters) · <b>"return the ordering of courses"</b> · <b>"eventual safe states"</b> (reverse the edges) · <b>"which recipes can you create"</b> · <b>"build order"</b>. The phrase <b>"if it is impossible, return an empty array"</b> is the cycle case being handed to you.</div>
+</section>
+

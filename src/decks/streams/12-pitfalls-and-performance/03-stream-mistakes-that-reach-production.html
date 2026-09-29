@@ -1,0 +1,29 @@
+<section class="slide" data-sec="Pitfalls and performance" data-title="Stream mistakes that reach production">
+  <h2>Sixteen stream mistakes that reach production</h2>
+  <p class="dek">Each one passes code review, most pass the tests, and all of them fail somewhere in production. The symptom column is what you will see in the logs. Every row is explained on an earlier slide in this tab.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Mistake</th><th>Symptom</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Consuming a stream twice</td><td><code>IllegalStateException: stream has already been operated upon or closed</code></td><td>Keep the collection or a <code>Supplier&lt;Stream&lt;T&gt;&gt;</code></td></tr>
+        <tr><td class="num">2</td><td><code>toMap</code> on a key that is not unique</td><td><code>IllegalStateException: Duplicate key …</code></td><td>A merge function, or <code>groupingBy</code></td></tr>
+        <tr><td class="num">3</td><td><code>toMap</code> with a nullable value</td><td><code>NullPointerException</code></td><td>Filter nulls, or the three-argument <code>collect</code></td></tr>
+        <tr><td class="num">4</td><td><code>groupingBy</code> on a nullable key</td><td><code>NullPointerException: element cannot be mapped to a null key</code></td><td>Map nulls to a real key</td></tr>
+        <tr><td class="num">5</td><td>Mutating the result of <code>Stream.toList()</code></td><td><code>UnsupportedOperationException</code></td><td><code>toCollection(ArrayList::new)</code></td></tr>
+        <tr><td class="num">6</td><td><code>Files.lines</code> without try-with-resources</td><td>"Too many open files" after hours or days</td><td>try-with-resources</td></tr>
+        <tr><td class="num">7</td><td><code>sorted()</code> or <code>distinct()</code> on an unbounded stream</td><td>Hangs, then <code>OutOfMemoryError</code></td><td>Bound it first</td></tr>
+        <tr><td class="num">8</td><td><code>forEach(list::add)</code> in parallel</td><td>Missing elements, or <code>ArrayIndexOutOfBoundsException</code></td><td>A collector</td></tr>
+        <tr><td class="num">9</td><td>Blocking I/O in <code>parallelStream()</code></td><td>Latency spikes in unrelated endpoints</td><td><code>mapConcurrent</code>, or an executor</td></tr>
+        <tr><td class="num">10</td><td>Business logic in <code>peek</code></td><td>Logic silently skipped, for example before <code>count()</code></td><td><code>forEach</code>, or a loop</td></tr>
+        <tr><td class="num">11</td><td><code>Optional.get()</code> without a check</td><td><code>NoSuchElementException: No value present</code></td><td><code>orElseThrow</code> with a message</td></tr>
+        <tr><td class="num">12</td><td><code>orElse(expensiveCall())</code></td><td>The call runs on every request, found or not</td><td><code>orElseGet</code></td></tr>
+        <tr><td class="num">13</td><td><code>int</code> totals with <code>sum()</code> or <code>summingInt</code></td><td>Negative revenue on a busy day</td><td>Sum as <code>long</code></td></tr>
+        <tr><td class="num">14</td><td><code>reduce</code> with a seed that is not an identity</td><td>Wrong only after someone adds <code>.parallel()</code></td><td>A true identity</td></tr>
+        <tr><td class="num">15</td><td>Relying on <code>HashSet</code> or <code>HashMap</code> order</td><td>Tests that start failing after an upgrade</td><td>Sort, or use a <code>LinkedHash…</code></td></tr>
+        <tr><td class="num">16</td><td><code>sorted(cmp).findFirst()</code> for a minimum</td><td>O(n log n) time and O(n) memory, where O(n) and O(1) would do</td><td><code>min(cmp)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

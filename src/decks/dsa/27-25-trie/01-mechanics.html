@@ -1,0 +1,90 @@
+<section class="slide" data-sec="25 · Trie" data-title="Mechanics">
+  <h2>Share every prefix exactly once</h2>
+  <p class="dek">A hash set answers "is this exact word present?" in O(1). It cannot answer "does any word start with this?" without scanning everything. A trie stores words as <b>paths through a tree</b>, so a shared prefix is stored once and every prefix question becomes a walk of length <code>L</code> — independent of how many words exist.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The structure</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Each node holds up to 26 child links and a boolean <code>isWord</code>. The <b>edges</b> carry the letters; the nodes themselves store nothing but structure.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Walking from the root spells a prefix. Reaching a node with <code>isWord</code> set means a complete word ends there — which is why <code>"car"</code> and <code>"card"</code> coexist with the shorter one marked mid-path.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">An <code>int[26]</code>-shaped array of children beats a <code>HashMap</code> for lowercase input: no hashing, no boxing, and the null check is the membership test.</p>
+    </div>
+    <div class="panel">
+      <h3>What it buys over a hash set</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Prefix queries</dt><dd>"Does anything start with <code>app</code>?" is a three-step walk, regardless of dictionary size.</dd>
+        <dt>Shared traversal</dt><dd>Searching a grid for 3000 words at once walks the board <em>once</em>, pruning the moment no word continues that way.</dd>
+        <dt>Ordered enumeration</dt><dd>Visiting children 'a' to 'z' emits words in lexicographic order for free — no sorting needed.</dd>
+        <dt>Wildcards</dt><dd>A <code>.</code> means "try every child", which is a branch in the recursion. A hash set cannot express that at all.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="A trie holding four words, showing shared prefixes and the isWord markers">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">A TRIE HOLDING: car · card · care · dog</text>
+
+        <circle cx="120" cy="50" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="120" y="55" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.5">root</text>
+
+        <path d="M134 60 L186 84" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="152" y="78" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">c</text>
+        <path d="M130 64 L150 160" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="128" y="118" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">d</text>
+
+        <circle cx="200" cy="92" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M216 92 L256 92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="232" y="84" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">a</text>
+        <circle cx="272" cy="92" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M288 92 L328 92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="304" y="84" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">r</text>
+
+        <circle cx="344" cy="92" r="17" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="344" y="97" text-anchor="middle" font-size="10" font-family="monospace" font-weight="600" fill="currentColor">■</text>
+        <text x="344" y="70" text-anchor="middle" font-size="9" font-family="monospace" fill="#D26A3F">"car" ends here</text>
+
+        <path d="M357 82 L400 60" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="372" y="62" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">d</text>
+        <path d="M357 102 L400 124" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="372" y="126" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">e</text>
+
+        <circle cx="416" cy="52" r="17" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="416" y="57" text-anchor="middle" font-size="10" font-family="monospace" font-weight="600" fill="currentColor">■</text>
+        <text x="460" y="56" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.55">"card"</text>
+        <circle cx="416" cy="132" r="17" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="416" y="137" text-anchor="middle" font-size="10" font-family="monospace" font-weight="600" fill="currentColor">■</text>
+        <text x="460" y="136" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.55">"care"</text>
+
+        <circle cx="152" cy="176" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M168 176 L208 176" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="184" y="168" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">o</text>
+        <circle cx="224" cy="176" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M240 176 L280 176" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <text x="256" y="168" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">g</text>
+        <circle cx="296" cy="176" r="17" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-width="1.7"></circle>
+        <text x="296" y="181" text-anchor="middle" font-size="10" font-family="monospace" font-weight="600" fill="currentColor">■</text>
+        <text x="340" y="180" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.55">"dog"</text>
+
+        <text x="560" y="86" font-size="11" fill="currentColor" opacity="0.72">"car", "card" and "care" share three nodes.</text>
+        <text x="560" y="106" font-size="11" fill="currentColor" opacity="0.72">A hash set would store all three in full.</text>
+        <text x="560" y="134" font-size="11" fill="currentColor" opacity="0.62">Letters live on the EDGES. A filled node means</text>
+        <text x="560" y="152" font-size="11" fill="currentColor" opacity="0.62">a word ends there — and it may still have children.</text>
+
+        <line x1="14" y1="206" x2="866" y2="206" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="226" font-size="11" fill="currentColor" opacity="0.75"><tspan font-weight="600" fill="#D26A3F">insert / search / startsWith</tspan> are all O(L) in the word length — and completely independent of how many words the trie holds.</text>
+        <text x="14" y="246" font-size="11" fill="currentColor" opacity="0.72">Without the <tspan font-family="monospace">isWord</tspan> flag you could not distinguish "car" the word from "car" the prefix of "card".</text>
+      </svg>
+    </div>
+    <figcaption>The node at the end of "car" is both a word terminus and an interior node. That dual role is exactly what the boolean flag records, and forgetting it is the most common trie bug.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Many strings share prefixes and the queries are about <b>prefixes</b> — autocomplete, dictionary lookup, word search over a grid, replacing words by their roots.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Only exact membership is needed — a <code>HashSet</code> is simpler and uses less memory. Also when the alphabet is huge, since 26 links per node becomes wasteful and a map per node is better.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(L)</b> per insert or query, where L is the word length. Space is <b>O(total characters × 26)</b> worst case — the constant is large, which is worth mentioning when memory is a stated constraint.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"implement a prefix tree"</b> · <b>"returns true if there is any previously inserted word that starts with the prefix"</b> · <b>"the word may contain dots, where a dot matches any letter"</b> · <b>"replace every word with the shortest root that forms it"</b> · <b>"return at most three suggested products after each character is typed"</b> · <b>"find all words in the board"</b>. The tell is <b>many words queried together</b>, or a query about a prefix rather than a whole word.</div>
+</section>
+

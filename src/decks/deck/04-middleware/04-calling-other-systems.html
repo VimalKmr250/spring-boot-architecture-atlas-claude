@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Middleware" data-title="Calling other systems">
+  <h2>Outbound HTTP, declared not hand-rolled</h2>
+  <p class="dek">Spring Boot 4 made HTTP interface clients properly first-class with <code>@ImportHttpServices</code>. You declare the contract as an interface; Spring builds the proxy with your timeouts, observability and interceptors already attached.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">payment/internal/gateway/ — the declared client</div>
+<pre><code class="language-java">public interface PaymentGatewayClient {
+
+    @PostExchange("/v1/authorizations")
+    AuthorizationResponse authorize(@RequestBody AuthorizationRequest req,
+                                    @RequestHeader("Idempotency-Key") String key);
+
+    @PostExchange("/v1/authorizations/{id}/capture")
+    CaptureResponse capture(@PathVariable String id, @RequestBody CaptureRequest req);
+}
+
+@Configuration
+@ImportHttpServices(group = "payments", types = PaymentGatewayClient.class)
+class PaymentClientConfig {
+
+    @Bean RestClientHttpServiceGroupConfigurer paymentsConfigurer(
+            ObservationRegistry observations) {
+        // requestFactory() takes a ClientHttpRequestFactory — build one
+        // from HttpClientSettings; it will NOT accept the settings object.
+        var factory = ClientHttpRequestFactoryBuilder.detect()
+                .build(HttpClientSettings.defaults()
+                        .withConnectTimeout(Duration.ofMillis(500))
+                        .withReadTimeout(Duration.ofSeconds(2)));   // never unbounded
+
+        return groups -&gt; groups.filterByName("payments").forEachClient((g, builder) -&gt;
+            builder.baseUrl("https://api.gateway.example")
+                   .requestFactory(factory)
+                   .observationRegistry(observations)               // traces + metrics, free
+                   .defaultStatusHandler(new PaymentErrorHandler()));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The anti-corruption layer</h3>
+        <p>The gateway's JSON is <em>their</em> model, full of their vocabulary and their nulls. Translate it at this boundary into <code>AuthorizationResult</code> in your language. When they ship v4 with renamed fields, exactly one class changes.</p>
+      </div>
+      <div class="card">
+        <h3>Client choices in Boot 4</h3>
+        <dl class="kv">
+          <dt>HTTP interface</dt><dd>default — declarative, testable, observable</dd>
+          <dt>RestClient</dt><dd>imperative and fluent; what the interface runs on</dd>
+          <dt>WebClient</dt><dd>when you genuinely need reactive streaming</dd>
+          <dt>RestTemplate</dt><dd>maintenance only; do not start new code on it</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">Non-negotiable</span>A connect timeout and a read timeout on <b>every</b> outbound client. The single most common cause of a thread-pool-exhaustion outage is one dependency that stopped answering but never closed the socket.</div>
+      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> set the floor globally</span>Per-client code is for the exceptions. Boot 4 gives every auto-configured client a default: <code>spring.http.clients.connect-timeout: 2s</code> and <code>spring.http.clients.read-timeout: 5s</code>. Put that in the service template so a client nobody configured is still bounded.</div>
+    </div>
+  </div>
+</section>
+

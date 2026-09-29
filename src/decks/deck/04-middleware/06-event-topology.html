@@ -1,0 +1,64 @@
+<section class="slide" data-sec="Middleware" data-title="Event topology">
+  <h2>The event backbone, drawn as it really is</h2>
+  <p class="dek">"We use Kafka" says nothing. What matters is the topic list, who owns each one, what the key is, and where poisoned messages go.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 300" role="img" aria-label="Kafka topology: order module publishes orders.placed via an outbox relay; payment, inventory, notification and search consumer groups read it; failures route to a dead letter topic with a replay path">
+        <rect x="14" y="88" width="136" height="72" rx="9" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="82" y="114" text-anchor="middle" font-size="12" fill="currentColor">order module</text>
+        <text x="82" y="132" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">writes outbox row</text>
+        <text x="82" y="148" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">in the same TX</text>
+
+        <rect x="180" y="96" width="112" height="56" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="236" y="120" text-anchor="middle" font-size="11" fill="currentColor">relay</text>
+        <text x="236" y="137" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">poll / Debezium CDC</text>
+        <line x1="152" y1="124" x2="176" y2="124" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="324" y="78" width="152" height="92" rx="9" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="400" y="102" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">orders.placed.v1</text>
+        <text x="400" y="122" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">key = orderId · 12 partitions</text>
+        <text x="400" y="138" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">Avro + schema registry</text>
+        <text x="400" y="154" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">retention 7d · compaction off</text>
+        <line x1="294" y1="124" x2="320" y2="124" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line>
+
+        <rect x="562" y="18" width="150" height="40" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="637" y="37" text-anchor="middle" font-size="11" fill="currentColor">payment-svc</text>
+        <text x="637" y="51" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">group: payment · 12 consumers</text>
+        <rect x="562" y="70" width="150" height="40" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="637" y="89" text-anchor="middle" font-size="11" fill="currentColor">inventory</text>
+        <text x="637" y="103" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">group: inventory</text>
+        <rect x="562" y="122" width="150" height="40" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="637" y="141" text-anchor="middle" font-size="11" fill="currentColor">notification</text>
+        <text x="637" y="155" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">group: notify</text>
+        <rect x="562" y="174" width="150" height="40" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="637" y="193" text-anchor="middle" font-size="11" fill="currentColor">search indexer</text>
+        <text x="637" y="207" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">group: search</text>
+
+        <line x1="478" y1="110" x2="558" y2="40" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="478" y1="118" x2="558" y2="90" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="478" y1="132" x2="558" y2="142" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="478" y1="146" x2="558" y2="194" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="518" y="172" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.55">each group reads</text>
+        <text x="518" y="185" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.55">every message</text>
+
+        <rect x="562" y="240" width="150" height="44" rx="7" fill="currentColor" fill-opacity="0.06" stroke="#A22636"></rect>
+        <text x="637" y="260" text-anchor="middle" font-size="11" fill="currentColor">orders.placed.v1.DLT</text>
+        <text x="637" y="276" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">alert on depth &gt; 0</text>
+        <line x1="637" y1="216" x2="637" y2="236" stroke="#A22636" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="724" y="230" font-size="9.5" fill="#A22636">after 3 local retries</text>
+        <path d="M712 262 C800 262 800 196 716 196" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="3 3" fill="none" marker-end="url(#arw)"></path>
+        <text x="806" y="228" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">manual</text>
+        <text x="806" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">replay</text>
+      </svg>
+    </div>
+    <figcaption>Partition count caps consumer parallelism — twelve partitions means at most twelve useful consumers in a group. Keying on <code>orderId</code> guarantees that all events for one order land on one partition, and therefore arrive in order.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Topic naming carries ownership</h4><p><code>&lt;domain&gt;.&lt;entity&gt;.&lt;event&gt;.v&lt;n&gt;</code>. The version in the name means a breaking schema change is a new topic and a dual-publish window, not a coordinated big-bang deploy.</p></div>
+    <div class="card"><h4>Events, not commands, on the bus</h4><p><code>OrderPlaced</code> (fact, past tense, many consumers) not <code>SendEmail</code> (instruction, one consumer). Facts let you add consumers without touching the producer — the whole point.</p></div>
+    <div class="card"><h4>Thin or fat?</h4><p>Thin events (ids only) force a call back and couple you to producer availability. Fat events (a snapshot of what changed) are the enterprise default: bigger payload, independent consumers.</p></div>
+  </div>
+</section>
+

@@ -1,0 +1,66 @@
+<section class="slide" data-sec="Modular monolith" data-title="Spring Modulith">
+  <h2>Spring Modulith: the boundary, documented and tested</h2>
+  <p class="dek">Spring Modulith (2.x, current on Boot 4) makes the module a first-class concept: it derives the module graph from your package structure, verifies it, generates documentation, and gives per-module integration tests.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">order/package-info.java — declaring the module and its exports</div>
+<pre><code class="language-java">@ApplicationModule(
+    displayName = "Order Management",
+    allowedDependencies = { "payment :: api", "inventory :: api", "shared" }
+)
+package com.retailco.shop.order;
+
+// order/api/package-info.java
+@NamedInterface("api")
+package com.retailco.shop.order.api;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">ModularityTest.java — verification + docs in four lines</div>
+<pre><code class="language-java">class ModularityTest {
+    static final ApplicationModules modules =
+            ApplicationModules.of(ShopApplication.class);
+
+    @Test void verifiesModuleStructure() {
+        modules.verify();          // fails the build on an illegal dependency
+    }
+
+    @Test void writesDocumentation() {
+        new Documenter(modules)
+            .writeModulesAsPlantUml()      // C4 component diagram, per module
+            .writeIndividualModulesAsPlantUml()
+            .writeModuleCanvases();        // exports, events, dependencies, beans
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card accent">
+      <h3>Slice tests you can actually run</h3>
+      <p><code>@ApplicationModuleTest</code> boots <b>one module</b>, so the order module's tests start in ~2 s instead of booting eight modules and Kafka. It does <b>not</b> stub the others for you — an unmocked bean reference across a module boundary fails the bootstrap, and you supply the mock yourself.</p>
+<pre style="margin-top:8px"><code class="language-java">// modes: STANDALONE (default) · DIRECT_DEPENDENCIES · ALL_DEPENDENCIES
+@ApplicationModuleTest                      // = STANDALONE: this module only
+class OrderModuleTests {
+
+    @MockitoBean PaymentService payments;   // YOU stub the neighbours
+
+    @Test void placesOrder(Scenario scenario) {
+        scenario.stimulate(() -&gt; orders.place(cmd))
+                .andWaitForEventOfType(OrderPlaced.class)
+                .toArriveAndVerify(e -&gt; assertThat(e.orderId()).isNotNull());
+    }
+}</code></pre>
+    </div>
+    <div class="card">
+      <h3>What it does not do</h3>
+      <ul class="tight">
+        <li>It will not invent boundaries — you still do the domain work.</li>
+        <li>It does not stop cross-schema SQL; that needs a database-level rule or a migration review.</li>
+        <li>Adopting it on a tangled codebase means a long list of violations on day one. Baseline them, then ratchet down.</li>
+      </ul>
+      <p style="margin-top:2px">Pair it with the ArchUnit rules on the previous slide — Modulith owns module-to-module, ArchUnit owns inside-the-module.</p>
+    </div>
+  </div>
+</section>
+

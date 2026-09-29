@@ -1,0 +1,118 @@
+<section class="slide" data-sec="17 · BST problems" data-title="The six problems">
+  <h2>Six BST questions, two engines</h2>
+  <p class="dek">700, 235 and 450 descend. 98, 230 and 99 read the in-order sequence. 99 is the one that combines both ideas and is worth the most time.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Engine</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">700</td><td><a href="https://leetcode.com/problems/search-in-a-binary-search-tree/" target="_blank" rel="noopener">Search in a Binary Search Tree</a></td><td><span class="tag g">Easy</span></td><td>Descent in its simplest form. Write it iteratively.</td><td>A</td><td class="num">O(h) / O(1)</td></tr>
+        <tr><td class="num">235</td><td><a href="https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/" target="_blank" rel="noopener">Lowest Common Ancestor of a BST</a></td><td><span class="tag w">Medium</span></td><td>The split point is the answer — far easier than the general tree version.</td><td>A</td><td class="num">O(h) / O(1)</td></tr>
+        <tr><td class="num">98</td><td><a href="https://leetcode.com/problems/validate-binary-search-tree/" target="_blank" rel="noopener">Validate Binary Search Tree</a></td><td><span class="tag w">Medium</span></td><td>A range carried down, or in-order monotonicity. Not a parent check.</td><td>A or B</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">230</td><td><a href="https://leetcode.com/problems/kth-smallest-element-in-a-bst/" target="_blank" rel="noopener">Kth Smallest Element in a BST</a></td><td><span class="tag w">Medium</span></td><td>In-order with an early exit, so O(h + k) rather than O(n).</td><td>B</td><td class="num">O(h + k) / O(h)</td></tr>
+        <tr><td class="num">450</td><td><a href="https://leetcode.com/problems/delete-node-in-a-bst/" target="_blank" rel="noopener">Delete Node in a BST</a></td><td><span class="tag w">Medium</span></td><td>Three cases; the two-child one needs the in-order successor.</td><td>A</td><td class="num">O(h) / O(h)</td></tr>
+        <tr><td class="num">99</td><td><a href="https://leetcode.com/problems/recover-binary-search-tree/" target="_blank" rel="noopener">Recover Binary Search Tree</a></td><td><span class="tag w">Medium</span></td><td>Two swapped nodes produce one or two inversions in the in-order sequence.</td><td>B</td><td class="num">O(n) / O(h)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 98 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The wrong first attempt</dt><dd>Check <code>left.val &lt; node.val &lt; right.val</code> at every node. This is the single most common wrong answer in the whole BST family, and it passes the problem's own first example.</dd>
+          <dt>Why it fails</dt><dd>The BST property is about entire <em>subtrees</em>, not immediate children. A node can satisfy its parent while violating an ancestor several levels up, exactly as in the traced tree.</dd>
+          <dt>Solution one — the range</dt><dd>Carry <code>(lo, hi)</code> down. Descending left tightens <code>hi</code> to the current value; descending right tightens <code>lo</code>. Every node must lie strictly inside its inherited interval.</dd>
+          <dt>Solution two — in-order</dt><dd>A valid BST emits a strictly increasing in-order sequence, so keep a <code>prev</code> pointer and fail the moment <code>prev.val &gt;= node.val</code>. Same complexity, and it generalises to LC 99.</dd>
+          <dt>The overflow trap</dt><dd>Use <code>long</code> bounds. A tree consisting of one node holding <code>Integer.MIN_VALUE</code> is valid, but <code>val &gt; Integer.MIN_VALUE</code> rejects it — and that case is in the test set.</dd>
+          <dt>Duplicates</dt><dd>Invalid by LeetCode's definition, so the comparisons are strict on both sides.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 98 · O(n) time, O(h) space</div>
+<pre><code class="language-java">class Solution {
+    public boolean isValidBST(TreeNode root) {
+        // long bounds: a node may legitimately hold Integer.MIN_VALUE
+        // or Integer.MAX_VALUE, which int sentinels would reject.
+        return valid(root, Long.MIN_VALUE, Long.MAX_VALUE);
+    }
+
+    private boolean valid(TreeNode node, long lo, long hi) {
+        if (node == null) return true;
+
+        // Strict on both sides — duplicates are not allowed.
+        if (node.val &lt;= lo || node.val &gt;= hi) return false;
+
+        // Descending LEFT tightens the upper bound to this value;
+        // descending RIGHT tightens the lower bound. That inherited
+        // bound is what a parent-only comparison cannot see.
+        return valid(node.left,  lo, node.val)
+            &amp;&amp; valid(node.right, node.val, hi);
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 99 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Collect the in-order values, sort a copy, compare position by position, and swap back the two that differ. O(n log n) time and O(n) space — correct, and worth stating first.</dd>
+          <dt>The reframing</dt><dd>The in-order sequence should be sorted. Swapping two elements of a sorted sequence creates a very specific defect, so you do not need to sort anything — just find it.</dd>
+          <dt>The two cases</dt><dd>If the swapped nodes are <b>non-adjacent</b> in the sequence, there are exactly <b>two</b> inversions: take the <em>first</em> element of the first and the <em>second</em> element of the last. If they are <b>adjacent</b>, there is exactly <b>one</b> inversion, and both culprits are in it.</dd>
+          <dt>Handling both uniformly</dt><dd>On the first inversion, record <code>first = prev</code> and <code>second = node</code>. On any later inversion, overwrite <code>second = node</code> only. That single rule covers both cases with no branching.</dd>
+          <dt>The final step</dt><dd>Swap the two <b>values</b>. The statement forbids changing the structure, so moving nodes is not allowed.</dd>
+          <dt>Edge cases</dt><dd>Exactly two nodes are swapped, as guaranteed. The O(1)-space follow-up is Morris traversal — mention it, but the stack version is what to write.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 99 · O(n) time, O(h) space</div>
+<pre><code class="language-java">class Solution {
+    private TreeNode first, second, prev;
+
+    public void recoverTree(TreeNode root) {
+        inorder(root);
+        // Swap VALUES — the structure must not change.
+        int tmp = first.val;
+        first.val = second.val;
+        second.val = tmp;
+    }
+
+    private void inorder(TreeNode node) {
+        if (node == null) return;
+
+        inorder(node.left);
+
+        // In-order should be strictly increasing. An inversion here
+        // means one of the two swapped nodes is involved.
+        if (prev != null &amp;&amp; prev.val &gt; node.val) {
+            // First inversion: BOTH candidates come from it.
+            if (first == null) first = prev;
+            // Every inversion updates `second`. If the nodes were
+            // adjacent there is only one inversion, and this line
+            // still captures the right node.
+            second = node;
+        }
+        prev = node;
+
+        inorder(node.right);
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>700 · Search in a BST <span class="tag a">engine A</span></h4><p><b>Path:</b> scanning the whole tree is O(n) and ignores the ordering. One comparison per level discards half the remaining tree.</p><p><b>Delta:</b> a three-line <code>while</code> loop. Prefer the iterative form — it is O(1) space, and the recursive version buys nothing here.</p><p><b>Watch for:</b> return the <em>node</em>, not a boolean. The subtree rooted there is the expected answer, and returning <code>null</code> when absent is correct rather than an error.</p></div>
+
+    <div class="card"><h4>235 · Lowest Common Ancestor of a BST <span class="tag a">engine A</span></h4><p><b>Path:</b> the general-tree algorithm is O(n) and works, but ignores the ordering entirely. The BST version is O(h) and much shorter.</p><p><b>Delta:</b> while both targets are on the same side of the current node, walk that way. The first node where they <em>split</em> — or that equals one of them — is the answer.</p><p><b>Watch for:</b> a node is permitted to be its own ancestor, so stop when <code>cur.val</code> equals either target. Forgetting that descends past the correct answer.</p></div>
+
+    <div class="card"><h4>230 · Kth Smallest Element in a BST <span class="tag a">engine B</span></h4><p><b>Path:</b> a full in-order into a list then index <code>k−1</code> is O(n) time and space. The observation is that you can stop as soon as <code>k</code> values have been emitted.</p><p><b>Delta:</b> the iterative in-order with an explicit stack, decrementing <code>k</code> on each pop and returning at zero. That is O(h + k), which matters when <code>k</code> is small and the tree is large.</p><p><b>Watch for:</b> the follow-up asks what changes if the tree is modified often. The answer is to store a subtree size in each node, making selection O(h) — worth naming even without coding it.</p></div>
+
+    <div class="card"><h4>450 · Delete Node in a BST <span class="tag a">engine A</span></h4><p><b>Path:</b> descend to the node using the ordering, then handle the removal. The descent is easy; the removal has three cases.</p><p><b>Delta:</b> zero or one child means returning that child upward — the parent's assignment splices it in. Two children means overwriting the value with the in-order successor, then deleting that successor from the right subtree.</p><p><b>Watch for:</b> the successor is the <em>leftmost node of the right subtree</em>, not simply <code>root.right</code>. It is the unique smallest value greater than the deleted one, which is what keeps both subtrees ordered.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>98</b> and <b>99</b>. 98 corrects the parent-comparison instinct, which is the error that quietly breaks more BST solutions than anything else. 99 then forces you to reason about what a swap <em>does</em> to the in-order sequence — and that habit of asking "what would the sorted order look like?" is what makes the rest of this family straightforward.</div>
+</section>
+

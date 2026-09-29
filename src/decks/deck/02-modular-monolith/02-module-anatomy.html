@@ -1,0 +1,43 @@
+<section class="slide" data-sec="Modular monolith" data-title="Module anatomy">
+  <h2>Three packages per module, and only one is public</h2>
+  <p class="dek">Java gives you <code>public</code> (the whole world) and package-private (this one package). There is nothing in between — so a modular monolith has to invent "module-private" by convention, and then enforce it with tooling.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The gap this works around</h3>
+        <p>Package-private <b>does not nest</b>. <code>order.internal.domain.Order</code> cannot be package-private and still visible to <code>order.internal.app</code> — those are different packages to the compiler. So every class in a module with any internal structure must be <code>public</code>, and therefore callable from every other module.</p>
+        <p>The three-package layout restores the missing level: the boundary is declared by <b>position in the package tree</b>, and the build enforces that position.</p>
+      </div>
+      <div class="note tip"><span class="lbl">The test for whether <code>api</code> is clean</span>Could you serialise everything in it to JSON and put it behind HTTP tomorrow, without touching a single field? If yes, the package is honest. That is not hypothetical — it is exactly what happens the day the module is extracted.</div>
+    </div>
+    <div class="tree"><span class="c">// one module, three packages, one of them importable</span>
+com.retailco.shop.<span class="h">order</span>
+├── <span class="g">api/</span>        <span class="c">← WHAT THE MODULE OFFERS. The only importable package.</span>
+│   ├── OrderService.java          <span class="c">interface — the verbs on offer</span>
+│   ├── OrderView.java             <span class="c">record — read model</span>
+│   ├── OrderSummary.java          <span class="c">record — list projection</span>
+│   ├── PlaceOrderCommand.java     <span class="c">record — input shape</span>
+│   ├── OrderId.java               <span class="c">value type used in signatures</span>
+│   └── events/OrderPlaced.java    <span class="c">published fact, versioned</span>
+│
+├── <span class="g">spi/</span>        <span class="c">← WHAT THE MODULE REQUIRES from someone else</span>
+│   ├── TaxCalculator.java
+│   └── CreditPolicy.java
+│
+└── <span class="g">internal/</span>   <span class="c">← everything else. Nobody outside imports this.</span>
+    ├── domain/   Order, OrderLine, Money, OrderRepository <span class="c">(port)</span>
+    ├── app/      PlaceOrderUseCase <span class="c">(implements api.OrderService)</span>
+    ├── jpa/      OrderJpaEntity, OrderRepositoryAdapter
+    ├── web/      OrderController, PlaceOrderRequest
+    └── kafka/    OrderPlacedPublisher
+</div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Interfaces and records only in <code>api</code></h4><p>No <code>@Entity</code>, no Hibernate proxies, no JPA collection types, no Jackson annotations carrying database column names. And nothing in <code>api</code> may reference <code>internal</code> — one field of type <code>Order</code> and the whole boundary is gone.</p></div>
+    <div class="card"><h4><code>web</code> belongs in <code>internal</code></h4><p>Surprising, but right: no module calls your controller in-process. The HTTP contract is a <em>different</em> contract from the in-process one, and merging them is how a Spring <code>@RequestBody</code> record ends up passed between modules.</p></div>
+    <div class="card"><h4><code>OrderRepository</code> is not in <code>spi</code></h4><p>It is a port the module implements <b>for itself</b>, in <code>internal/jpa</code>. It lives with the domain that declares it. <code>spi</code> is only for what someone <em>else</em> must provide — the next slide.</p></div>
+  </div>
+</section>
+

@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Scale &amp; governance" data-title="Privacy by design">
+  <h2>Data residency, PII and retention as architecture</h2>
+  <p class="dek">In a regulated enterprise these constraints arrive as requirements, not preferences, and each one is far cheaper designed in than retrofitted. All four below are architectural, not operational.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Know where personal data is</h3>
+      <p>A data inventory per module: which fields are personal, what the lawful basis is, how long it is kept, who it is shared with. Without it you cannot answer a regulator, a deletion request, or "does this new report leak anything".</p>
+      <p style="color:var(--text-3)">Practical version: annotate the fields. <code>@Pii(category = CONTACT)</code> on the entity, and a test that fails if a <code>@Pii</code> field appears in a log format or an unencrypted export.</p>
+    </div>
+    <div class="card">
+      <h3>Residency shapes the topology</h3>
+      <p>"EU customer data stays in the EU" decides your region strategy, your backup locations, your analytics pipeline and which SaaS vendors you may use. It also rules out a single global database — which is exactly the kind of constraint that must land in level 1 of the decision hierarchy, not level 6.</p>
+    </div>
+    <div class="card">
+      <h3>Deletion must be designed</h3>
+      <p>A deletion request has to reach: the OLTP row, every read model, the search index, the cache, the warehouse, the backups, and the event log. The last two are the hard ones — <b>an immutable event log and a right to erasure are in direct tension</b>.</p>
+      <p style="color:var(--text-3)">The usual resolution is crypto-shredding: store personal fields encrypted with a per-subject key, and delete the key. The events remain; their personal content becomes unreadable.</p>
+    </div>
+    <div class="card">
+      <h3>Minimise, then separate</h3>
+      <ul class="tight">
+        <li>Do not collect what you do not need; do not copy it into three services because it was convenient.</li>
+        <li>Pseudonymise in analytics — the warehouse rarely needs a real name.</li>
+        <li>Keep the PCI or PII surface in as few components as possible; that is one of the four legitimate reasons to extract a service.</li>
+        <li>Retention policies enforced by a job, not by a wiki page.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The one that catches everybody</span>Logs and heap dumps. A team designs beautiful field-level encryption, then logs the whole request body at DEBUG during an incident, and ships a copy to a log aggregator in another jurisdiction with 90-day retention. Privacy controls must cover the diagnostic path, because that is the path people use under pressure.</div>
+</section>
+
+

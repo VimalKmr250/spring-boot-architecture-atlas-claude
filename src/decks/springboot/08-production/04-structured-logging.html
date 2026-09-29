@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Production" data-title="Structured logging">
+  <h2>Logs a machine can query</h2>
+  <p class="dek">A line of prose is readable by one person on one server. A JSON object with a trace id is queryable across four hundred pods — which is the only mode that works once you are past one instance.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Boot 3.4+ ships structured logging — no Logback XML needed</div>
+<pre><code class="language-yaml">logging:
+  structured.format.console: ecs        # or gelf, logstash
+  level:
+    root: INFO
+    com.retailco.shop: DEBUG
+    org.hibernate.SQL: DEBUG            # local only
+  pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
+      <div class="codelabel" style="margin-top:14px">MDC — context that attaches to every line automatically</div>
+<pre><code class="language-java">@Component
+class MdcFilter extends OncePerRequestFilter {
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
+                                    FilterChain chain) throws IOException, ServletException {
+        MDC.put("tenantId", TenantContext.current());
+        MDC.put("channel", req.getHeader("X-Channel"));
+        try {
+            chain.doFilter(req, res);
+        } finally {
+            MDC.clear();            // ALWAYS — pooled threads carry it to the next request
+        }
+    }
+}
+
+// Per-statement structured fields, without string concatenation:
+log.atInfo()
+   .setMessage("order placed")
+   .addKeyValue("orderId", order.id())
+   .addKeyValue("totalMinor", order.totalMinor())
+   .addKeyValue("lines", order.lines().size())
+   .log();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Forgetting <code>MDC.clear()</code></span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always clear in a <code>finally</code>.</div>
+      <div class="note warn"><span class="lbl">MDC does not cross threads</span><code>@Async</code>, <code>CompletableFuture</code>, Kafka listeners and scheduled jobs all start with an empty MDC. Propagate explicitly — a <code>TaskDecorator</code> on your executor that copies the map is the standard fix, and it is about ten lines.</div>
+      <div class="note tip"><span class="lbl">Runtime log levels</span><code>POST /actuator/loggers/com.retailco.shop.payment {"configuredLevel":"DEBUG"}</code> turns on debug for one package on one pod, with no restart and no deploy. Then turn it off. This is the single most useful production debugging capability Boot gives you, and most teams never enable the endpoint.</div>
+    </div>
+  </div>
+</section>
+

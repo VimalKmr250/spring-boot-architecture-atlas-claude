@@ -1,0 +1,99 @@
+<section class="slide" data-sec="25 · Trie" data-title="Dry run">
+  <h2>LC 212 traced on a 2×2 board with a three-word dictionary</h2>
+  <p class="dek">The board is <code>o a / a n</code>, and the words are <code>"oath"</code>, <code>"oan"</code>, <code>"pea"</code>. The point of the trie is that all three are searched in a <b>single</b> board traversal, and a branch dies the moment no word continues down it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 312" role="img" aria-label="A grid word search driven by a trie, showing branches pruned when no word shares the prefix">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">BOARD</text>
+        <rect x="70" y="28" width="44" height="44" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="114" y="28" width="44" height="44" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="70" y="72" width="44" height="44" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="114" y="72" width="44" height="44" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="92" y="56" text-anchor="middle" font-size="15" font-family="monospace" font-weight="600" fill="currentColor">o</text>
+        <text x="136" y="56" text-anchor="middle" font-size="15" font-family="monospace" fill="currentColor" opacity="0.5">a</text>
+        <text x="92" y="100" text-anchor="middle" font-size="15" font-family="monospace" font-weight="600" fill="currentColor">a</text>
+        <text x="136" y="100" text-anchor="middle" font-size="15" font-family="monospace" font-weight="600" fill="currentColor">n</text>
+
+        <text x="200" y="44" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TRIE</text>
+        <circle cx="240" cy="70" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <path d="M253 63 L288 48" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="266" y="50" font-size="10" font-family="monospace" fill="#D26A3F">o</text>
+        <path d="M253 78 L288 96" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="266" y="98" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">p</text>
+        <circle cx="302" cy="42" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M315 42 L350 42" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="330" y="34" font-size="10" font-family="monospace" fill="#D26A3F">a</text>
+        <circle cx="364" cy="42" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <path d="M377 35 L410 22" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="390" y="24" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">t</text>
+        <path d="M377 49 L410 62" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="390" y="66" font-size="10" font-family="monospace" fill="#3AA79B">n</text>
+        <circle cx="424" cy="16" r="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></circle>
+        <circle cx="424" cy="68" r="14" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-width="1.6"></circle>
+        <text x="424" y="73" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor">■</text>
+        <text x="448" y="72" font-size="9.5" font-family="monospace" fill="#3AA79B">"oan"</text>
+        <text x="448" y="20" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">…h → "oath"</text>
+        <circle cx="302" cy="102" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="322" y="116" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">"pea" — no 'p' on the board</text>
+
+        <line x1="14" y1="146" x2="866" y2="146" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="166" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">STEP</text>
+        <text x="80" y="166" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">CELL</text>
+        <text x="170" y="166" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">PREFIX</text>
+        <text x="270" y="166" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TRIE CHILD EXISTS?</text>
+        <text x="470" y="166" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ACTION</text>
+
+        <text x="14" y="190" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="80" y="190" font-size="11" font-family="monospace" fill="currentColor">(0,0) o</text>
+        <text x="170" y="190" font-size="11" font-family="monospace" fill="currentColor">"o"</text>
+        <text x="270" y="190" font-size="11" fill="#3AA79B">yes</text>
+        <text x="470" y="190" font-size="11" fill="currentColor" opacity="0.75">descend into the trie and the board together</text>
+
+        <text x="14" y="212" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="80" y="212" font-size="11" font-family="monospace" fill="currentColor">(0,1) a</text>
+        <text x="170" y="212" font-size="11" font-family="monospace" fill="currentColor">"oa"</text>
+        <text x="270" y="212" font-size="11" fill="#3AA79B">yes</text>
+        <text x="470" y="212" font-size="11" fill="currentColor" opacity="0.75">still on a live path — continue</text>
+
+        <text x="14" y="234" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="80" y="234" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">(1,1) n</text>
+        <text x="170" y="234" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">"oan"</text>
+        <text x="270" y="234" font-size="11" font-weight="600" fill="#3AA79B">yes, and isWord</text>
+        <text x="470" y="234" font-size="11" font-weight="600" fill="#3AA79B">COLLECT "oan", then null the flag</text>
+
+        <text x="14" y="256" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">4</text>
+        <text x="80" y="256" font-size="11" font-family="monospace" fill="currentColor">(1,0) a</text>
+        <text x="170" y="256" font-size="11" font-family="monospace" fill="currentColor">"a"</text>
+        <text x="270" y="256" font-size="11" font-weight="600" fill="#D26A3F">no 'a' child at the root</text>
+        <text x="470" y="256" font-size="11" fill="#D26A3F">PRUNE immediately — no word starts with 'a'</text>
+
+        <text x="14" y="278" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">5</text>
+        <text x="80" y="278" font-size="11" font-family="monospace" fill="currentColor">(0,1) a</text>
+        <text x="170" y="278" font-size="11" font-family="monospace" fill="currentColor">"a"</text>
+        <text x="270" y="278" font-size="11" font-weight="600" fill="#D26A3F">no</text>
+        <text x="470" y="278" font-size="11" fill="#D26A3F">PRUNE — same reason</text>
+
+        <text x="14" y="302" font-size="10.5" fill="currentColor" opacity="0.62">Two of the four starting cells are rejected at depth 0. Without the trie, each would launch a separate search for every word in the dictionary.</text>
+      </svg>
+    </div>
+    <figcaption>Steps 4 and 5 are where the trie earns its place: a single null check rules out every dictionary word beginning with that letter, at zero cost.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">start cell</th><th>prefix reached</th><th>trie says</th><th>outcome</th></tr></thead>
+      <tbody>
+        <tr><td class="num">(0,0) 'o'</td><td class="num">"o" → "oa" → "oan"</td><td>live path, then <code>isWord</code></td><td><b>collect "oan"</b></td></tr>
+        <tr><td class="num">(0,0) 'o'</td><td class="num">"oa" → "oat"?</td><td>no 't' reachable — board has no 't'</td><td>branch dies</td></tr>
+        <tr><td class="num">(0,1) 'a'</td><td class="num">"a"</td><td>no child at the root</td><td>pruned at depth 0</td></tr>
+        <tr><td class="num">(1,0) 'a'</td><td class="num">"a"</td><td>no child at the root</td><td>pruned at depth 0</td></tr>
+        <tr><td class="num">(1,1) 'n'</td><td class="num">"n"</td><td>no child at the root</td><td>pruned at depth 0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Two optimisations that matter at scale</span><b>Null the <code>isWord</code> flag after collecting</b> a word, so the same word is never added twice from a different path — cheaper and cleaner than de-duplicating a result list afterwards. <b>Prune dead trie branches</b>: after a child's subtree is exhausted and it holds no words, set that child link to null. On the large LC 212 test cases this shrinks the trie as the search proceeds and turns a timeout into a comfortable pass.</div>
+</section>
+

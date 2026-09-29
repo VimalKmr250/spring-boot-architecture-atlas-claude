@@ -1,0 +1,66 @@
+<section class="slide" data-sec="13 · Greedy scheduling" data-title="Mechanics">
+  <h2>Take the locally best option — and be able to prove it is safe</h2>
+  <p class="dek">A greedy algorithm commits to a choice and never reconsiders. That makes it fast and simple, and wrong far more often than people expect. The pattern is not "take the biggest"; it is <b>finding the ordering under which the obvious choice is provably optimal</b>, then saying why.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The exchange argument</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Every correct greedy has the same proof shape. Take any optimal solution that differs from yours at the first choice. Show you can <b>swap</b> its choice for yours without making it worse. Repeat, and the optimal solution has been transformed into the greedy one — so the greedy is optimal too.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">If you cannot construct that swap, the greedy is probably wrong. That failure is the signal to reach for dynamic programming instead.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Interviewers ask "why does that work?" on every greedy problem. The exchange argument is the answer, and it is usually two sentences.</p>
+    </div>
+    <div class="panel">
+      <h3>The three shapes greedy takes here</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Furthest reach</dt><dd>Track how far you can get, and commit only when forced. Jump problems.</dd>
+        <dt>Sort, then place</dt><dd>Find an order in which each item's position is forced once its predecessors are fixed. Reconstruction problems.</dd>
+        <dt>Bound then construct</dt><dd>Prove a lower bound on the answer from the most constrained element, then show it is achievable. Scheduling with cooldowns.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">All three are O(n) or O(n log n), and all three are short — the difficulty is entirely in the justification.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="The furthest-reach greedy advancing in layers, and the exchange argument that justifies a greedy choice">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">FURTHEST REACH — COMMIT ONLY WHEN FORCED</text>
+
+        <line x1="60" y1="92" x2="800" y2="92" stroke="currentColor" stroke-opacity="0.2"></line>
+        <rect x="60" y="56" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="120" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">jump 1</text>
+        <rect x="184" y="56" width="230" height="30" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="299" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">jump 2</text>
+        <rect x="418" y="56" width="330" height="30" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.5"></rect>
+        <text x="583" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">jump 3</text>
+
+        <text x="120" y="112" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">reachable with 1</text>
+        <text x="299" y="112" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">reachable with 2</text>
+        <text x="583" y="112" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">reachable with 3</text>
+
+        <path d="M180 44 L180 54" stroke="#3AA79B" stroke-width="1.6"></path>
+        <path d="M414 44 L414 54" stroke="#3AA79B" stroke-width="1.6"></path>
+        <text x="180" y="38" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">forced</text>
+        <text x="414" y="38" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">forced</text>
+
+        <text x="60" y="140" font-size="11" fill="currentColor" opacity="0.72">Each band is everything reachable in that many jumps. You never choose <em>which</em> index to jump from —</text>
+        <text x="60" y="158" font-size="11" fill="currentColor" opacity="0.72">you scan the whole band, take the furthest reach it offers, and increment only at the band's edge.</text>
+        <text x="60" y="176" font-size="10.5" fill="currentColor" opacity="0.58">That is breadth-first search over layers, written without a queue.</text>
+
+        <line x1="14" y1="194" x2="866" y2="194" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="214" font-size="11.5" font-weight="600" fill="#D26A3F">The exchange argument, in the form you should say it</text>
+        <text x="14" y="234" font-size="11" fill="currentColor" opacity="0.75">"Suppose an optimal solution makes a different first choice. Swapping in mine cannot make it worse, because <tspan font-style="italic">&lt;reason&gt;</tspan> —</text>
+        <text x="14" y="248" font-size="11" fill="currentColor" opacity="0.75">so there is an optimal solution that agrees with the greedy, and by induction the greedy is optimal."</text>
+      </svg>
+    </div>
+    <figcaption>The furthest-reach greedy never decides which index to jump from. It only decides <em>when</em> the current layer is exhausted — which is why it is really a layered BFS in disguise.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>A locally optimal choice is <b>provably safe</b>: taking it never rules out an optimal completion. Usually visible after sorting, or when one element is so constrained that it dictates the answer.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Choices interact — taking the biggest coin now may strand you later. That is the coin-change trap, and it is what dynamic programming exists for. If you cannot write the exchange argument, assume greedy is wrong.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> when no sort is needed, <b>O(n log n)</b> when there is one. Space is usually <b>O(1)</b>. These are among the cheapest solutions in the deck — the cost is all in the reasoning.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the minimum number of jumps"</b> · <b>"can you reach the last index"</b> · <b>"partition the string into as many parts as possible"</b> · <b>"the least number of intervals"</b> · <b>"reconstruct the queue"</b> · <b>"the minimum time to finish all tasks with a cooldown"</b> · <b>"is there a starting point from which you can complete the circuit"</b>. The tell is an optimisation with <b>no obvious subproblem structure</b> — if a DP state is hard to define, look for a greedy and its proof.</div>
+</section>
+

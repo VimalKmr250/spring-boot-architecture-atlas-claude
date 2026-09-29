@@ -1,0 +1,102 @@
+<section class="slide" data-sec="16 · Tree BFS" data-title="The reusable structure">
+  <h2>One loop, and a single line that changes per problem</h2>
+  <p class="dek">The skeleton is identical across all six problems. What differs is which node of the drained level you keep, and whether the collected list gets reversed.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The template — level order</div>
+<pre><code class="language-java">/**
+ * INVARIANT: at the top of each outer iteration the queue holds
+ * exactly one complete level.
+ *
+ * The size SNAPSHOT is the whole pattern — capture it before the
+ * inner loop, because the queue grows as children are enqueued.
+ */
+List&lt;List&lt;Integer&gt;&gt; levelOrder(TreeNode root) {
+    List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+    if (root == null) return out;                 // empty tree, empty answer
+
+    Queue&lt;TreeNode&gt; q = new ArrayDeque&lt;&gt;();       // ArrayDeque, not LinkedList
+    q.offer(root);
+
+    while (!q.isEmpty()) {
+        int size = q.size();                      // SNAPSHOT — never read live
+        List&lt;Integer&gt; level = new ArrayList&lt;&gt;(size);
+
+        for (int i = 0; i &lt; size; i++) {
+            TreeNode node = q.poll();
+            level.add(node.val);
+
+            // Filter nulls HERE, so the snapshot stays meaningful.
+            if (node.left  != null) q.offer(node.left);
+            if (node.right != null) q.offer(node.right);
+        }
+        out.add(level);
+    }
+    return out;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The one line that changes</div>
+<pre><code class="language-java">// LC 102 — the whole level
+level.add(node.val);
+
+// LC 199 — right side view: keep only the LAST of each level
+if (i == size - 1) out.add(node.val);
+
+// LC 515 — the maximum per level
+levelMax = Math.max(levelMax, node.val);
+
+// LC 637 — the average per level. Sum in `long` or `double`:
+// 2000 nodes of Integer.MAX_VALUE overflows int.
+sum += node.val;             // long sum
+// after the inner loop:  out.add((double) sum / size);
+
+// LC 103 — zigzag: build normally, then reverse odd levels.
+// Or use addFirst on a LinkedList, which avoids the reverse pass.
+if (leftToRight) level.addLast(node.val);
+else             level.addFirst(node.val);</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Variant · O(1) space using the links you just built (LC 116)</div>
+<pre><code class="language-java">// The queue costs O(w) space. But once a level's `next` pointers
+// exist, that level is ITSELF a linked list — so you can walk it
+// without a queue and wire up the level below.
+Node connect(Node root) {
+    Node leftmost = root;
+
+    while (leftmost != null &amp;&amp; leftmost.left != null) {
+        // Walk the current level using the next pointers already set.
+        for (Node head = leftmost; head != null; head = head.next) {
+
+            head.left.next = head.right;              // within this node
+
+            // Across the gap to the neighbour's subtree — this is
+            // the step that needs the level's own next pointer.
+            if (head.next != null) {
+                head.right.next = head.next.left;
+            }
+        }
+        leftmost = leftmost.left;                     // drop one level
+    }
+    return root;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>What you keep</dt><dd>All values, the last one, a running max, or a running sum. That single line is usually the entire difference between two problems in this family.</dd>
+        <dt>Direction</dt><dd>For zigzag, either reverse alternate levels afterwards or use <code>addFirst</code> on a <code>LinkedList</code>. The second is O(1) per insert and avoids a second pass.</dd>
+        <dt>Queue type</dt><dd><code>ArrayDeque</code>, not <code>LinkedList</code> — faster and it rejects null elements, which surfaces a null-enqueue bug immediately instead of silently.</dd>
+        <dt>Null root</dt><dd>Return the empty answer before touching the queue. Enqueuing a null root throws on <code>ArrayDeque</code>.</dd>
+        <dt>Accumulator width</dt><dd><code>long</code> or <code>double</code> for level sums. LC 637 has a test case that overflows <code>int</code> precisely here.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Reading <code>q.size()</code> inside the inner loop</b> — the levels merge, because the size grows as children are added. This breaks every problem in the pattern in the same way. <b>Enqueuing nulls</b> — the snapshot then counts phantom nodes, so level widths are wrong, and <code>ArrayDeque</code> throws outright. <b>Summing level values in an <code>int</code></b> — LC 637's test set includes values near <code>Integer.MAX_VALUE</code>, and the average comes back negative.</div>
+  </div>
+</section>
+

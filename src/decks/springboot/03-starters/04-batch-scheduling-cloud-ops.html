@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Starters" data-title="Batch, scheduling, cloud & ops">
+  <h2>Batch, scheduling, and the cloud/ops set</h2>
+  <p class="dek">Batch is the half of enterprise Java that architecture decks usually ignore and that runs the business overnight.</p>
+
+  <div class="split">
+    <div class="card">
+      <h3>Batch &amp; scheduling</h3>
+      <dl class="kv" style="margin-top:8px">
+        <dt><code>-batch</code></dt><dd>Jobs, steps, chunk-oriented processing, restartability, and the <code>BATCH_*</code> metadata tables that make a failed job resumable from the last commit point. For end-of-day reconciliation, statement generation, bulk file loads.</dd>
+        <dt><code>-quartz</code></dt><dd>Clustered, persistent scheduling. Use when the schedule must survive restarts and must fire exactly once across a fleet.</dd>
+        <dt><code>@Scheduled</code></dt><dd>Built into the core — no starter. Fine for a single instance; on N pods it fires N times unless you add a lock (ShedLock, or a database advisory lock).</dd>
+      </dl>
+      <div class="note warn" style="margin-top:12px"><span class="lbl">The classic bug</span><code>@Scheduled</code> on a service running 6 replicas sends six reminder emails to every customer. Every team meets this once. Design for it: either Quartz clustered, ShedLock, or a dedicated single-replica <code>batch</code> deployment — the third option is the one from the deployment-topology slide.</div>
+    </div>
+    <div class="card">
+      <h3>Cloud &amp; ops</h3>
+      <dl class="kv" style="margin-top:8px">
+        <dt><code>-oauth2-resource-server</code></dt><dd>Validate incoming JWTs. What your API uses.</dd>
+        <dt><code>-oauth2-client</code></dt><dd>Obtain tokens to call others — client-credentials for service-to-service.</dd>
+        <dt><code>cloud-config-client</code></dt><dd>Externalised config with refresh. Weigh against ConfigMaps + a restart, which is simpler and usually enough.</dd>
+        <dt><code>cloud-openfeign</code></dt><dd>Declarative HTTP clients. <span class="tag a">Boot 4</span> Spring's own <code>@ImportHttpServices</code> covers most of this natively now.</dd>
+        <dt><code>resilience4j-spring-boot3</code></dt><dd>Circuit breaker, bulkhead, rate limiter with Actuator endpoints. <span class="tag a">Boot 4</span> core <code>@Retryable</code> and <code>@ConcurrencyLimit</code> cover the common cases.</dd>
+        <dt><code>vault-config</code></dt><dd>Secrets, and — the part that matters — dynamically issued, short-lived database credentials.</dd>
+        <dt><code>-cache</code></dt><dd><code>@Cacheable</code> plus a provider (Caffeine local, Redis shared).</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">A Spring Batch step — chunked, restartable, and the reason batch exists</div>
+<pre><code class="language-java">@Bean
+Step reconcilePayments(JobRepository repo, PlatformTransactionManager tx,
+                       ItemReader&lt;PaymentRecord&gt; reader,
+                       ItemProcessor&lt;PaymentRecord, Reconciliation&gt; processor,
+                       ItemWriter&lt;Reconciliation&gt; writer) {
+    return new StepBuilder("reconcilePayments", repo)
+            .&lt;PaymentRecord, Reconciliation&gt;chunk(500, tx)   // commit every 500 items
+            .reader(reader).processor(processor).writer(writer)
+            .faultTolerant()
+              .skipLimit(50).skip(MalformedRecordException.class)   // tolerate bad rows
+              .retryLimit(3).retry(TransientDatabaseException.class)
+            .build();
+}
+// Crash at item 12,300 of 500,000? Restart resumes from the last committed chunk,
+// because the BATCH_STEP_EXECUTION table recorded it. That is the whole value.</code></pre>
+  </div>
+</section>
+

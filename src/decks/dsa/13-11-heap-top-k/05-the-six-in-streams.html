@@ -1,0 +1,138 @@
+<section class="slide" data-sec="11 · Heap / top K" data-title="The six, in streams">
+  <h2>Top K is <code>sorted().limit(k)</code>: you pay log n instead of log k</h2>
+  <p class="dek">A heap is a mutable structure that a pipeline cannot own halfway through, but top-K has a direct substitute: <code>sorted</code> with the right comparator, then <code>limit(k)</code>. It sorts everything, so it pays O(n log n) where the size-k heap pays O(n log k). That is fine at these limits, and the comparator is the same one you would hand the heap. The two exceptions are 703, where the heap is the design itself, and 1046, where n ≤ 30 lets a pure simulation replace the heap entirely.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">215</td><td><a href="https://leetcode.com/problems/kth-largest-element-in-an-array/" target="_blank" rel="noopener">Kth Largest Element in an Array</a></td><td>A primitive <code>sorted()</code>, then <code>skip(n − k)</code> and <code>findFirst</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log k) / O(k)</td></tr>
+        <tr><td class="num">703</td><td><a href="https://leetcode.com/problems/kth-largest-element-in-a-stream/" target="_blank" rel="noopener">Kth Largest Element in a Stream</a></td><td>The heap is the design. The constructor only streams the seed values through <code>add</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(log k) per add</td><td class="num">same</td></tr>
+        <tr><td class="num">973</td><td><a href="https://leetcode.com/problems/k-closest-points-to-origin/" target="_blank" rel="noopener">K Closest Points to Origin</a></td><td><code>sorted(comparingInt(squared distance))</code>, then <code>limit(k)</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log k) / O(k)</td></tr>
+        <tr><td class="num">347</td><td><a href="https://leetcode.com/problems/top-k-frequent-elements/" target="_blank" rel="noopener">Top K Frequent Elements</a></td><td>Count with <code>groupingBy</code>, sort the entries by count descending, then <code>limit(k)</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n) with buckets</td></tr>
+        <tr><td class="num">692</td><td><a href="https://leetcode.com/problems/top-k-frequent-words/" target="_blank" rel="noopener">Top K Frequent Words</a></td><td>Count, then one comparator: count descending, then the word ascending.</td><td><span class="tag g">clean</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n log k) / O(n)</td></tr>
+        <tr><td class="num">1046</td><td><a href="https://leetcode.com/problems/last-stone-weight/" target="_blank" rel="noopener">Last Stone Weight</a></td><td>n ≤ 30: <code>Stream.iterate</code> smashes the two heaviest stones and builds a fresh sorted list each step.</td><td><span class="tag g">clean</span></td><td class="num">O(n² log n) / O(n)</td><td class="num">O(n log n) / O(n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 215 · Kth Largest Element in an Array · clean</div>
+<pre><code class="language-java">class Solution {
+    public int findKthLargest(int[] nums, int k) {
+        // Sort ascending, then skip to the kth from the end.
+        // sorted() on an IntStream stays primitive: no boxing.
+        return Arrays.stream(nums).sorted()
+                .skip(nums.length - k)
+                .findFirst().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 703 · Kth Largest Element in a Stream · stateful</div>
+<pre><code class="language-java">class KthLargest {
+    private final int k;
+    // min-heap of the k largest values seen so far
+    private final Queue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;();
+
+    public KthLargest(int k, int[] nums) {
+        this.k = k;
+        // The stream only feeds the heap. The heap is the
+        // design: it outlives every call, so no pipeline can
+        // own it.
+        Arrays.stream(nums).forEach(this::add);
+    }
+
+    public int add(int val) {
+        heap.offer(val);
+        if (heap.size() &gt; k) heap.poll();
+        return heap.peek();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 973 · K Closest Points to Origin · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[][] kClosest(int[][] points, int k) {
+        // Squared distance keeps it in ints (at most 2·10⁸)
+        // and needs no square root: the order is the same.
+        return Arrays.stream(points)
+                .sorted(Comparator.comparingInt(
+                        p -&gt; p[0] * p[0] + p[1] * p[1]))
+                .limit(k)
+                .toArray(int[][]::new);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 347 · Top K Frequent Elements · clean</div>
+<pre><code class="language-java">class Solution {
+    public int[] topKFrequent(int[] nums, int k) {
+        // Count, then sort the entries by count, descending.
+        // The hashing slides do this in O(n) with buckets. This
+        // is the O(n log n) form a heap cuts to O(n log k).
+        return Arrays.stream(nums).boxed()
+                .collect(Collectors.groupingBy(
+                        v -&gt; v, Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry
+                        .&lt;Integer, Long&gt;comparingByValue()
+                        .reversed())
+                .limit(k)
+                .mapToInt(Map.Entry::getKey)
+                .toArray();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 692 · Top K Frequent Words · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;String&gt; topKFrequent(String[] words, int k) {
+        Map&lt;String, Long&gt; freq = Arrays.stream(words)
+                .collect(Collectors.groupingBy(
+                        w -&gt; w, Collectors.counting()));
+        // One comparator: count descending, then the word. The
+        // heap version needs exactly this, reversed.
+        Comparator&lt;String&gt; byCount =
+                Comparator.comparing(freq::get);
+        return freq.keySet().stream()
+                .sorted(byCount.reversed().thenComparing(
+                        Comparator.naturalOrder()))
+                .limit(k)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1046 · Last Stone Weight · clean</div>
+<pre><code class="language-java">class Solution {
+    public int lastStoneWeight(int[] stones) {
+        // n &lt;= 30, so a pure simulation is fine: every smash
+        // builds a fresh sorted list. No heap is mutated.
+        List&lt;Integer&gt; start = Arrays.stream(stones).boxed()
+                .sorted(Comparator.reverseOrder()).toList();
+        return Stream.iterate(start, Solution::smash)
+                .filter(l -&gt; l.size() &lt;= 1)
+                .findFirst().get()
+                .stream().findFirst().orElse(0);
+    }
+
+    // l is sorted heaviest first; its two heaviest collide
+    static List&lt;Integer&gt; smash(List&lt;Integer&gt; l) {
+        int left = l.get(0) - l.get(1);
+        return Stream.concat(l.stream().skip(2),
+                             Stream.of(left).filter(w -&gt; w &gt; 0))
+                .sorted(Comparator.reverseOrder())
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say the trade out loud</span><code>sorted()</code> is a full barrier: it takes in all n elements before <code>limit</code> sees a single one. At n = 10⁵ that is still milliseconds. Name it anyway: "this is O(n log n), and a size-k heap would make it O(n log k)". That sentence is the whole point of the pattern.</div>
+  <div class="note good"><span class="lbl">The comparator is the reusable part</span>692's comparator (count descending, then the word) is exactly what the heap solution needs, reversed for a min-heap of size k. Writing it for <code>sorted()</code> and writing it for the <code>PriorityQueue</code> is the same decision. The stream version just lets you test that decision on its own before the heap arrives.</div>
+</section>
+
+

@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Scale &amp; governance" data-title="Multi-region">
+  <h2>Multi-region: three topologies, one hard question</h2>
+  <p class="dek">The hard question is never compute — it is <b>where writes happen</b>. Everything else follows from that answer, and picking it is one of the few decisions that is genuinely irreversible.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 258" role="img" aria-label="Three multi-region topologies: active-passive with asynchronous replication and a promotion step, read-local write-global with a single write region, and active-active with conflict resolution">
+        <text x="14" y="16" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">A · ACTIVE–PASSIVE</text>
+        <rect x="14" y="26" width="112" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="45" text-anchor="middle" font-size="10.5" fill="currentColor">EU — live</text>
+        <text x="70" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">reads + writes</text>
+        <rect x="176" y="26" width="112" height="46" rx="7" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 3"></rect>
+        <text x="232" y="45" text-anchor="middle" font-size="10.5" fill="currentColor">US — standby</text>
+        <text x="232" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">idle, warm</text>
+        <line x1="128" y1="49" x2="172" y2="49" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="150" y="42" text-anchor="middle" font-size="8" fill="#3AA79B">async</text>
+        <text x="306" y="42" font-size="10" fill="currentColor" opacity="0.75">Simplest. RPO = replication lag (seconds of writes lost).</text>
+        <text x="306" y="58" font-size="10" fill="currentColor" opacity="0.75">RTO = however long promotion takes — and if you have never</text>
+        <text x="306" y="74" font-size="10" fill="#A22636">rehearsed it, the honest RTO is "unknown".</text>
+
+        <line x1="14" y1="90" x2="866" y2="90" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <text x="14" y="110" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">B · READ-LOCAL, WRITE-GLOBAL</text>
+        <rect x="14" y="120" width="112" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="139" text-anchor="middle" font-size="10.5" fill="currentColor">EU — writes</text>
+        <text x="70" y="155" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">the single writer</text>
+        <rect x="176" y="120" width="112" height="46" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="232" y="139" text-anchor="middle" font-size="10.5" fill="currentColor">US — reads</text>
+        <text x="232" y="155" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">local replica</text>
+        <line x1="128" y1="143" x2="172" y2="143" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="306" y="136" font-size="10" fill="currentColor" opacity="0.75">Fast local reads, one consistent write path. Writes from the US</text>
+        <text x="306" y="152" font-size="10" fill="currentColor" opacity="0.75">cross the ocean (~80 ms), and read-your-own-writes needs</text>
+        <text x="306" y="168" font-size="10" fill="currentColor" opacity="0.75">sticky routing. <tspan font-weight="600">The usual right answer.</tspan></text>
+
+        <line x1="14" y1="182" x2="866" y2="182" stroke="currentColor" stroke-opacity="0.12"></line>
+
+        <text x="14" y="202" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">C · ACTIVE–ACTIVE</text>
+        <rect x="14" y="210" width="112" height="34" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="70" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">EU — writes</text>
+        <rect x="176" y="210" width="112" height="34" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="232" y="232" text-anchor="middle" font-size="10.5" fill="currentColor">US — writes</text>
+        <line x1="128" y1="227" x2="172" y2="227" stroke="#A22636" stroke-width="1.4" marker-end="url(#arw)" marker-start="url(#arw)"></line>
+        <text x="306" y="220" font-size="10" fill="currentColor" opacity="0.75">Both regions accept writes, so conflicts are now a domain problem:</text>
+        <text x="306" y="236" font-size="10" fill="#A22636">who wins when the same order is cancelled in both? Needs partitioned</text>
+        <text x="306" y="248" font-size="10" fill="#A22636">ownership, CRDTs, or a business rule. Do not choose this by default.</text>
+      </svg>
+    </div>
+    <figcaption>A useful reframing in a design interview: multi-region is usually bought for <em>disaster recovery</em>, not latency. If latency is the goal, a CDN and read replicas get you most of the way for a fraction of the complexity.</figcaption>
+  </figure>
+
+  <div class="note warn"><span class="lbl">Things that quietly break when you go multi-region</span>Auto-increment ids collide — switch to UUIDv7 or region-prefixed sequences. Kafka does not replicate itself; you need MirrorMaker and a consumer-offset story. Caches are per-region and diverge. Scheduled jobs fire twice. Every one of these is discovered after the decision, so raise them during it.</div>
+</section>
+

@@ -1,0 +1,295 @@
+<section class="slide" data-sec="21 · Topological sort" data-title="The six, in streams">
+  <h2>Kahn's algorithm is a stream of frontiers; the indegree decrement is the state</h2>
+  <p class="dek">Build the graph with collectors: <code>groupingBy</code> for the adjacency, and a <code>collect</code> with a real combiner for the indegrees. Kahn's algorithm then becomes a stream of frontiers. First come the nodes with nothing left to wait for, then the nodes they release, and so on. Exactly one lambda carries state: the filter that decrements an indegree and admits the node when it hits zero. 1462 needs no traversal at all, because its transitive closure is a pure fold over <code>BitSet</code> rows.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">207</td><td><a href="https://leetcode.com/problems/course-schedule/" target="_blank" rel="noopener">Course Schedule</a></td><td>Kahn frontiers via <code>Stream.iterate</code>. The schedule works exactly when every course is released.</td><td><span class="tag w">stateful</span></td><td class="num">O(V+E) / O(V+E)</td><td class="num">same</td></tr>
+        <tr><td class="num">210</td><td><a href="https://leetcode.com/problems/course-schedule-ii/" target="_blank" rel="noopener">Course Schedule II</a></td><td>The same frontiers, flattened into the order. If it is shorter than n, there is a cycle.</td><td><span class="tag w">stateful</span></td><td class="num">O(V+E) / O(V+E)</td><td class="num">same</td></tr>
+        <tr><td class="num">802</td><td><a href="https://leetcode.com/problems/find-eventual-safe-states/" target="_blank" rel="noopener">Find Eventual Safe States</a></td><td>Reverse the edges and run Kahn from the terminal nodes. Whatever gets released is safe.</td><td><span class="tag w">stateful</span></td><td class="num">O(V+E) / O(V+E)</td><td class="num">same</td></tr>
+        <tr><td class="num">2115</td><td><a href="https://leetcode.com/problems/find-all-possible-recipes-from-given-supplies/" target="_blank" rel="noopener">Find All Possible Recipes from Given Supplies</a></td><td>Kahn over names: the supplies are the first frontier, and a recipe is released along with its last ingredient.</td><td><span class="tag w">stateful</span></td><td class="num">O(V+E) / O(V+E)</td><td class="num">same</td></tr>
+        <tr><td class="num">1462</td><td><a href="https://leetcode.com/problems/course-schedule-iv/" target="_blank" rel="noopener">Course Schedule IV</a></td><td>Floyd–Warshall as a pure fold: each <code>Stream.iterate</code> step lets paths pass through one more course, on <code>BitSet</code> rows.</td><td><span class="tag g">clean</span></td><td class="num">O(V³/64 + Q) / O(V²)</td><td class="num">O(V·E) / O(V²)</td></tr>
+        <tr><td class="num">1203</td><td><a href="https://leetcode.com/problems/sort-items-by-groups-respecting-dependencies/" target="_blank" rel="noopener">Sort Items by Groups Respecting Dependencies</a></td><td>Two Kahn sorts, one for items and one for groups. Then the items are grouped in topological order, and the groups come out in theirs.</td><td><span class="tag w">stateful</span></td><td class="num">O(V+E) / O(V+E)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 207 · Course Schedule · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean canFinish(int n, int[][] prerequisites) {
+        // e = [course, prereq]: the edge runs e[1] -&gt; e[0]
+        Map&lt;Integer, List&lt;Integer&gt;&gt; next = adj(Arrays
+                .stream(prerequisites)
+                .map(e -&gt; new int[]{ e[1], e[0] }));
+        int[] waits = Arrays.stream(prerequisites).collect(
+                () -&gt; new int[n], (w, e) -&gt; w[e[0]]++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        List&lt;Integer&gt; free = IntStream.range(0, n)
+                .filter(c -&gt; waits[c] == 0).boxed().toList();
+        // It works exactly when every course gets released.
+        return Stream.iterate(free, l -&gt; !l.isEmpty(),
+                              l -&gt; release(l, next, waits))
+                .mapToInt(List::size).sum() == n;
+    }
+
+    // ---- the same two helpers in 207, 210, 802 and 1203 ----
+    // edges [from, to], grouped as from -&gt; every to
+    static Map&lt;Integer, List&lt;Integer&gt;&gt; adj(Stream&lt;int[]&gt; es) {
+        return es.collect(Collectors.groupingBy(e -&gt; e[0],
+                Collectors.mapping(e -&gt; e[1],
+                        Collectors.toList())));
+    }
+
+    // Kahn's next frontier. The decrement is the state: a node
+    // joins exactly when its last incoming edge is used up.
+    static List&lt;Integer&gt; release(List&lt;Integer&gt; level,
+            Map&lt;Integer, List&lt;Integer&gt;&gt; next, int[] waits) {
+        return level.stream()
+                .flatMap(u -&gt; next.getOrDefault(u, List.of())
+                        .stream())
+                .filter(v -&gt; --waits[v] == 0)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 210 · Course Schedule II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] findOrder(int n, int[][] prerequisites) {
+        Map&lt;Integer, List&lt;Integer&gt;&gt; next = adj(Arrays
+                .stream(prerequisites)
+                .map(e -&gt; new int[]{ e[1], e[0] }));
+        int[] waits = Arrays.stream(prerequisites).collect(
+                () -&gt; new int[n], (w, e) -&gt; w[e[0]]++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        List&lt;Integer&gt; free = IntStream.range(0, n)
+                .filter(c -&gt; waits[c] == 0).boxed().toList();
+        // The frontiers of 207, flattened: a topological order.
+        int[] order = Stream
+                .iterate(free, l -&gt; !l.isEmpty(),
+                         l -&gt; release(l, next, waits))
+                .flatMap(List::stream)
+                .mapToInt(Integer::intValue).toArray();
+        // shorter than n: a cycle kept some course waiting
+        return order.length == n ? order : new int[0];
+    }
+
+    // ---- the same two helpers in 207, 210, 802 and 1203 ----
+    // edges [from, to], grouped as from -&gt; every to
+    static Map&lt;Integer, List&lt;Integer&gt;&gt; adj(Stream&lt;int[]&gt; es) {
+        return es.collect(Collectors.groupingBy(e -&gt; e[0],
+                Collectors.mapping(e -&gt; e[1],
+                        Collectors.toList())));
+    }
+
+    // Kahn's next frontier. The decrement is the state: a node
+    // joins exactly when its last incoming edge is used up.
+    static List&lt;Integer&gt; release(List&lt;Integer&gt; level,
+            Map&lt;Integer, List&lt;Integer&gt;&gt; next, int[] waits) {
+        return level.stream()
+                .flatMap(u -&gt; next.getOrDefault(u, List.of())
+                        .stream())
+                .filter(v -&gt; --waits[v] == 0)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 802 · Find Eventual Safe States · stateful</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;Integer&gt; eventualSafeNodes(int[][] graph) {
+        int n = graph.length;
+        // Reverse every edge u -&gt; v, so that safety can flow
+        // backwards from the terminal nodes.
+        Map&lt;Integer, List&lt;Integer&gt;&gt; into = adj(IntStream
+                .range(0, n).boxed()
+                .flatMap(u -&gt; Arrays.stream(graph[u])
+                        .mapToObj(v -&gt; new int[]{ v, u })));
+        int[] out = Arrays.stream(graph).mapToInt(a -&gt; a.length)
+                .toArray();
+        // Kahn from the terminals: a node is released, so safe,
+        // once every edge out of it leads somewhere safe.
+        List&lt;Integer&gt; terminal = IntStream.range(0, n)
+                .filter(u -&gt; out[u] == 0).boxed().toList();
+        return Stream.iterate(terminal, l -&gt; !l.isEmpty(),
+                              l -&gt; release(l, into, out))
+                .flatMap(List::stream)
+                .sorted()
+                .toList();
+    }
+
+    // ---- the same two helpers in 207, 210, 802 and 1203 ----
+    // edges [from, to], grouped as from -&gt; every to
+    static Map&lt;Integer, List&lt;Integer&gt;&gt; adj(Stream&lt;int[]&gt; es) {
+        return es.collect(Collectors.groupingBy(e -&gt; e[0],
+                Collectors.mapping(e -&gt; e[1],
+                        Collectors.toList())));
+    }
+
+    // Kahn's next frontier. The decrement is the state: a node
+    // joins exactly when its last incoming edge is used up.
+    static List&lt;Integer&gt; release(List&lt;Integer&gt; level,
+            Map&lt;Integer, List&lt;Integer&gt;&gt; next, int[] waits) {
+        return level.stream()
+                .flatMap(u -&gt; next.getOrDefault(u, List.of())
+                        .stream())
+                .filter(v -&gt; --waits[v] == 0)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 2115 · Find All Possible Recipes from Given Supplies · stateful</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;String&gt; findAllRecipes(String[] recipes,
+            List&lt;List&lt;String&gt;&gt; ingredients, String[] supplies) {
+        // ingredient name -&gt; the recipes that need it
+        Map&lt;String, List&lt;Integer&gt;&gt; usedBy = IntStream
+                .range(0, recipes.length).boxed()
+                .flatMap(i -&gt; ingredients.get(i).stream()
+                        .map(item -&gt; Map.entry(item, i)))
+                .collect(Collectors.groupingBy(e -&gt; e.getKey(),
+                        Collectors.mapping(e -&gt; e.getValue(),
+                                Collectors.toList())));
+        int[] missing = ingredients.stream()
+                .mapToInt(List::size).toArray();
+        // Kahn over names: supplies are the first frontier, and
+        // a recipe is released along with its last ingredient.
+        List&lt;String&gt; start = List.of(supplies);
+        return Stream.iterate(start, l -&gt; !l.isEmpty(),
+                l -&gt; unlock(l, recipes, usedBy, missing))
+                .skip(1)                     // the supplies
+                .flatMap(List::stream)
+                .toList();
+    }
+
+    // The recipes whose last missing ingredient is in level.
+    // The decrement is the stateful line.
+    static List&lt;String&gt; unlock(List&lt;String&gt; level,
+            String[] recipes, Map&lt;String, List&lt;Integer&gt;&gt; usedBy,
+            int[] missing) {
+        return level.stream()
+                .flatMap(s -&gt; usedBy.getOrDefault(s, List.of())
+                        .stream())
+                .filter(i -&gt; --missing[i] == 0)
+                .map(i -&gt; recipes[i])
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1462 · Course Schedule IV · clean</div>
+<pre><code class="language-java">class Solution {
+    // after k steps, reach[i] holds every course reachable
+    // from i through intermediate courses &lt; k (Floyd-Warshall)
+    record Closure(int k, BitSet[] reach) {
+        Closure next() {
+            BitSet[] r = Arrays.stream(reach).map(row -&gt; {
+                BitSet copy = (BitSet) row.clone();
+                if (row.get(k)) copy.or(reach[k]);
+                return copy;
+            }).toArray(BitSet[]::new);
+            return new Closure(k + 1, r);
+        }
+    }
+
+    public List&lt;Boolean&gt; checkIfPrerequisite(int n,
+            int[][] prerequisites, int[][] queries) {
+        // Direct edges; BitSet::or is a real combiner, so this
+        // collect is parallel-safe.
+        BitSet[] direct = IntStream.range(0, n)
+                .mapToObj(u -&gt; Arrays.stream(prerequisites)
+                        .filter(e -&gt; e[0] == u)
+                        .mapToInt(e -&gt; e[1])
+                        .collect(BitSet::new, BitSet::set,
+                                 BitSet::or))
+                .toArray(BitSet[]::new);
+        // n pure steps, each allowing paths through one more
+        // course. No traversal, so no visited marks anywhere.
+        BitSet[] reach = Stream.iterate(new Closure(0, direct),
+                                        Closure::next)
+                .skip(n).findFirst().get().reach();
+        return Arrays.stream(queries)
+                .map(q -&gt; reach[q[0]].get(q[1]))
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1203 · Sort Items by Groups Respecting Dependencies · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[] sortItems(int n, int m, int[] group,
+                           List&lt;List&lt;Integer&gt;&gt; beforeItems) {
+        // An item without a group gets a group of its own.
+        int[] g = IntStream.range(0, n)
+                .map(i -&gt; group[i] &gt;= 0 ? group[i] : m + i)
+                .toArray();
+        List&lt;int[]&gt; items = IntStream.range(0, n).boxed()
+                .flatMap(i -&gt; beforeItems.get(i).stream()
+                        .map(b -&gt; new int[]{ b, i }))
+                .toList();
+        // group edges: the item edges that cross between groups
+        List&lt;int[]&gt; groups = items.stream()
+                .filter(e -&gt; g[e[0]] != g[e[1]])
+                .map(e -&gt; new int[]{ g[e[0]], g[e[1]] })
+                .toList();
+        List&lt;Integer&gt; itemOrder = topo(n, items);
+        List&lt;Integer&gt; groupOrder = topo(m + n, groups);
+        if (itemOrder.size() &lt; n || groupOrder.size() &lt; m + n)
+            return new int[0];
+        // Items keep their global order inside each group, and
+        // the groups come out in theirs.
+        Map&lt;Integer, List&lt;Integer&gt;&gt; byGroup = itemOrder.stream()
+                .collect(Collectors.groupingBy(i -&gt; g[i]));
+        return groupOrder.stream()
+                .flatMap(x -&gt; byGroup.getOrDefault(x, List.of())
+                        .stream())
+                .mapToInt(Integer::intValue).toArray();
+    }
+
+    // Kahn by frontiers over [from, to] edges
+    static List&lt;Integer&gt; topo(int n, List&lt;int[]&gt; edges) {
+        Map&lt;Integer, List&lt;Integer&gt;&gt; next = adj(edges.stream());
+        int[] waits = edges.stream().collect(() -&gt; new int[n],
+                (w, e) -&gt; w[e[1]]++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        List&lt;Integer&gt; free = IntStream.range(0, n)
+                .filter(v -&gt; waits[v] == 0).boxed().toList();
+        return Stream.iterate(free, l -&gt; !l.isEmpty(),
+                              l -&gt; release(l, next, waits))
+                .flatMap(List::stream)
+                .toList();
+    }
+
+    // ---- the same two helpers in 207, 210, 802 and 1203 ----
+    // edges [from, to], grouped as from -&gt; every to
+    static Map&lt;Integer, List&lt;Integer&gt;&gt; adj(Stream&lt;int[]&gt; es) {
+        return es.collect(Collectors.groupingBy(e -&gt; e[0],
+                Collectors.mapping(e -&gt; e[1],
+                        Collectors.toList())));
+    }
+
+    // Kahn's next frontier. The decrement is the state: a node
+    // joins exactly when its last incoming edge is used up.
+    static List&lt;Integer&gt; release(List&lt;Integer&gt; level,
+            Map&lt;Integer, List&lt;Integer&gt;&gt; next, int[] waits) {
+        return level.stream()
+                .flatMap(u -&gt; next.getOrDefault(u, List.of())
+                        .stream())
+                .filter(v -&gt; --waits[v] == 0)
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The decrement carries the algorithm</span><code>filter(v -&gt; --waits[v] == 0)</code> admits a node exactly when its last prerequisite leaves. It is correct only because each edge is seen once, in order, and that makes it stateful. It is the one line in these solutions that must never run in parallel, and keeping it inside a single helper, <code>release</code>, makes that easy to see.</div>
+  <div class="note good"><span class="lbl"><code>BitSet</code> collects</span><code>collect(BitSet::new, BitSet::set, BitSet::or)</code> is a mutable reduction whose combiner is a real union, so building a set of indices this way is safe in parallel. 1462's closure is then a fold over fresh <code>BitSet</code> rows, with no visited marks anywhere. At n ≤ 100 that is 100 steps of cheap bit-level ORs.</div>
+</section>
+
+

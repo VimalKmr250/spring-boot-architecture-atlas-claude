@@ -1,0 +1,40 @@
+<section class="slide" data-sec="Coding drills" data-title="How to answer a stream coding question">
+  <h2>Name the output type first, then the collector writes itself</h2>
+  <p class="dek">The stream coding problems below are the ones that recur across the question lists Java candidates are given, grouped by the shape of the data: numbers, characters, words, employees, and collections. Every output quoted in this section is what JDK 25 printed for the code as shown.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The data set used on the employee slides</div>
+<pre><code class="language-java">import static java.util.stream.Collectors.*;   // assumed on every drill slide
+
+record Employee(int id, String name, String dept, double salary,
+                int age, String gender, String city) {}
+
+List&lt;Employee&gt; employees = List.of(
+    new Employee(1,  "Asha",  "Engineering", 125_000, 34, "F", "Pune"),
+    new Employee(2,  "Bruno", "Engineering", 118_000, 41, "M", "Lisbon"),
+    new Employee(3,  "Chen",  "Engineering",  98_000, 28, "M", "Pune"),
+    new Employee(4,  "Dara",  "Sales",        72_000, 25, "F", "Dublin"),
+    new Employee(5,  "Emeka", "Sales",        81_000, 38, "M", "Lagos"),
+    new Employee(6,  "Farah", "Sales",        81_000, 31, "F", "Dublin"),
+    new Employee(7,  "Goran", "Finance",      95_000, 45, "M", "Zagreb"),
+    new Employee(8,  "Hana",  "Finance",      88_000, 29, "F", "Prague"),
+    new Employee(9,  "Ivo",   "Support",      54_000, 23, "M", "Lisbon"),
+    new Employee(10, "Jia",   "Support",      61_000, 36, "F", "Pune"),
+    new Employee(11, "Kofi",  "Sales",        69_000, 27, "M", "Lagos"));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Four questions before you type</h3>
+        <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+          <li><b>What is the output type?</b> <code>Map&lt;String, Long&gt;</code>, <code>List&lt;String&gt;</code>, <code>Optional&lt;Employee&gt;</code>. Say it out loud; it picks the terminal operation for you.</li>
+          <li><b>What is the shape?</b> Filter, transform, group, rank or reduce, or a chain of two.</li>
+          <li><b>Which collector produces that type?</b> The cheat sheet at the end of this section maps question wording to idiom.</li>
+          <li><b>What are the edge cases?</b> Ties, empty input, nulls, duplicates. Name them before the interviewer does.</li>
+        </ol>
+      </div>
+      <div class="note tip"><span class="lbl">The data is chosen to have traps</span>Emeka and Farah tie at 81,000, so "the highest paid in Sales" has two correct people. Sales has four employees and the others fewer, so "the department with the most staff" has one answer. And no one in Support earns over 80,000, so a per-department filter has an empty group. Each drill's follow-up uses one of these.</div>
+    </div>
+  </div>
+</section>
+

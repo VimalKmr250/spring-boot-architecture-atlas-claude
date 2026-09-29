@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Middleware" data-title="Outbox and CDC">
+  <h2>The outbox: the only honest way to write and publish</h2>
+  <p class="dek">You cannot atomically commit to PostgreSQL and produce to Kafka. So don't try — commit the intent to publish alongside the data, and let a separate process do the publishing.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 210" role="img" aria-label="Outbox pattern: one transaction writes both the order row and the outbox row; a relay or Debezium CDC reads the outbox and publishes to Kafka, marking rows sent; contrasted with the dual-write failure where a crash between commit and publish loses the event">
+        <rect x="14" y="30" width="330" height="104" rx="10" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        <text x="179" y="24" text-anchor="middle" font-size="10.5" font-weight="600" fill="#D26A3F">ONE TRANSACTION</text>
+        <rect x="34" y="52" width="130" height="60" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="99" y="76" text-anchor="middle" font-size="11.5" fill="currentColor">orders</text>
+        <text x="99" y="94" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">INSERT order row</text>
+        <rect x="194" y="52" width="130" height="60" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="259" y="76" text-anchor="middle" font-size="11.5" fill="currentColor">outbox</text>
+        <text x="259" y="94" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">INSERT event payload</text>
+
+        <rect x="404" y="52" width="140" height="60" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="474" y="76" text-anchor="middle" font-size="11.5" fill="currentColor">relay</text>
+        <text x="474" y="94" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">poll · or Debezium WAL</text>
+        <line x1="346" y1="82" x2="400" y2="82" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="373" y="74" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">reads unsent</text>
+
+        <rect x="604" y="52" width="140" height="60" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="674" y="76" text-anchor="middle" font-size="11.5" fill="currentColor">Kafka</text>
+        <text x="674" y="94" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">orders.placed.v1</text>
+        <line x1="546" y1="82" x2="600" y2="82" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line>
+        <path d="M604 108 C560 132 520 132 478 116" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" fill="none" marker-end="url(#arw)"></path>
+        <text x="540" y="140" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">mark sent (or delete)</text>
+
+        <text x="766" y="70" font-size="10" fill="currentColor" opacity="0.7">Crash anywhere</text>
+        <text x="766" y="85" font-size="10" fill="currentColor" opacity="0.7">after commit → the</text>
+        <text x="766" y="100" font-size="10" fill="currentColor" opacity="0.7">row is still there,</text>
+        <text x="766" y="115" font-size="10" fill="currentColor" opacity="0.7">so it is sent again.</text>
+        <text x="766" y="134" font-size="10" fill="#3AA79B">At-least-once.</text>
+
+        <line x1="14" y1="160" x2="866" y2="160" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="182" font-size="11" fill="#A22636">✕ Dual write — <tspan font-family="monospace">save(order); kafka.send(event);</tspan> — a crash between the two loses the event with no trace,</text>
+        <text x="14" y="198" font-size="11" fill="#A22636">and a send inside the transaction publishes an order that then rolls back. Both failures are invisible until reconciliation.</text>
+      </svg>
+    </div>
+    <figcaption>The outbox converts an impossible distributed-transaction problem into an ordinary local-transaction problem plus a retry loop. The cost is duplicates, which is why every consumer on the previous slide is idempotent.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). <b>Spring Modulith's registry is exactly this.</b></p></div>
+    <div class="card"><h3>CDC (Debezium)</h3><p>Reads the write-ahead log, so no polling, no load on the table, ordering guaranteed by the log, latency in milliseconds. Costs a Kafka Connect cluster and replication-slot operations. Worth it above roughly a few thousand events/sec.</p></div>
+  </div>
+</section>
+

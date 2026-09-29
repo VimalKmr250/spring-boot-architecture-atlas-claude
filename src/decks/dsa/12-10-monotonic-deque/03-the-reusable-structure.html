@@ -1,0 +1,111 @@
+<section class="slide" data-sec="10 · Monotonic deque" data-title="The reusable structure">
+  <h2>Expire, evict, read — in that order, every time</h2>
+  <p class="dek">The order is not stylistic. Expiring before evicting keeps the deque small; reading last guarantees the front is both in-window and maximal. Swap any two and the answer is wrong on some input.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The template — maximum of every window of width k</div>
+<pre><code class="language-java">/**
+ * Deque holds INDICES whose values DECREASE from front to back.
+ * front = the maximum of the current window.
+ *
+ * Each index is added once and removed once (from one end or
+ * the other), so the two inner loops still total O(n).
+ */
+int[] maxSlidingWindow(int[] a, int k) {
+    int n = a.length;
+    int[] out = new int[n - k + 1];
+
+    Deque&lt;Integer&gt; dq = new ArrayDeque&lt;&gt;();
+
+    for (int i = 0; i &lt; n; i++) {
+
+        // 1 · EXPIRE — the front has slid out of the window.
+        // Window covering i starts at i-k+1, so &lt;= i-k is stale.
+        while (!dq.isEmpty() &amp;&amp; dq.peekFirst() &lt;= i - k) {
+            dq.pollFirst();
+        }
+
+        // 2 · EVICT — anything smaller than a[i] is dead forever:
+        // a[i] is bigger AND outlives it.
+        while (!dq.isEmpty() &amp;&amp; a[dq.peekLast()] &lt;= a[i]) {
+            dq.pollLast();
+        }
+        dq.offerLast(i);
+
+        // 3 · READ — only once the window is actually full.
+        if (i &gt;= k - 1) out[i - k + 1] = a[dq.peekFirst()];
+    }
+    return out;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Variant · two deques for max AND min (LC 1438)</div>
+<pre><code class="language-java">// "Absolute difference at most limit" means max - min &lt;= limit,
+// so run one decreasing deque and one increasing deque side by
+// side. The window is invalid while their fronts differ too much.
+int longestSubarray(int[] a, int limit) {
+    Deque&lt;Integer&gt; maxD = new ArrayDeque&lt;&gt;();   // decreasing
+    Deque&lt;Integer&gt; minD = new ArrayDeque&lt;&gt;();   // increasing
+    int l = 0, best = 0;
+
+    for (int r = 0; r &lt; a.length; r++) {
+        while (!maxD.isEmpty() &amp;&amp; maxD.peekLast() &lt; a[r]) maxD.pollLast();
+        maxD.offerLast(a[r]);
+        while (!minD.isEmpty() &amp;&amp; minD.peekLast() &gt; a[r]) minD.pollLast();
+        minD.offerLast(a[r]);
+
+        // Here the left edge moves for VALIDITY, not for age.
+        while (maxD.peekFirst() - minD.peekFirst() &gt; limit) {
+            if (maxD.peekFirst() == a[l]) maxD.pollFirst();
+            if (minD.peekFirst() == a[l]) minD.pollFirst();
+            l++;
+        }
+        best = Math.max(best, r - l + 1);
+    }
+    return best;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Variant · deque as a DP accelerator (LC 1696, 1425)</div>
+<pre><code class="language-java">// dp[i] = a[i] + max(dp[i-k] .. dp[i-1])
+// The inner max over a moving band is exactly what the deque gives
+// in O(1), turning an O(n*k) DP into O(n).
+int maxResult(int[] a, int k) {
+    int n = a.length;
+    int[] dp = new int[n];
+    dp[0] = a[0];
+
+    Deque&lt;Integer&gt; dq = new ArrayDeque&lt;&gt;();   // indices, dp decreasing
+    dq.offerLast(0);
+
+    for (int i = 1; i &lt; n; i++) {
+        // expire: only the last k positions may be jumped from
+        while (!dq.isEmpty() &amp;&amp; dq.peekFirst() &lt; i - k) dq.pollFirst();
+
+        dp[i] = a[i] + dp[dq.peekFirst()];    // best reachable predecessor
+
+        while (!dq.isEmpty() &amp;&amp; dp[dq.peekLast()] &lt;= dp[i]) dq.pollLast();
+        dq.offerLast(i);
+    }
+    return dp[n - 1];
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Direction</dt><dd>Decreasing for a maximum, increasing for a minimum. Both at once when the question is about a spread.</dd>
+        <dt>Expiry rule</dt><dd>By <b>age</b> for a fixed-width window (<code>index &lt;= i - k</code>); by <b>validity</b> when the left edge is driven by a condition, as in the two-deque variant.</dd>
+        <dt>What you store</dt><dd>Indices when you need positions or an age test; raw values when the eviction is purely by comparison, as in LC 1438.</dd>
+        <dt>When to read</dt><dd>Guard with <code>i &gt;= k - 1</code> for fixed windows, or the first few outputs come from an incomplete window.</dd>
+        <dt><code>&lt;</code> or <code>&lt;=</code> on eviction</dt><dd><code>&lt;=</code> keeps the deque shorter by discarding equal values. Both are correct for a maximum; prefer <code>&lt;=</code>.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Reading before the window is full</b> — without the <code>i &gt;= k - 1</code> guard the first k−1 answers are maxima of partial windows. <b>Expiring with <code>&lt;</code> instead of <code>&lt;=</code></b> — keeps one stale index, so the reported maximum can come from just outside the window. <b>Using <code>peek()</code> on an <code>ArrayDeque</code> and expecting the back</b> — <code>peek()</code> is <code>peekFirst()</code>; always write <code>peekFirst</code> and <code>peekLast</code> explicitly here, because both ends are in play.</div>
+  </div>
+</section>
+

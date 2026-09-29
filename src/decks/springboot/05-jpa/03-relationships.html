@@ -1,0 +1,48 @@
+<section class="slide" data-sec="JPA" data-title="Relationships">
+  <h2>Relationships: owning side, cascade, orphans</h2>
+  <p class="dek">Four annotations, and about six ways each to get it subtly wrong. The owning side is the concept everything else hangs off: <b>the side without <code>mappedBy</code> owns the foreign key</b>, and only changes to the owning side are written.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The parent — order owns its lines</div>
+<pre><code class="language-java">@Entity
+class OrderJpaEntity {
+
+    @OneToMany(mappedBy = "order",              // ← inverse side: line owns the FK
+               cascade = CascadeType.ALL,       // persist/merge/remove flow to lines
+               orphanRemoval = true,            // removing from the list DELETEs the row
+               fetch = FetchType.LAZY)          // default for *ToMany — keep it
+    private List&lt;OrderLineEntity&gt; lines = new ArrayList&lt;&gt;();
+
+    // ALWAYS maintain both sides — the object graph is not self-healing
+    void addLine(OrderLineEntity line) {
+        lines.add(line);
+        line.setOrder(this);
+    }
+    void removeLine(OrderLineEntity line) {
+        lines.remove(line);
+        line.setOrder(null);
+    }
+
+    @ManyToOne(fetch = FetchType.LAZY)          // EAGER is the default here — override it
+    @JoinColumn(name = "customer_id", nullable = false)
+    private CustomerEntity customer;
+
+    @ManyToMany
+    @JoinTable(name = "order_promotion",
+               joinColumns = @JoinColumn(name = "order_id"),
+               inverseJoinColumns = @JoinColumn(name = "promotion_id"))
+    private Set&lt;PromotionEntity&gt; promotions = new HashSet&lt;&gt;();
+
+    @OneToOne(mappedBy = "order", fetch = LAZY, optional = false)
+    private OrderPaymentEntity payment;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Cascade the aggregate, never across aggregates</span><code>CascadeType.ALL</code> from <code>Order</code> to <code>OrderLine</code> is right — lines have no life without the order. <code>CascadeType.ALL</code> from <code>Order</code> to <code>Customer</code> means deleting an order deletes the customer. <code>REMOVE</code> is the dangerous one; <code>PERSIST</code> and <code>MERGE</code> are usually what people actually wanted.</div>
+      <div class="note warn"><span class="lbl">@ManyToOne is EAGER by default</span>The spec default, and it is wrong for almost every enterprise entity. Every <code>@ManyToOne</code> without <code>fetch = LAZY</code> adds a join or an extra select to every single load of that entity — and they compound: five eager parents on one entity means loading one row touches six tables.</div>
+      <div class="note tip"><span class="lbl">@ManyToMany: prefer the join entity</span>The moment the relationship needs an attribute — when the promotion was applied, who applied it — <code>@ManyToMany</code> has to be rewritten as two <code>@OneToMany</code>s to an explicit join entity. That request always comes. Also: use <code>Set</code>, not <code>List</code>, or Hibernate deletes and reinserts the whole join table on every change.</div>
+    </div>
+  </div>
+</section>
+

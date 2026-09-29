@@ -1,0 +1,69 @@
+<section class="slide" data-sec="09 · Monotonic stack" data-title="Mechanics">
+  <h2>Throw away everything that can never win again</h2>
+  <p class="dek">Keep a stack whose values are sorted. When a new element arrives that <b>dominates</b> what is on top, that top can never be the answer for anything further right — so pop it, and settle its answer on the way out. Each element is pushed once and popped once, which is why the whole thing is O(n) despite the inner loop.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The stack is always monotone — strictly increasing or strictly decreasing from bottom to top, depending on the question. Everything on it is <b>still waiting</b> for its answer.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">A new element <code>a[i]</code> arrives. While it beats the top, the top has found what it was waiting for: pop it and record <code>i</code> as its answer. Then push <code>i</code>.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Anything left on the stack at the end never found an answer — those get the default, usually 0 or −1.</p>
+    </div>
+    <div class="panel">
+      <h3>Why it is O(n), not O(n²)</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The <code>while</code> loop looks quadratic. It is not: an index is pushed <b>exactly once</b> and popped <b>at most once</b>, so across the entire run the inner loop body executes at most <code>n</code> times in total — not <code>n</code> times per iteration.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Total work is 2n operations, amortised O(1) per element. Being able to state that in one sentence is worth more than the code: it is the follow-up interviewers ask when the loop looks nested.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Store <b>indices</b>, not values. You almost always need the distance <code>i − stack.peek()</code>, and an index gives you the value for free while the reverse is not true.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 258" role="img" aria-label="A decreasing stack of indices, with a taller arriving element popping everything it dominates">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE STACK HOLDS INDICES STILL WAITING FOR AN ANSWER</text>
+
+        <!-- bars -->
+        <line x1="40" y1="140" x2="470" y2="140" stroke="currentColor" stroke-opacity="0.25"></line>
+        <rect x="52" y="52" width="44" height="88" fill="currentColor" fill-opacity="0.16" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="106" y="80" width="44" height="60" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="160" y="100" width="44" height="40" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="214" y="116" width="44" height="24" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="268" y="36" width="44" height="104" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F" stroke-width="1.8"></rect>
+        <text x="74" y="156" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">9</text>
+        <text x="128" y="156" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">6</text>
+        <text x="182" y="156" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">4</text>
+        <text x="236" y="156" text-anchor="middle" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">2</text>
+        <text x="290" y="156" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">7</text>
+        <text x="290" y="28" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#D26A3F">arriving</text>
+
+        <text x="128" y="176" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">pop</text>
+        <text x="182" y="176" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">pop</text>
+        <text x="236" y="176" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">pop</text>
+        <text x="74" y="176" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.45">stays</text>
+
+        <path d="M266 88 L212 88" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="3 3" marker-end="url(#arwA)"></path>
+        <text x="330" y="60" font-size="11" fill="currentColor" opacity="0.72">7 is taller than 2, 4 and 6, so all three</text>
+        <text x="330" y="76" font-size="11" fill="currentColor" opacity="0.72">have found their "next greater" — settle them.</text>
+        <text x="330" y="100" font-size="11" fill="currentColor" opacity="0.72">9 is taller than 7, so it keeps waiting.</text>
+        <text x="330" y="124" font-size="11" fill="currentColor" opacity="0.72">The stack stays decreasing at all times.</text>
+
+        <line x1="14" y1="192" x2="866" y2="192" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="212" font-size="11.5" font-weight="600" fill="#D26A3F">The four questions, and the stack each one needs</text>
+        <text x="14" y="232" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">next greater  → decreasing stack, scan left to right</text>
+        <text x="300" y="232" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">next smaller  → increasing stack, scan left to right</text>
+        <text x="14" y="250" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">prev greater  → decreasing stack, answer is peek BEFORE push</text>
+        <text x="460" y="250" font-size="11" font-family="monospace" fill="currentColor" opacity="0.75">prev smaller  → increasing stack, same</text>
+      </svg>
+    </div>
+    <figcaption>"Next" answers are settled when an element is <em>popped</em>; "previous" answers are read from <code>peek()</code> just <em>before</em> pushing. Both directions use the same loop — only the moment you record the answer changes.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Every element needs to know about the <b>nearest</b> element to one side that is bigger or smaller than it. Also for rectangle problems, where a bar's reach is bounded by the first shorter bar on each side.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>You need the nearest element by <em>position</em> under some other predicate, or the maximum over a sliding window of fixed width — a stack cannot evict from the bottom, which is what that requires.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time by the push-once, pop-once argument. <b>O(n)</b> space worst case, when the input is already sorted so nothing is ever popped until the end.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the next greater element"</b> · <b>"how many days until a warmer temperature"</b> · <b>"the first element to the right that is larger"</b> · <b>"the largest rectangle"</b> · <b>"the span"</b> · <b>"the nearest smaller value"</b>. The giveaway is <b>"nearest"</b> or <b>"first … to the right/left"</b> combined with a size comparison. If the comparison is by position only, it is not this pattern.</div>
+</section>
+

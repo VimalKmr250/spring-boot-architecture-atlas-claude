@@ -1,0 +1,38 @@
+<section class="slide" data-sec="Intermediate operations" data-title="limit, skip, takeWhile, dropWhile">
+  <h2>Slicing by count, and slicing by condition</h2>
+  <p class="dek"><code>limit</code> and <code>skip</code> slice by position. <code>takeWhile</code> and <code>dropWhile</code> (Java 9) slice at the <b>first</b> element that fails a condition. Only <code>limit</code> and <code>takeWhile</code> can end an infinite stream.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Five ways to cut the same list</div>
+<pre><code class="language-java">List&lt;Integer&gt; xs = List.of(1, 2, 5, 1, 2);
+
+xs.stream().limit(2).toList();                  // [1, 2]
+xs.stream().skip(2).toList();                   // [5, 1, 2]
+xs.stream().takeWhile(x -&gt; x &lt; 3).toList();     // [1, 2]        stops at 5
+xs.stream().dropWhile(x -&gt; x &lt; 3).toList();     // [5, 1, 2]     keeps all from 5
+xs.stream().filter(x -&gt; x &lt; 3).toList();        // [1, 2, 1, 2]  looks at everything
+
+// Page 3, twenty per page
+orders.stream().skip(2 * 20).limit(20).toList();
+
+// Log lines up to the first error, in timestamp order
+List&lt;String&gt; log = List.of("09:00 start", "09:01 ok", "09:02 ERROR disk full", "09:03 ok");
+log.stream().takeWhile(l -&gt; !l.contains("ERROR")).toList();   // [09:00 start, 09:01 ok]</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>Watch for</th></tr></thead>
+        <tbody>
+          <tr><td><code>limit(n)</code></td><td>Short-circuits. A negative n throws <code>IllegalArgumentException</code>. On an ordered parallel stream it must find the first n by position, which costs; <code>unordered()</code> removes that cost if any n will do.</td></tr>
+          <tr><td><code>skip(n)</code></td><td>Still reads the skipped elements. Paging a database stream with <code>skip</code> fetches every earlier row: page in SQL instead.</td></tr>
+          <tr><td><code>takeWhile(p)</code> <span class="tag a">9</span></td><td>Not a filter: it stops at the first failure. On sorted data the two agree; on unsorted data they do not.</td></tr>
+          <tr><td><code>dropWhile(p)</code> <span class="tag a">9</span></td><td>Drops the leading run only. Everything after the first failure is kept, even if it matches <code>p</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">takeWhile on an unordered stream</span>Over a <code>HashSet</code> there is no "first" element, so the Javadoc allows <code>takeWhile</code> to return <b>any subset</b> of the matching elements, including none. The behaviour is nondeterministic. Slice by condition only on ordered sources, where "until the first failure" means something.</div>
+</section>
+

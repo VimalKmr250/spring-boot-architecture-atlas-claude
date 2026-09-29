@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Operations" data-title="Replay playbook">
+  <h2>Replay and reprocessing: the playbook</h2>
+  <p class="dek">Replay is the superpower of a log-based system and the fastest way to cause a second incident. Four scenarios, each with a different safe procedure.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>1 · Drain a DLT after fixing a bug</h3>
+      <ol class="tight">
+        <li>Fix and deploy the consumer first. Confirm new traffic is clean.</li>
+        <li>Consume the DLT with a purpose-built job, not the main listener.</li>
+        <li>Republish to the main topic, or apply directly — whichever preserves idempotency.</li>
+        <li>Rate-limit. Ten thousand dead letters replayed at full speed becomes a second outage.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>2 · Rebuild a projection</h3>
+      <ol class="tight">
+        <li>Build into a <b>new table</b> with a <b>new consumer group</b>.</li>
+        <li>Let it catch up; compare against the live table.</li>
+        <li>Switch reads with a feature flag.</li>
+        <li>Keep the old table until you are confident.</li>
+      </ol>
+      <p style="color:var(--text-3)">Never reset the live group and truncate in place — you have no read model at all while it rebuilds.</p>
+    </div>
+    <div class="card">
+      <h3>3 · Backfill a new consumer</h3>
+      <ol class="tight">
+        <li>Deploy with <code>auto.offset.reset=earliest</code> and a new group id.</li>
+        <li>Apply a client quota first, so the backfill cannot starve production consumers.</li>
+        <li>Expect old schema versions — your upcasters must cover them.</li>
+        <li>Watch downstream systems: replaying a year of events into a database at full speed will find its limits.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>4 · Reprocess after a logic bug</h3>
+      <ol class="tight">
+        <li><b>Work out what the wrong logic already did.</b> Emails sent, payments taken — replay will not unsend them.</li>
+        <li>Reset the group to a timestamp, not an offset — timestamps are meaningful to humans and stable across partitions.</li>
+        <li>Suppress non-idempotent side effects for the replay window, with a flag.</li>
+        <li>Reconcile afterwards and report the delta.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Resetting a group — the group must be inactive</div>
+<pre><code class="language-yaml"># Always --dry-run first. It prints what WOULD happen.
+kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history \
+  --topic orders.order.placed.v1 --reset-offsets \
+  --to-datetime 2026-09-14T00:00:00.000 --dry-run
+
+# Then --execute. Other options: --to-earliest --to-latest --shift-by -1000
+#   --to-offset N   --by-duration PT6H</code></pre>
+    </div>
+    <div class="note bad"><span class="lbl">The rule that prevents the second incident</span>Replay re-fires <b>every</b> side effect the handler performs. Customers have been emailed their order confirmation four times by a well-intentioned replay. Before any replay, list what the consumer does that is not idempotent, and turn it off for the duration — deliberately, with a flag, and tell the people who own it.</div>
+  </div>
+</section>
+

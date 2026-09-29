@@ -1,0 +1,52 @@
+<section class="slide" data-sec="Modular monolith" data-title="Call or publish?">
+  <h2>Call an API, or publish an event?</h2>
+  <p class="dek">This is the single most consequential line-level decision in the codebase. Get it wrong in one direction and modules cannot be extracted; wrong in the other and nobody can follow the flow.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Comparison of a synchronous call chain where order calls payment and inventory inside one transaction, versus an event-driven flow where order commits then publishes OrderPlaced which payment and inventory consume in their own transactions">
+        <text x="14" y="16" font-size="11" font-weight="600" fill="currentColor" opacity="0.65">A · SYNCHRONOUS — one transaction, caller blocked, failure cascades</text>
+        <rect x="14" y="30" width="96" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="62" y="58" text-anchor="middle" font-size="12" fill="currentColor">order</text>
+        <rect x="190" y="30" width="96" height="46" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="238" y="58" text-anchor="middle" font-size="12" fill="currentColor">payment</text>
+        <rect x="366" y="30" width="96" height="46" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="414" y="58" text-anchor="middle" font-size="12" fill="currentColor">inventory</text>
+        <line x1="112" y1="53" x2="186" y2="53" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="288" y1="53" x2="362" y2="53" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="149" y="45" text-anchor="middle" font-size="9.5" fill="#D26A3F">authorise()</text>
+        <text x="325" y="45" text-anchor="middle" font-size="9.5" fill="#D26A3F">reserve()</text>
+        <rect x="6" y="20" width="466" height="68" rx="9" fill="none" stroke="#D26A3F" stroke-dasharray="4 3" stroke-opacity="0.55"></rect>
+        <text x="486" y="48" font-size="10.5" fill="#D26A3F">one @Transactional scope —</text>
+        <text x="486" y="63" font-size="10.5" fill="#D26A3F">inventory failing rolls back the payment row too,</text>
+        <text x="486" y="78" font-size="10.5" fill="#D26A3F">and holds DB locks for the gateway's 800 ms</text>
+
+        <line x1="14" y1="110" x2="866" y2="110" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="136" font-size="11" font-weight="600" fill="currentColor" opacity="0.65">B · EVENT — order commits alone, reactions run independently and retry</text>
+        <rect x="14" y="152" width="96" height="46" rx="7" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="62" y="173" text-anchor="middle" font-size="12" fill="currentColor">order</text>
+        <text x="62" y="188" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">COMMIT</text>
+        <rect x="160" y="152" width="112" height="46" rx="7" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="216" y="173" text-anchor="middle" font-size="11.5" fill="currentColor">event registry</text>
+        <text x="216" y="188" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">same TX, durable</text>
+        <rect x="360" y="122" width="110" height="42" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="415" y="148" text-anchor="middle" font-size="12" fill="currentColor">payment</text>
+        <rect x="360" y="186" width="110" height="42" rx="7" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="415" y="212" text-anchor="middle" font-size="12" fill="currentColor">inventory</text>
+        <line x1="112" y1="175" x2="156" y2="175" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line>
+        <path d="M274 168 C316 168 316 143 356 143" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#arwB)"></path>
+        <path d="M274 184 C316 184 316 207 356 207" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#arwB)"></path>
+        <text x="316" y="128" text-anchor="middle" font-size="9.5" fill="#3AA79B">OrderPlaced</text>
+        <text x="500" y="160" font-size="10.5" fill="#3AA79B">each listener has its own transaction and its own retry;</text>
+        <text x="500" y="175" font-size="10.5" fill="#3AA79B">a payment outage delays fulfilment, it does not lose the order</text>
+        <text x="496" y="196" font-size="10.5" fill="currentColor" opacity="0.6">cost: the order exists in a state where payment has not happened —</text>
+        <text x="500" y="211" font-size="10.5" fill="currentColor" opacity="0.6">the UI and the domain model must both admit that state</text>
+      </svg>
+    </div>
+    <figcaption>The event version does not remove the failure — it moves it out of the customer's request and makes it retryable. That is the whole trade: consistency now, versus availability now plus consistency shortly.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The decision rule</span>Ask: <b>"if this step fails, should the user's action fail?"</b> Yes → synchronous call, same transaction (taking payment). No → event (sending the confirmation email, updating the loyalty balance, reindexing search). Teams that apply only this one rule consistently end up with a system that can be pulled apart later.</div>
+</section>
+

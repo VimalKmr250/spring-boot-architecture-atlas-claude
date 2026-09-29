@@ -1,0 +1,91 @@
+<section class="slide" data-sec="22 · Union find" data-title="Dry run">
+  <h2>LC 684 traced on <code>[[1,2],[1,3],[2,3]]</code></h2>
+  <p class="dek">Find the edge that creates a cycle. Three nodes, three edges — one too many for a tree. The first two unions succeed; the third finds both endpoints already in the same component, and that is the answer.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 314" role="img" aria-label="Three union operations, the third detecting that both endpoints already share a root">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">STATE AFTER EACH EDGE</text>
+
+        <text x="14" y="50" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">start</text>
+        <circle cx="90" cy="60" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="90" y="65" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <circle cx="140" cy="60" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="140" y="65" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <circle cx="190" cy="60" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="190" y="65" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="230" y="65" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">three separate components</text>
+
+        <text x="14" y="128" font-size="10" font-family="monospace" fill="#3AA79B">[1,2]</text>
+        <circle cx="90" cy="120" r="16" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.5"></circle>
+        <text x="90" y="125" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <circle cx="152" cy="150" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="152" y="155" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <path d="M140 140 L106 128" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <circle cx="210" cy="120" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="210" y="125" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="250" y="132" font-size="10.5" font-family="monospace" fill="#3AA79B">union succeeds — 2 joins 1</text>
+
+        <text x="14" y="212" font-size="10" font-family="monospace" fill="#3AA79B">[1,3]</text>
+        <circle cx="120" cy="196" r="16" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.5"></circle>
+        <text x="120" y="201" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <circle cx="80" cy="234" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="80" y="239" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <circle cx="160" cy="234" r="16" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="160" y="239" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <path d="M92 222 L110 210" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <path d="M150 222 L131 210" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <text x="220" y="216" font-size="10.5" font-family="monospace" fill="#3AA79B">union succeeds — all three now share root 1</text>
+
+        <text x="14" y="284" font-size="10" font-family="monospace" fill="#D26A3F">[2,3]</text>
+        <text x="80" y="272" font-size="11" font-family="monospace" fill="currentColor">find(2) = 1</text>
+        <text x="200" y="272" font-size="11" font-family="monospace" fill="currentColor">find(3) = 1</text>
+        <text x="330" y="272" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">same root → union returns false</text>
+        <text x="80" y="294" font-size="11" fill="#D26A3F" opacity="0.85">Adding this edge would close a cycle, so [2,3] is the redundant connection.</text>
+
+        <line x1="440" y1="36" x2="440" y2="250" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="480" y="56" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">EDGE</text>
+        <text x="556" y="56" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">find(a)</text>
+        <text x="636" y="56" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">find(b)</text>
+        <text x="716" y="56" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">RESULT</text>
+
+        <text x="480" y="80" font-size="11" font-family="monospace" fill="currentColor">[1,2]</text>
+        <text x="562" y="80" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="642" y="80" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="716" y="80" font-size="11" fill="#3AA79B">merged</text>
+
+        <text x="480" y="104" font-size="11" font-family="monospace" fill="currentColor">[1,3]</text>
+        <text x="562" y="104" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="642" y="104" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="716" y="104" font-size="11" fill="#3AA79B">merged</text>
+
+        <text x="480" y="128" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">[2,3]</text>
+        <text x="562" y="128" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="642" y="128" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="716" y="128" font-size="11" font-weight="600" fill="#D26A3F">ALREADY JOINED</text>
+
+        <text x="480" y="166" font-size="11" fill="currentColor" opacity="0.7">The problem guarantees exactly one extra edge,</text>
+        <text x="480" y="184" font-size="11" fill="currentColor" opacity="0.7">so the first false is the answer — return immediately.</text>
+        <text x="480" y="212" font-size="11" fill="currentColor" opacity="0.62">Processing edges in the given order is what makes</text>
+        <text x="480" y="230" font-size="11" fill="currentColor" opacity="0.62">it the LAST such edge, which the problem requires.</text>
+      </svg>
+    </div>
+    <figcaption>After edge <code>[1,3]</code>, both 2 and 3 point directly at 1. So the third edge's two <code>find</code> calls each return in one step, and the equality test is the entire cycle check.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>edge</th><th class="num">root of a</th><th class="num">root of b</th><th>union</th><th>parent array after</th><th>components</th></tr></thead>
+      <tbody>
+        <tr><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>initial</td><td class="num">[_, 1, 2, 3]</td><td class="num">3</td></tr>
+        <tr><td class="num">[1,2]</td><td class="num">1</td><td class="num">2</td><td><b>true</b> — merged</td><td class="num">[_, 1, 1, 3]</td><td class="num">2</td></tr>
+        <tr><td class="num">[1,3]</td><td class="num">1</td><td class="num">3</td><td><b>true</b> — merged</td><td class="num">[_, 1, 1, 1]</td><td class="num">1</td></tr>
+        <tr><td class="num">[2,3]</td><td class="num">1</td><td class="num">1</td><td><b>false</b> — cycle</td><td class="num">unchanged</td><td class="num">1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why union-find and not a traversal</span>DFS also detects the cycle, but it must re-examine the graph built so far after every edge, giving O(E²) if you want the <em>last</em> redundant edge. Union-find processes each edge once and answers immediately, because the connectivity state is carried forward rather than recomputed. That incremental property is the whole reason this structure exists.</div>
+</section>
+

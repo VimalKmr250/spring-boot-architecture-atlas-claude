@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Data" data-title="Read models">
+  <h2>CQRS without the ceremony</h2>
+  <p class="dek">Full CQRS with event sourcing is rarely justified. Separating the <em>read path</em> from the write path almost always is — and it costs one class, not an architecture.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The write path: aggregates, JPA, invariants</div>
+<pre><code class="language-java">@Transactional
+public OrderId place(PlaceOrderCommand cmd) { /* slide 15 */ }</code></pre>
+      <div class="codelabel" style="margin-top:14px">The read path: no entities, no mapping, one query</div>
+<pre><code class="language-java">@Transactional(readOnly = true)
+public List&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
+    return jdbc.sql("""
+            SELECT o.id, o.placed_at, o.status, o.total_minor, o.currency,
+                   o.line_count, o.customer_display_name
+              FROM order_mgmt.order_summary o
+             WHERE o.customer_id = :customer
+               AND (:status::text IS NULL OR o.status = :status)
+             ORDER BY o.placed_at DESC
+             LIMIT :limit OFFSET :offset
+            """)
+        .param("customer", f.customerId()).param("status", f.status())
+        .param("limit", page.getPageSize()).param("offset", page.getOffset())
+        .query(OrderSummary.class)     // record, mapped by column name
+        .list();                       // → List, not Page
+}
+
+// A Page needs a total, which is a SECOND query — so only ask for one
+// when the UI actually renders "page 4 of 87":
+public Page&lt;OrderSummary&gt; searchPaged(OrderSearch f, Pageable page) {
+    var rows = search(f, page);
+    return PageableExecutionUtils.getPage(rows, page, () -&gt; countMatching(f));
+}   // the supplier is skipped when the result obviously fits one page</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Why <code>order_summary</code> exists</h3>
+        <p>It is a denormalised table maintained by event listeners — it already contains the customer's display name and the line count, so the order-history screen is one index scan instead of three joins across two schemas that the boundaries forbid anyway.</p>
+        <p>Cost: eventual consistency of a second or two, and a rebuild job. Benefit: the p99 on your most-hit screen drops by an order of magnitude and stops depending on other modules.</p>
+      </div>
+      <div class="note"><span class="lbl">Make rebuild a first-class feature</span>Every projection needs a documented, tested "replay from scratch" path. You will need it — after a bug, after a schema change, and the first time someone asks for a field you did not project.</div>
+      <div class="note warn"><span class="lbl">Where the line is</span>Use a read model when the query is hot, cross-module, or awkward. Do <b>not</b> project everything: each projection is a second source of truth that can drift, and drift is discovered by customers.</div>
+    </div>
+  </div>
+</section>
+

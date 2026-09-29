@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Internals" data-title="Writing an aspect">
+  <h2>AOP: the mechanism behind every annotation that "just works"</h2>
+  <p class="dek"><code>@Transactional</code>, <code>@Cacheable</code>, <code>@PreAuthorize</code> are all aspects Spring ships. Writing one yourself is the fastest way to stop treating them as magic — and occasionally the right answer for a genuine cross-cutting concern.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">An audit aspect — one concern, applied everywhere, defined once</div>
+<pre><code class="language-java">@Aspect
+@Component
+@Order(20)                                   // lower runs first; @Transactional is Ordered.LOWEST
+class AuditAspect {
+
+    // A named pointcut — reusable, and the place to put the expression
+    @Pointcut("@annotation(com.retailco.shop.shared.Audited)")
+    void audited() { }
+
+    @Pointcut("within(com.retailco.shop..internal.app..*)")
+    void inApplicationLayer() { }
+
+    @Around("audited() &amp;&amp; inApplicationLayer()")
+    Object record(ProceedingJoinPoint pjp) throws Throwable {
+        var sig  = (MethodSignature) pjp.getSignature();
+        var user = SecurityContextHolder.getContext().getAuthentication().getName();
+        long t0  = System.nanoTime();
+        try {
+            Object result = pjp.proceed();                       // ← call the real method
+            audit.success(sig.getName(), user, pjp.getArgs(), Duration.ofNanos(System.nanoTime() - t0));
+            return result;
+        } catch (Throwable ex) {
+            audit.failure(sig.getName(), user, ex);
+            throw ex;                                            // NEVER swallow
+        }
+    }
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">The five advice types</div>
+<pre><code class="language-java">@Before          // runs first; cannot change args or prevent the call
+@AfterReturning  // on success; can read (not replace) the return value
+@AfterThrowing   // on exception; for logging, not for handling
+@After           // finally — always runs
+@Around          // the only one that can skip the call, retry it, or change the result</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Pointcut designators worth knowing</h3>
+        <dl class="kv">
+          <dt><code>execution(..)</code></dt><dd>method signature match — the most precise, and the most brittle</dd>
+          <dt><code>within(..)</code></dt><dd>any method in a type or package. Good for layer-wide rules</dd>
+          <dt><code>@annotation(X)</code></dt><dd>methods carrying an annotation. <b>The one to prefer</b> — explicit at the call site</dd>
+          <dt><code>@within(X)</code></dt><dd>any method of a class carrying an annotation</dd>
+          <dt><code>bean(orderService)</code></dt><dd>by bean name, with wildcards — Spring-specific</dd>
+          <dt><code>args(..)</code>, <code>this(..)</code>, <code>target(..)</code></dt><dd>match on argument or proxy/target type, and bind them as parameters</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">Prefer an annotation over a wildcard</span><code>execution(* com.retailco..*Service.*(..))</code> silently stops matching the day someone renames a class or moves a package — and nothing fails, the aspect just stops running. <code>@Audited</code> on the method is visible in the code, greppable, and survives refactoring.</div>
+      <div class="note tip"><span class="lbl">Where AOP earns its place</span>Audit trails, timing and metrics on a whole layer, tenant context propagation, feature-flag gating. <b>Not</b> business rules — an aspect that changes what an order costs is logic nobody reading <code>PlaceOrderUseCase</code> can see.</div>
+    </div>
+  </div>
+</section>
+

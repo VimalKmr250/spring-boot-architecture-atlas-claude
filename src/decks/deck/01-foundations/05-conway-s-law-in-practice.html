@@ -1,0 +1,24 @@
+<section class="slide" data-sec="Foundations" data-title="Conway's law in practice">
+  <h2>You will ship your org chart — plan for it</h2>
+  <p class="dek">Conway's law is not a warning, it is a design tool. Pick the team structure you want the architecture to have, and the architecture follows within two quarters.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Team → module map</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Checkout</dt><dd>cart, pricing, order — owns the customer-facing latency budget</dd>
+        <dt>Payments</dt><dd>payment module + gateway adapters; PCI scope lives here alone</dd>
+        <dt>Supply</dt><dd>inventory, fulfilment; owns ERP and WMS integrations</dd>
+        <dt>Catalog</dt><dd>catalog, search projection</dd>
+        <dt>Platform</dt><dd>no business module; owns gateway, observability, CI, shared libs</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Rule of thumb</span>One module has exactly <b>one owning team</b>. A team may own several modules; a module owned by two teams has no owner, and its boundary will erode within months.</div>
+      <div class="note warn"><span class="lbl">Watch for</span>An "integration team" or a "database team" is an inverse Conway smell: it means the real boundaries run through the middle of your modules and every change needs a hand-off.</div>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">Cognitive load, not headcount</span>The useful limit on a module is how much a team can hold in their heads: one domain language, one data model, one set of external systems. When a team needs two glossaries to explain their module, split it.</div>
+</section>
+

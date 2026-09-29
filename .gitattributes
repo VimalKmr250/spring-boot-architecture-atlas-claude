@@ -1,0 +1,4 @@
+# Check out text files with LF on every platform, whatever core.autocrlf says.
+# index.html is built from src/ and `node build.mjs --check` compares it byte
+# for byte, so the fragments, the template and the page must agree on line endings.
+* text=auto eol=lf

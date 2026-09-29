@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Parallel streams" data-title="Parallel correctness">
+  <h2>Code that is right sequentially and wrong in parallel</h2>
+  <p class="dek">A pipeline that keeps the rules gives the same answer sequentially and in parallel. The bugs come from breaking them: shared mutable state, a <code>reduce</code> with a false identity or a non-associative operation, and code that assumes an order or a thread. Every "parallel" result below was measured on JDK 25 on a 20-core machine.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Code</th><th>Sequential</th><th>Parallel</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>forEach(list::add)</code> into an <code>ArrayList</code>, 100,000 elements</td><td>100,000</td><td>14,084 in one run; sometimes <code>ArrayIndexOutOfBoundsException</code></td><td><code>toList()</code> or a collector</td></tr>
+        <tr><td><code>rangeClosed(1, 4)…reduce(1, Integer::sum)</code></td><td>11</td><td>14</td><td>A true identity: <code>0</code></td></tr>
+        <tr><td><code>rangeClosed(1, 4)…reduce(0, (a, b) -&gt; a - b)</code></td><td>−10</td><td>0</td><td>Subtraction is not associative; do not reduce with it</td></tr>
+        <tr><td><code>forEach</code> expecting input order</td><td>In order</td><td>Any order</td><td><code>forEachOrdered</code>, or collect first</td></tr>
+        <tr><td>A <code>ThreadLocal</code> read inside the lambda</td><td>The caller's value</td><td><code>null</code> on worker threads</td><td>Read it before the pipeline, pass the value in</td></tr>
+        <tr><td>A <code>synchronized</code> block around shared state</td><td>Correct</td><td>Correct, and usually slower than sequential: the lock serialises the work</td><td>Do not share state</td></tr>
+        <tr><td>A custom collector with <code>(a, b) -&gt; a</code> as its combiner</td><td>Correct</td><td>Data from all but one chunk disappears</td><td>A real merge</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">The Spring version of the ThreadLocal row</span>Spring binds the transaction, the persistence context, the security context and the logging MDC to the calling <b>thread</b>. Inside <code>parallelStream()</code> the worker threads have none of them. A repository call in the lambda runs outside the caller's <code>@Transactional</code>, lazy loading throws <code>LazyInitializationException</code>, and log lines lose their trace id. Load the data first, then go parallel over plain objects, if at all.</div>
+    <div class="note good"><span class="lbl">The checklist that makes parallel safe</span>Lambdas that are stateless and do not touch shared mutable data. <code>reduce</code> with a true identity and an associative operation. Results produced by collectors, never by side effects. No assumptions about order or thread. Code written this way can switch between sequential and parallel with no change in its result, which is exactly the property the Stream API was designed around.</div>
+  </div>
+</section>
+

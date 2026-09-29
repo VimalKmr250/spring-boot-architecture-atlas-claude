@@ -1,0 +1,64 @@
+<section class="slide" data-sec="At scale" data-title="Kafka Streams: when">
+  <h2>Kafka Streams: when it beats a plain consumer</h2>
+  <p class="dek">A library, not a cluster — it runs inside your Spring Boot app. It earns its place when you need <b>state</b> or <b>time</b>; for stateless work a <code>@KafkaListener</code> is simpler and easier to operate.</p>
+
+  <div class="split">
+    <div class="card">
+      <h3>Use Streams when you need…</h3>
+      <ul class="checks tight">
+        <li><b>Aggregation over a stream</b> — orders per customer per hour, running totals.</li>
+        <li><b>Joins</b> — enrich an order event with customer data from another topic, without calling a service.</li>
+        <li><b>Windowing</b> — "more than 5 failed payments from one card in 10 minutes".</li>
+        <li><b>Deduplication at scale</b> with a state store rather than a database table.</li>
+        <li><b>Repartitioning</b> — re-key a stream so downstream processing has the ordering it needs.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">All of these need to remember something between messages. That memory is what Streams manages for you.</p>
+    </div>
+    <div class="card">
+      <h3>Stay with a plain consumer when…</h3>
+      <ul class="checks tight">
+        <li>Each message is handled independently — reserve stock, send an email, update a row.</li>
+        <li>The work is a database write; Streams' state store adds nothing.</li>
+        <li>You need arbitrary access to other systems mid-processing.</li>
+        <li>The team has no appetite for a second operational model — Streams brings state stores, changelog topics, standby replicas and rebalance-triggered state restoration.</li>
+      </ul>
+      <p style="margin-top:2px;color:var(--text-3)">Most enterprise consumers are in this column, and should stay there.</p>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">The DSL, in the shapes you will actually use</div>
+<pre><code class="language-java">@Bean
+KStream&lt;String, OrderPlaced&gt; topology(StreamsBuilder builder) {
+
+    KStream&lt;String, OrderPlaced&gt; orders = builder.stream("orders.order.placed.v1");
+
+    orders
+        .filter((key, order) -&gt; order.totalMinor() &gt; 100_00)        // stateless
+        .mapValues(OrderEnricher::toHighValue)                      // stateless
+        .to("orders.order.highvalue.v1");
+
+    orders
+        .selectKey((key, order) -&gt; order.customerId())               // re-key…
+        .groupByKey()                                               // …triggers a repartition
+        .count(Materialized.as("orders-per-customer"))              // STATEFUL
+        .toStream()
+        .to("analytics.customer.ordercount.v1");
+
+    orders
+        .flatMapValues(order -&gt; order.lines())                      // one event → many
+        .groupBy((key, line) -&gt; line.sku(), Grouped.with(Serdes.String(), lineSerde))
+        .aggregate(() -&gt; 0,                                         // units per SKU
+                   (sku, line, total) -&gt; total + line.qty(),
+                   Materialized.with(Serdes.String(), Serdes.Integer()));
+    // reduce() needs (V, V) -> V, so the values must already BE the number.
+    // Here they are OrderLines, so aggregate() with an initialiser is the
+    // right operator — or mapValues(OrderLine::qty) first, then reduce.
+
+    return orders;
+}</code></pre>
+  </div>
+
+  <div class="note warn"><span class="lbl">Every re-key is a round trip through Kafka</span><code>selectKey</code> followed by an aggregation writes the whole stream to an internal repartition topic and reads it back, because the new key must land on the right partition. It is correct and it doubles your traffic for that stage — so re-key once, as early as possible, not repeatedly through the topology.</div>
+</section>
+

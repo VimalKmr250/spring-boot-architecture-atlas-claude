@@ -1,0 +1,83 @@
+<section class="slide" data-sec="14 · Linked list manipulation" data-title="Mechanics">
+  <h2>Rewire pointers without losing the rest of the list</h2>
+  <p class="dek">Every one of these problems is the same physical act: change a <code>next</code> field. The difficulty is that overwriting <code>cur.next</code> destroys your only route to everything after it — so the discipline is <b>save first, rewire second</b>, and the tools are a dummy head and a fixed vocabulary of four moves.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The dummy head</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Allocate one throwaway node that sits <em>before</em> the real head. Every "what if the head itself changes?" case vanishes, because the head is no longer special — it is just <code>dummy.next</code>.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Use it whenever the head might be removed, replaced, or reordered — which is most of this pattern. Return <code>dummy.next</code>, never the original <code>head</code> variable, since that node may no longer be first.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">The cost is one node. The benefit is deleting an entire class of edge cases before they exist.</p>
+    </div>
+    <div class="panel">
+      <h3>The four moves</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Reverse</dt><dd>Three pointers, four lines, always in the same order: save next, flip the link, advance prev, advance cur.</dd>
+        <dt>Merge</dt><dd>A dummy plus a tail pointer. Repeatedly attach the smaller head and advance.</dd>
+        <dt>Split</dt><dd>Find a boundary node, then <b>cut</b> by setting its <code>next</code> to null — after saving what came after.</dd>
+        <dt>Interleave</dt><dd>Weave new nodes between existing ones so that position encodes a relationship, then unweave.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Everything in this family is a composition of those four. Naming which ones you need before writing anything is what keeps a Hard list problem tractable.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 254" role="img" aria-label="The reverse operation shown as four ordered pointer moves, and the dummy head removing the head special case">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">REVERSE — THE FOUR MOVES, ALWAYS IN THIS ORDER</text>
+
+        <circle cx="100" cy="62" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="100" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">prev</text>
+        <circle cx="220" cy="62" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.7"></circle>
+        <text x="220" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">cur</text>
+        <circle cx="340" cy="62" r="20" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.7"></circle>
+        <text x="340" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">next</text>
+        <circle cx="460" cy="62" r="20" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></circle>
+        <text x="460" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">…</text>
+
+        <path d="M240 62 L318 62" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="3 3" marker-end="url(#arwB)"></path>
+        <text x="279" y="52" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">1 · save</text>
+        <path d="M200 78 C 170 96, 130 96, 100 82" stroke="#D26A3F" stroke-width="1.6" fill="none" marker-end="url(#arwA)"></path>
+        <text x="150" y="106" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#D26A3F">2 · flip cur.next = prev</text>
+        <path d="M360 62 L438 62" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.2" marker-end="url(#arw)"></path>
+
+        <text x="540" y="46" font-size="11" font-family="monospace" fill="currentColor" opacity="0.8">3 · prev = cur</text>
+        <text x="540" y="64" font-size="11" font-family="monospace" fill="currentColor" opacity="0.8">4 · cur  = next</text>
+        <text x="540" y="88" font-size="10.5" fill="currentColor" opacity="0.62">Step 1 must come first, or step 2</text>
+        <text x="540" y="104" font-size="10.5" fill="currentColor" opacity="0.62">destroys the only route onward.</text>
+
+        <line x1="14" y1="130" x2="866" y2="130" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="150" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE DUMMY HEAD — WHY THE FIRST NODE STOPS BEING SPECIAL</text>
+
+        <circle cx="70" cy="192" r="20" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="4 3"></circle>
+        <text x="70" y="197" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">dummy</text>
+        <path d="M90 192 L148 192" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="170" cy="192" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="170" y="197" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <path d="M190 192 L248 192" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="270" cy="192" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="270" y="197" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <path d="M290 192 L348 192" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="370" cy="192" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="370" y="197" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">3</text>
+
+        <text x="70" y="228" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">not part of the list</text>
+
+        <text x="440" y="176" font-size="11" fill="currentColor" opacity="0.72">Deleting node 1 needs no special case: its predecessor</text>
+        <text x="440" y="194" font-size="11" fill="currentColor" opacity="0.72">is the dummy, exactly like every other node's is.</text>
+        <text x="440" y="218" font-size="11" fill="currentColor" opacity="0.72">Return <tspan font-family="monospace" fill="#D26A3F">dummy.next</tspan>, never <tspan font-family="monospace">head</tspan> — the original</text>
+        <text x="440" y="236" font-size="11" fill="currentColor" opacity="0.72">head may no longer be first.</text>
+      </svg>
+    </div>
+    <figcaption>The order of the four reverse moves is not a style choice. Writing <code>cur.next = prev</code> before saving <code>next</code> severs the list, and the resulting bug looks like a truncated answer rather than a crash.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>You must <b>restructure</b> a list rather than just read it — reversing a section, merging, grouping, or deep-copying. Also when O(1) extra space is demanded, which rules out copying into an array.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>You only need to read values in order — copy them into a list and solve the array problem, unless the space constraint forbids it. Say that out loud before doing pointer surgery.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> for a single pass; merging k lists is <b>O(n log k)</b> with a heap. Space is <b>O(1)</b> for iterative solutions — prefer them, since recursion on a 10⁴-node list risks a stack overflow.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"reverse the nodes in k-group"</b> · <b>"merge two sorted lists"</b> · <b>"swap every two adjacent nodes"</b> · <b>"reverse between positions left and right"</b> · <b>"a deep copy of the list"</b> · <b>"you may not modify the values in the list's nodes — only the nodes themselves may be changed"</b>. That last sentence is decisive: it forbids the value-swapping shortcut and forces genuine pointer work.</div>
+</section>
+

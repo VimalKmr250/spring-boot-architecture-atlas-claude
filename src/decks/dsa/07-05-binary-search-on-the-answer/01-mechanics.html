@@ -1,0 +1,62 @@
+<section class="slide" data-sec="05 · Binary search on the answer" data-title="Mechanics">
+  <h2>Guess the answer, then check whether it works</h2>
+  <p class="dek">The highest-yield pattern in this deck, and the one most people never recognise. Nothing here is sorted. What is monotone is <b>feasibility</b>: if a capacity of 5 is enough, so is 6. Binary search that, and an apparently intractable optimisation becomes an O(n log V) loop around a ten-line simulation.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The inversion</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The question "what is the smallest capacity that works?" is hard. The question "does capacity 7 work?" is usually <b>easy</b> — a single greedy pass.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">So stop optimising and start <em>checking</em>. Binary search over the range of possible answers, using the easy question as the predicate. You never derive the answer; you converge on it.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Cost: O(log V) checks, each O(n). With values up to 10⁹ that is 30 checks — the log factor is essentially free, which is why this beats almost any clever direct construction.</p>
+    </div>
+    <div class="panel">
+      <h3>Three questions, in this order</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>What exactly is the answer, and what range must it lie in?</b> Pick <code>lo</code> as a value that obviously fails or is the smallest legal one, and <code>hi</code> as one that obviously works. Sloppy bounds are the main source of wrong answers here.</li>
+        <li><b>Can I check one candidate in O(n)?</b> Write <code>feasible(x)</code> as a literal simulation of the problem statement. Resist cleverness — it should read like the English.</li>
+        <li><b>Is feasibility monotone?</b> If <code>x</code> works, must <code>x + 1</code> work? Say the argument out loud. If the answer is no, this pattern does not apply.</li>
+      </ol>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Answer those three and the code writes itself — it is an ordinary boundary search whose array comparison has been replaced by <code>feasible(mid)</code>.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 232" role="img" aria-label="The answer space with an infeasible region, a feasible region, and the boundary that binary search converges on">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE ANSWER SPACE — NOT THE INPUT ARRAY</text>
+
+        <rect x="40" y="34" width="360" height="40" rx="6" fill="#D26A3F" fill-opacity="0.11" stroke="#D26A3F" stroke-opacity="0.55"></rect>
+        <rect x="400" y="34" width="440" height="40" rx="6" fill="#3AA79B" fill-opacity="0.11" stroke="#3AA79B" stroke-opacity="0.55"></rect>
+        <text x="220" y="59" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">too small — infeasible</text>
+        <text x="620" y="59" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">works — feasible, but wasteful above the boundary</text>
+
+        <text x="44" y="90" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">lo</text>
+        <text x="820" y="90" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">hi</text>
+        <text x="44" y="104" font-size="10" fill="currentColor" opacity="0.45">must obviously fail,</text>
+        <text x="44" y="116" font-size="10" fill="currentColor" opacity="0.45">or be the smallest legal value</text>
+        <text x="742" y="104" font-size="10" fill="currentColor" opacity="0.45">must obviously work</text>
+
+        <path d="M400 104 L400 80" stroke="#D26A3F" stroke-width="1.8" marker-end="url(#arwA)"></path>
+        <text x="400" y="122" text-anchor="middle" font-size="11.5" font-weight="600" fill="#D26A3F">the answer — the first feasible value</text>
+
+        <line x1="14" y1="138" x2="866" y2="138" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="158" font-size="11.5" font-weight="600" fill="currentColor">Why this is monotone, in the words you should say aloud</text>
+        <text x="14" y="178" font-size="11" fill="currentColor" opacity="0.72">"If Koko can finish at 5 bananas an hour, she can certainly finish at 6 — a faster rate never needs more hours."</text>
+        <text x="14" y="195" font-size="11" fill="currentColor" opacity="0.72">"If the packages fit in a ship of capacity C, they fit in one of capacity C + 1 — a bigger ship never needs more days."</text>
+        <text x="14" y="212" font-size="11" fill="currentColor" opacity="0.72">"If the array splits into k parts each ≤ M, it splits into k parts each ≤ M + 1 — a looser cap never needs more parts."</text>
+        <text x="14" y="228" font-size="10.5" fill="currentColor" opacity="0.55">Each sentence is one line of reasoning, and each licenses the entire algorithm. If you cannot produce the sentence, do not use the pattern.</text>
+      </svg>
+    </div>
+    <figcaption>The search runs over the <em>answer</em> axis, which in these problems is a range of capacities, speeds or thresholds — often 1 to 10⁹. The input array is never sorted and never needs to be.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The answer is a single number in a known range; you are asked to <b>minimise a maximum</b> or <b>maximise a minimum</b>; and checking one candidate is a straightforward greedy pass. The constraint shape "small n, huge values" is the giveaway.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Feasibility is not monotone — for example "exactly k parts" where a larger cap can force <em>fewer</em> parts than required. Reformulate it as "at most k" first, or the search converges on a value that is not actually achievable.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n log V)</b> where V is the width of the answer range — typically 30 iterations for values to 10⁹, so about 30n. Space is <b>O(1)</b>. For real-valued answers, use a fixed 100 iterations rather than an epsilon comparison.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"minimise the maximum…"</b> or <b>"maximise the minimum…"</b> (decisive on their own) · <b>"the smallest X such that…"</b> · <b>"within D days"</b> · <b>"at most k operations"</b> · <b>"the minimum eating speed"</b> · <b>"split into k subarrays"</b> · <b>"the minimum capacity"</b>. Add the constraint tell: <code>n ≤ 10⁵</code> next to <code>value ≤ 10⁹</code> means the search is over the <em>values</em>, not the array.</div>
+</section>
+

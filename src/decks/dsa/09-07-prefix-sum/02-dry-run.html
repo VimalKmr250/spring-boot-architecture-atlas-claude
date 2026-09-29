@@ -1,0 +1,120 @@
+<section class="slide" data-sec="07 · Prefix sum" data-title="Dry run">
+  <h2>LC 560 traced on <code>[1,2,3,-3,1,2]</code>, k = 3</h2>
+  <p class="dek">Count the subarrays summing to 3. There are six, and several overlap — which is why the running total is a <em>sum of counts</em> rather than a simple tally. The negative value at index 3 is the reason no window can solve this.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 336" role="img" aria-label="Trace of the prefix sum plus hash map count for subarrays summing to three">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">RUNNING PREFIX SUM</text>
+        <rect x="120" y="26" width="52" height="26" rx="4" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <rect x="174" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="228" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="282" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="336" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="390" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="444" y="26" width="52" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="146" y="44" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">0</text>
+        <text x="200" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">1</text>
+        <text x="254" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="308" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <text x="362" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="416" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">4</text>
+        <text x="470" y="44" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <text x="14" y="44" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">prefix</text>
+        <text x="14" y="66" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">value</text>
+        <text x="146" y="66" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#3AA79B">seed</text>
+        <text x="200" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="254" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="308" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="362" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="#D26A3F">−3</text>
+        <text x="416" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="470" y="66" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="530" y="44" font-size="10.5" fill="currentColor" opacity="0.6">The prefix sum falls at index 3.</text>
+        <text x="530" y="60" font-size="10.5" fill="currentColor" opacity="0.6">A window cannot cope with that —</text>
+        <text x="530" y="76" font-size="10.5" fill="currentColor" opacity="0.6">growing it may lower the sum.</text>
+
+        <line x1="14" y1="86" x2="866" y2="86" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">i</text>
+        <text x="56" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SUM</text>
+        <text x="120" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">LOOK UP sum−k</text>
+        <text x="270" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">FOUND</text>
+        <text x="350" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">MAP AFTER THIS STEP</text>
+        <text x="700" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TOTAL</text>
+
+        <text x="14" y="128" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">—</text>
+        <text x="56" y="128" font-size="11" font-family="monospace" fill="currentColor">0</text>
+        <text x="120" y="128" font-size="11" fill="currentColor" opacity="0.5">seed before the loop</text>
+        <text x="270" y="128" font-size="11" font-family="monospace" fill="currentColor" opacity="0.4">—</text>
+        <text x="350" y="128" font-size="11" font-family="monospace" fill="#3AA79B">{0:1}</text>
+        <text x="706" y="128" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+
+        <text x="14" y="150" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">0</text>
+        <text x="56" y="150" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="120" y="150" font-size="11" font-family="monospace" fill="currentColor">1 − 3 = −2</text>
+        <text x="270" y="150" font-size="11" fill="currentColor" opacity="0.5">absent</text>
+        <text x="350" y="150" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">{0:1, 1:1}</text>
+        <text x="706" y="150" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+
+        <text x="14" y="172" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="56" y="172" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="120" y="172" font-size="11" font-family="monospace" fill="currentColor">3 − 3 = 0</text>
+        <text x="270" y="172" font-size="11" font-weight="600" fill="#D26A3F">×1</text>
+        <text x="350" y="172" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">{0:1, 1:1, 3:1}</text>
+        <text x="706" y="172" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">1</text>
+
+        <text x="14" y="194" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="56" y="194" font-size="11" font-family="monospace" fill="currentColor">6</text>
+        <text x="120" y="194" font-size="11" font-family="monospace" fill="currentColor">6 − 3 = 3</text>
+        <text x="270" y="194" font-size="11" font-weight="600" fill="#D26A3F">×1</text>
+        <text x="350" y="194" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">{0:1, 1:1, 3:1, 6:1}</text>
+        <text x="706" y="194" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">2</text>
+
+        <text x="14" y="216" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="56" y="216" font-size="11" font-family="monospace" fill="#D26A3F">3</text>
+        <text x="120" y="216" font-size="11" font-family="monospace" fill="currentColor">3 − 3 = 0</text>
+        <text x="270" y="216" font-size="11" font-weight="600" fill="#D26A3F">×1</text>
+        <text x="350" y="216" font-size="11" font-family="monospace" fill="#3AA79B">{0:1, 1:1, 3:2, 6:1}</text>
+        <text x="706" y="216" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">3</text>
+
+        <text x="14" y="238" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">4</text>
+        <text x="56" y="238" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="120" y="238" font-size="11" font-family="monospace" fill="currentColor">4 − 3 = 1</text>
+        <text x="270" y="238" font-size="11" font-weight="600" fill="#D26A3F">×1</text>
+        <text x="350" y="238" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">{0:1, 1:1, 3:2, 4:1, 6:1}</text>
+        <text x="706" y="238" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">4</text>
+
+        <text x="14" y="260" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">5</text>
+        <text x="56" y="260" font-size="11" font-family="monospace" fill="currentColor">6</text>
+        <text x="120" y="260" font-size="11" font-family="monospace" fill="currentColor">6 − 3 = 3</text>
+        <text x="270" y="260" font-size="11" font-weight="600" fill="#3AA79B">×2</text>
+        <text x="350" y="260" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">{0:1, 1:1, 3:2, 4:1, 6:2}</text>
+        <text x="706" y="260" font-size="11.5" font-family="monospace" font-weight="600" fill="#D26A3F">6</text>
+
+        <line x1="14" y1="276" x2="866" y2="276" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="296" font-size="11" fill="currentColor" opacity="0.72">Step 5 adds <tspan font-family="monospace" fill="#3AA79B">two</tspan> at once: prefix 3 had been reached twice, at index 1 and index 3, so two different subarrays end here with sum 3.</text>
+        <text x="14" y="314" font-size="11" fill="currentColor" opacity="0.72">That is why the map stores <em>counts</em> rather than positions — you never need to know where the earlier prefixes were, only how many there were.</text>
+        <text x="14" y="332" font-size="10.5" fill="currentColor" opacity="0.55">The seed {0:1} is what lets step 1 and step 3 count the subarrays that begin at index 0.</text>
+      </svg>
+    </div>
+    <figcaption>The six subarrays are (0,1), (2,2), (0,3), (1,4), (2,5) and (4,5). Several overlap, and two end at the same index — which a scanning approach that stops at the first hit would miss.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">i</th><th class="num">nums[i]</th><th class="num">running sum</th><th>needs prefix</th><th class="num">matches</th><th class="num">total</th><th>the subarray(s) just counted</th></tr></thead>
+      <tbody>
+        <tr><td class="num">—</td><td class="num">—</td><td class="num">0</td><td>seed the map with {0:1}</td><td class="num">—</td><td class="num">0</td><td>the empty prefix</td></tr>
+        <tr><td class="num">0</td><td class="num">1</td><td class="num">1</td><td>−2</td><td class="num">0</td><td class="num">0</td><td>—</td></tr>
+        <tr><td class="num">1</td><td class="num">2</td><td class="num">3</td><td>0</td><td class="num">1</td><td class="num">1</td><td>[1,2] at 0–1</td></tr>
+        <tr><td class="num">2</td><td class="num">3</td><td class="num">6</td><td>3</td><td class="num">1</td><td class="num">2</td><td>[3] at 2–2</td></tr>
+        <tr><td class="num">3</td><td class="num">−3</td><td class="num">3</td><td>0</td><td class="num">1</td><td class="num">3</td><td>[1,2,3,−3] at 0–3</td></tr>
+        <tr><td class="num">4</td><td class="num">1</td><td class="num">4</td><td>1</td><td class="num">1</td><td class="num">4</td><td>[2,3,−3,1] at 1–4</td></tr>
+        <tr><td class="num">5</td><td class="num">2</td><td class="num">6</td><td>3</td><td class="num">2</td><td class="num">6</td><td>[3,−3,1,2] at 2–5 <b>and</b> [1,2] at 4–5</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why the map must be updated after the lookup</span>Insert <code>sum</code> into the map <em>after</em> querying for <code>sum − k</code>. With <code>k = 0</code> the two are equal, so inserting first would let a prefix match itself and count an empty subarray that does not exist. The same ordering rule applies to every complement-style hash lookup.</div>
+</section>
+

@@ -1,0 +1,115 @@
+<section class="slide" data-sec="13 · Greedy scheduling" data-title="The six problems">
+  <h2>Six greedies, six different proofs</h2>
+  <p class="dek">55 and 45 share a frontier. 763 is a frontier over last-occurrences. 406 and 621 need constructions. 134 is the one where the proof is the entire problem.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The greedy choice</th><th>Skeleton</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">55</td><td><a href="https://leetcode.com/problems/jump-game/" target="_blank" rel="noopener">Jump Game</a></td><td><span class="tag w">Medium</span></td><td>Track the furthest reachable index; fail if <code>i</code> outruns it.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">45</td><td><a href="https://leetcode.com/problems/jump-game-ii/" target="_blank" rel="noopener">Jump Game II</a></td><td><span class="tag w">Medium</span></td><td>Same frontier, counting band edges. BFS without a queue.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">763</td><td><a href="https://leetcode.com/problems/partition-labels/" target="_blank" rel="noopener">Partition Labels</a></td><td><span class="tag w">Medium</span></td><td>A part ends at the furthest last-occurrence seen so far.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">406</td><td><a href="https://leetcode.com/problems/queue-reconstruction-by-height/" target="_blank" rel="noopener">Queue Reconstruction by Height</a></td><td><span class="tag w">Medium</span></td><td>Place the tallest first; shorter people are invisible to them.</td><td>B</td><td class="num">O(n²) / O(n)</td></tr>
+        <tr><td class="num">621</td><td><a href="https://leetcode.com/problems/task-scheduler/" target="_blank" rel="noopener">Task Scheduler</a></td><td><span class="tag w">Medium</span></td><td>The most frequent task dictates a skeleton; everything fills its gaps.</td><td>C</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">134</td><td><a href="https://leetcode.com/problems/gas-station/" target="_blank" rel="noopener">Gas Station</a></td><td><span class="tag w">Medium</span></td><td>If the total is non-negative a solution exists, and it is unique.</td><td>C</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 45 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Try every jump length from every index. Exponential, then O(n²) with memoisation — a fine first answer.</dd>
+          <dt>The reframing</dt><dd>This is a shortest-path problem on an unweighted graph, so BFS gives the minimum. Each BFS layer is a contiguous <em>band</em> of indices, because reachability from a band is an interval.</dd>
+          <dt>What that buys</dt><dd>Contiguous layers need no queue. Scan left to right, track the furthest reach of the current band, and advance the band boundary when you hit its edge.</dd>
+          <dt>Why you never choose an index</dt><dd>The scan visits every index in the band before committing, so it already has the best reach available. There is no decision to make — which is why the code has no <code>max</code> over candidates beyond the running one.</dd>
+          <dt>The off-by-one</dt><dd>Loop to <code>n − 2</code>. Arriving at the last index ends the journey; counting a jump from it inflates the answer by one.</dd>
+          <dt>Edge cases</dt><dd>A single-element array needs 0 jumps, which the loop bound handles for free. The problem guarantees the end is reachable, so no failure path is needed.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 45 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int jump(int[] nums) {
+        int jumps = 0;
+        int bandEnd = 0;     // last index reachable with `jumps` jumps
+        int farthest = 0;    // furthest anything in this band can reach
+
+        // n - 1: arriving at the last index finishes the journey,
+        // so we never jump FROM it.
+        for (int i = 0; i &lt; nums.length - 1; i++) {
+
+            farthest = Math.max(farthest, i + nums[i]);
+
+            // Reached the edge of the current band, so the next step
+            // must cost one more jump. `farthest` is the true limit
+            // of that next band, since we scanned the whole band.
+            if (i == bandEnd) {
+                jumps++;
+                bandEnd = farthest;
+            }
+        }
+        return jumps;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 134 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Try every station as a start and simulate the full circuit. O(n²), and the natural first attempt.</dd>
+          <dt>Claim one — existence</dt><dd>If <code>sum(gas) &lt; sum(cost)</code> no start can work, because the circuit is a closed loop and the total deficit is start-independent. If the total is non-negative, a valid start <b>must</b> exist.</dd>
+          <dt>Claim two — location</dt><dd>Suppose you start at <code>s</code> and run dry arriving at <code>i</code>. Then <b>no station between <code>s</code> and <code>i</code> works either</b>: each such start reaches <code>i</code> with less fuel than you had, since your running balance was non-negative throughout that stretch.</dd>
+          <dt>What that buys</dt><dd>On failure you skip the entire prefix in one move — restart at <code>i + 1</code> rather than <code>s + 1</code>. So each station is examined once and the scan is O(n).</dd>
+          <dt>Why one pass proves it</dt><dd>The final candidate is the only one never invalidated, and claim one guarantees some start works. Therefore that candidate is the answer — no verification pass is needed.</dd>
+          <dt>Edge cases</dt><dd>Return <code>−1</code> when the total is negative. The answer is unique, as the problem states, which is what makes the single candidate safe.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 134 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int canCompleteCircuit(int[] gas, int[] cost) {
+        int total = 0;      // whole-loop surplus: decides EXISTENCE
+        int tank = 0;       // running surplus since the candidate start
+        int start = 0;
+
+        for (int i = 0; i &lt; gas.length; i++) {
+            int diff = gas[i] - cost[i];
+            total += diff;
+            tank  += diff;
+
+            if (tank &lt; 0) {
+                // Ran dry arriving at i. Every station from `start`
+                // to i also fails — each would reach i with even less
+                // fuel, because tank was non-negative all the way here.
+                // So skip the whole prefix in one move.
+                start = i + 1;
+                tank = 0;
+            }
+        }
+        // Non-negative total guarantees a solution exists, and `start`
+        // is the only candidate never invalidated.
+        return total &gt;= 0 ? start : -1;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>55 · Jump Game <span class="tag a">skeleton A</span></h4><p><b>Path:</b> the DP marks each index reachable or not in O(n²). The greedy needs only the frontier.</p><p><b>Delta:</b> track <code>farthest</code>; if <code>i &gt; farthest</code> you have hit a gap you cannot cross, so return false. Otherwise extend and continue.</p><p><b>Watch for:</b> "always take the biggest jump" is <b>not</b> correct here — a large jump can overshoot a launchpad. The frontier is what works, and knowing why the obvious greedy fails is the point of the problem.</p></div>
+
+    <div class="card"><h4>763 · Partition Labels <span class="tag a">skeleton A</span></h4><p><b>Path:</b> a letter must live entirely inside one part, so a part cannot end before the last occurrence of any letter it contains.</p><p><b>Delta:</b> record each letter's last index in one pass. Then sweep, extending <code>end = max(end, last[c])</code>; when <code>i == end</code>, cut. The frontier is over last-occurrences instead of jump reaches.</p><p><b>Watch for:</b> the part length is <code>i − start + 1</code>, and <code>start</code> must be reset to <code>i + 1</code> after each cut.</p></div>
+
+    <div class="card"><h4>406 · Queue Reconstruction by Height <span class="tag a">skeleton B</span></h4><p><b>Path:</b> trying orderings is factorial. The insight is choosing a processing order in which each placement is forced.</p><p><b>Delta:</b> sort tallest first, ties by ascending <code>k</code>. Insert each person at index <code>k</code>. Because everyone already placed is at least as tall, inserting at <code>k</code> puts exactly <code>k</code> taller-or-equal people in front — and later, shorter insertions are invisible to them, so no earlier placement is ever disturbed.</p><p><b>Watch for:</b> <code>List.add(index, element)</code> is O(n) per insert, giving O(n²) overall. That is accepted; say so rather than reaching for something exotic.</p></div>
+
+    <div class="card"><h4>621 · Task Scheduler <span class="tag a">skeleton C</span></h4><p><b>Path:</b> simulating with a max-heap and a cooldown queue works and is O(n log 26) — a correct answer worth stating. The closed form is better and much shorter.</p><p><b>Delta:</b> the most frequent task forces <code>(maxFreq − 1)</code> blocks of width <code>(n + 1)</code>, plus a tail of every task tied at <code>maxFreq</code>. Take <code>max(bound, tasks.length)</code>.</p><p><b>Watch for:</b> the <code>max</code> with <code>tasks.length</code> is essential — when there are many distinct tasks the gaps are already full and no idling occurs, so the bound underestimates.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>45</b> and <b>134</b>. 45 teaches the frontier and the layered-BFS view that also solves 55 and 763. 134 is the one where the code is eight lines and the <em>argument</em> is the whole problem — and being able to give both claims out loud is exactly what an interviewer is probing for when they ask why a greedy is safe.</div>
+</section>
+

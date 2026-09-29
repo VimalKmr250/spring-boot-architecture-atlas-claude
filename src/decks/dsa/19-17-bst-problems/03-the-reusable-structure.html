@@ -1,0 +1,124 @@
+<section class="slide" data-sec="17 · BST problems" data-title="The reusable structure">
+  <h2>Two engines: range descent, and in-order with a previous pointer</h2>
+  <p class="dek">Range descent covers search, insert, delete and ancestry. In-order with a remembered predecessor covers validation, selection and repair. Almost every BST question is one of the two.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Engine A · range descent (LC 700, 235, 450)</div>
+<pre><code class="language-java">// Compare, discard a half, repeat. Iterative, so O(1) space.
+TreeNode search(TreeNode root, int target) {
+    TreeNode cur = root;
+    while (cur != null &amp;&amp; cur.val != target) {
+        cur = target &lt; cur.val ? cur.left : cur.right;
+    }
+    return cur;
+}
+
+// LCA in a BST: the split point is the answer. While both targets
+// lie on the SAME side, walk that way; the first node between them
+// (or equal to one) is the lowest common ancestor.
+TreeNode lca(TreeNode root, TreeNode p, TreeNode q) {
+    TreeNode cur = root;
+    while (cur != null) {
+        if (p.val &lt; cur.val &amp;&amp; q.val &lt; cur.val)      cur = cur.left;
+        else if (p.val &gt; cur.val &amp;&amp; q.val &gt; cur.val) cur = cur.right;
+        else return cur;                    // they split here
+    }
+    return null;
+}
+
+// Validation carries a RANGE down, not a parent comparison.
+// Long bounds: a node may legitimately hold Integer.MIN_VALUE.
+boolean isValid(TreeNode node, long lo, long hi) {
+    if (node == null) return true;
+    if (node.val &lt;= lo || node.val &gt;= hi) return false;
+
+    return isValid(node.left,  lo, node.val)    // tighten the upper bound
+        &amp;&amp; isValid(node.right, node.val, hi);   // tighten the lower bound
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Engine B · in-order with a previous pointer (LC 98, 99, 230)</div>
+<pre><code class="language-java">// In-order emits sorted values, so remembering the PREVIOUS node
+// turns "is it sorted?" into a single comparison per step.
+private TreeNode prev;
+
+boolean isValidInOrder(TreeNode node) {
+    if (node == null) return true;
+
+    if (!isValidInOrder(node.left)) return false;
+
+    // Strictly increasing — duplicates are invalid in a BST.
+    if (prev != null &amp;&amp; prev.val &gt;= node.val) return false;
+    prev = node;
+
+    return isValidInOrder(node.right);
+}
+
+// The ITERATIVE in-order, which lets you stop early. This is what
+// LC 230 needs: quit after k emissions instead of walking the tree.
+int kthSmallest(TreeNode root, int k) {
+    Deque&lt;TreeNode&gt; stack = new ArrayDeque&lt;&gt;();
+    TreeNode cur = root;
+
+    while (cur != null || !stack.isEmpty()) {
+        while (cur != null) {          // descend as far left as possible
+            stack.push(cur);
+            cur = cur.left;
+        }
+        cur = stack.pop();             // the next value in sorted order
+        if (--k == 0) return cur.val;  // early exit — O(h + k), not O(n)
+        cur = cur.right;
+    }
+    return -1;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Deletion — the three cases, and why the successor is chosen (LC 450)</div>
+<pre><code class="language-java">/**
+ * Descend to the node, then handle exactly three cases:
+ *   0 or 1 child  ->  splice the child in
+ *   2 children    ->  replace the value with the IN-ORDER SUCCESSOR,
+ *                     then delete that successor from the right subtree
+ *
+ * The successor is the smallest value greater than this node, so it
+ * is the unique value that preserves the ordering for BOTH subtrees.
+ * The predecessor works equally well; pick one and be consistent.
+ */
+TreeNode deleteNode(TreeNode root, int key) {
+    if (root == null) return null;
+
+    if      (key &lt; root.val) root.left  = deleteNode(root.left,  key);
+    else if (key &gt; root.val) root.right = deleteNode(root.right, key);
+    else {
+        // Found it. Cases 0 and 1: hand the single child upward.
+        if (root.left  == null) return root.right;
+        if (root.right == null) return root.left;
+
+        // Case 2: the successor is the leftmost node on the right.
+        TreeNode succ = root.right;
+        while (succ.left != null) succ = succ.left;
+
+        root.val = succ.val;                                 // overwrite
+        root.right = deleteNode(root.right, succ.val);       // remove the dup
+    }
+    return root;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Which engine</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>"find", "insert", "delete", "LCA"</dt><dd>Engine A. Compare and descend; never visit both children.</dd>
+        <dt>"is it valid", "k-th smallest", "two nodes swapped"</dt><dd>Engine B. Think about what the in-order sequence looks like, then detect the property on that sequence.</dd>
+        <dt>Early exit needed</dt><dd>The iterative in-order with an explicit stack. The recursive version cannot stop cleanly partway.</dd>
+        <dt>Bounds type</dt><dd><code>long</code>, or <code>Integer</code> objects with <code>null</code> for unbounded. Never bare <code>int</code> sentinels.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Comparing against the parent instead of a range</b> — accepts trees that are locally fine and globally invalid, exactly as in the trace. <b><code>int</code> sentinels in the range check</b> — a node legitimately holding <code>Integer.MIN_VALUE</code> is rejected. <b>Deleting a two-child node by promoting an arbitrary child</b> — the ordering breaks; only the in-order successor or predecessor preserves it, and the duplicate must then be removed from the subtree.</div>
+  </div>
+</section>
+

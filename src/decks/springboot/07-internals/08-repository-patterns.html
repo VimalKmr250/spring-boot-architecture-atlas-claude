@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Internals" data-title="Repository patterns">
+  <h2>Custom repository behaviour, without abandoning Spring Data</h2>
+  <p class="dek">Three extension points, in the order you should reach for them. Most teams jump straight to injecting <code>EntityManager</code> into a service, which puts persistence code in the application layer.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">1 · A fragment — custom code on one repository</div>
+<pre><code class="language-java">interface OrderRepositoryCustom {
+    List&lt;OrderJpaEntity&gt; search(OrderSearch filter, Pageable page);
+}
+
+class OrderRepositoryCustomImpl implements OrderRepositoryCustom {   // "Impl" suffix is required
+    @PersistenceContext private EntityManager em;
+
+    public List&lt;OrderJpaEntity&gt; search(OrderSearch f, Pageable page) {
+        var cb = em.getCriteriaBuilder();
+        var q  = cb.createQuery(OrderJpaEntity.class);
+        var root = q.from(OrderJpaEntity.class);
+        var predicates = new ArrayList&lt;Predicate&gt;();
+        if (f.status() != null)     predicates.add(cb.equal(root.get("status"), f.status()));
+        if (f.customerId() != null) predicates.add(cb.equal(root.get("customerId"), f.customerId()));
+        q.where(cb.and(predicates.toArray(Predicate[]::new)));
+        return em.createQuery(q)
+                 .setFirstResult((int) page.getOffset())
+                 .setMaxResults(page.getPageSize())
+                 .getResultList();
+    }
+}
+
+interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt;,
+                                     OrderRepositoryCustom { }   // ← composed in</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">2 · Specifications — composable, for filter-heavy screens</div>
+<pre><code class="language-java">class OrderSpecs {
+    static Specification&lt;OrderJpaEntity&gt; hasStatus(OrderStatus s) {
+        return (root, q, cb) -&gt; s == null ? null : cb.equal(root.get("status"), s);
+    }
+    static Specification&lt;OrderJpaEntity&gt; placedAfter(Instant t) {
+        return (root, q, cb) -&gt; t == null ? null : cb.greaterThan(root.get("placedAt"), t);
+    }
+}
+// null predicates are ignored, so optional filters compose cleanly:
+repo.findAll(where(hasStatus(f.status())).and(placedAfter(f.since())), page);</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">3 · A base repository — behaviour for EVERY repository</div>
+<pre><code class="language-java">@EnableJpaRepositories(repositoryBaseClass = SoftDeleteRepositoryImpl.class)
+// e.g. make every findAll() exclude soft-deleted rows, or add a
+// findByIdOrThrow(). Powerful, and correspondingly easy to surprise
+// people with — document it where new joiners will see it.</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Which to reach for</span>One awkward query → <b>fragment</b>. A search screen with many optional filters → <b>Specifications</b>. A rule that must hold for every entity → <b>base repository</b>. And if the query is genuinely complex SQL, stop fighting the abstraction: <code>JdbcClient</code> or jOOQ in a fragment is clearer than a 40-line Criteria tree.</div>
+    </div>
+  </div>
+</section>
+

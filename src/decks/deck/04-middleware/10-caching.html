@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Middleware" data-title="Caching">
+  <h2>Two cache layers, and an invalidation story</h2>
+  <p class="dek">Caching is easy; knowing when the cached value is wrong is the whole engineering problem. Decide the staleness budget per use case before choosing a mechanism.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Near cache (Caffeine) in front of a distributed cache (Redis)</div>
+<pre><code class="language-java">@Service
+class CatalogQueryService {
+
+    @Cacheable(cacheNames = "product", key = "#sku", cacheManager = "twoLevel")
+    public ProductView byKey(String sku) { return repo.load(sku); }
+
+    // invalidation is an EVENT, not a scheduled job
+    @ApplicationModuleListener
+    void on(ProductUpdated e) {
+        cache.evict("product", e.sku());                 // local
+        redis.convertAndSend("cache.evict", e.sku());    // tell the other 11 instances
+    }
+}</code></pre>
+<pre style="margin-top:12px"><code class="language-yaml"># "twoLevel" is YOUR CacheManager bean (Caffeine in front of Redis).
+# spring.cache.caffeine.spec configures Boot's AUTO-CONFIGURED manager,
+# so a custom manager must read the spec itself — or keep the L1 spec
+# in your own @ConfigurationProperties. They are not wired together.
+shop.cache.l1.spec: maximumSize=10000,expireAfterWrite=60s
+# L1 Caffeine: ~100 ns, per instance, may be 60 s stale
+# L2 Redis:    ~1 ms, shared, TTL 10 min, invalidated by event</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Data</th><th>Staleness OK</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Product copy, images</td><td>minutes</td><td>CDN + L1</td></tr>
+            <tr><td>Category tree</td><td>minutes</td><td>L1 + L2</td></tr>
+            <tr><td>Price</td><td>seconds</td><td>L2, event-evicted</td></tr>
+            <tr><td>Stock level shown</td><td>~30 s, with a caveat in the UI</td><td>L2</td></tr>
+            <tr><td>Stock at checkout</td><td><b>never</b></td><td>no cache — read and reserve</td></tr>
+            <tr><td>Cart contents</td><td>never</td><td>no cache</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Three classic failures</span><b>Stampede:</b> a hot key expires and 500 threads hit the database — use <code>@Cacheable(sync = true)</code> or a short lock. <b>Penetration:</b> lookups for ids that do not exist bypass the cache every time — cache the negative result briefly. <b>Avalanche:</b> everything expires at the same second — add jitter to TTLs.</div>
+    </div>
+  </div>
+</section>
+

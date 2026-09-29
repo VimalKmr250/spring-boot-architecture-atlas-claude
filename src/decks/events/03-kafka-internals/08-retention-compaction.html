@@ -1,0 +1,38 @@
+<section class="slide" data-sec="Kafka internals" data-title="Retention & compaction">
+  <h2>Retention, compaction and tiered storage</h2>
+  <p class="dek">How long data lives is a design decision per topic, not an infrastructure default. Compaction in particular turns a topic into something quite different — a changelog you can rebuild state from.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Deletion by time or size — the normal case</div>
+<pre><code class="language-yaml">cleanup.policy: delete
+retention.ms: 604800000        # 7 days
+retention.bytes: -1            # unlimited, or cap per partition
+segment.ms: 86400000           # roll a new segment daily
+# Retention is enforced per SEGMENT, and the active segment is never deleted —
+# so actual retention is always a little longer than configured.</code></pre>
+      <div class="codelabel" style="margin-top:14px">Compaction — keep the latest value per key, forever</div>
+<pre><code class="language-yaml">cleanup.policy: compact
+min.cleanable.dirty.ratio: 0.5
+delete.retention.ms: 86400000  # how long tombstones survive
+# The log becomes a snapshot: every key's most recent value is retained.
+# Publishing a null value is a TOMBSTONE — it marks the key deleted.
+
+cleanup.policy: compact,delete  # both: compact, and also drop very old records</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>What compaction is for</h3>
+        <dl class="kv">
+          <dt>Reference data</dt><dd>A <code>products</code> topic where the latest record per SKU is the current product. A new consumer reads from the start and has the full catalogue.</dd>
+          <dt>Changelogs</dt><dd>Kafka Streams state stores back themselves with a compacted topic — that is how a stateful processor rebuilds after a restart.</dd>
+          <dt>Materialising state</dt><dd>Any "current state per entity" feed where history is not needed.</dd>
+        </dl>
+        <p style="margin-top:4px"><b>Compacted topics must be keyed.</b> An unkeyed compacted topic retains everything and quietly does nothing.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Compaction is not immediate and not a guarantee</span>The cleaner runs in the background on non-active segments, so duplicates for a key exist for a while. A consumer reading from the start may see two versions of a key — it must apply them in order and end at the right value, which it will, since order within a partition holds.</div>
+      <div class="note tip"><span class="lbl">Tiered storage changes the retention conversation</span>GA since Kafka 3.9: older segments move to object storage, so months of retention no longer means months of expensive broker disk. It makes long replay windows affordable, but reading cold data is slower — plan a backfill to take longer than a recent replay.</div>
+    </div>
+  </div>
+</section>
+
