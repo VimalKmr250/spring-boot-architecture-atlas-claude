@@ -33,7 +33,7 @@ stockBySku.forEach((sku, qty) -&gt; log.info("{} = {}", sku, qty));</code></pre>
   <div class="grid3">
     <div class="card"><h4>Not for building results</h4><p><code>forEach(list::add)</code> is the parallel lost-update bug from the side-effects slide. When the goal is a collection, a map or a number, end with <code>toList</code>, <code>collect</code> or <code>reduce</code>.</p></div>
     <div class="card"><h4>No <code>break</code></h4><p>A lambda cannot break out of the loop that calls it. To stop early, make the condition part of the pipeline with <code>takeWhile</code>, <code>anyMatch</code> or <code>findFirst</code>. If the stopping logic is complex, a plain <code>for</code> loop is clearer.</p></div>
-    <div class="card"><h4>No checked exceptions</h4><p><code>Consumer.accept</code> declares none, so <code>forEach(this::writeToDisk)</code> does not compile if <code>writeToDisk</code> throws <code>IOException</code>. The options are on <a data-deck="st" data-slide="Checked exceptions and debugging" href="#streams">Checked exceptions and debugging</a>.</p></div>
+    <div class="card"><h4>No checked exceptions</h4><p><code>Consumer.accept</code> declares none, so <code>forEach(this::writeToDisk)</code> does not compile if <code>writeToDisk</code> throws <code>IOException</code>. The options are on <a data-deck="st" data-slide="Checked exceptions and debugging">Checked exceptions and debugging</a>.</p></div>
   </div>
 </section>
 

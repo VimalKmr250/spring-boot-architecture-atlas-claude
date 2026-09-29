@@ -1,14 +1,14 @@
 (function () {
   "use strict";
 
-  var DECKS = {
-    deck: { el: document.getElementById("stage"),    slug: "deck",       tab: "tab-deck", cur: 0, slides: [] },
-    sb:   { el: document.getElementById("stage-sb"), slug: "springboot", tab: "tab-sb",   cur: 0, slides: [] },
-    ed:   { el: document.getElementById("stage-ed"), slug: "events",     tab: "tab-ed",   cur: 0, slides: [] },
-    dsa:  { el: document.getElementById("stage-dsa"), slug: "dsa",       tab: "tab-dsa",  cur: 0, slides: [] },
-    st:   { el: document.getElementById("stage-st"), slug: "streams",    tab: "tab-st",   cur: 0, slides: [] }
-  };
-  var DECK_KEYS = ["deck", "sb", "ed", "dsa", "st"];
+  // Each deck is declared once in the template, as a main.stage with data-deck (its key) and
+  // data-slug (its URL name), plus a tab button id="tab-" + key. build.mjs reads the same attributes.
+  var DECKS = {}, DECK_KEYS = [];
+  document.querySelectorAll("main.stage[data-deck]").forEach(function (el) {
+    var k = el.getAttribute("data-deck");
+    DECKS[k] = { el: el, slug: el.getAttribute("data-slug"), tab: "tab-" + k, cur: 0, slides: [] };
+    DECK_KEYS.push(k);
+  });
 
   var ivroot   = document.getElementById("ivroot");
   var counter  = document.getElementById("counter");
@@ -27,7 +27,7 @@
   var tocButtons = [];
   var ivCur = "";
 
-  /* ---- prepare both decks: eyebrows, and hide all but the first ---- */
+  /* ---- prepare every deck: eyebrows, and hide all but the first ---- */
   DECK_KEYS.forEach(function (k) {
     var d = DECKS[k];
     d.slides = Array.prototype.slice.call(d.el.querySelectorAll(".slide"));
@@ -208,29 +208,75 @@
     secs.forEach(function (s) { io.observe(s); });
   })();
 
+  /* ---- steppers: a list of frames, played one step at a time ---- */
+  function esc(t) {
+    return String(t).replace(/[&<>"']/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; });
+  }
+  function q(t) { return "<code>" + esc(t) + "</code>"; }
+
+  // The player owns what every stepper shares: the Reset/Back/Play/Next buttons (data-<prefix>),
+  // autoplay every ms milliseconds, and the .sw-say line with its "Step N of M · tag" header.
+  // Each frame carries { kind, tag, msg }; render(frame, at, frames) draws everything else.
+  // Returns load(frames), which stops playback and shows the first frame.
+  function stepper(root, prefix, ms, render) {
+    var say = root.querySelector(".sw-say");
+    var btns = {}, frames = [], at = 0, timer = null;
+    root.querySelectorAll("button[data-" + prefix + "]").forEach(function (b) { btns[b.getAttribute("data-" + prefix)] = b; });
+
+    function draw() {
+      var f = frames[at];
+      render(f, at, frames);
+      say.innerHTML = '<span class="k ' + f.kind + '">' +
+        (frames.length > 1 ? "Step " + at + " of " + (frames.length - 1) + " · " : "") + esc(f.tag) + "</span>" + f.msg;
+      btns.back.disabled = btns.reset.disabled = at === 0;
+      btns.next.disabled = at >= frames.length - 1;
+      btns.play.disabled = frames.length < 2;
+    }
+    function step(d) { at = Math.max(0, Math.min(frames.length - 1, at + d)); draw(); }
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      btns.play.textContent = "Play";
+      btns.play.setAttribute("aria-pressed", "false");
+    }
+    function play() {
+      if (at >= frames.length - 1) at = 0;
+      btns.play.textContent = "Pause";
+      btns.play.setAttribute("aria-pressed", "true");
+      step(1);
+      timer = setInterval(function () {
+        // stop quietly once the slide is navigated away from, or the run is over
+        if (!root.offsetParent || at >= frames.length - 1) { stop(); return; }
+        step(1);
+      }, ms);
+    }
+
+    btns.next.addEventListener("click", function () { stop(); step(1); });
+    btns.back.addEventListener("click", function () { stop(); step(-1); });
+    btns.reset.addEventListener("click", function () { stop(); at = 0; draw(); });
+    btns.play.addEventListener("click", function () { if (timer) stop(); else play(); });
+    return function load(next) { stop(); frames = next; at = 0; draw(); };
+  }
+
   /* ---- sliding-window stepper: every press moves exactly one pointer ---- */
   (function windowStepper() {
     var root = document.getElementById("sw-demo");
     if (!root) return;
     var input = root.querySelector("input");
     var grid  = root.querySelector(".sw-grid");
-    var say   = root.querySelector(".sw-say");
-    var outs = {}, btns = {};
+    var outs = {};
     root.querySelectorAll("[data-sw-out]").forEach(function (el) { outs[el.getAttribute("data-sw-out")] = el; });
-    root.querySelectorAll("button[data-sw]").forEach(function (b) { btns[b.getAttribute("data-sw")] = b; });
 
-    var s = "", frames = [], at = 0, timer = null;
-
-    function esc(t) {
-      return String(t).replace(/[&<>"']/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; });
-    }
-    function q(t) { return "<code>" + esc(t) + "</code>"; }
+    var s = "", player = stepper(root, "sw", 1800, render);
 
     /* LC 3 on str, recorded as one frame per pointer move */
     function trace(str) {
       var out = [], seen = Object.create(null), l = 0, r = -1, best = 0, bestL = 0, explained = false;
+      var TAGS = { start: "Ready", grow: "Head moves · r = ", shrink: "Tail moves · l = ", done: "Finished" };
       function win() { return str.slice(l, r + 1); }
-      function push(kind, dup, msg) { out.push({ kind: kind, l: l, r: r, dup: dup, best: best, bestL: bestL, msg: msg }); }
+      function push(kind, dup, msg) {
+        var tag = TAGS[kind] + (kind === "grow" ? r : kind === "shrink" ? l : "");
+        out.push({ kind: kind, tag: tag, l: l, r: r, dup: dup, best: best, bestL: bestL, msg: msg });
+      }
       function clean(lead) {
         var len = r - l + 1, grew = len > best;
         if (grew) { best = len; bestL = l; }
@@ -292,8 +338,8 @@
       outs.chips.appendChild(el);
     }
 
-    function render() {
-      var f = frames[at], n = s.length, i;
+    function render(f, at, frames) {
+      var n = s.length, i;
 
       grid.textContent = "";
       grid.style.setProperty("--n", String(Math.max(n, 1)));
@@ -313,10 +359,6 @@
           if (f.r >= 0) pointer(f.r, "r", f.kind === "grow");
         }
       }
-
-      var label = { start: "Ready", grow: "Head moves · r = " + f.r, shrink: "Tail moves · l = " + f.l, done: "Finished" }[f.kind];
-      say.innerHTML = '<span class="k ' + f.kind + '">' +
-        (frames.length > 1 ? "Step " + at + " of " + (frames.length - 1) + " · " : "") + esc(label) + "</span>" + f.msg;
 
       outs.chips.textContent = "";
       if (f.r < f.l) chip("empty", "tag");
@@ -346,41 +388,15 @@
       }
       outs.moves.textContent = n ? "head " + heads + " + tail " + tails + " = " + (heads + tails) +
         "  ·  never more than 2n = " + (2 * n) : "";
-
-      btns.back.disabled = btns.reset.disabled = at === 0;
-      btns.next.disabled = at >= frames.length - 1;
-      btns.play.disabled = frames.length < 2;
     }
 
-    function step(d) { at = Math.max(0, Math.min(frames.length - 1, at + d)); render(); }
-    function stop() {
-      if (timer) { clearInterval(timer); timer = null; }
-      btns.play.textContent = "Play";
-      btns.play.setAttribute("aria-pressed", "false");
-    }
-    function play() {
-      if (at >= frames.length - 1) at = 0;
-      btns.play.textContent = "Pause";
-      btns.play.setAttribute("aria-pressed", "true");
-      step(1);
-      timer = setInterval(function () {
-        // stop quietly once the slide is navigated away from, or the run is over
-        if (!root.offsetParent || at >= frames.length - 1) { stop(); return; }
-        step(1);
-      }, 1800);
-    }
     function load(v) {
       var cleaned = v.replace(/\s+/g, "").slice(0, 14);
       if (cleaned !== v) input.value = cleaned;
-      stop();
-      s = cleaned; frames = trace(s); at = 0;
-      render();
+      s = cleaned;
+      player(trace(s));
     }
 
-    btns.next.addEventListener("click", function () { stop(); step(1); });
-    btns.back.addEventListener("click", function () { stop(); step(-1); });
-    btns.reset.addEventListener("click", function () { stop(); at = 0; render(); });
-    btns.play.addEventListener("click", function () { if (timer) stop(); else play(); });
     input.addEventListener("input", function () { load(input.value); });
     load(input.value);
   })();
@@ -395,10 +411,8 @@
     var select = root.querySelector("select");
     var input  = root.querySelector("input");
     var board  = root.querySelector(".pl-board");
-    var say    = root.querySelector(".sw-say");
-    var outs = {}, btns = {};
+    var outs = {};
     root.querySelectorAll("[data-pl-out]").forEach(function (el) { outs[el.getAttribute("data-pl-out")] = el; });
-    root.querySelectorAll("button[data-pl]").forEach(function (b) { btns[b.getAttribute("data-pl")] = b; });
 
     var FILTER = { op: "filter", label: ".filter(s -> s.length() > 3)" };
     var UPPER  = { op: "map", label: ".map(String::toUpperCase)", fn: function (s) { return s.toUpperCase(); } };
@@ -413,12 +427,8 @@
       forever: { words: false, stages: [SORTED, limit(3)], term: "toList", cap: 8 }
     };
 
-    var p, words = [], frames = [], at = 0, timer = null;
+    var p, words = [], player = stepper(root, "pl", 1500, render);
 
-    function esc(t) {
-      return String(t).replace(/[&<>"']/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; });
-    }
-    function q(t) { return "<code>" + esc(t) + "</code>"; }
     function joinAnd(xs) {
       xs = xs.map(q);
       return xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
@@ -593,8 +603,8 @@
       return el;
     }
 
-    function render() {
-      var f = frames[at], last = at === frames.length - 1;
+    function render(f, at, frames) {
+      var last = at === frames.length - 1;
       var labels = ["Stream." + (p.words ? "of(…)" : "iterate(1, n -> n * 2)")]
         .concat(p.stages.map(function (s) { return s.label; }), ["." + p.term + "()"]);
 
@@ -610,50 +620,20 @@
         board.appendChild(row);
       });
 
-      say.innerHTML = '<span class="k ' + f.kind + '">' +
-        (frames.length > 1 ? "Step " + at + " of " + (frames.length - 1) + " · " : "") + esc(f.tag) + "</span>" + f.msg;
-
       outs.pulled.textContent = p.words ? f.pulled + " of " + words.length : f.pulled + ", from an infinite source";
       outs.calls.textContent = p.stages.map(function (s, k) { return s.op + " ×" + f.rows[k + 1].calls; }).join("  ·  ");
       outs.result.textContent = p.term === "findFirst"
         ? (f.found !== null ? "Optional[" + f.found + "]" : f.kind === "done" ? "Optional.empty" : "nothing yet")
         : (p.cap && last ? "nothing, ever" : "[" + f.result.join(", ") + "]" + (f.kind === "done" ? "" : "  so far"));
-
-      btns.back.disabled = btns.reset.disabled = at === 0;
-      btns.next.disabled = last;
-      btns.play.disabled = frames.length < 2;
     }
 
-    function step(d) { at = Math.max(0, Math.min(frames.length - 1, at + d)); render(); }
-    function stop() {
-      if (timer) { clearInterval(timer); timer = null; }
-      btns.play.textContent = "Play";
-      btns.play.setAttribute("aria-pressed", "false");
-    }
-    function play() {
-      if (at >= frames.length - 1) at = 0;
-      btns.play.textContent = "Pause";
-      btns.play.setAttribute("aria-pressed", "true");
-      step(1);
-      timer = setInterval(function () {
-        // stop quietly once the slide is navigated away from, or the run is over
-        if (!root.offsetParent || at >= frames.length - 1) { stop(); return; }
-        step(1);
-      }, 1500);
-    }
     function load() {
-      stop();
       p = PRESETS[select.value] || PRESETS.first;
       input.disabled = !p.words;
       words = input.value.split(/[\s,]+/).filter(Boolean).slice(0, 8).map(function (w) { return w.slice(0, 12); });
-      frames = trace(); at = 0;
-      render();
+      player(trace());
     }
 
-    btns.next.addEventListener("click", function () { stop(); step(1); });
-    btns.back.addEventListener("click", function () { stop(); step(-1); });
-    btns.reset.addEventListener("click", function () { stop(); at = 0; render(); });
-    btns.play.addEventListener("click", function () { if (timer) stop(); else play(); });
     select.addEventListener("change", load);
     input.addEventListener("input", load);
     load();
@@ -668,23 +648,7 @@
   } catch (e) { /* highlighting is decorative; the code still reads */ }
 
   /* ---- cross-references: interview answers link to the slides that cover them ---- */
-  // Links name a slide by data-sec and/or data-slide (its data-title), not by number,
-  // so inserting slides never breaks them. The href is filled in here.
-  function findSlide(key, sec, title) {
-    var d = DECKS[key];
-    if (!d) return -1;
-    for (var i = 0; i < d.slides.length; i++) {
-      var s = d.slides[i];
-      if ((!sec || s.getAttribute("data-sec") === sec) &&
-          (!title || s.getAttribute("data-title") === title)) return i;
-    }
-    return -1;
-  }
-  document.querySelectorAll("a[data-deck]").forEach(function (a) {
-    var key = a.getAttribute("data-deck");
-    var i = findSlide(key, a.getAttribute("data-sec"), a.getAttribute("data-slide"));
-    if (i >= 0) a.setAttribute("href", "#" + DECKS[key].slug + "/" + (i + 1));
-  });
+  // build.mjs resolves each a[data-deck] to its slide's href.
   // Before following one, record the current section on this history entry,
   // so Back lands on the question you left rather than the top of the page.
   document.addEventListener("click", function (e) {
