@@ -1,0 +1,96 @@
+<!-- dsa · pattern 05 · structure -->
+<section class="slide" data-sec="05 · Binary search on the answer" data-title="The reusable structure">
+  <h2>One template, three blanks to fill</h2>
+  <p class="dek">The loop is an ordinary boundary search; the array comparison becomes <code>feasible(mid)</code> and you are done. All the thinking moves into <code>feasible</code>, which should be a direct transcription of the problem statement — deliberately dull code.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The template — fill in three blanks</div>
+<pre><code class="language-java">/**
+ * Smallest x in [lo, hi] for which feasible(x) holds.
+ * Requires monotone feasibility:  F F F T T T over the answer range.
+ *
+ * BLANK 1 · lo   — a value that fails, or the smallest legal one
+ * BLANK 2 · hi   — a value that obviously works
+ * BLANK 3 · feasible(x) — an O(n) simulation, as literal as possible
+ */
+int solve(int[] a, int limit) {
+    int lo = 1, hi = 0;
+    for (int v : a) hi = Math.max(hi, v);        // BLANKS 1 and 2
+
+    while (lo &lt; hi) {                            // an ordinary boundary search
+        int mid = lo + (hi - lo) / 2;
+
+        if (feasible(a, mid, limit)) hi = mid;   // mid might be the answer: keep it
+        else                         lo = mid + 1;
+    }
+    return lo;                                   // lo == hi == the smallest feasible x
+}
+
+/** BLANK 3 · read this straight off the problem statement. */
+private boolean feasible(int[] a, int speed, int limit) {
+    long hours = 0;
+    for (int pile : a) {
+        hours += (pile + speed - 1) / speed;     // ceil without floating point
+        if (hours &gt; limit) return false;         // early exit: cheap and avoids overflow
+    }
+    return hours &lt;= limit;
+}
+
+// MAXIMISING instead? Mirror it: keep a feasible mid on the RIGHT.
+//     if (feasible(mid)) lo = mid;  else hi = mid - 1;
+//     mid = lo + (hi - lo + 1) / 2;   // round UP, or this loops forever</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">feasible() for the four shapes you will meet</div>
+<pre><code class="language-java">// 1 · COUNT THE UNITS — LC 875, 1283
+//     "how many hours / how large a sum at this rate?"
+long units = 0;
+for (int v : a) units += (v + x - 1) / x;
+return units &lt;= limit;
+
+// 2 · GREEDY PACKING — LC 410, 1011
+//     "how many groups do I need if each is capped at x?"
+int parts = 1; long cur = 0;
+for (int v : a) {
+    if (cur + v &gt; x) { parts++; cur = v; }   // start a new group
+    else               cur += v;
+}
+return parts &lt;= limit;
+
+// 3 · COUNT WHAT QUALIFIES BY TIME x — LC 1482
+//     "how many runs of k adjacent bloomed flowers exist by day x?"
+int made = 0, run = 0;
+for (int day : bloom) {
+    if (day &lt;= x) { if (++run == k) { made++; run = 0; } }
+    else          run = 0;                   // the run is broken
+}
+return made &gt;= m;
+
+// 4 · REAL-VALUED ANSWER — LC 774
+//     No integer grid, so iterate a FIXED number of times.
+//     100 halvings drives the interval below 1e-30 — far past
+//     any 1e-6 tolerance — and cannot loop forever the way an
+//     epsilon comparison can.
+for (int i = 0; i &lt; 100; i++) {
+    double mid = (lo + hi) / 2;
+    if (feasible(mid)) hi = mid; else lo = mid;
+}
+return hi;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Choosing the bounds</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Capacity / speed</dt><dd><code>lo = max(a)</code> when every element must fit somewhere on its own (LC 410, 1011); <code>lo = 1</code> when elements may be consumed over several steps (LC 875, 1283).</dd>
+          <dt>Upper</dt><dd><code>hi = sum(a)</code> for packing — one group holds everything. <code>hi = max(a)</code> for rates. Too generous costs a few iterations; too tight returns a wrong answer.</dd>
+          <dt>Time-style answers</dt><dd><code>[min(day), max(day)]</code>, and check feasibility at <code>hi</code> first — LC 1482 can be impossible outright, and returns −1.</dd>
+          <dt>Overflow</dt><dd>Accumulate in <code>long</code>. With n = 10⁵ and values to 10⁹ the sum reaches 10¹⁴, which overflows <code>int</code> long before the search goes wrong.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b><code>lo</code> set below the largest element</b> in a packing problem — capacity 3 can never hold an item of size 7, and the greedy check loops or reports nonsense. <b>Forgetting to round up</b> — <code>pile / speed</code> is floor division, so a pile of 7 at speed 6 reports one hour instead of two; use <code>(v + x - 1) / x</code>. <b>The maximising mirror without rounding <code>mid</code> up</b> — with <code>lo = mid</code> and a floor midpoint, a two-element range never shrinks and the loop hangs.</div>
+    </div>
+  </div>
+</section>
+

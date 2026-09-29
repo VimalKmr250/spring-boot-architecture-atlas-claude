@@ -1,0 +1,111 @@
+<!-- dsa · pattern 07 · problems -->
+<section class="slide" data-sec="07 · Prefix sum" data-title="The six problems">
+  <h2>Six prefixes, three different keys</h2>
+  <p class="dek">303 and 724 use the array directly. 560 and 930 key the map on the sum. 974 and 523 key it on the remainder — the same skeleton with one line changed.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Skeleton</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">303</td><td><a href="https://leetcode.com/problems/range-sum-query-immutable/" target="_blank" rel="noopener">Range Sum Query — Immutable</a></td><td><span class="tag g">Easy</span></td><td>The array itself. "Immutable" is the problem telling you to precompute.</td><td>A</td><td class="num">O(n) build, O(1) query</td></tr>
+        <tr><td class="num">724</td><td><a href="https://leetcode.com/problems/find-pivot-index/" target="_blank" rel="noopener">Find Pivot Index</a></td><td><span class="tag g">Easy</span></td><td>Needs no array at all — one running left sum against the total.</td><td>A, streamed</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">560</td><td><a href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">Subarray Sum Equals K</a></td><td><span class="tag w">Medium</span></td><td>The baseline counting form. Negatives are what rule out a window.</td><td>B</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">930</td><td><a href="https://leetcode.com/problems/binary-subarrays-with-sum/" target="_blank" rel="noopener">Binary Subarrays With Sum</a></td><td><span class="tag w">Medium</span></td><td>Identical to 560 with a 0/1 array — so the map is an <code>int[n+1]</code>.</td><td>B</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">974</td><td><a href="https://leetcode.com/problems/subarray-sums-divisible-by-k/" target="_blank" rel="noopener">Subarray Sums Divisible by K</a></td><td><span class="tag w">Medium</span></td><td>Key on the remainder. Java's negative <code>%</code> is the whole difficulty.</td><td>B, modular</td><td class="num">O(n) / O(k)</td></tr>
+        <tr><td class="num">523</td><td><a href="https://leetcode.com/problems/continuous-subarray-sum/" target="_blank" rel="noopener">Continuous Subarray Sum</a></td><td><span class="tag w">Medium</span></td><td>Remainder again, but store the <em>first index</em> to enforce length ≥ 2.</td><td>B, modular</td><td class="num">O(n) / O(k)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 560 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Every pair <code>(l, r)</code> with a fresh inner sum. O(n³), or O(n²) if the inner loop accumulates as it goes.</dd>
+          <dt>Why not a window</dt><dd>Because <code>nums[i]</code> may be negative. Extending the window can raise <em>or</em> lower the sum, so "shrink while too large" is not a valid rule. Say this out loud — it is the step that shows you chose the pattern rather than guessed it.</dd>
+          <dt>The reformulation</dt><dd>A subarray ending at <code>r</code> sums to k exactly when an earlier prefix equalled <code>P[r] − k</code>. That turns a search over ranges into a lookup on a single number.</dd>
+          <dt>Why counts, not positions</dt><dd>Several earlier prefixes may share a value, and each one yields a distinct subarray. Step 5 of the trace adds two at once for exactly this reason.</dd>
+          <dt>Edge cases</dt><dd>Seed <code>{0:1}</code>. Look up before inserting, which matters when <code>k = 0</code>. Accumulate in <code>long</code>.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 560 · O(n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int subarraySum(int[] nums, int k) {
+        // prefix value -> how many times it has occurred
+        Map&lt;Long, Integer&gt; seen = new HashMap&lt;&gt;();
+        seen.put(0L, 1);            // the empty prefix
+
+        long sum = 0;
+        int count = 0;
+
+        for (int v : nums) {
+            sum += v;
+
+            // Every earlier prefix equal to (sum - k) marks the
+            // start of a distinct subarray ending here.
+            count += seen.getOrDefault(sum - k, 0);
+
+            // Insert AFTER the lookup: with k == 0 the keys coincide.
+            seen.merge(sum, 1, Integer::sum);
+        }
+        return count;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 974 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>All O(n²) subarrays, testing each sum for divisibility. Too slow at n = 3×10⁴.</dd>
+          <dt>The observation</dt><dd><code>(P[r] − P[l]) % k == 0</code> is the same statement as <code>P[r] % k == P[l] % k</code>. So the question becomes "how many earlier prefixes share my remainder?" — the counting skeleton with the key changed.</dd>
+          <dt>Why an array beats a map</dt><dd>There are only <code>k</code> possible remainders, so <code>int[k]</code> is exact, faster, and needs no boxing.</dd>
+          <dt>The real difficulty</dt><dd>Java defines <code>%</code> to take the sign of the dividend, so <code>-1 % 5</code> is <code>-1</code>, not <code>4</code>. Indexing an array with that throws; using it as a map key silently splits one remainder class into two and returns a wrong count.</dd>
+          <dt>The fix</dt><dd><code>((sum % k) + k) % k</code>. Write it every time, even when the input looks non-negative — the running sum can still go negative.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 974 · O(n) time, O(k) space</div>
+<pre><code class="language-java">class Solution {
+    public int subarraysDivByK(int[] nums, int k) {
+        // There are only k possible remainders, so index them directly.
+        int[] seen = new int[k];
+        seen[0] = 1;                // the empty prefix
+
+        int sum = 0, count = 0;
+
+        for (int v : nums) {
+            sum += v;
+
+            // Java's % takes the sign of the dividend: -1 % 5 == -1.
+            // Normalise into [0, k) or this indexes out of bounds.
+            int r = ((sum % k) + k) % k;
+
+            // Every earlier prefix with the same remainder gives a
+            // subarray whose sum is divisible by k.
+            count += seen[r];
+            seen[r]++;
+        }
+        return count;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>303 · Range Sum Query — Immutable <span class="tag a">skeleton A</span></h4><p><b>Path:</b> summing the range per call is O(n) each, and the problem says <code>sumRange</code> is called up to 10⁴ times. The word <em>immutable</em> in the title is the hint: the array never changes, so precomputing is safe.</p><p><b>Delta:</b> skeleton A verbatim. Build <code>P</code> in the constructor, return <code>P[r+1] − P[l]</code>.</p><p><b>Watch for:</b> sizing <code>P</code> at <code>n</code> instead of <code>n+1</code>. It compiles, and then <code>l = 0</code> needs a branch that is easy to get wrong.</p></div>
+
+    <div class="card"><h4>724 · Find Pivot Index <span class="tag a">skeleton A, streamed</span></h4><p><b>Path:</b> computing both sides for every candidate is O(n²). One total plus a running left sum makes it O(n) with no array.</p><p><b>Delta:</b> take <code>total</code> first, then sweep keeping <code>left</code>. The right side is <code>total − left − nums[i]</code>; return <code>i</code> the first time the two match.</p><p><b>Watch for:</b> index 0 is a legal pivot with an empty left side summing to 0 — so test before adding <code>nums[i]</code> to <code>left</code>, not after.</p></div>
+
+    <div class="card"><h4>930 · Binary Subarrays With Sum <span class="tag a">skeleton B</span></h4><p><b>Path:</b> the values are only 0 and 1, so the prefix sum is non-decreasing and bounded by <code>n</code>. That means the map can be a plain array.</p><p><b>Delta:</b> skeleton B with <code>int[n + 1]</code> in place of the <code>HashMap</code>, indexed by the prefix sum itself. Everything else is unchanged.</p><p><b>Watch for:</b> <code>goal</code> may be 0, which makes the lookup key equal the current sum — the look-up-before-insert ordering is what keeps that correct.</p></div>
+
+    <div class="card"><h4>523 · Continuous Subarray Sum <span class="tag a">skeleton B, modular</span></h4><p><b>Path:</b> same remainder reformulation, but the problem demands a subarray of length <b>at least two</b>, so a raw count is not enough.</p><p><b>Delta:</b> store the <em>first index</em> at which each remainder appeared, not a count. On a repeat, return true only when <code>i − firstIndex ≥ 2</code>. Seed with remainder 0 at index −1 so a qualifying prefix from the start still works.</p><p><b>Watch for:</b> record the index only when the remainder is new — overwriting it destroys the earliest occurrence and loses valid answers.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>560</b> and <b>974</b>. 560 is the counting reformulation in its plainest form, and the look-up-before-insert ordering it teaches applies to every problem on this slide. 974 adds the one piece of Java-specific knowledge in this pattern — that <code>%</code> can return a negative remainder — which is the difference between a correct submission and a runtime exception.</div>
+</section>
+

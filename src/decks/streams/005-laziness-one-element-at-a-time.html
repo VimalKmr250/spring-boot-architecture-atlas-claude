@@ -1,0 +1,55 @@
+<!-- streams 05 · the stepper -->
+<section class="slide" data-sec="How a stream runs" data-title="Laziness: one element at a time">
+  <h2>Elements travel down the pipeline one at a time</h2>
+  <p class="dek">The obvious mental model is wrong. A stream does not filter the whole list, then map the whole list, then collect. It takes one element and pushes it through every stage as far as it goes, then takes the next. That one fact explains laziness and short-circuiting, and it is why <code>sorted()</code> costs what it does. Pick a pipeline, press <b>Next</b>, and predict each step before you see it.</p>
+
+  <div class="sw" id="pl-demo">
+    <div class="sw-top">
+      <label class="sw-field"><span>Pipeline</span>
+        <select>
+          <option value="first">1 · filter → map → findFirst</option>
+          <option value="list">2 · filter → map → toList</option>
+          <option value="sorted">3 · filter → sorted → map → limit(2)</option>
+          <option value="iterate">4 · iterate → map → limit(4)</option>
+          <option value="forever">5 · iterate → sorted → limit(3)</option>
+        </select>
+      </label>
+      <label class="sw-field"><span>Source words</span><input class="pl-words" type="text" value="fig kiwi apple plum cherry" placeholder="up to 8 words" spellcheck="false" autocomplete="off" autocapitalize="off"></label>
+      <div class="sw-btns">
+        <button type="button" class="iconbtn" data-pl="reset">Reset</button>
+        <button type="button" class="iconbtn" data-pl="back">‹ Back</button>
+        <button type="button" class="iconbtn" data-pl="play" aria-pressed="false">Play</button>
+        <button type="button" class="iconbtn sw-next" data-pl="next">Next ›</button>
+      </div>
+    </div>
+    <div class="pl-board" aria-hidden="true"></div>
+    <div class="sw-say" aria-live="polite"></div>
+    <div class="sw-stats">
+      <div class="sw-stat"><span>Pulled from the source</span><div class="sw-val" data-pl-out="pulled"></div></div>
+      <div class="sw-stat"><span>Calls per stage</span><div class="sw-val" data-pl-out="calls"></div></div>
+      <div class="sw-stat"><span>Result</span><div class="sw-val" data-pl-out="result"></div></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Vertical, not horizontal</h4><p>In pipeline 2, <code>filter</code> and <code>map</code> take turns: <code>fig</code> is dropped before <code>kiwi</code> is even read. No list of filtered elements exists at any point, which is why a stream over a million rows needs no more memory than a stream over ten.</p></div>
+    <div class="card"><h4>Pulled by the terminal operation</h4><p>Nothing runs until the terminal operation starts asking for elements. In pipeline 1, <code>apple</code>, <code>plum</code> and <code>cherry</code> are never read, because <code>findFirst()</code> had its answer after two pulls. Pipeline 4 does the same with an infinite source.</p></div>
+    <div class="card"><h4>A barrier breaks the flow</h4><p><code>sorted()</code> cannot release anything until it has seen everything. In pipeline 3, <code>filter</code> runs on all five words before <code>map</code> runs once. After the barrier, laziness resumes: <code>limit(2)</code> stops <code>map</code> after two calls. Pipeline 5 shows what a barrier does to an infinite stream.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Pipeline 1 with print statements, on JDK 25</div>
+<pre><code class="language-java">Stream.of("fig", "kiwi", "apple", "plum", "cherry")
+      .filter(s -&gt; { System.out.println("filter " + s); return s.length() &gt; 3; })
+      .map(s -&gt; { System.out.println("map " + s); return s.toUpperCase(); })
+      .findFirst();
+
+// filter fig
+// filter kiwi
+// map kiwi         ← and nothing else: apple, plum and cherry are never read</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">"Why didn't my peek print?"</span>Usually because nothing pulled. Without a terminal operation a pipeline is only a description, so <code>list.stream().peek(System.out::println)</code> prints nothing at all. Since Java 9 even a terminal operation can skip it. <code>count()</code> on a source whose size is known, such as a <code>List</code> (and still known after <code>map</code>), returns the size without reading a single element, so a <code>peek</code> in front of it never runs. Put a <code>filter</code> in between and the size becomes unknown, so every element flows again.</div>
+  </div>
+</section>
+

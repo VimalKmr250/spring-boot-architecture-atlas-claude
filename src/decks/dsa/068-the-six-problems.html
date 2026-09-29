@@ -1,0 +1,113 @@
+<!-- dsa · pattern 11 · problems -->
+<section class="slide" data-sec="11 · Heap / top K" data-title="The six problems">
+  <h2>Six selections, and two worth beating</h2>
+  <p class="dek">215, 973 and 703 are the bounded heap with different comparators. 347 and 692 add a counting step first — and 347 can then be solved in O(n) without a heap at all. 1046 uses a heap for repeated extraction rather than selection.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Heap</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">215</td><td><a href="https://leetcode.com/problems/kth-largest-element-in-an-array/" target="_blank" rel="noopener">Kth Largest Element in an Array</a></td><td><span class="tag w">Medium</span></td><td>The baseline. Quickselect is the O(n)-average follow-up.</td><td>min, size k</td><td class="num">O(n log k) / O(k)</td></tr>
+        <tr><td class="num">703</td><td><a href="https://leetcode.com/problems/kth-largest-element-in-a-stream/" target="_blank" rel="noopener">Kth Largest Element in a Stream</a></td><td><span class="tag g">Easy</span></td><td>The same heap as a field. O(k) memory is the requirement.</td><td>min, size k</td><td class="num">O(log k) per add</td></tr>
+        <tr><td class="num">973</td><td><a href="https://leetcode.com/problems/k-closest-points-to-origin/" target="_blank" rel="noopener">K Closest Points to Origin</a></td><td><span class="tag w">Medium</span></td><td>k <em>smallest</em> distances, so the heap flips to max. No <code>sqrt</code>.</td><td>max, size k</td><td class="num">O(n log k) / O(k)</td></tr>
+        <tr><td class="num">347</td><td><a href="https://leetcode.com/problems/top-k-frequent-elements/" target="_blank" rel="noopener">Top K Frequent Elements</a></td><td><span class="tag w">Medium</span></td><td>Count first. Then bucket sort beats the heap outright.</td><td>min on count</td><td class="num">O(n) with buckets</td></tr>
+        <tr><td class="num">692</td><td><a href="https://leetcode.com/problems/top-k-frequent-words/" target="_blank" rel="noopener">Top K Frequent Words</a></td><td><span class="tag w">Medium</span></td><td>Two sort keys, and the tie-break must be reversed.</td><td>min, mixed</td><td class="num">O(n log k) / O(n)</td></tr>
+        <tr><td class="num">1046</td><td><a href="https://leetcode.com/problems/last-stone-weight/" target="_blank" rel="noopener">Last Stone Weight</a></td><td><span class="tag g">Easy</span></td><td>Not selection — repeated extract-max with re-insertion.</td><td>max, unbounded</td><td class="num">O(n log n) / O(n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 215 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Sort descending and read index <code>k − 1</code>. O(n log n), two lines, and it passes. Say it — then explain why you would do better.</dd>
+          <dt>The observation</dt><dd>Sorting orders all n elements when you only care about k of them. The other <code>n − k</code> comparisons are wasted.</dd>
+          <dt>The bounded heap</dt><dd>Keep the best k seen so far in a min-heap. The root is the weakest of those, so it doubles as the admission threshold and as the running answer.</dd>
+          <dt>Why min and not max</dt><dd>Because the root must be the element you would drop first. Holding the k largest, that is the smallest of them — which is also, by definition, the k-th largest.</dd>
+          <dt>The O(n) follow-up</dt><dd>Quickselect. Partition around a random pivot; if the pivot lands at index <code>n − k</code> you are done, otherwise recurse into one side only. Average O(n), worst case O(n²) — mention that it mutates the input.</dd>
+          <dt>Edge case</dt><dd>Duplicates count separately: the 2nd largest of <code>[5,5]</code> is 5, not an error. Never de-duplicate.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 215 · O(n log k) time, O(k) space</div>
+<pre><code class="language-java">class Solution {
+    public int findKthLargest(int[] nums, int k) {
+        // MIN-heap: the root is the smallest of the k largest,
+        // which is exactly the k-th largest overall.
+        PriorityQueue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;();
+
+        for (int v : nums) {
+            if (heap.size() &lt; k) {
+                heap.offer(v);
+            } else if (v &gt; heap.peek()) {
+                // v beats the weakest one we hold — swap them.
+                heap.poll();
+                heap.offer(v);
+            }
+            // otherwise v cannot make the top k: discard in O(1)
+        }
+        return heap.peek();
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 692 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Count with a map, sort all entries by (count desc, word asc), take k. O(n log n) and completely correct — the expected baseline.</dd>
+          <dt>Why it is the interesting one</dt><dd>Two sort keys pointing in <em>opposite</em> directions: frequency descending, but ties broken alphabetically <em>ascending</em>.</dd>
+          <dt>The reversal</dt><dd>In a bounded min-heap the root holds the item to evict — the <b>worst</b> candidate. So the comparator must sort worst-first: lowest count first, and among equal counts the alphabetically <em>largest</em> word first, because that is the one that loses.</dd>
+          <dt>Why that reads backwards</dt><dd>The heap order is the inverse of the output order. Writing the comparator as if it were the output order is the standard failure, and it produces answers that are right on counts and wrong on ties.</dd>
+          <dt>The final step</dt><dd>Draining a min-heap yields worst-first, so the result must be reversed before returning.</dd>
+          <dt>Edge case</dt><dd>Use <code>compareTo</code> on the strings, not <code>==</code> or <code>equals</code> alone — you need an ordering, not equality.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 692 · O(n log k) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;String&gt; topKFrequent(String[] words, int k) {
+        Map&lt;String, Integer&gt; freq = new HashMap&lt;&gt;();
+        for (String w : words) freq.merge(w, 1, Integer::sum);
+
+        // The ROOT must hold the WORST candidate, so this comparator
+        // is the reverse of the output order:
+        //   lower count first, and among equal counts the
+        //   alphabetically LARGER word first — it loses ties.
+        PriorityQueue&lt;Map.Entry&lt;String, Integer&gt;&gt; heap =
+            new PriorityQueue&lt;&gt;((x, y) -&gt;
+                x.getValue().equals(y.getValue())
+                    ? y.getKey().compareTo(x.getKey())
+                    : x.getValue() - y.getValue());
+
+        for (Map.Entry&lt;String, Integer&gt; e : freq.entrySet()) {
+            heap.offer(e);
+            if (heap.size() &gt; k) heap.poll();     // drops the worst
+        }
+
+        // Draining gives worst-first, so reverse for the answer.
+        LinkedList&lt;String&gt; out = new LinkedList&lt;&gt;();
+        while (!heap.isEmpty()) out.addFirst(heap.poll().getKey());
+        return out;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>703 · Kth Largest Element in a Stream <span class="tag a">min, size k</span></h4><p><b>Path:</b> storing every value and sorting on each <code>add</code> is O(n log n) per call. The stream has no known end, so O(k) memory is the actual requirement.</p><p><b>Delta:</b> the same bounded min-heap, but as an instance <b>field</b>. Seed it from the constructor's array, then <code>add</code> is offer-then-trim-then-peek.</p><p><b>Watch for:</b> the initial array may be shorter than <code>k</code>, so guard <code>peek()</code> until the heap has filled. This is the design question the problem is really asking.</p></div>
+
+    <div class="card"><h4>973 · K Closest Points to Origin <span class="tag a">max, size k</span></h4><p><b>Path:</b> sort by distance and take k — O(n log n). The heap brings it to O(n log k), and quickselect on distance averages O(n).</p><p><b>Delta:</b> you want the k <em>smallest</em> distances, so the heap flips to <b>max</b>: the farthest point sits at the root ready to be evicted.</p><p><b>Watch for:</b> compare <code>x² + y²</code> directly. <code>Math.sqrt</code> is slower and introduces floating-point comparisons for no gain, since squaring preserves order on non-negative values.</p></div>
+
+    <div class="card"><h4>347 · Top K Frequent Elements <span class="tag a">min on count</span></h4><p><b>Path:</b> count with a map, then a bounded min-heap keyed on the count gives O(n log k) — the expected answer.</p><p><b>Delta:</b> then beat it. A frequency can never exceed <code>n</code>, so it can index an array directly: bucket the values by count and read downwards from <code>n</code>. That is O(n) with no comparator at all.</p><p><b>Watch for:</b> <code>new List[n + 1]</code> raises an unchecked-generic-array warning. It is correct and idiomatic here — say so rather than working around it.</p></div>
+
+    <div class="card"><h4>1046 · Last Stone Weight <span class="tag a">max, unbounded</span></h4><p><b>Path:</b> re-sorting after every smash is O(n² log n). The heap gives extract-max in O(log n), which is what the simulation needs.</p><p><b>Delta:</b> this is <em>not</em> a top-k problem. The heap is unbounded and the loop repeatedly pulls the two largest, pushing back the difference when it is non-zero.</p><p><b>Watch for:</b> loop while <code>size &gt; 1</code>, and return 0 when the heap empties. Use <code>Comparator.reverseOrder()</code> for the max-heap — and with values bounded at 1000, a counting approach also works.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>215</b> and <b>692</b>. 215 fixes the direction rule — k largest means a min-heap — which is the error that costs people this whole family. 692 is the one that forces you to reason about <em>why</em> the comparator reads backwards, and once that clicks, writing a correct comparator for any two-key selection becomes mechanical.</div>
+</section>
+

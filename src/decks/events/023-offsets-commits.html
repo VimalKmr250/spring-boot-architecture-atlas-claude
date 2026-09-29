@@ -1,0 +1,57 @@
+<!-- events 23 -->
+<section class="slide" data-sec="Kafka internals" data-title="Offsets & commits">
+  <h2>Offsets: when you commit decides what you lose</h2>
+  <p class="dek">Four strategies. The dangerous one is the <em>raw client's</em> default — Spring's container quietly saves you from it, which is worth knowing precisely, because the answer to "what happens if I crash mid-batch?" depends on which of these you are actually running.</p>
+
+  <div class="grid2x2">
+    <div class="card">
+      <h3><span class="tag b">Auto-commit</span> — raw client default</h3>
+<pre style="margin-top:6px"><code class="language-yaml">enable.auto.commit: true
+auto.commit.interval.ms: 5000</code></pre>
+      <p>Commits on a <b>timer</b>, during <code>poll()</code>, regardless of whether your handler succeeded. A crash after the commit but before processing loses those records permanently.</p>
+      <p style="color:var(--text-3)">Acceptable only for telemetry where loss is cheaper than complexity — and <b>you will not get this by accident in Spring</b>: since spring-kafka 2.3 the listener container sets it to <code>false</code> unless you explicitly ask for <code>true</code>.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">BATCH</span> — what Spring actually gives you</h3>
+<pre style="margin-top:6px"><code class="language-yaml"># nothing to configure — this is the container default
+ack-mode: BATCH</code></pre>
+      <p>Offsets for the whole poll are committed after <em>every</em> record in it has been handled. No timer, so nothing is acknowledged before it was processed.</p>
+      <p style="color:var(--text-3)">Fine for most consumers. The gap: fail on record 400 of 500 and the poll's offsets are not committed, so all 500 are redelivered — which is correct, and is why the handler must be idempotent.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag w">RECORD</span> — commit per message</h3>
+<pre style="margin-top:6px"><code class="language-yaml">ack-mode: RECORD</code></pre>
+      <p>The container commits after each record returns. Narrowest redelivery window, and the most commit traffic — at volume it can dominate your processing time.</p>
+      <p style="color:var(--text-3)">Use when each message is expensive and irreplaceable, so the commit cost is noise.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag g">MANUAL_IMMEDIATE</span> — you decide</h3>
+<pre style="margin-top:6px"><code class="language-yaml">enable.auto.commit: false
+ack-mode: MANUAL_IMMEDIATE</code></pre>
+      <p>You take an <code>Acknowledgment</code> and call it once the work has committed. Same guarantee as RECORD, but <em>you</em> choose the moment — which is what lets you ack a duplicate early and skip the work.</p>
+      <p style="color:var(--text-3)"><b>The choice for anything that matters</b>, because the acknowledgement point becomes explicit in the code rather than implicit in a property.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Order of operations — the part that actually provides the guarantee</div>
+<pre><code class="language-java">@KafkaListener(topics = "orders.order.placed.v1", groupId = "inventory")
+public void on(OrderPlaced e, Acknowledgment ack) {
+    inventory.reserve(e);       // 1. do the work; its transaction commits
+    ack.acknowledge();          // 2. only then record that we handled it
+}
+// Crash between 1 and 2 → the record is redelivered → the idempotency
+// guard makes the second attempt a no-op. That is the whole contract.
+
+// Reset a group deliberately (offline, group must be inactive):
+// kafka-consumer-groups.sh --reset-offsets --group inventory \
+//   --topic orders.order.placed.v1 --to-datetime 2026-09-15T00:00:00.000 --execute</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl"><code>auto.offset.reset</code> is only used when there is no committed offset</span>A brand-new group, or one whose offsets expired. <code>latest</code> (the default) silently skips everything already on the topic — which is why a newly deployed consumer can appear to work while processing nothing. <code>earliest</code> replays all history, which can be a stampede. Choose it deliberately per consumer, and know which you have.</div>
+      <div class="note tip"><span class="lbl">Offsets are not a bookmark you own</span>They live in <code>__consumer_offsets</code> with their own retention (<code>offsets.retention.minutes</code>, seven days by default). A group that is down longer than that loses its position and falls back to <code>auto.offset.reset</code> — a genuinely nasty surprise after a long outage or a holiday shutdown.</div>
+    </div>
+  </div>
+</section>
+

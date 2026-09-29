@@ -1,0 +1,47 @@
+<!-- deck 10 -->
+<section class="slide" data-sec="Modular monolith" data-title="Enforcing it with ArchUnit">
+  <h2>A boundary nobody can break by accident</h2>
+  <p class="dek">Rules in a wiki decay. Rules in the test suite do not. These four tests, running in CI, are the difference between a modular monolith and a monolith with optimistic folder names.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">src/test/java/.../architecture/ModuleBoundaryTest.java</div>
+<pre><code class="language-java">@AnalyzeClasses(packages = "com.retailco.shop", importOptions = DoNotIncludeTests.class)
+class ModuleBoundaryTest {
+
+    /** 1. Nobody reaches into another module's internals. */
+    @ArchTest
+    static final ArchRule internals_are_private = SlicesRuleDefinition.slices()
+            .matching("com.retailco.shop.(*)..")
+            .namingSlices("module $1")
+            .should().notDependOnEachOther()
+            .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.(*).api.."))
+            .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.shared.."));
+
+    /** 2. No module cycles — the rule that keeps extraction possible. */
+    @ArchTest
+    static final ArchRule no_cycles = SlicesRuleDefinition.slices()
+            .matching("com.retailco.shop.(*)..")
+            .should().beFreeOfCycles();
+
+    /** 3. The domain stays framework-free: it must survive a Spring upgrade untouched. */
+    @ArchTest
+    static final ArchRule domain_is_pure = noClasses()
+            .that().resideInAPackage("..internal.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "org.springframework..", "jakarta.persistence..", "com.fasterxml.jackson..");
+
+    /** 4. Controllers never touch repositories — the layering most teams silently lose. */
+    @ArchTest
+    static final ArchRule web_goes_through_application = noClasses()
+            .that().resideInAPackage("..internal.web..")
+            .should().dependOnClassesThat().resideInAnyPackage("..internal.jpa..", "..internal.domain..repository..");
+}</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Cost</h4><p>Four tests, about 90 lines, ~6 s in CI. Written once in week one.</p></div>
+    <div class="card"><h4>What it buys</h4><p>A new joiner physically cannot create the shortcut that would take a quarter to unwind.</p></div>
+    <div class="card"><h4>Fitness function</h4><p>These are executable architecture. Add one every time a review catches the same mistake twice.</p></div>
+  </div>
+</section>
+

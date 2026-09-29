@@ -1,0 +1,33 @@
+<!-- events 08 -->
+<section class="slide" data-sec="Foundations" data-title="When not to">
+  <h2>When not to go event-driven</h2>
+  <p class="dek">The honest version of this list is what separates someone who has run an event-driven system from someone who has read about one.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Do not use events when…</h3>
+      <ul class="checks tight">
+        <li><b>The caller needs the answer now.</b> "Is this card authorised?" is a synchronous question. Making it async means inventing a pending state the whole product must handle.</li>
+        <li><b>You need a strong read-your-own-writes guarantee</b> and the UI cannot express "processing".</li>
+        <li><b>There is exactly one consumer, forever</b>, and it is owned by the same team. You have added a broker and gained decoupling from yourself.</li>
+        <li><b>The team has no operational capacity</b> for a broker — Kafka is a distributed system that needs owners, upgrades and on-call.</li>
+        <li><b>Ordering across entities is a business requirement.</b> Kafka orders within a partition only; global ordering means one partition, which means no parallelism.</li>
+        <li><b>You are using it to avoid fixing a boundary.</b> Events between two modules that share a database is decoupling theatre.</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The costs, stated plainly</h3>
+        <dl class="kv">
+          <dt>Debugging</dt><dd>A bug spans four services and a queue. Without end-to-end tracing you are reading four log files by timestamp.</dd>
+          <dt>Testing</dt><dd>You cannot unit-test a topology. You need contract tests, Testcontainers, and discipline about what each level proves.</dd>
+          <dt>Consistency</dt><dd>Every screen must handle "not yet". Product and design have to be part of this decision, not told afterwards.</dd>
+          <dt>Operations</dt><dd>Lag, DLTs, rebalances, disk, retention, schema compatibility, replay. All new work that did not exist before.</dd>
+          <dt>Cognitive load</dt><dd>New joiners must learn the topology, not just the codebase.</dd>
+        </dl>
+      </div>
+      <div class="note good"><span class="lbl">The proportionate default</span>Synchronous calls inside the request path for what must succeed now; events for everything that reacts. That is the rule from the architecture deck, and for most enterprise systems it is the whole of the event-driven architecture they need. Reach for the full toolkit — streams, projections, event mesh — when you have a specific problem it solves.</div>
+    </div>
+  </div>
+</section>
+

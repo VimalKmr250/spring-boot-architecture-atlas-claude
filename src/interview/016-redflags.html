@@ -1,0 +1,25 @@
+    <section class="ivsec" id="redflags">
+      <h2>Red flags, and how to say the right thing instead</h2>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>What sinks the answer</th><th>Say this instead</th></tr></thead>
+          <tbody>
+            <tr><td>"I'd use microservices."</td><td>"I'd start modular in one deployable, and split when I can point at scaling, SLA, team or compliance pressure."</td></tr>
+            <tr><td>"Kafka guarantees exactly-once."</td><td>"At-least-once delivery into an idempotent handler gives exactly-once effects. Kafka's transactions are exactly-once within Kafka."</td></tr>
+            <tr><td>"We'd just add a cache."</td><td>"I'd fix the query first; caching a bad query hides it until the cache misses at peak. Then cache, with an invalidation story."</td></tr>
+            <tr><td>"It scales horizontally."</td><td>"The app layer scales horizontally; the bottleneck is the database write path, and here's how I'd relieve it."</td></tr>
+            <tr><td>"We use Spring Boot and Kubernetes."</td><td>Describe behaviour and boundaries. Tools are the last five percent of the answer.</td></tr>
+            <tr><td>"I'd make the connection pool bigger."</td><td>"I'd check pool wait time first. If the database is the constraint, a bigger pool just moves the queue. I'd size it from throughput × hold time."</td></tr>
+            <tr><td>"We'd add more consumers."</td><td>"Consumers stop helping at the partition count, and scaling triggers a rebalance. I'd check whether the lag is on one partition or all of them first."</td></tr>
+            <tr><td>"I'd give it more heap."</td><td>"Is there an <code>OutOfMemoryError</code>, or an exit 137? The second is native memory, and a bigger heap makes it worse."</td></tr>
+            <tr><td>"The payment call goes inside the transaction."</td><td>"I'd never hold a database transaction open across a remote call. It holds a connection and its locks for the gateway's 800 ms."</td></tr>
+            <tr><td>"We validate the JWT, so it's secure."</td><td>"The token says who you are. It doesn't say you own order 88421, so the ownership check happens on every access."</td></tr>
+            <tr><td>Silence while thinking.</td><td>"Let me think about the consistency requirement here — I'm weighing a saga against keeping it in one transaction." Narrate; they are grading reasoning.</td></tr>
+            <tr><td>Defending the first idea.</td><td>"That constraint changes it — with a hard 200 ms budget I'd drop the synchronous tax call and use a cached estimate."</td></tr>
+            <tr><td>No failure discussion.</td><td>Volunteer it: "The obvious failure mode here is the payment gateway, so…" Bring it up before they have to ask.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">The last minute</span>When they ask if you have questions, ask something that only someone who would have to live in the system would ask: "What's your deployment frequency, and what usually blocks it?" · "Where do your boundaries currently hurt most?" · "How do you decide when to extract a service?" The answers tell you more about the job than any job description, and asking them is itself a signal.</div>
+    </section>
+

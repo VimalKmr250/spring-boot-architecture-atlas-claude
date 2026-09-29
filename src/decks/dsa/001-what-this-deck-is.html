@@ -1,0 +1,38 @@
+<!-- dsa 01 -->
+<section class="slide" data-sec="Orientation" data-title="What this deck is">
+  <h2>Thirty patterns, not one hundred and eighty problems</h2>
+  <p class="lede">Nobody solves an interview problem by recalling the problem. You recognise the <b>shape</b>, reach for the structure that fits it, and adapt three lines. This deck takes the thirty patterns one at a time, teaches each as a reusable Java structure, and drills it on the six LeetCode problems that stress a different corner of that one idea.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">30</span><p>patterns, each a self-contained topic. Nothing in one topic depends on having read another.</p></div>
+    <div class="card lift"><span class="bignum">180</span><p>LeetCode problems, linked. Two per pattern are solved in full; the other four are shown as a delta against that pattern's own structure.</p></div>
+    <div class="card lift"><span class="bignum">4</span><p>slides per pattern — mechanics, a dry run, the reusable structure, the six problems. Every line of code is Java 17+.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The four slides, every time</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Mechanics</dt><dd>The invariant that holds on every iteration, and the argument for why the work is bounded. This is the part that transfers to problems not on the list.</dd>
+        <dt>Dry run</dt><dd>One concrete input traced step by step, as a diagram and a table. If you cannot trace it by hand, you do not know it yet.</dd>
+        <dt>Structure</dt><dd>The generic Java skeleton, its variants, and the exact knobs you turn per problem.</dd>
+        <dt>Problems</dt><dd>The six, each with the path from brute force to optimal — not just the finished answer.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>How to use it</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each pattern is its own section.</li>
+        <li>New to pointer patterns? <b>Sliding window</b> opens with two extra slides that build the idea from zero, including a step-through you can type your own input into.</li>
+        <li>Work one pattern to the end before starting the next. They are deliberately independent.</li>
+        <li>Read the mechanics slide, then cover the dry-run table and trace the input yourself. Compare after.</li>
+        <li>Type the structure from memory before reading the problems. The structure is the unit of recall.</li>
+        <li>Copper marks the pointer or value that moved this step; <span style="color:var(--async);font-weight:600">teal</span> marks auxiliary state changing.</li>
+        <li>Complexity is always stated as <code>time / space</code>, excluding the space taken by the output. The <b>Complexity analysis</b> section, straight after these orientation slides, shows how every one of those figures is derived.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The one habit worth building</span>Before writing anything, say out loud which pattern you are using and what its invariant is. If you cannot name the invariant, you are about to write a loop you will then debug for ten minutes. Interviewers score that naming almost as highly as the code.</div>
+</section>
+

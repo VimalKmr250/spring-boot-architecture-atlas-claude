@@ -1,0 +1,44 @@
+<!-- streams 18 -->
+<section class="slide" data-sec="Intermediate operations" data-title="peek, parallel, sequential, unordered, onClose">
+  <h2>Operations that change how a pipeline runs, not what it computes</h2>
+  <p class="dek"><code>peek</code> looks at elements in passing, and exists for debugging. The other four set flags on the <b>whole</b> pipeline: run in parallel or sequentially, ignore encounter order, and register cleanup for when the stream is closed.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Each one, with its effect</div>
+<pre><code class="language-java">// peek: watch elements while debugging, then delete it
+List&lt;String&gt; ids = orders.stream()
+        .filter(o -&gt; o.total() &gt; 500)
+        .peek(o -&gt; log.debug("large order {}", o.id()))
+        .map(Order::id)
+        .toList();
+
+// The last parallel()/sequential() call wins, for every stage
+orders.stream().parallel().map(Order::id).sequential().isParallel();  // false
+
+// unordered(): allow the order to be lost, for cheaper parallel work
+Set&lt;String&gt; someIds = ids.parallelStream().unordered().limit(100)
+                         .collect(Collectors.toSet());
+
+// onClose: cleanup that close() runs, in registration order
+try (Stream&lt;String&gt; s = Stream.of("a").onClose(() -&gt; System.out.println("closed"))) {
+    s.count();
+}                                                     // prints "closed"</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>What it really does</th></tr></thead>
+        <tbody>
+          <tr><td><code>peek(action)</code></td><td>Runs the action on each element <em>that flows past</em>. Elements that never flow are never peeked: short-circuits, and <code>count()</code> on a sized stream. The Javadoc says it "exists mainly to support debugging".</td></tr>
+          <tr><td><code>parallel()</code> · <code>sequential()</code></td><td>Sets one mode for the entire pipeline, whatever its position. There is no way to run one stage in parallel.</td></tr>
+          <tr><td><code>unordered()</code></td><td>Drops the ordering constraint. It does not shuffle anything; it only permits operations to stop preserving order.</td></tr>
+          <tr><td><code>onClose(handler)</code></td><td>All handlers run on <code>close()</code>, even if one throws. The first exception propagates, with the rest attached as suppressed.</td></tr>
+          <tr><td><code>isParallel()</code> · <code>close()</code></td><td>Query the mode; close the stream. After <code>close()</code>, using the stream throws <code>IllegalStateException</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note bad"><span class="lbl">peek that changes things</span><code>orders.stream().peek(o -&gt; o.markExported()).count()</code> marks nothing. The list's size is known, so since Java 9 <code>count()</code> returns it without running the pipeline, and <code>peek</code> never fires. Any logic that must run belongs in <code>forEach</code>, or better, in a plain loop that says what it does.</div>
+</section>
+

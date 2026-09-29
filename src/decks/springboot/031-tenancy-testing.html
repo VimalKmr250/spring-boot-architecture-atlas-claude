@@ -1,0 +1,56 @@
+<!-- springboot 31 -->
+<section class="slide" data-sec="Security" data-title="Tenancy & testing">
+  <h2>Row-level scoping, multi-tenancy, and testing all of it</h2>
+  <p class="dek">The third authorisation layer, and the annotations that let you prove any of it works. A security rule with no test is a security rule that will be deleted by a refactor.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Scoping applied centrally, not per query</div>
+<pre><code class="language-java">// Hibernate filter enabled once per request — every query gets the predicate
+@Entity
+@FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
+@Filter(name = "tenant", condition = "tenant_id = :tenantId")
+class OrderJpaEntity { ... }
+
+@Component
+class TenantFilterActivator {
+    @PersistenceContext EntityManager em;
+    void activate(String tenantId) {
+        em.unwrap(Session.class).enableFilter("tenant").setParameter("tenantId", tenantId);
+    }
+}
+
+// Stronger: let PostgreSQL enforce it, so even a native query or a rogue
+// psql session cannot see another tenant's rows.
+// ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+// CREATE POLICY tenant_isolation ON orders
+//   USING (tenant_id = current_setting('app.tenant_id'));</code></pre>
+      <div class="codelabel" style="margin-top:14px">Testing security</div>
+<pre><code class="language-java">@WebMvcTest(OrderController.class)
+class OrderControllerSecurityTest {
+
+    @Test @WithMockUser(roles = "OPS")
+    void opsCanCancelAnyOrder() throws Exception { ... }
+
+    @Test @WithAnonymousUser
+    void anonymousGets401() throws Exception {
+        mvc.perform(post("/api/orders")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void customerCannotSeeAnotherCustomersOrder() throws Exception {
+        mvc.perform(get("/api/orders/{id}", otherOrderId)
+                .with(jwt().jwt(j -&gt; j.subject("customer-2"))))
+           .andExpect(status().isNotFound());     // 404, not 403 — do not confirm existence
+    }
+}
+// @WithSecurityContext for a fully custom principal</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">Multi-tenancy: pick deliberately</span><b>Shared schema + tenant column</b> — cheapest, needs RLS discipline, and one forgotten <code>WHERE</code> is a cross-tenant leak. <b>Schema per tenant</b> — good isolation, but migrations across 500 schemas get slow and a failure halfway leaves you inconsistent. <b>Database per tenant</b> — strongest, viable with tens of tenants, and what regulated customers pay for.</div>
+      <div class="note tip"><span class="lbl">404 or 403 for someone else's order?</span><b>404.</b> A 403 confirms the resource exists, which is an information leak — an attacker can enumerate order ids and learn your volume. Return 403 only when the user can legitimately know the resource exists but may not perform this action on it.</div>
+      <div class="note good"><span class="lbl">Write the negative tests</span>The tests that matter are the ones asserting someone is <em>refused</em>. Positive-only security tests pass just as happily against a filter chain that permits everything — which is exactly what an accidental <code>permitAll()</code> looks like.</div>
+    </div>
+  </div>
+</section>
+

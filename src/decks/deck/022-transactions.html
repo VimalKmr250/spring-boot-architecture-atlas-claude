@@ -1,0 +1,37 @@
+<!-- deck 22 -->
+<section class="slide" data-sec="Backend" data-title="Transactions">
+  <h2>Transactions: the four things that bite</h2>
+  <p class="dek"><code>@Transactional</code> looks like a keyword and behaves like a proxy. Almost every production transaction bug is one of these four.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>1 · Self-invocation does nothing</h3>
+<pre><code class="language-java">@Service
+class OrderService {
+    public void importAll(List&lt;Row&gt; rows) {
+        rows.forEach(this::importOne);   // ← proxy bypassed
+    }
+    @Transactional public void importOne(Row r) { ... }  // NOT transactional here
+}</code></pre>
+      <p>Fix: move <code>importOne</code> to another bean, or inject <code>TransactionTemplate</code>. Spring does <b>not</b> warn you — the reference manual's own words are that the annotation "may be silently ignored", and your code appears to work until you test a rollback. AspectJ weaving is the only mode that advises self-invocation; an IDE inspection is the cheap defence.</p>
+    </div>
+    <div class="card">
+      <h3>2 · Rollback rules surprise people</h3>
+      <p>By default Spring rolls back on <code>RuntimeException</code> and <code>Error</code> — <b>not</b> on checked exceptions. A checked <code>PaymentDeclinedException</code> commits the half-written order.</p>
+<pre><code class="language-java">@Transactional(rollbackFor = Exception.class)</code></pre>
+      <p>…or simply make domain exceptions unchecked, which is the convention worth adopting wholesale.</p>
+    </div>
+    <div class="card">
+      <h3>3 · The transaction is not the message boundary</h3>
+      <p>Committing the order and publishing to Kafka are two systems. There is no distributed transaction here that you want. Use the outbox: write the event to your database in the same transaction, relay it after.</p>
+      <p style="color:var(--text-3)">"Send then commit" loses events on rollback; "commit then send" loses them on crash. Only the outbox survives both.</p>
+    </div>
+    <div class="card">
+      <h3>4 · <code>REQUIRES_NEW</code> is a second connection</h3>
+      <p>It suspends the current transaction and takes another connection from the pool. Nest it inside a loop and you deadlock your own pool. Legitimate uses: audit rows that must survive a rollback, and <code>@ApplicationModuleListener</code>.</p>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking and lets the driver route to a replica.</div>
+</section>
+

@@ -1,0 +1,52 @@
+<!-- streams 29 -->
+<section class="slide" data-sec="Collectors" data-title="groupingBy, all three overloads">
+  <h2><code>groupingBy</code>: the GROUP BY of streams</h2>
+  <p class="dek"><code>groupingBy</code> sorts elements into buckets by a key, then reduces each bucket with a <b>downstream collector</b>, which defaults to <code>toList()</code>. Most interview coding questions about employees and departments come down to one <code>groupingBy</code> with the right downstream.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The three overloads, then nesting and composite keys</div>
+<pre><code class="language-java">// 1 · key → list of elements                     (a HashMap of ArrayLists today)
+Map&lt;String, List&lt;Order&gt;&gt; byStatus = orders.stream()
+        .collect(Collectors.groupingBy(Order::status));
+
+// 2 · key → a reduced value
+Map&lt;String, Double&gt; revenueByCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.summingDouble(Order::total)));
+
+// 3 · you choose the map
+TreeMap&lt;String, Long&gt; countByStatus = orders.stream()
+        .collect(Collectors.groupingBy(Order::status, TreeMap::new,
+                 Collectors.counting()));
+
+// Two levels: customer → status → orders
+Map&lt;String, Map&lt;String, List&lt;Order&gt;&gt;&gt; nested = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.groupingBy(Order::status)));
+
+// A composite key is a record, not a concatenated string
+record CustomerStatus(String customer, String status) {}
+Map&lt;CustomerStatus, Long&gt; pairs = orders.stream()
+        .collect(Collectors.groupingBy(
+                 o -&gt; new CustomerStatus(o.customer(), o.status()),
+                 Collectors.counting()));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Overload</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td><code>groupingBy(classifier)</code></td><td><code>Map&lt;K, List&lt;T&gt;&gt;</code></td></tr>
+            <tr><td><code>groupingBy(classifier, downstream)</code></td><td><code>Map&lt;K, D&gt;</code></td></tr>
+            <tr><td><code>groupingBy(classifier, mapFactory, downstream)</code></td><td>The map type you supply</td></tr>
+            <tr><td><code>groupingByConcurrent</code> ×3</td><td>A <code>ConcurrentMap</code>, for parallel streams</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note bad"><span class="lbl">The null key</span>A classifier that returns <code>null</code> throws <code>NullPointerException: element cannot be mapped to a null key</code>. It is the <code>groupingBy</code> version of the <code>toMap</code> surprise: the test data had a status on every order. Map missing keys to a real value, for example <code>o -&gt; Objects.requireNonNullElse(o.status(), "UNKNOWN")</code>.</div>
+      <div class="note warn"><span class="lbl">Key order and missing groups</span>The default map is a <code>HashMap</code>, so printing it gives no particular order: pass <code>TreeMap::new</code> or <code>LinkedHashMap::new</code> when order matters. And a group exists only for keys that occur. A status with no orders is absent, not an empty list.</div>
+    </div>
+  </div>
+</section>
+

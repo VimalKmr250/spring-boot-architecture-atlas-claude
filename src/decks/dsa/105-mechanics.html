@@ -1,0 +1,91 @@
+<!-- dsa · pattern 19 · mechanics -->
+<section class="slide" data-sec="19 · Backtracking with constraints" data-title="Mechanics">
+  <h2>Prune early, and make the feasibility test O(1)</h2>
+  <p class="dek">Plain enumeration explores the whole tree. Constrained backtracking kills a branch the moment it becomes impossible — and the difference between a solution that finishes and one that times out is almost always <b>how cheaply you can ask "is this still legal?"</b>.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Two kinds of pruning</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Feasibility</dt><dd>This branch violates a rule <em>now</em> — a queen attacks another, a cell is already on the path, the remaining sum went negative. Cut immediately.</dd>
+        <dt>Bound</dt><dd>This branch cannot possibly reach a solution even if everything goes well — not enough candidates remain, or the smallest remaining value already exceeds the target. Cut on arithmetic rather than on a rule.</dd>
+      </dl>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Both belong at the <b>top of the loop body</b>, before the choose step. Pruning after recursing does the work you were trying to avoid.</p>
+    </div>
+    <div class="panel">
+      <h3>Make the test O(1)</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">A feasibility check that scans the partial solution turns an already exponential search into something far worse. Maintain <b>incremental state</b> instead, updated on choose and restored on un-choose.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">For N-Queens, three boolean arrays — column, and the two diagonals keyed by <code>r + c</code> and <code>r − c + n</code> — turn an O(n) scan into three array reads. For a grid walk, mutating the board itself records the visited set with no extra memory at all.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Identifying that state is the real work in this pattern. The recursion is unchanged.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 262" role="img" aria-label="A search tree with branches pruned early, and the diagonal indexing used for constant-time queen checks">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">PRUNING CUTS SUBTREES, NOT LEAVES</text>
+
+        <circle cx="140" cy="42" r="15" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.6"></circle>
+        <path d="M128 54 L82 78" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M152 54 L198 78" stroke="#D26A3F" stroke-opacity="0.5" stroke-width="1.4" stroke-dasharray="4 3"></path>
+        <circle cx="70" cy="90" r="15" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="210" cy="90" r="15" fill="none" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="3 2"></circle>
+        <path d="M202 82 L218 98" stroke="#D26A3F" stroke-width="1.8"></path>
+        <path d="M218 82 L202 98" stroke="#D26A3F" stroke-width="1.8"></path>
+        <text x="240" y="94" font-size="10.5" font-family="monospace" fill="#D26A3F">illegal — cut here</text>
+
+        <path d="M60 102 L34 126" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M80 102 L106 126" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="26" cy="138" r="13" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <circle cx="114" cy="138" r="13" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></circle>
+
+        <path d="M210 108 L180 136" stroke="currentColor" stroke-opacity="0.12" stroke-width="1" stroke-dasharray="2 3"></path>
+        <path d="M210 108 L244 136" stroke="currentColor" stroke-opacity="0.12" stroke-width="1" stroke-dasharray="2 3"></path>
+        <circle cx="174" cy="146" r="12" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-dasharray="2 3"></circle>
+        <circle cx="250" cy="146" r="12" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-dasharray="2 3"></circle>
+        <text x="212" y="180" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.4">never explored</text>
+
+        <line x1="330" y1="28" x2="330" y2="200" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="366" y="44" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">CONSTANT-TIME QUEEN CHECK</text>
+        <g>
+          <rect x="380" y="56" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="414" y="56" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="448" y="56" width="34" height="34" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="482" y="56" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="380" y="90" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="414" y="90" width="34" height="34" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+          <rect x="448" y="90" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="482" y="90" width="34" height="34" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+          <rect x="380" y="124" width="34" height="34" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+          <rect x="414" y="124" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="448" y="124" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+          <rect x="482" y="124" width="34" height="34" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        </g>
+        <text x="465" y="78" text-anchor="middle" font-size="13" fill="currentColor">Q</text>
+
+        <text x="540" y="72" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.75">col[c]</text>
+        <text x="620" y="72" font-size="10" fill="currentColor" opacity="0.6">same column</text>
+        <text x="540" y="94" font-size="10.5" font-family="monospace" fill="#3AA79B">diag[r + c]</text>
+        <text x="620" y="94" font-size="10" fill="currentColor" opacity="0.6">↙↗ is constant along r + c</text>
+        <text x="540" y="116" font-size="10.5" font-family="monospace" fill="#3AA79B">anti[r − c + n]</text>
+        <text x="620" y="116" font-size="10" fill="currentColor" opacity="0.6">↘↖ is constant along r − c</text>
+        <text x="540" y="142" font-size="10" fill="currentColor" opacity="0.55">the + n shifts the range into [0, 2n)</text>
+
+        <line x1="14" y1="214" x2="866" y2="214" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="234" font-size="11" fill="currentColor" opacity="0.72">Three array reads replace scanning the board. The state is updated on choose and restored on un-choose, exactly like the path itself.</text>
+        <text x="14" y="254" font-size="11" fill="currentColor" opacity="0.72">Finding that O(1) encoding is the actual work in this pattern — the recursion is identical to the unconstrained version.</text>
+      </svg>
+    </div>
+    <figcaption>Cutting a branch at depth 2 removes every descendant below it. That is why the test must be cheap and must run <em>before</em> the recursive call rather than inside it.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Enumeration plus rules: a grid path that cannot revisit cells, a partition where every piece must satisfy a predicate, placements that must not conflict. Constraints are what keep the exponential search tractable.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Only a count or an optimum is wanted and subproblems repeat — that is dynamic programming. Backtracking re-explores overlapping states; DP solves each once.</p></div>
+    <div class="card"><h4>Complexity</h4><p>Worst case still exponential — <b>O(m·n·4^L)</b> for a grid word search, <b>O(n!)</b> for N-Queens — but pruning makes the practical running time far smaller. State the worst case, then say what the pruning buys.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"return all unique combinations"</b> where each number is used once · <b>"the same letter cell may not be used more than once"</b> · <b>"partition so that every substring is a palindrome"</b> · <b>"place n queens such that no two attack each other"</b> · <b>"all letter combinations the number could represent"</b>. The tell is <b>enumerate</b> plus an explicit <b>rule</b> that candidates must satisfy.</div>
+</section>
+

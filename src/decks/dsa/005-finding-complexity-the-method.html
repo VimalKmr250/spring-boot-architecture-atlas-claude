@@ -1,0 +1,101 @@
+<!-- dsa · complexity 01 · the method -->
+<section class="slide" data-sec="Complexity analysis" data-title="Finding complexity: the method">
+  <h2>Count the work, then keep only what grows</h2>
+  <p class="dek">Every pattern in this deck quotes a <code>time / space</code> figure. None of them needs memorising: each one is <b>derived</b> by counting, and the counting takes the same five steps every time. Learn the steps once and you can price code that is not on the list — including your own half-written solution, while there is still time to change it.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The five steps</h3>
+      <ol class="tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Name the size variables.</b> <code>n</code> for the array, but also <code>m</code> for a second input, <code>k</code> for a window or heap, <code>L</code> for a string's length, <code>V</code> and <code>E</code> for a graph. Never fold two independent inputs into one <code>n</code>.</li>
+        <li><b>Price one unit of work.</b> Find the statement that runs most often, and cost every line that is not O(1): a sort, a <code>substring</code>, a heap push, a copy of a list.</li>
+        <li><b>Count how often it runs.</b> Sequential blocks add. Nested loops multiply. A range that halves contributes a log. Recursion is calls × work per call. A pointer that only moves forward is counted over the whole run, not per iteration.</li>
+        <li><b>Simplify.</b> Drop constant factors and lower-order terms: <code>3n² + 5n + 7</code> is O(n²). Independent variables stay side by side — O(n + m) does not become O(n).</li>
+        <li><b>Repeat for space.</b> The peak extra memory alive at any one moment: structures that grow with the input, plus the deepest recursion stack. The input and the output are excluded, and you say so.</li>
+      </ol>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Code shape</th><th>Contributes</th></tr></thead>
+        <tbody>
+          <tr><td>Block A, then block B</td><td class="num">O(A + B) — the larger wins</td></tr>
+          <tr><td>A loop of n whose body costs B</td><td class="num">O(n · B)</td></tr>
+          <tr><td>Two nested loops, both to n</td><td class="num">O(n²)</td></tr>
+          <tr><td>Inner loop starts at <code>i + 1</code></td><td class="num">n(n−1)/2 → O(n²)</td></tr>
+          <tr><td>A loop over n, then a separate one over m</td><td class="num">O(n + m)</td></tr>
+          <tr><td>A loop over n with a loop over m inside</td><td class="num">O(n · m)</td></tr>
+          <tr><td><code>i *= 2</code>, or the range halves</td><td class="num">O(log n)</td></tr>
+          <tr><td><code>while (i * i &lt;= n)</code></td><td class="num">O(√n)</td></tr>
+          <tr><td>Inner bound is a constant, like 26</td><td class="num">O(n) — 26 is a constant</td></tr>
+          <tr><td>A pointer that never moves back</td><td class="num">O(n) in total — amortised</td></tr>
+          <tr><td>Recursion</td><td class="num">calls × work per call</td></tr>
+          <tr><td>Memoised recursion</td><td class="num">states × work per state</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 264" role="img" aria-label="Operations needed at n equal to one hundred thousand for each complexity class, on a log scale, against a budget of one hundred million operations per second">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">OPERATIONS AT n = 10⁵ · LOG SCALE</text>
+        <text x="486" y="16" font-size="10.5" font-family="monospace" fill="#D26A3F">BUDGET · 10⁸ ≈ ONE SECOND</text>
+        <path d="M480 22 L480 226" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3"></path>
+
+        <!-- within budget -->
+        <text x="14" y="42" font-size="11.5" font-family="monospace" fill="currentColor">O(1)</text>
+        <rect x="130" y="30" width="4" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="142" y="42" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">1</text>
+
+        <text x="14" y="66" font-size="11.5" font-family="monospace" fill="currentColor">O(log n)</text>
+        <rect x="130" y="54" width="54" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="192" y="66" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">17</text>
+
+        <text x="14" y="90" font-size="11.5" font-family="monospace" fill="currentColor">O(√n)</text>
+        <rect x="130" y="78" width="109" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="247" y="90" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">316</text>
+
+        <text x="14" y="114" font-size="11.5" font-family="monospace" fill="currentColor">O(n)</text>
+        <rect x="130" y="102" width="219" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="357" y="114" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.7">10⁵ · ≈ 1 ms</text>
+
+        <text x="14" y="138" font-size="11.5" font-family="monospace" fill="currentColor">O(n log n)</text>
+        <rect x="130" y="126" width="272" height="16" rx="2" fill="#3AA79B" fill-opacity="0.3" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="394" y="138" text-anchor="end" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.8">1.7 × 10⁶ · ≈ 17 ms</text>
+
+        <!-- over budget -->
+        <text x="14" y="162" font-size="11.5" font-family="monospace" fill="currentColor">O(n²)</text>
+        <rect x="130" y="150" width="438" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="576" y="162" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10¹⁰ · ≈ 100 s</text>
+
+        <text x="14" y="186" font-size="11.5" font-family="monospace" fill="currentColor">O(n³)</text>
+        <rect x="130" y="174" width="656" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="778" y="186" text-anchor="end" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10¹⁵ · ≈ four months</text>
+
+        <text x="14" y="210" font-size="11.5" font-family="monospace" fill="currentColor">O(2ⁿ)</text>
+        <rect x="130" y="198" width="700" height="16" rx="2" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <path d="M830 206 L862 206" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></path>
+        <text x="820" y="210" text-anchor="end" font-size="10.5" font-family="monospace" font-weight="600" fill="#D26A3F">10³⁰¹⁰³ · never finishes</text>
+
+        <!-- axis -->
+        <line x1="130" y1="226" x2="830" y2="226" stroke="currentColor" stroke-opacity="0.3"></line>
+        <path d="M130 226 V230 M217.5 226 V230 M305 226 V230 M392.5 226 V230 M480 226 V230 M567.5 226 V230 M655 226 V230 M742.5 226 V230 M830 226 V230" stroke="currentColor" stroke-opacity="0.3"></path>
+        <text x="130" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁰</text>
+        <text x="217.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10²</text>
+        <text x="305" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁴</text>
+        <text x="392.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁶</text>
+        <text x="480" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10⁸</text>
+        <text x="567.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁰</text>
+        <text x="655" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹²</text>
+        <text x="742.5" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁴</text>
+        <text x="830" y="241" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">10¹⁶</text>
+
+        <text x="14" y="259" font-size="11" fill="currentColor" opacity="0.72">One rung down the ladder — n² to n log n — is a 6 000× saving at this size. No faster machine buys you that.</text>
+      </svg>
+    </div>
+    <figcaption>The same n = 10⁵ priced at each rung, against the budget of roughly 10⁸ simple operations per second from the constraints slide. Everything left of the dashed line finishes in time; everything right of it is a time-limit error.</figcaption>
+  </figure>
+
+  <div class="note tip"><span class="lbl">Worst case, unless you say otherwise</span>A bare Big-O is read as the worst case. When a figure only holds <b>on average</b> — <code>HashMap</code> lookups, quickselect — say so, and expect the worst case as the follow-up question. When it only holds over the whole run, as with the sliding window's inner loop, say <b>amortised</b>. Interviewers listen for those two qualifiers.</div>
+</section>
+

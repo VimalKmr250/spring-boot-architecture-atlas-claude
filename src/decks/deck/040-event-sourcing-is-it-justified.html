@@ -1,0 +1,61 @@
+<!-- deck 40 -->
+<section class="slide" data-sec="Data" data-title="Event sourcing: is it justified?">
+  <h2>Event sourcing: store the decisions, derive the state</h2>
+  <p class="dek">Instead of a row that holds where the order is now, an append-only log of everything that happened to it. Current state is a fold over that log. The question is never "is it elegant" — it is whether the audit trail is a requirement or a nice-to-have.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 236" role="img" aria-label="State storage keeps one mutable row where the previous status is overwritten; event sourcing appends immutable events and derives the current state by replaying them, preserving the full history">
+        <text x="14" y="18" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">STATE STORAGE — one row, updated in place</text>
+        <rect x="14" y="28" width="380" height="52" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="30" y="50" font-size="10.5" font-family="monospace" fill="currentColor">orders: id=88421  status=SHIPPED  total=4250  version=7</text>
+        <text x="30" y="70" font-size="10" fill="#A22636">the six previous states are gone — overwritten, unrecoverable</text>
+
+        <text x="14" y="112" font-size="10.5" font-weight="600" fill="currentColor" opacity="0.65">EVENT SOURCING — append only, nothing is ever overwritten</text>
+        <rect x="14" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="58" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">OrderPlaced</text>
+        <text x="58" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t0</text>
+        <rect x="112" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="156" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">LineAdded</text>
+        <text x="156" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t1</text>
+        <rect x="210" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="254" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">PaymentTaken</text>
+        <text x="254" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t2</text>
+        <rect x="308" y="122" width="88" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="352" y="140" text-anchor="middle" font-size="9.5" fill="currentColor">Shipped</text>
+        <text x="352" y="155" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.6">t3</text>
+        <line x1="404" y1="143" x2="440" y2="143" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="422" y="135" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.6">fold</text>
+
+        <rect x="446" y="118" width="170" height="50" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="531" y="140" text-anchor="middle" font-size="11" fill="currentColor">current state</text>
+        <text x="531" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">derived, never stored as truth</text>
+
+        <text x="642" y="130" font-size="10" fill="currentColor" opacity="0.75">"What did this order look like</text>
+        <text x="642" y="145" font-size="10" fill="currentColor" opacity="0.75">on the 3rd, before the refund?"</text>
+        <text x="642" y="163" font-size="10" fill="#3AA79B">Replay to t2. Free here;</text>
+        <text x="642" y="178" font-size="10" fill="#3AA79B">impossible above.</text>
+
+        <line x1="14" y1="200" x2="866" y2="200" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="222" font-size="10.5" fill="currentColor" opacity="0.8">The events are the source of truth, so they can never be deleted or edited — which is the benefit, and also every one of the costs.</text>
+      </svg>
+    </div>
+    <figcaption>Note what this is <em>not</em>: publishing domain events from a normal state-stored aggregate (the outbox pattern) gives you integration and a useful audit log without any of the machinery on the next slide. Most teams want that, not this.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h3>Justified when</h3><ul class="tight">
+      <li>The audit trail <b>is</b> the requirement — ledgers, trading, regulated workflows where "prove what you knew and when" is a legal question.</li>
+      <li>Temporal queries are a real business need, not a hypothetical.</li>
+      <li>The domain is genuinely event-shaped and experts already talk in events.</li>
+      <li>You need to retro-actively fix a bug by replaying with corrected logic.</li>
+    </ul></div>
+    <div class="card"><h3>Not justified when</h3><ul class="tight">
+      <li>"It would be good to have history" — an audit table or a domain-event log is a tenth of the cost.</li>
+      <li>The team has not run it before and the domain is still moving.</li>
+      <li>Ad-hoc querying matters: analysts cannot query an event stream.</li>
+      <li>You mainly wanted decoupling — that is the outbox, and you can have it today.</li>
+    </ul></div>
+  </div>
+</section>
+

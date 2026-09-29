@@ -1,0 +1,44 @@
+<!-- streams 24 -->
+<section class="slide" data-sec="Primitive streams" data-title="Summary statistics and numeric traps">
+  <h2>Four numeric answers that surprise people</h2>
+  <p class="dek">The primitive streams and numeric collectors are convenient and nearly always right. These four edge cases are the exceptions that turn into production bugs: overflow, the average of nothing, the statistics of nothing, and floating-point totals. Every output below is from JDK 25.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>1 · <code>sum()</code> overflows silently</h4>
+<pre><code class="language-java">IntStream.of(Integer.MAX_VALUE, 1).sum();                   // -2147483648
+Stream.of(Integer.MAX_VALUE, 1)
+      .collect(Collectors.summingInt(x -&gt; x));              // -2147483648
+IntStream.of(Integer.MAX_VALUE, 1).asLongStream().sum();    // 2147483648</code></pre>
+      <p>A revenue total held in cents as an <code>int</code> overflows at about $21.4 million, with no exception. Sum into a <code>long</code> with <code>asLongStream()</code> or <code>mapToLong</code>, or use <code>Math.addExact</code> in a <code>reduce</code> if overflow must fail loudly.</p>
+    </div>
+    <div class="card">
+      <h4>2 · The average of nothing: empty, or zero</h4>
+<pre><code class="language-java">IntStream.empty().average();                                // OptionalDouble.empty
+Stream.&lt;Integer&gt;empty()
+      .collect(Collectors.averagingInt(x -&gt; x));            // 0.0</code></pre>
+      <p>The stream says there is no average; the collector says it is zero. A dashboard showing an average order value of $0.00 on a day with no orders is this bug. Prefer the <code>OptionalDouble</code>, and decide what "no data" should display.</p>
+    </div>
+    <div class="card">
+      <h4>3 · The statistics of nothing</h4>
+<pre><code class="language-java">IntStream.of(4, 8, 15).summaryStatistics();
+// IntSummaryStatistics{count=3, sum=27, min=4, average=9.000000, max=15}
+
+IntStream.empty().summaryStatistics();
+// IntSummaryStatistics{count=0, sum=0, min=2147483647,
+//                      average=0.000000, max=-2147483648}</code></pre>
+      <p>On an empty stream, <code>getMin()</code> is <code>Integer.MAX_VALUE</code> and <code>getMax()</code> is <code>Integer.MIN_VALUE</code>. Check <code>getCount()</code> before reading either, or a report shows a minimum price of 2,147,483,647.</p>
+    </div>
+    <div class="card">
+      <h4>4 · Floating-point totals depend on how you add</h4>
+<pre><code class="language-java">DoubleStream.of(0.1, 0.2, 0.3).sum();      // 0.6
+double s = 0;
+for (double d : new double[]{0.1, 0.2, 0.3}) s += d;
+// s is 0.6000000000000001</code></pre>
+      <p><code>DoubleStream.sum()</code> uses compensated summation, so it is more accurate than a naive loop, and refactoring between the two changes the last digits. For money, neither is right: use <code>long</code> cents, or <code>BigDecimal</code> with <code>reduce(BigDecimal.ZERO, BigDecimal::add)</code>.</p>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">The statistics classes</span><code>IntSummaryStatistics</code>, <code>LongSummaryStatistics</code> and <code>DoubleSummaryStatistics</code> compute count, sum, min, average and max in one pass. Get them from <code>summaryStatistics()</code> on a primitive stream, or from <code>Collectors.summarizingInt</code> and friends, which also work downstream of a <code>groupingBy</code>: one pass gives the statistics of every group.</div>
+</section>
+

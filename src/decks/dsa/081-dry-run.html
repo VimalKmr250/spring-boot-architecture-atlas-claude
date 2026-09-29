@@ -1,0 +1,90 @@
+<!-- dsa · pattern 14 · dry run -->
+<section class="slide" data-sec="14 · Linked list manipulation" data-title="Dry run">
+  <h2>LC 25 traced on <code>1→2→3→4→5</code>, k = 3</h2>
+  <p class="dek">Reverse each group of three; leave any short remainder alone. The result is <code>3→2→1→4→5</code>. The whole problem is bookkeeping: for each group you need the node before it, its old head, and its old tail — because the old head becomes the new tail and must be reconnected.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 300" role="img" aria-label="Reversing the first group of three nodes and reconnecting the surrounding pointers">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">BEFORE — GROUP OF 3 IDENTIFIED</text>
+
+        <circle cx="70" cy="62" r="19" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="4 3"></circle>
+        <text x="70" y="67" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor">dum</text>
+        <path d="M89 62 L131 62" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="150" cy="62" r="19" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="150" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <path d="M169 62 L211 62" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="230" cy="62" r="19" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="230" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <path d="M249 62 L291 62" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="310" cy="62" r="19" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="310" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <path d="M329 62 L371 62" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="390" cy="62" r="19" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="390" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <path d="M409 62 L451 62" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="470" cy="62" r="19" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="470" y="67" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">5</text>
+
+        <text x="70" y="98" text-anchor="middle" font-size="9" font-family="monospace" fill="#3AA79B">groupPrev</text>
+        <text x="150" y="98" text-anchor="middle" font-size="9" font-family="monospace" fill="#D26A3F">old head</text>
+        <text x="310" y="98" text-anchor="middle" font-size="9" font-family="monospace" fill="#D26A3F">old tail (kth)</text>
+        <text x="390" y="98" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.5">next group</text>
+        <text x="540" y="56" font-size="10.5" fill="currentColor" opacity="0.62">Walk k steps to find the kth node.</text>
+        <text x="540" y="72" font-size="10.5" fill="currentColor" opacity="0.62">If it is null, the remainder is short —</text>
+        <text x="540" y="88" font-size="10.5" fill="currentColor" opacity="0.62">stop and leave it as it is.</text>
+
+        <line x1="14" y1="116" x2="866" y2="116" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="136" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">AFTER — GROUP REVERSED AND RECONNECTED</text>
+
+        <circle cx="70" cy="182" r="19" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="4 3"></circle>
+        <text x="70" y="187" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor">dum</text>
+        <path d="M89 182 L131 182" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <circle cx="150" cy="182" r="19" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F" stroke-width="1.7"></circle>
+        <text x="150" y="187" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">3</text>
+        <path d="M169 182 L211 182" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="230" cy="182" r="19" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="230" y="187" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <path d="M249 182 L291 182" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="310" cy="182" r="19" fill="#3AA79B" fill-opacity="0.25" stroke="#3AA79B" stroke-width="1.6"></circle>
+        <text x="310" y="187" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">1</text>
+        <path d="M329 182 L371 182" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></path>
+        <circle cx="390" cy="182" r="19" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="390" y="187" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <path d="M409 182 L451 182" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="470" cy="182" r="19" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="470" y="187" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">5</text>
+
+        <text x="150" y="218" text-anchor="middle" font-size="9" font-family="monospace" fill="#D26A3F">new head</text>
+        <text x="310" y="218" text-anchor="middle" font-size="9" font-family="monospace" fill="#3AA79B">new tail — becomes groupPrev</text>
+
+        <text x="540" y="164" font-size="10.5" fill="currentColor" opacity="0.62">Two reconnections make it work:</text>
+        <text x="540" y="182" font-size="10.5" font-family="monospace" fill="#D26A3F">groupPrev.next = kth</text>
+        <text x="540" y="200" font-size="10.5" font-family="monospace" fill="#3AA79B">oldHead.next = nextGroup</text>
+        <text x="540" y="222" font-size="10.5" fill="currentColor" opacity="0.62">Then groupPrev = oldHead, and repeat.</text>
+
+        <line x1="14" y1="240" x2="866" y2="240" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="260" font-size="11" fill="currentColor" opacity="0.72">Second pass: <tspan font-family="monospace">groupPrev</tspan> is now node 1, and walking 3 steps from it hits null — only 4 and 5 remain.</text>
+        <text x="14" y="278" font-size="11" fill="currentColor" opacity="0.72">So the loop stops and <tspan font-family="monospace">4→5</tspan> is left untouched, exactly as the problem requires.</text>
+        <text x="14" y="296" font-size="10.5" fill="currentColor" opacity="0.55">Result: 3→2→1→4→5.</text>
+      </svg>
+    </div>
+    <figcaption>The old head becomes the new tail — that is the single fact the whole algorithm turns on. Saving it before reversing is what makes the second reconnection possible.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Step</th><th>What it does</th><th>Why it is needed</th></tr></thead>
+      <tbody>
+        <tr><td>Find <code>kth</code></td><td>Walk <code>k</code> steps from <code>groupPrev</code>.</td><td>If it is null, fewer than <code>k</code> nodes remain — stop, leaving the tail alone.</td></tr>
+        <tr><td>Save <code>nextGroup</code></td><td><code>kth.next</code>, before anything is rewired.</td><td>The reversal overwrites it; without this the rest of the list is lost.</td></tr>
+        <tr><td>Reverse</td><td>Standard three-pointer reverse, seeded with <code>prev = nextGroup</code>.</td><td>Seeding with <code>nextGroup</code> instead of <code>null</code> performs the tail reconnection for free.</td></tr>
+        <tr><td>Reconnect front</td><td><code>groupPrev.next = kth</code>.</td><td><code>kth</code> is now the group's first node, so the preceding node must point at it.</td></tr>
+        <tr><td>Advance</td><td><code>groupPrev = oldHead</code>.</td><td>The old head is now the group's last node, so it precedes the next group.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">The trick worth stealing</span>Seeding the reversal with <code>prev = nextGroup</code> rather than <code>null</code> means the old head's <code>next</code> already points at the following group when the reversal finishes. One of the two reconnections happens automatically, which removes a line and with it the most common place this problem goes wrong.</div>
+</section>
+

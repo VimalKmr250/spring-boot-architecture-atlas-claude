@@ -1,0 +1,179 @@
+<!-- dsa · pattern 01 · streams -->
+<section class="slide" data-sec="01 · Sliding window" data-title="The six, in streams">
+  <h2>A window cannot slide in a stream, so change the question</h2>
+  <p class="dek">A sliding window is two pointers plus a count that both of them update: state carried from one element to the next, which no Java 17 stream stage can hold. So each pipeline below asks a question with no moving window in it: how far a run goes from each start, where each letter occurs, which indices a window may swallow. Only 904 carries the loop's state itself, in a record handed from step to step.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">3</td><td><a href="https://leetcode.com/problems/longest-substring-without-repeating-characters/" target="_blank" rel="noopener">Longest Substring Without Repeating Characters</a></td><td>From every start, <code>takeWhile(seen::add)</code> counts how far the letters stay distinct. The alphabet caps every run.</td><td><span class="tag w">stateful</span></td><td class="num">O(n·k) / O(k), k ≤ 95</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">209</td><td><a href="https://leetcode.com/problems/minimum-size-subarray-sum/" target="_blank" rel="noopener">Minimum Size Subarray Sum</a></td><td>Prefix sums, then a binary search per end for the latest start that still reaches <code>target</code>. This is LeetCode's own O(n log n) follow-up.</td><td><span class="tag w">stateful</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">424</td><td><a href="https://leetcode.com/problems/longest-repeating-character-replacement/" target="_blank" rel="noopener">Longest Repeating Character Replacement</a></td><td>Per letter, the gaps between its non-matching indices. The best window swallows exactly k of them.</td><td><span class="tag g">clean</span></td><td class="num">O(26·n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">904</td><td><a href="https://leetcode.com/problems/fruit-into-baskets/" target="_blank" rel="noopener">Fruit Into Baskets</a></td><td><code>Stream.iterate</code> over a record holding the two types, the trailing run and the window length.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">567</td><td><a href="https://leetcode.com/problems/permutation-in-string/" target="_blank" rel="noopener">Permutation in String</a></td><td>Every window of width <code>|s1|</code>, counted from scratch by a <code>collect</code> and compared.</td><td><span class="tag g">clean</span></td><td class="num">O(n·m) / O(1)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">76</td><td><a href="https://leetcode.com/problems/minimum-window-substring/" target="_blank" rel="noopener">Minimum Window Substring</a></td><td>Occurrence lists per letter. The shortest cover from <code>l</code> ends at the <code>need[c]</code>-th occurrence of every needed letter.</td><td><span class="tag g">clean</span></td><td class="num">O(n·k log n) / O(n)</td><td class="num">O(n + m) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 3 · Longest Substring Without Repeating Characters · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int lengthOfLongestSubstring(String s) {
+        // From each start: how long do letters stay distinct?
+        // A distinct run is at most ~95 printable characters,
+        // so every inner stream stops early: O(n·k), not O(n²).
+        return IntStream.range(0, s.length())
+                .map(l -&gt; {
+                    Set&lt;Integer&gt; seen = new HashSet&lt;&gt;();
+                    return (int) IntStream.range(l, s.length())
+                            .map(s::charAt)
+                            .takeWhile(seen::add)   // STATE
+                            .count();
+                })
+                .max().orElse(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 209 · Minimum Size Subarray Sum · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minSubArrayLen(int target, int[] nums) {
+        // p[i] = sum of the first i values. Java 17 has no
+        // scan, so the running total is a stateful map.
+        int[] run = {0};
+        int[] p = IntStream.concat(IntStream.of(0),
+                Arrays.stream(nums).map(v -&gt; run[0] += v))
+                .toArray();
+        // Values are positive, so p strictly increases: for
+        // each end r, binary-search the latest start l that
+        // still leaves p[r] - p[l] &gt;= target.
+        return IntStream.rangeClosed(1, nums.length)
+                .filter(r -&gt; p[r] &gt;= target)
+                .map(r -&gt; {
+                    int key = p[r] - target;
+                    int i = Arrays.binarySearch(p, 0, r, key);
+                    return r - (i &gt;= 0 ? i : -i - 2);
+                })
+                .min().orElse(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 424 · Longest Repeating Character Replacement · clean</div>
+<pre><code class="language-java">class Solution {
+    public int characterReplacement(String s, int k) {
+        int n = s.length();
+        // Fix the letter c the window is made of. Its "other"
+        // indices are the ones to replace, and the best window
+        // swallows k of them: from just after other[i-1] to
+        // just before other[i+k]. Nothing slides.
+        return IntStream.rangeClosed('A', 'Z').map(c -&gt; {
+            int[] other = IntStream.range(0, n)
+                    .filter(i -&gt; s.charAt(i) != c).toArray();
+            int m = other.length;
+            return IntStream.rangeClosed(0, Math.max(0, m - k))
+                    .map(i -&gt; (i + k &lt; m ? other[i + k] : n)
+                            - (i &gt; 0 ? other[i - 1] : -1) - 1)
+                    .max().getAsInt();
+        }).max().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 904 · Fruit Into Baskets · clean</div>
+<pre><code class="language-java">class Solution {
+    // b = the last fruit, a = the other type in the window,
+    // run = b's ending the window, len = the window's length
+    record State(int i, int a, int b,
+                 int run, int len, int best) {
+        State eat(int f) {
+            int newLen = f == a || f == b ? len + 1 : run + 1;
+            return new State(i + 1, f == b ? a : b, f,
+                             f == b ? run + 1 : 1,
+                             newLen, Math.max(best, newLen));
+        }
+    }
+
+    public int totalFruit(int[] fruits) {
+        // One pure step per fruit. A third type keeps only the
+        // trailing run of b, so the window restarts at run + 1.
+        return Stream.iterate(new State(0, -1, -1, 0, 0, 0),
+                              s -&gt; s.eat(fruits[s.i()]))
+                .skip(fruits.length)
+                .findFirst().get().best();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 567 · Permutation in String · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean checkInclusion(String s1, String s2) {
+        int m = s1.length();
+        int[] need = counts(s1);
+        // Every window of width |s1|, counted from scratch:
+        // O(n·m), at most 2.5·10⁷ steps at these limits.
+        return IntStream.rangeClosed(0, s2.length() - m)
+                .anyMatch(i -&gt; Arrays.equals(
+                        counts(s2.substring(i, i + m)), need));
+    }
+
+    // A mutable reduction with a real combiner: parallel-safe.
+    private static int[] counts(String s) {
+        return s.chars().collect(() -&gt; new int[26],
+                (a, c) -&gt; a[c - 'a']++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 76 · Minimum Window Substring · clean</div>
+<pre><code class="language-java">class Solution {
+    private static final int NONE = Integer.MAX_VALUE;
+    private int[][] at;    // at[c] = indices of c, ascending
+    private int[] need;    // need[c] = copies of c in t
+    private int[] letters; // the letters t needs
+
+    public String minWindow(String s, String t) {
+        int n = s.length();
+        at = IntStream.range(0, 128)
+                .mapToObj(c -&gt; IntStream.range(0, n)
+                        .filter(i -&gt; s.charAt(i) == c)
+                        .toArray())
+                .toArray(int[][]::new);
+        need = t.chars().collect(() -&gt; new int[128],
+                (a, c) -&gt; a[c]++,
+                (a, b) -&gt; Arrays.setAll(a, i -&gt; a[i] + b[i]));
+        letters = IntStream.range(0, 128)
+                .filter(c -&gt; need[c] &gt; 0).toArray();
+        // A shortest cover always starts on a needed letter.
+        return IntStream.range(0, n)
+                .filter(l -&gt; need[s.charAt(l)] &gt; 0)
+                .mapToObj(l -&gt; new int[]{ l, end(l) })
+                .filter(w -&gt; w[1] != NONE)
+                .min(Comparator.comparingInt(w -&gt; w[1] - w[0]))
+                .map(w -&gt; s.substring(w[0], w[1]))
+                .orElse("");
+    }
+
+    // The shortest cover from l ends just after the need[c]-th
+    // occurrence of every needed letter c at or after l.
+    private int end(int l) {
+        return IntStream.of(letters).map(c -&gt; {
+            int i = Arrays.binarySearch(at[c], l);
+            int k = (i &lt; 0 ? -i - 1 : i) + need[c] - 1;
+            return k &lt; at[c].length ? at[c][k] + 1 : NONE;
+        }).max().getAsInt();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Where the loop still wins</span>Five of the six pay for not sliding: a log factor (209, 76), the alphabet (3, 424) or the window width (567). Every one fits the constraints, but the loop is linear with O(1) extra space in all six. If an interviewer asks for a stream version, give one of these and <b>name its cost</b>. That sentence is what they are listening for.</div>
+  <div class="note tip"><span class="lbl">The idea worth keeping</span>424's reading is a real technique, not a stream trick. <b>A window allowed at most k marked positions is bounded by the marks just outside it</b>, so the best one spans k consecutive gaps. The same reading solves <a href="https://leetcode.com/problems/max-consecutive-ones-iii/" target="_blank" rel="noopener">Max Consecutive Ones III</a> directly, and counts the subarrays in <a href="https://leetcode.com/problems/count-number-of-nice-subarrays/" target="_blank" rel="noopener">Count Number of Nice Subarrays</a> as products of neighbouring gaps.</div>
+</section>
+
+

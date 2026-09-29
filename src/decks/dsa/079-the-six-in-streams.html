@@ -1,0 +1,174 @@
+<!-- dsa · pattern 13 · streams -->
+<section class="slide" data-sec="13 · Greedy scheduling" data-title="The six, in streams">
+  <h2>A greedy remembers two or three numbers, so it folds cleanly</h2>
+  <p class="dek">A greedy algorithm scans once and remembers very little: a reach, a tank, a start. That is exactly a small record folded over the input with <code>Stream.iterate</code>, and the fold is as fast as the loop. Jump Game goes one better. Its reachable indices come in ranges, one per jump, so it is breadth-first search where each level is a range. 621 needs no scan at all, because its greedy has a closed form.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">55</td><td><a href="https://leetcode.com/problems/jump-game/" target="_blank" rel="noopener">Jump Game</a></td><td>BFS over index ranges: each level runs from just past the last one to the furthest reach inside it. Stop when a level reaches the end or comes out empty.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">45</td><td><a href="https://leetcode.com/problems/jump-game-ii/" target="_blank" rel="noopener">Jump Game II</a></td><td>The same levels, counted with <code>takeWhile</code> until one reaches the end.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">763</td><td><a href="https://leetcode.com/problems/partition-labels/" target="_blank" rel="noopener">Partition Labels</a></td><td>The last index of each letter via <code>lastIndexOf</code>. A part ends where the prefix max of those equals <code>i</code>, recomputed each time, which n ≤ 500 allows.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(1)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">406</td><td><a href="https://leetcode.com/problems/queue-reconstruction-by-height/" target="_blank" rel="noopener">Queue Reconstruction by Height</a></td><td>Tallest first, then fold: each person goes in at index <code>k</code> of a fresh immutable list.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">621</td><td><a href="https://leetcode.com/problems/task-scheduler/" target="_blank" rel="noopener">Task Scheduler</a></td><td>The closed form: (max − 1)·(n + 1) plus the tasks tied at max, or the task count if that is larger.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">134</td><td><a href="https://leetcode.com/problems/gas-station/" target="_blank" rel="noopener">Gas Station</a></td><td>Fold a <code>(tank, start, total)</code> record: an empty tank restarts the journey at the next station.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 55 · Jump Game · clean</div>
+<pre><code class="language-java">class Solution {
+    // indices reachable in exactly one more jump: [from, to]
+    record Level(int from, int to) {
+        Level next(int[] nums) {
+            int reach = IntStream.rangeClosed(from, to)
+                    .map(i -&gt; i + nums[i]).max().getAsInt();
+            return new Level(to + 1, reach);   // empty if stuck
+        }
+        boolean done(int n) { return to &gt;= n - 1 || from &gt; to; }
+    }
+
+    public boolean canJump(int[] nums) {
+        int n = nums.length;
+        // BFS where every level is a range. Stop when a level
+        // reaches the end, or comes out empty.
+        Level last = Stream.iterate(new Level(0, 0),
+                                    l -&gt; l.next(nums))
+                .filter(l -&gt; l.done(n))
+                .findFirst().get();
+        return last.to() &gt;= n - 1;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 45 · Jump Game II · clean</div>
+<pre><code class="language-java">class Solution {
+    // the indices reachable in exactly k jumps: [from, to]
+    record Level(int from, int to) {
+        Level next(int[] nums) {
+            int reach = IntStream.rangeClosed(from, to)
+                    .map(i -&gt; i + nums[i]).max().getAsInt();
+            return new Level(to + 1, reach);
+        }
+    }
+
+    public int jump(int[] nums) {
+        int n = nums.length;
+        // Level k holds every index first reachable in k jumps,
+        // so the answer is how many levels come before the end.
+        return (int) Stream.iterate(new Level(0, 0),
+                                    l -&gt; l.next(nums))
+                .takeWhile(l -&gt; l.to() &lt; n - 1)
+                .count();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 763 · Partition Labels · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;Integer&gt; partitionLabels(String s) {
+        int n = s.length();
+        int[] last = IntStream.range(0, 26)
+                .map(c -&gt; s.lastIndexOf('a' + c)).toArray();
+        // A part ends at i when no letter seen so far appears
+        // after i. n &lt;= 500, so recomputing that prefix max per
+        // i (O(n²)) is fine, and it keeps the pipeline pure.
+        IntPredicate endsPart = i -&gt; IntStream.rangeClosed(0, i)
+                .map(j -&gt; last[s.charAt(j) - 'a'])
+                .max().getAsInt() == i;
+        int[] ends = IntStream.concat(IntStream.of(-1),
+                        IntStream.range(0, n).filter(endsPart))
+                .toArray();
+        return IntStream.range(1, ends.length)
+                .mapToObj(k -&gt; ends[k] - ends[k - 1])
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 406 · Queue Reconstruction by Height · clean</div>
+<pre><code class="language-java">class Solution {
+    // everyone placed so far, as an immutable list
+    record Line(int i, List&lt;int[]&gt; people) {
+        Line place(int[] p) {
+            // Everyone already placed is taller or equal, so
+            // p's k is exactly its index among them.
+            int k = p[1];
+            List&lt;int[]&gt; next = Stream.of(
+                    people.subList(0, k).stream(),
+                    Stream.of(p),
+                    people.subList(k, people.size()).stream())
+                    .flatMap(s -&gt; s).toList();
+            return new Line(i + 1, next);
+        }
+    }
+
+    public int[][] reconstructQueue(int[][] people) {
+        // Tallest first; among equals, fewest in front first.
+        Comparator&lt;int[]&gt; tallFirst = Comparator
+                .&lt;int[]&gt;comparingInt(p -&gt; -p[0])
+                .thenComparingInt(p -&gt; p[1]);
+        int[][] order = Arrays.stream(people).sorted(tallFirst)
+                .toArray(int[][]::new);
+        return Stream.iterate(new Line(0, List.of()),
+                              l -&gt; l.place(order[l.i()]))
+                .skip(order.length)
+                .findFirst().get().people()
+                .toArray(int[][]::new);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 621 · Task Scheduler · clean</div>
+<pre><code class="language-java">class Solution {
+    public int leastInterval(char[] tasks, int n) {
+        Collection&lt;Long&gt; freq = new String(tasks).chars()
+                .boxed()
+                .collect(Collectors.groupingBy(
+                        c -&gt; c, Collectors.counting()))
+                .values();
+        long max = Collections.max(freq);
+        long tied = freq.stream().filter(f -&gt; f == max).count();
+        // (max - 1) frames of n + 1 slots, plus one slot per
+        // task tied at max; or no idling at all, if more.
+        long framed = (max - 1) * (n + 1) + tied;
+        return (int) Math.max(tasks.length, framed);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 134 · Gas Station · clean</div>
+<pre><code class="language-java">class Solution {
+    // the greedy's state: station, fuel in the tank, where this
+    // attempt began, and the net total over the whole loop
+    record Trip(int i, int tank, int start, int total) {
+        Trip next(int d) {
+            int t = total + d;
+            return tank + d &lt; 0
+                    ? new Trip(i + 1, 0, i + 1, t)
+                    : new Trip(i + 1, tank + d, start, t);
+        }
+    }
+
+    public int canCompleteCircuit(int[] gas, int[] cost) {
+        // Running dry at i rules out every start up to i, so
+        // the next attempt begins at i + 1. One pass decides.
+        Trip end = Stream.iterate(new Trip(0, 0, 0, 0),
+                        t -&gt; t.next(gas[t.i()] - cost[t.i()]))
+                .skip(gas.length)
+                .findFirst().get();
+        return end.total() &gt;= 0 ? end.start() : -1;
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Why greedy suits streams</span>A greedy never looks back, so its state is a handful of numbers rather than a structure. That makes this the one pattern where every fold is both pure and as fast as the loop. The record holds the loop's local variables, and <code>next()</code> is the loop body.</div>
+  <div class="note tip"><span class="lbl">Jump Game is BFS</span>Writing 45 as levels of ranges shows why the greedy is optimal. Level k is exactly the set of indices first reachable in k jumps, and the answer is the first level that contains the end. The loop version tracks the same two boundaries under the names <code>curEnd</code> and <code>farthest</code>, and saying so in an interview is worth more than either version of the code.</div>
+</section>
+
+

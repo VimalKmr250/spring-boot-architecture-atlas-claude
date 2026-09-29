@@ -1,0 +1,114 @@
+<!-- dsa · pattern 02 · problems -->
+<section class="slide" data-sec="02 · Two pointers" data-title="The six problems">
+  <h2>Six pairs of pointers, two discard rules</h2>
+  <p class="dek">167 is the bare core. 15, 16 and 18 are the same core under one, one and two anchors. 11 and 42 switch to Rule B, where the bound is the weaker end rather than a target sum.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Skeleton</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">167</td><td><a href="https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/" target="_blank" rel="noopener">Two Sum II — Input Array Is Sorted</a></td><td><span class="tag w">Medium</span></td><td>The core, nothing around it. Note the 1-indexed answer.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">15</td><td><a href="https://leetcode.com/problems/3sum/" target="_blank" rel="noopener">3Sum</a></td><td><span class="tag w">Medium</span></td><td>One anchor plus the core. All the difficulty is de-duplication.</td><td>C · k=3</td><td class="num">O(n²) / O(1)</td></tr>
+        <tr><td class="num">16</td><td><a href="https://leetcode.com/problems/3sum-closest/" target="_blank" rel="noopener">3Sum Closest</a></td><td><span class="tag w">Medium</span></td><td>No exact hit exists, so track the minimum distance instead.</td><td>C · k=3</td><td class="num">O(n²) / O(1)</td></tr>
+        <tr><td class="num">18</td><td><a href="https://leetcode.com/problems/4sum/" target="_blank" rel="noopener">4Sum</a></td><td><span class="tag w">Medium</span></td><td>Two anchors. Overflow is the real adversary — use <code>long</code>.</td><td>C · k=4</td><td class="num">O(n³) / O(1)</td></tr>
+        <tr><td class="num">11</td><td><a href="https://leetcode.com/problems/container-with-most-water/" target="_blank" rel="noopener">Container With Most Water</a></td><td><span class="tag w">Medium</span></td><td>Rule B. Do <em>not</em> sort — position is the width.</td><td>B</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">42</td><td><a href="https://leetcode.com/problems/trapping-rain-water/" target="_blank" rel="noopener">Trapping Rain Water</a></td><td><span class="tag b">Hard</span></td><td>Rule B again, but accumulating per column rather than taking a max.</td><td>B</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 15 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Three nested loops, O(n³), plus a <code>Set</code> of sorted triples to kill duplicates. Correct and far too slow at n = 3000.</dd>
+          <dt>The observation</dt><dd>Fix the first element. What remains is exactly 2Sum with target <code>−a[i]</code> — a solved problem. Sorting first costs O(n log n) once and buys the O(n) core at every anchor.</dd>
+          <dt>The real difficulty</dt><dd>Not the search, the <b>duplicates</b>. Sorting puts equal values adjacent, which makes de-duplication a skip rather than a hash set: skip repeated anchors, and after recording a hit skip repeated values on both sides.</dd>
+          <dt>Early exit</dt><dd>Once <code>a[i] &gt; 0</code> the smallest possible triple already exceeds zero, so break. Cheap, and it shows you are thinking about the sorted order.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 15 · O(n²) time, O(1) space beyond the output</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; threeSum(int[] nums) {
+        Arrays.sort(nums);                       // creates the ordering the discard needs
+        List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+
+        for (int i = 0; i + 2 &lt; nums.length; i++) {
+            if (nums[i] &gt; 0) break;              // sorted: nothing ahead can reach 0
+            if (i &gt; 0 &amp;&amp; nums[i] == nums[i - 1]) continue;   // duplicate ANCHOR
+
+            int l = i + 1, r = nums.length - 1;
+            while (l &lt; r) {
+                int sum = nums[i] + nums[l] + nums[r];
+
+                if (sum &lt; 0)      l++;           // too small: a[l] is finished
+                else if (sum &gt; 0) r--;           // too large: a[r] is finished
+                else {
+                    out.add(List.of(nums[i], nums[l], nums[r]));
+
+                    // duplicate HITS — distinct from the anchor skip above
+                    while (l &lt; r &amp;&amp; nums[l] == nums[l + 1]) l++;
+                    while (l &lt; r &amp;&amp; nums[r] == nums[r - 1]) r--;
+
+                    l++; r--;                    // both, or we re-find this pair
+                }
+            }
+        }
+        return out;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 42 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The right question</dt><dd>Do not ask "how much water sits in this valley". Ask, for each <em>column</em> independently: how high does the water stand here? The answer is <code>min(maxLeft, maxRight) − h[i]</code>.</dd>
+          <dt>First solution</dt><dd>Precompute <code>maxLeft[]</code> and <code>maxRight[]</code> in two passes, then sum. O(n) time but O(n) space — a perfectly good answer, and worth stating before optimising.</dd>
+          <dt>The observation</dt><dd>You never need both maxima at once. If <code>h[l] &lt; h[r]</code>, then <code>rightMax ≥ h[r] &gt; h[l]</code>, so the water at <code>l</code> is fixed by <code>leftMax</code> alone — the right side cannot be the binding constraint.</dd>
+          <dt>The result</dt><dd>Two running maxima and two pointers: O(n) time, O(1) space. Always mention the O(n)-space version first, then this.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 42 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int trap(int[] h) {
+        int l = 0, r = h.length - 1;
+        int leftMax = 0, rightMax = 0, water = 0;
+
+        while (l &lt; r) {
+            // Whichever side is SHORTER is the binding constraint,
+            // so that side's water is already fully determined.
+            if (h[l] &lt; h[r]) {
+                leftMax = Math.max(leftMax, h[l]);
+                water  += leftMax - h[l];   // never negative: leftMax >= h[l]
+                l++;
+            } else {
+                rightMax = Math.max(rightMax, h[r]);
+                water   += rightMax - h[r];
+                r--;
+            }
+        }
+        return water;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>167 · Two Sum II <span class="tag a">skeleton A</span></h4><p><b>Path:</b> the array is handed to you sorted, which is the problem telling you the intended pattern. A hash map also works in O(n) but uses O(n) space and ignores the gift.</p><p><b>Delta:</b> skeleton A verbatim. The only trap is the <b>1-indexed</b> return: <code>{l + 1, r + 1}</code>.</p><p><b>Watch for:</b> if asked for an O(n log n) alternative, fix each <code>l</code> and binary search the remainder for its complement. Slower here, but it is the version that survives when the two pointers cannot both move.</p></div>
+
+    <div class="card"><h4>16 · 3Sum Closest <span class="tag a">skeleton C</span></h4><p><b>Path:</b> identical scaffold to 15, but there may be no exact hit, so "found it" is replaced by "is this the closest so far".</p><p><b>Delta:</b> keep <code>bestDiff</code> and update it before the comparison branch. The move rule is unchanged — <code>sum &lt; target</code> still means <code>l++</code>, because closeness is still monotone along the sorted array. Return immediately on an exact hit; nothing can beat zero.</p><p><b>Watch for:</b> initialise with the first valid triple, not <code>Integer.MAX_VALUE</code>, or the difference computation overflows.</p></div>
+
+    <div class="card"><h4>18 · 4Sum <span class="tag a">skeleton C</span></h4><p><b>Path:</b> exactly 15 with one more nesting level. Writing the generic <code>kSum</code> from the previous slide once is cheaper than writing 3Sum and 4Sum separately.</p><p><b>Delta:</b> two anchors, both with their own duplicate skip. <b>Use <code>long</code> for the running sum and target</b> — four values near 10⁹ overflow <code>int</code>, and LeetCode's test set includes exactly that case.</p><p><b>Watch for:</b> the pruning <code>if ((long) a[i] * k &gt; target) break;</code> turns a borderline solution into a comfortable one.</p></div>
+
+    <div class="card"><h4>11 · Container With Most Water <span class="tag a">skeleton B</span></h4><p><b>Path:</b> brute force is all O(n²) pairs. The discard argument traced on the previous slide reduces it to one pass.</p><p><b>Delta:</b> skeleton B verbatim. The instinct to sort is the single biggest trap in this problem — the width <em>is</em> the index distance, so sorting destroys the thing being measured.</p><p><b>Watch for:</b> on a tie, move either pointer; both choices are safe because the measured area is already recorded.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>15</b> and <b>42</b>. 15 contains the entire k-sum family and the duplicate handling that trips up most submissions; 42 contains the Rule B argument in its subtlest form, and is asked at senior level far more often than its Hard tag suggests.</div>
+</section>
+

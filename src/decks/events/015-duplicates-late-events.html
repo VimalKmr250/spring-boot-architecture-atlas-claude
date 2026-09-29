@@ -1,0 +1,62 @@
+<!-- events 15 -->
+<section class="slide" data-sec="Guarantees" data-title="Duplicates & late events">
+  <h2>Duplicates, out-of-order and late events</h2>
+  <p class="dek">Three distinct problems that get conflated. Each has a different fix, and a consumer that handles all three is what "robust" actually means in an event-driven system.</p>
+
+  <div class="grid3">
+    <div class="card">
+      <h3>Duplicate</h3>
+      <p><b>Same event, twice.</b> Caused by producer retries, consumer rebalances, redeploys mid-batch, replay.</p>
+      <p><b>Fix:</b> idempotent handler, keyed on a business key or the event id. Covered two slides back.</p>
+      <p style="color:var(--text-3)">Frequency: constant. Design for it always.</p>
+    </div>
+    <div class="card">
+      <h3>Out-of-order</h3>
+      <p><b>Event B applied before event A.</b> Caused by no key, repartitioning, a retry topic, or concurrent handlers.</p>
+      <p><b>Fix:</b> carry a monotonic version or business timestamp; ignore anything not newer than what you have applied.</p>
+      <p style="color:var(--text-3)">Frequency: occasional, and always at the worst moment.</p>
+    </div>
+    <div class="card">
+      <h3>Late</h3>
+      <p><b>Correctly ordered, but hours behind</b> — a consumer was down, a DLT was replayed, an upstream backlog cleared.</p>
+      <p><b>Fix:</b> decide the business rule. Apply it anyway? Ignore beyond a window? Route to manual review?</p>
+      <p style="color:var(--text-3)">Frequency: after every incident.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A consumer that survives all three</div>
+<pre><code class="language-java">@KafkaListener(topics = "orders.order.statuschanged.v1", groupId = "projection")
+@Transactional
+public void on(OrderStatusChanged e, Acknowledgment ack) {
+
+    var view = projections.findById(e.orderId()).orElseGet(() -&gt; OrderView.empty(e.orderId()));
+
+    // out-of-order + duplicate in one guard
+    if (e.aggregateVersion() &lt;= view.appliedVersion()) {
+        meters.counter("events.stale", "type", e.type()).increment();
+        ack.acknowledge();
+        return;
+    }
+
+    // late: a business decision, not a technical one
+    if (Duration.between(e.occurredAt(), Instant.now()).toHours() &gt; 24) {
+        lateEvents.quarantine(e);            // human review, do not silently apply
+        ack.acknowledge();
+        return;
+    }
+
+    view.apply(e);
+    view.setAppliedVersion(e.aggregateVersion());
+    projections.save(view);
+    ack.acknowledge();
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Measure staleness, not just lag</span>Consumer lag counts messages. The number that matters is <code>now() - event.occurredAt</code> at the point of processing — actual end-to-end latency, including time spent in retries and upstream queues. Publish it as a histogram; it is the SLI your product owner would recognise.</div>
+      <div class="note warn"><span class="lbl">Gaps are the fourth problem</span>Not a missing duplicate but a genuinely missing event — dropped before the outbox, or lost in a mis-handled DLT. No consumer-side pattern detects this. Only <b>reconciliation</b> does: a periodic job comparing source-of-truth counts and totals against each projection. Every serious event-driven system has one.</div>
+    </div>
+  </div>
+</section>
+

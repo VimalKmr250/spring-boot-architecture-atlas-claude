@@ -1,0 +1,14 @@
+    <section class="ivsec" id="framework">
+      <h2>Six steps for any design question</h2>
+      <p class="dek">Say the step names out loud as you go. It makes your reasoning legible and stops you spiralling on one part.</p>
+      <div class="grid2">
+        <div class="card"><h4>1 · Clarify (3–5 min)</h4><p>Functional scope — what is explicitly out. Scale: DAU, peak RPS, data volume, growth. Consistency needs per operation. Latency budget. Team size and timeline. <b>Write the numbers where you both can see them.</b></p></div>
+        <div class="card"><h4>2 · Contract first</h4><p>The 4–6 API operations, and the core entities with their key fields. This anchors everything after it and costs two minutes.</p></div>
+        <div class="card"><h4>3 · Boxes and arrows</h4><p>Client → edge → API → services/modules → data. Say which arrows are synchronous and which are events, and why, as you draw them.</p></div>
+        <div class="card"><h4>4 · Data model and storage</h4><p>Which store for which data and why. Partition/shard key. Indexes for the top three queries. Where the read model is, if any.</p></div>
+        <div class="card"><h4>5 · Scale the bottleneck</h4><p>Name the bottleneck first — usually the database or a single hot partition — then fix <em>that</em>: caching, read replicas, async offload, partitioning. Do not scale everything.</p></div>
+        <div class="card"><h4>6 · Failure and operations</h4><p>What happens when each dependency is down. Idempotency and retries. Monitoring and the SLO. This is the section most candidates run out of time for — budget for it deliberately.</p></div>
+      </div>
+      <div class="note warn"><span class="lbl">Time discipline</span>In a 45-minute round: 5 clarify, 5 contract, 10 high-level, 10 deep-dive on whatever they steer you to, 10 failure and scale, 5 spare. If you are still on step 3 at minute 25, summarise and move.</div>
+    </section>
+

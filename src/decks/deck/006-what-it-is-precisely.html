@@ -1,0 +1,61 @@
+<!-- deck 06 -->
+<section class="slide" data-sec="Modular monolith" data-title="What it is, precisely">
+  <h2>A modular monolith is a compile-time distributed system</h2>
+  <p class="dek">One process, one deployable, one transaction manager — but modules that only see each other through published interfaces and events. Every microservice discipline except the network.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 290" role="img" aria-label="Contrast: a layered monolith where every class can call every other, versus a modular monolith where calls cross only through published module APIs and an event bus">
+        <text x="14" y="18" font-size="11" font-weight="600" fill="currentColor" opacity="0.6">LAYERED MONOLITH — any class may call any class</text>
+        <rect x="14" y="30" width="390" height="96" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="32" y="52" width="80" height="52" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="72" y="82" text-anchor="middle" font-size="11.5" fill="currentColor">order</text>
+        <rect x="148" y="52" width="80" height="52" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="188" y="82" text-anchor="middle" font-size="11.5" fill="currentColor">payment</text>
+        <rect x="264" y="52" width="80" height="52" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="304" y="82" text-anchor="middle" font-size="11.5" fill="currentColor">inventory</text>
+        <path d="M112 64 L148 64" stroke="#A22636" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <path d="M228 92 L264 92" stroke="#A22636" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <path d="M304 52 C304 20 72 20 72 50" stroke="#A22636" stroke-width="1.3" fill="none" marker-end="url(#arw)"></path>
+        <path d="M188 104 C188 130 72 130 72 106" stroke="#A22636" stroke-width="1.3" fill="none" marker-end="url(#arw)"></path>
+        <text x="209" y="146" text-anchor="middle" font-size="10.5" fill="#A22636">every edge is allowed → every edge exists</text>
+
+        <text x="14" y="188" font-size="11" font-weight="600" fill="currentColor" opacity="0.6">MODULAR MONOLITH — two legal edge types</text>
+        <rect x="14" y="200" width="390" height="80" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="32" y="216" width="80" height="48" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="72" y="238" text-anchor="middle" font-size="11.5" fill="currentColor">order</text>
+        <text x="72" y="253" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">api | internal</text>
+        <rect x="148" y="216" width="80" height="48" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="188" y="238" text-anchor="middle" font-size="11.5" fill="currentColor">payment</text>
+        <text x="188" y="253" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">api | internal</text>
+        <rect x="264" y="216" width="80" height="48" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="304" y="238" text-anchor="middle" font-size="11.5" fill="currentColor">inventory</text>
+        <text x="304" y="253" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">api | internal</text>
+        <path d="M112 232 L146 232" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+        <path d="M228 232 L262 232" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></path>
+
+        <!-- right column: legend / mechanism -->
+        <rect x="446" y="30" width="420" height="250" rx="10" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.22"></rect>
+        <text x="466" y="56" font-size="12.5" font-weight="600" fill="currentColor">The only two legal edges</text>
+
+        <line x1="470" y1="86" x2="534" y2="86" stroke="#D26A3F" stroke-width="2" marker-end="url(#arwA)"></line>
+        <text x="548" y="82" font-size="12" fill="currentColor">Call a published API</text>
+        <text x="548" y="99" font-size="10.5" fill="currentColor" opacity="0.65">synchronous, same transaction, caller waits</text>
+        <text x="548" y="114" font-size="10.5" fill="currentColor" opacity="0.65">use for: queries, and commands you must confirm now</text>
+
+        <line x1="470" y1="146" x2="534" y2="146" stroke="#3AA79B" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="548" y="142" font-size="12" fill="currentColor">Publish a domain event</text>
+        <text x="548" y="159" font-size="10.5" fill="currentColor" opacity="0.65">after commit, listener runs in its own transaction</text>
+        <text x="548" y="174" font-size="10.5" fill="currentColor" opacity="0.65">use for: reactions, side effects, anything the caller</text>
+        <text x="548" y="189" font-size="10.5" fill="currentColor" opacity="0.65">does not need to succeed</text>
+
+        <line x1="466" y1="212" x2="846" y2="212" stroke="currentColor" stroke-opacity="0.2"></line>
+        <text x="466" y="236" font-size="11.5" fill="#A22636">✕ reaching into another module's internal package</text>
+        <text x="466" y="256" font-size="11.5" fill="#A22636">✕ joining across another module's tables</text>
+        <text x="466" y="272" font-size="10.5" fill="currentColor" opacity="0.6">Both are compile or build failures, not review comments.</text>
+      </svg>
+    </div>
+    <figcaption>The difference is not how the code is foldered — both diagrams have three boxes. It is which edges the build permits. In the lower system, the red edges cannot compile.</figcaption>
+  </figure>
+</section>
+

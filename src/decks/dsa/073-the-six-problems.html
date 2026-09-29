@@ -1,0 +1,115 @@
+<!-- dsa · pattern 12 · problems -->
+<section class="slide" data-sec="12 · Intervals" data-title="The six problems">
+  <h2>Six interval questions, three skeletons</h2>
+  <p class="dek">56 and 57 merge. 252 and 253 count concurrency. 435 and 452 are the same greedy with different wording. Two of the six are behind LeetCode's paywall, and both have free equivalents noted below.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Sort by</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">56</td><td><a href="https://leetcode.com/problems/merge-intervals/" target="_blank" rel="noopener">Merge Intervals</a></td><td><span class="tag w">Medium</span></td><td>The baseline. <code>Math.max</code> on the end is the detail that matters.</td><td>start</td><td class="num">O(n log n) / O(n)</td></tr>
+        <tr><td class="num">57</td><td><a href="https://leetcode.com/problems/insert-interval/" target="_blank" rel="noopener">Insert Interval</a></td><td><span class="tag w">Medium</span></td><td>Already sorted, so no sort — three phases in O(n).</td><td>already sorted</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">252</td><td><a href="https://leetcode.com/problems/meeting-rooms/" target="_blank" rel="noopener">Meeting Rooms</a> <span class="tag">Premium</span></td><td><span class="tag g">Easy</span></td><td>Sort by start, return false at the first conflict.</td><td>start</td><td class="num">O(n log n) / O(1)</td></tr>
+        <tr><td class="num">253</td><td><a href="https://leetcode.com/problems/meeting-rooms-ii/" target="_blank" rel="noopener">Meeting Rooms II</a> <span class="tag">Premium</span></td><td><span class="tag w">Medium</span></td><td>Peak concurrency via a heap of end times, or an event sweep.</td><td>start</td><td class="num">O(n log n) / O(n)</td></tr>
+        <tr><td class="num">435</td><td><a href="https://leetcode.com/problems/non-overlapping-intervals/" target="_blank" rel="noopener">Non-overlapping Intervals</a></td><td><span class="tag w">Medium</span></td><td>Activity selection. Sorting by start is the trap.</td><td>end</td><td class="num">O(n log n) / O(1)</td></tr>
+        <tr><td class="num">452</td><td><a href="https://leetcode.com/problems/minimum-number-of-arrows-to-burst-balloons/" target="_blank" rel="noopener">Minimum Number of Arrows to Burst Balloons</a></td><td><span class="tag w">Medium</span></td><td>Identical to 435, counting the groups instead of the removals.</td><td>end</td><td class="num">O(n log n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 56 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Repeatedly scan for any overlapping pair and fuse them, until a full pass changes nothing. O(n³) and awkward to write correctly.</dd>
+          <dt>The observation</dt><dd>Sorting by start makes overlap <b>local</b>: if an interval does not overlap the one immediately before it, it cannot overlap anything earlier either, because every earlier interval starts no later and has already been absorbed.</dd>
+          <dt>What that buys</dt><dd>Only the last emitted interval ever needs checking — so one pass with one comparison per element.</dd>
+          <dt>The two cases</dt><dd><code>cur.start &lt;= last.end</code> means extend; otherwise append. There is no third case, which is a useful thing to notice out loud.</dd>
+          <dt>The detail</dt><dd><code>last.end = max(last.end, cur.end)</code>. A contained interval such as <code>[2,3]</code> inside <code>[1,10]</code> would otherwise truncate the merge.</dd>
+          <dt>Edge cases</dt><dd>Touching intervals <em>do</em> merge here, so the test is <code>&lt;=</code>. Copy each interval into the output rather than storing the input reference, or later mutation corrupts the source array.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 56 · O(n log n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int[][] merge(int[][] intervals) {
+        // Sorting by start makes overlap local: only the previously
+        // emitted interval can possibly overlap the current one.
+        Arrays.sort(intervals, (a, b) -&gt; Integer.compare(a[0], b[0]));
+
+        List&lt;int[]&gt; out = new ArrayList&lt;&gt;();
+
+        for (int[] cur : intervals) {
+            int[] last = out.isEmpty() ? null : out.get(out.size() - 1);
+
+            if (last != null &amp;&amp; cur[0] &lt;= last[1]) {
+                // Overlapping (touching counts here, hence &lt;=).
+                // max() because cur may be fully CONTAINED in last.
+                last[1] = Math.max(last[1], cur[1]);
+            } else {
+                // Disjoint — copy, never alias the input row.
+                out.add(new int[]{ cur[0], cur[1] });
+            }
+        }
+        return out.toArray(new int[0][]);
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 253 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Restating it</dt><dd>The number of rooms needed is the <b>maximum number of meetings running at the same instant</b>. Once phrased that way, the problem stops being about rooms.</dd>
+          <dt>Brute force</dt><dd>For each meeting, count how many others overlap it. O(n²).</dd>
+          <dt>Solution one — the heap</dt><dd>Sort by start. Keep a min-heap of end times: the root is the room freeing up soonest. For each meeting, reuse that room if it has already finished, otherwise open a new one. The heap size <em>is</em> the room count.</dd>
+          <dt>Solution two — the sweep</dt><dd>Split every meeting into a <code>+1</code> at its start and a <code>−1</code> at its end, sort all events by time, and track the running maximum. Same O(n log n), and often easier to explain.</dd>
+          <dt>The ordering detail</dt><dd>At equal timestamps, process the <b>end</b> before the start — a room genuinely frees at that instant. In the heap version this is the <code>&lt;=</code> in the reuse test.</dd>
+          <dt>Why the heap is never bigger than needed</dt><dd>A room is only opened when every existing one is still busy, so the size never exceeds true peak concurrency.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 253 · O(n log n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int minMeetingRooms(int[][] intervals) {
+        if (intervals.length == 0) return 0;
+
+        // Process meetings in the order they begin.
+        Arrays.sort(intervals, (a, b) -&gt; Integer.compare(a[0], b[0]));
+
+        // Min-heap of END times: the root is the room that
+        // becomes free soonest.
+        PriorityQueue&lt;Integer&gt; rooms = new PriorityQueue&lt;&gt;();
+
+        for (int[] m : intervals) {
+            // &lt;= because a room frees AT the end instant: a meeting
+            // ending at 10 does not conflict with one starting at 10.
+            if (!rooms.isEmpty() &amp;&amp; rooms.peek() &lt;= m[0]) {
+                rooms.poll();          // reuse that room
+            }
+            rooms.offer(m[1]);         // occupy a room until m ends
+        }
+        // A room was only ever added when all others were busy,
+        // so the size is exactly the peak concurrency.
+        return rooms.size();
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>57 · Insert Interval <span class="tag a">skeleton A</span></h4><p><b>Path:</b> appending and re-running LC 56 is O(n log n) and correct — say it. But the input is <em>already sorted</em>, so the sort is pure waste.</p><p><b>Delta:</b> three phases in one pass. Copy everything ending before the new interval starts; absorb everything overlapping it by taking <code>min</code> of starts and <code>max</code> of ends; copy the rest.</p><p><b>Watch for:</b> the new interval may overlap nothing, or everything. Both fall out of the three phases with no special case — which is why this structure is worth writing rather than branching.</p></div>
+
+    <div class="card"><h4>252 · Meeting Rooms <span class="tag a">skeleton A</span> <span class="tag">Premium</span></h4><p><b>Path:</b> checking all pairs is O(n²). Sorting by start makes conflict local, exactly as in LC 56.</p><p><b>Delta:</b> sort by start and return <code>false</code> the moment <code>intervals[i][0] &lt; intervals[i-1][1]</code>. Strict <code>&lt;</code> here: a meeting starting when another ends is fine.</p><p><b>Premium:</b> paywalled. <b>LC 56 covers the same reasoning</b>, and <b>253 below is the strictly harder version</b> — solving that one subsumes this entirely.</p></div>
+
+    <div class="card"><h4>435 · Non-overlapping Intervals <span class="tag a">skeleton C</span></h4><p><b>Path:</b> "remove the minimum" is the same as "keep the maximum", which is classic activity selection. That restatement is the whole problem.</p><p><b>Delta:</b> sort by <b>end</b>, then greedily accept any interval starting at or after the last accepted end. The answer is <code>n − kept</code>.</p><p><b>Watch for:</b> sorting by start is the trap — it picks a long early interval and loses several short ones. Be ready to give the exchange argument for why earliest-finish-first is safe; that is the follow-up question.</p></div>
+
+    <div class="card"><h4>452 · Minimum Arrows to Burst Balloons <span class="tag a">skeleton C</span></h4><p><b>Path:</b> identical to 435 with the count inverted — instead of removals, you are counting the groups that survive.</p><p><b>Delta:</b> sort by end; fire an arrow at the end of the first balloon, and skip every balloon whose start is at or before that point. The arrow count is the number of groups.</p><p><b>Watch for:</b> coordinates span the full <code>int</code> range, so <code>a[1] - b[1]</code> in the comparator <b>overflows</b> and produces a wrong sort order. Use <code>Integer.compare</code> — LeetCode tests this case specifically.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>56</b> and <b>435</b>. Together they force the central decision: 56 sorts by start because it is <em>building</em> merged intervals, 435 sorts by end because it is <em>keeping</em> as many as possible. Once you can state why each is right, 57, 252, 253 and 452 are all short variations — and picking the wrong end is the only way this family goes wrong.</div>
+</section>
+

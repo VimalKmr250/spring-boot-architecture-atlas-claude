@@ -1,0 +1,49 @@
+<!-- springboot 45 -->
+<section class="slide" data-sec="Production" data-title="Health indicators">
+  <h2>Health checks that mean something</h2>
+  <p class="dek">Boot auto-registers indicators for every datasource, Redis, Kafka and disk. The ones you write yourself are for dependencies Boot cannot know about — and they need timeouts, or the health check becomes the outage.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A custom indicator — with the two things people forget</div>
+<pre><code class="language-java">@Component("paymentGateway")
+class PaymentGatewayHealth implements HealthIndicator {
+
+    private final PaymentGatewayClient client;
+    private final CircuitBreaker breaker;
+
+    @Override public Health health() {
+        if (breaker.getState() == OPEN) {
+            return Health.status("DEGRADED")            // custom status, not DOWN
+                    .withDetail("reason", "circuit open")
+                    .build();
+        }
+        try {
+            var latency = client.ping(Duration.ofMillis(500));   // 1. ALWAYS bound it
+            return Health.up().withDetail("latencyMs", latency.toMillis()).build();
+        } catch (Exception ex) {
+            return Health.down().withDetail("error", ex.getClass().getSimpleName()).build();
+            //                                       2. class name, not the message —
+            //                                          messages leak hostnames and SQL
+        }
+    }
+}</code></pre>
+      <div class="codelabel" style="margin-top:14px">Map a custom status to an HTTP code</div>
+<pre><code class="language-yaml">management.endpoint.health.status:
+  order: DOWN,OUT_OF_SERVICE,DEGRADED,UP,UNKNOWN
+  http-mapping:
+    DEGRADED: 200       # degraded still serves traffic — do NOT fail readiness</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>The question every indicator must answer</h3>
+        <p><b>"If this is DOWN, should Kubernetes stop sending traffic to this pod?"</b></p>
+        <p>For the primary database: yes. For the payment gateway: <em>no</em> — every pod would fail readiness simultaneously, the whole service would leave the load balancer, and customers would get a connection error instead of "payments are temporarily unavailable, your basket is saved".</p>
+        <p>Third-party dependencies belong on a dashboard and in an alert, not in readiness.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Health checks are called constantly</span>Every few seconds, by every pod, plus your load balancer and your monitoring. An unbounded query or an unauthenticated call to a partner API inside <code>health()</code> is a self-inflicted load test on that partner. Cache the result for a few seconds if the check is expensive.</div>
+      <div class="note tip"><span class="lbl">Startup probe</span>For an app with a slow cold start, a Kubernetes <code>startupProbe</code> against <code>/health/liveness</code> with a generous <code>failureThreshold</code> lets you keep liveness aggressive afterwards without killing pods mid-boot.</div>
+    </div>
+  </div>
+</section>
+

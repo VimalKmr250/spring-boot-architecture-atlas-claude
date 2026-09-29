@@ -1,0 +1,56 @@
+<!-- deck 44 -->
+<section class="slide" data-sec="Frontend" data-title="Angular structure">
+  <h2>An Angular structure that mirrors the backend modules</h2>
+  <p class="dek">Same principle as the backend: group by feature, keep a thin shared layer, and make cross-feature imports a lint error rather than a habit.</p>
+
+  <div class="split">
+    <div class="tree"><span class="c">// Angular 20+, standalone components, no NgModules</span>
+src/app
+├── <span class="h">core/</span>                      <span class="c">provided once, app-wide</span>
+│   ├── auth/            <span class="c">guards, session state</span>
+│   ├── http/            <span class="c">interceptors: correlation-id, error, retry</span>
+│   └── config/
+├── <span class="h">shared/</span>                    <span class="c">dumb, reusable, zero feature imports</span>
+│   ├── ui/              <span class="c">button, table, money-pipe, empty-state</span>
+│   └── util/
+├── <span class="h">features/</span>
+│   ├── <span class="g">catalog/</span>
+│   │   ├── catalog.routes.ts     <span class="c">lazy: loadChildren</span>
+│   │   ├── data/catalog.store.ts <span class="c">signals + the generated client</span>
+│   │   └── ui/product-card.ts
+│   ├── <span class="g">cart/</span>
+│   ├── <span class="g">checkout/</span>
+│   └── <span class="g">orders/</span>
+└── <span class="h">api/</span>                       <span class="c">GENERATED from openapi.yaml — never edited</span>
+    ├── models/order-view.ts
+    └── services/orders.service.ts
+
+<span class="c">// eslint boundaries rule — the frontend's ArchUnit</span>
+<span class="c">// features/* may import core, shared, api — never another feature</span>
+</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">features/orders/data/orders.store.ts — signals, no boilerplate</div>
+<pre><code class="language-typescript">@Injectable({ providedIn: 'root' })
+export class OrdersStore {
+  private api = inject(OrdersService);          // generated client
+
+  readonly filter  = signal&lt;OrderSearch&gt;({ status: null });
+  readonly page    = signal(0);
+
+  // declarative data fetching: refetches when filter or page changes
+  private readonly resource = rxResource({
+    request: () =&gt; ({ ...this.filter(), page: this.page() }),
+    loader: ({ request }) =&gt; this.api.listOrders(request),
+  });
+
+  readonly orders  = computed(() =&gt; this.resource.value()?.content ?? []);
+  readonly loading = this.resource.isLoading;
+  readonly error   = this.resource.error;
+}</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">State: pick the smallest tool that works</span>Server data is a <b>cache</b>, not state — let a resource/query layer own it. Keep a real store (NgRx, or signal stores) for genuine client state: multi-step checkout, a wizard, optimistic edits. Most teams reach for the store first and then maintain reducers that only mirror HTTP responses.</div>
+    </div>
+  </div>
+</section>
+

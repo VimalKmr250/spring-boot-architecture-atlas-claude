@@ -1,0 +1,157 @@
+<!-- dsa · pattern 18 · streams -->
+<section class="slide" data-sec="18 · Backtracking basics" data-title="The six, in streams">
+  <h2>Backtracking is <code>flatMap</code>, and the call stack does the undo</h2>
+  <p class="dek">A backtracking loop adds a choice, recurses, then removes the choice again. A stream version never removes anything. Each recursive call returns a stream of finished answers for the choices still left, and <code>flatMap</code> puts the current choice on the front of each one. No list is shared between branches, so there is nothing to undo. The depth here is at most 20, so recursing through a pipeline is safe. Subsets and combinations need no recursion at all, because they are just bitmasks.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">78</td><td><a href="https://leetcode.com/problems/subsets/" target="_blank" rel="noopener">Subsets</a></td><td>Every mask from 0 to 2ⁿ − 1 is one subset: bit <code>i</code> says whether <code>nums[i]</code> is in it.</td><td><span class="tag g">clean</span></td><td class="num">O(n·2ⁿ)</td><td class="num">same</td></tr>
+        <tr><td class="num">77</td><td><a href="https://leetcode.com/problems/combinations/" target="_blank" rel="noopener">Combinations</a></td><td>A combination is a mask with exactly k bits: <code>filter(bitCount == k)</code> over up to 2²⁰ masks.</td><td><span class="tag g">clean</span></td><td class="num">O(2ⁿ + k·C(n,k))</td><td class="num">O(k·C(n,k))</td></tr>
+        <tr><td class="num">39</td><td><a href="https://leetcode.com/problems/combination-sum/" target="_blank" rel="noopener">Combination Sum</a></td><td>Recursive <code>flatMap</code> from the same index, so a number can repeat; a <code>filter</code> prunes what would overshoot.</td><td><span class="tag g">clean</span></td><td class="num">O(n^(T/min)) × depth</td><td class="num">O(n^(T/min))</td></tr>
+        <tr><td class="num">46</td><td><a href="https://leetcode.com/problems/permutations/" target="_blank" rel="noopener">Permutations</a></td><td><code>flatMap</code> over each remaining value, then recurse on the rest.</td><td><span class="tag g">clean</span></td><td class="num">O(n²·n!)</td><td class="num">O(n·n!)</td></tr>
+        <tr><td class="num">90</td><td><a href="https://leetcode.com/problems/subsets-ii/" target="_blank" rel="noopener">Subsets II</a></td><td>Sort, enumerate every mask, and let <code>distinct()</code> remove the equal subsets.</td><td><span class="tag g">clean</span></td><td class="num">O(n·2ⁿ)</td><td class="num">same</td></tr>
+        <tr><td class="num">47</td><td><a href="https://leetcode.com/problems/permutations-ii/" target="_blank" rel="noopener">Permutations II</a></td><td>Branch only on distinct remaining values: <code>distinct()</code> at each level is the entire dedup.</td><td><span class="tag g">clean</span></td><td class="num">O(n²·n!)</td><td class="num">O(n·n!)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 78 · Subsets · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; subsets(int[] nums) {
+        int n = nums.length;
+        // Every mask 0 .. 2^n - 1 is one subset: bit i says
+        // whether nums[i] is in it. No recursion at all.
+        return IntStream.range(0, 1 &lt;&lt; n)
+                .mapToObj(m -&gt; IntStream.range(0, n)
+                        .filter(i -&gt; (m &gt;&gt; i &amp; 1) == 1)
+                        .mapToObj(i -&gt; nums[i])
+                        .toList())
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 77 · Combinations · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; combine(int n, int k) {
+        // A combination is a mask with exactly k bits set. Up
+        // to 2^20 masks, filtered by bitCount: no recursion.
+        return IntStream.range(0, 1 &lt;&lt; n)
+                .filter(m -&gt; Integer.bitCount(m) == k)
+                .mapToObj(m -&gt; IntStream.rangeClosed(1, n)
+                        .filter(i -&gt; (m &gt;&gt; (i - 1) &amp; 1) == 1)
+                        .boxed()
+                        .toList())
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 39 · Combination Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; combinationSum(int[] candidates,
+                                              int target) {
+        return sums(candidates, 0, target).toList();
+    }
+
+    // Recurse from the SAME index: a number may be reused, but
+    // never an earlier one, so every combination appears once.
+    static Stream&lt;List&lt;Integer&gt;&gt; sums(int[] c, int from,
+                                      int left) {
+        if (left == 0) return Stream.of(List.of());
+        return IntStream.range(from, c.length)
+                .filter(i -&gt; c[i] &lt;= left)   // prune overshoot
+                .boxed()
+                .flatMap(i -&gt; sums(c, i, left - c[i])
+                        .map(rest -&gt; prepend(c[i], rest)));
+    }
+
+    static List&lt;Integer&gt; prepend(int x, List&lt;Integer&gt; rest) {
+        return Stream.concat(Stream.of(x), rest.stream())
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 46 · Permutations · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; permute(int[] nums) {
+        return perms(Arrays.stream(nums).boxed().toList())
+                .toList();
+    }
+
+    // Each remaining value in turn goes first; the rest are
+    // permuted recursively. equals(), not ==, on Integers.
+    static Stream&lt;List&lt;Integer&gt;&gt; perms(List&lt;Integer&gt; left) {
+        if (left.isEmpty()) return Stream.of(List.of());
+        return left.stream().flatMap(x -&gt; perms(left.stream()
+                        .filter(y -&gt; !y.equals(x)).toList())
+                .map(rest -&gt; prepend(x, rest)));
+    }
+
+    static List&lt;Integer&gt; prepend(int x, List&lt;Integer&gt; rest) {
+        return Stream.concat(Stream.of(x), rest.stream())
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 90 · Subsets II · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; subsetsWithDup(int[] nums) {
+        int[] a = nums.clone();
+        Arrays.sort(a);   // equal subsets become equal lists
+        int n = a.length;
+        // Every mask, as in 78; distinct() drops the repeats.
+        return IntStream.range(0, 1 &lt;&lt; n)
+                .mapToObj(m -&gt; IntStream.range(0, n)
+                        .filter(i -&gt; (m &gt;&gt; i &amp; 1) == 1)
+                        .mapToObj(i -&gt; a[i])
+                        .toList())
+                .distinct()
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 47 · Permutations II · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; permuteUnique(int[] nums) {
+        return perms(Arrays.stream(nums).boxed().toList())
+                .toList();
+    }
+
+    // Branch on each DISTINCT remaining value, never on each
+    // element: equal values then never start two branches.
+    static Stream&lt;List&lt;Integer&gt;&gt; perms(List&lt;Integer&gt; left) {
+        if (left.isEmpty()) return Stream.of(List.of());
+        return left.stream().distinct()
+                .flatMap(x -&gt; perms(removeOne(left, x))
+                        .map(rest -&gt; prepend(x, rest)));
+    }
+
+    static List&lt;Integer&gt; removeOne(List&lt;Integer&gt; l, int x) {
+        int i = l.indexOf(x);
+        return Stream.concat(l.subList(0, i).stream(),
+                        l.subList(i + 1, l.size()).stream())
+                .toList();
+    }
+
+    static List&lt;Integer&gt; prepend(int x, List&lt;Integer&gt; rest) {
+        return Stream.concat(Stream.of(x), rest.stream())
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Why nothing is undone</span>The loop's <code>path.add</code>, recurse, <code>path.remove</code> exists because one mutable list is shared by every branch. Here each call builds its answers from the bottom up and hands them back, so there is no shared list and no undo step to forget. The price is copying: an answer is rebuilt once per level, which multiplies the loop's cost by the depth. The Streams column shows that factor wherever it applies.</div>
+  <div class="note tip"><span class="lbl">Where duplicates go</span>90 and 47 show the two stream answers to duplicate input. For subsets, generate everything from sorted input and let <code>distinct()</code> remove the equal lists. For permutations, branch on <code>left.stream().distinct()</code>, so equal values never start two branches. That is the loop's "skip if equal to the previous unused element" rule, without the index bookkeeping. Note too that 46 compares with <code>equals</code>: <code>==</code> on boxed values past 127 compares references.</div>
+</section>
+
+

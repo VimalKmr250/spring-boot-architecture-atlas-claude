@@ -1,0 +1,111 @@
+<!-- dsa · pattern 30 · structure -->
+<section class="slide" data-sec="30 · String / sequence DP" data-title="The reusable structure">
+  <h2>One table, and the rule that changes per problem</h2>
+  <p class="dek">The loops and the index offset never vary. What varies is the base row, what a match contributes, and how a mismatch combines its two neighbours.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The template — longest common subsequence</div>
+<pre><code class="language-java">/**
+ * dp[i][j] = the answer for the first i chars of a and first j of b.
+ *
+ * The table is (m+1) x (n+1) because row 0 and column 0 represent
+ * the EMPTY prefix — a real base case, not padding.
+ *
+ * Index offset: dp[i][j] compares a.charAt(i-1) with b.charAt(j-1).
+ */
+int longestCommonSubsequence(String a, String b) {
+    int m = a.length(), n = b.length();
+    int[][] dp = new int[m + 1][n + 1];
+    // Base row and column are 0: nothing in common with an empty string.
+
+    for (int i = 1; i &lt;= m; i++) {
+        for (int j = 1; j &lt;= n; j++) {
+
+            if (a.charAt(i - 1) == b.charAt(j - 1)) {
+                // MATCH: pairing them is never worse than skipping
+                // either, so take the diagonal with no comparison.
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                // MISMATCH: drop one character from one string.
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+    return dp[m][n];
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The rule per problem</div>
+<pre><code class="language-java">// LC 1143 — longest common subsequence
+match:    dp[i-1][j-1] + 1
+mismatch: max(dp[i-1][j], dp[i][j-1])
+base:     row 0 and col 0 are 0
+
+// LC 72 — edit distance. THREE options on a mismatch.
+match:    dp[i-1][j-1]                       // free, no operation
+mismatch: 1 + min(dp[i-1][j],                // delete from a
+                  dp[i][j-1],                // insert into a
+                  dp[i-1][j-1])              // replace
+base:     dp[i][0] = i  and  dp[0][j] = j    // deleting down to empty
+
+// LC 115 — count distinct subsequences of s equalling t
+match:    dp[i-1][j-1] + dp[i-1][j]          // use this char, OR skip it
+mismatch: dp[i-1][j]                         // can only skip
+base:     dp[i][0] = 1                       // the empty target: one way
+          dp[0][j] = 0 for j &gt; 0             // empty source: no way
+
+// LC 583 — minimum deletions to make the strings equal
+// Reduces to LCS: delete everything not in the common subsequence.
+answer:   m + n - 2 * lcs(a, b)</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Single-sequence problems in disguise (LC 1312)</div>
+<pre><code class="language-java">// "Minimum insertions to make s a palindrome."
+// A palindrome reads the same forwards and backwards, so the
+// characters you can KEEP are exactly the longest common
+// subsequence of s and its own reverse. Everything else must be
+// paired with an inserted character.
+int minInsertions(String s) {
+    String rev = new StringBuilder(s).reverse().toString();
+    return s.length() - longestCommonSubsequence(s, rev);
+}
+
+// LC 97 — interleaving. Here the SECOND index is derived, not free:
+// having used i chars of s1 and j of s2, you must be exactly at
+// position i+j in s3. So the table is still 2D, not 3D.
+boolean isInterleave(String s1, String s2, String s3) {
+    int m = s1.length(), n = s2.length();
+    if (m + n != s3.length()) return false;      // cheap rejection
+
+    boolean[][] dp = new boolean[m + 1][n + 1];
+    dp[0][0] = true;
+
+    for (int i = 0; i &lt;= m; i++)
+        for (int j = 0; j &lt;= n; j++) {
+            if (i &gt; 0 &amp;&amp; dp[i - 1][j]
+                     &amp;&amp; s1.charAt(i - 1) == s3.charAt(i + j - 1)) dp[i][j] = true;
+            if (j &gt; 0 &amp;&amp; dp[i][j - 1]
+                     &amp;&amp; s2.charAt(j - 1) == s3.charAt(i + j - 1)) dp[i][j] = true;
+        }
+    return dp[m][n];
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Base row and column</dt><dd>0 for a length, <code>i</code> or <code>j</code> for a distance, 1 for a count against the empty pattern. Getting these wrong shifts every value in the table.</dd>
+        <dt>Match contribution</dt><dd><code>+1</code> for a length, <code>+0</code> for a distance, a <b>sum</b> for a count.</dd>
+        <dt>Mismatch combiner</dt><dd><code>max</code> for longest, <code>min</code> for cheapest, and for a count only one neighbour is even valid.</dd>
+        <dt>Reductions</dt><dd>Deletions and palindrome insertions both reduce to LCS. Spotting that is faster than deriving a new recurrence.</dd>
+        <dt>Space</dt><dd>Two rolling rows, or one row plus a saved diagonal. Halve the table by iterating over the shorter string.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>The index offset</b> — <code>dp[i][j]</code> compares <code>charAt(i−1)</code>, not <code>charAt(i)</code>. Using <code>i</code> throws at the last row or silently compares the wrong characters. <b>Wrong base row</b> — edit distance with a zero base row reports 0 for converting anything into an empty string. <b>Overwriting the diagonal</b> in the rolling form — you must save <code>dp[j−1]</code> from the previous row <em>before</em> writing <code>dp[j]</code>, or the match branch reads the current row instead.</div>
+  </div>
+</section>
+

@@ -1,0 +1,113 @@
+<!-- dsa · pattern 08 · problems -->
+<section class="slide" data-sec="08 · Difference array" data-title="The six problems">
+  <h2>Six range updates, one idea</h2>
+  <p class="dek">370 and 1109 are the template unmodified. 1094 checks a threshold during the sweep. 1893 and 2381 change what the array counts. 1943 replaces the array with sorted events because the coordinates are too large to allocate.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Form</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">370</td><td><a href="https://leetcode.com/problems/range-addition/" target="_blank" rel="noopener">Range Addition</a> <span class="tag">Premium</span></td><td><span class="tag w">Medium</span></td><td>The pattern with nothing on top. The purest statement of it.</td><td>template</td><td class="num">O(q + n) / O(n)</td></tr>
+        <tr><td class="num">1109</td><td><a href="https://leetcode.com/problems/corporate-flight-bookings/" target="_blank" rel="noopener">Corporate Flight Bookings</a></td><td><span class="tag w">Medium</span></td><td>Same as 370 with 1-indexed flights. The free equivalent.</td><td>template</td><td class="num">O(q + n) / O(n)</td></tr>
+        <tr><td class="num">1094</td><td><a href="https://leetcode.com/problems/car-pooling/" target="_blank" rel="noopener">Car Pooling</a></td><td><span class="tag w">Medium</span></td><td>Half-open intervals — the fall goes at <code>to</code>, not <code>to + 1</code>.</td><td>sweep + threshold</td><td class="num">O(q + M) / O(M)</td></tr>
+        <tr><td class="num">1893</td><td><a href="https://leetcode.com/problems/check-if-all-the-integers-in-a-range-are-covered/" target="_blank" rel="noopener">Check if All the Integers in a Range Are Covered</a></td><td><span class="tag g">Easy</span></td><td>Counts coverage rather than a value; the answer is "is any cell zero?".</td><td>template</td><td class="num">O(q + M) / O(M)</td></tr>
+        <tr><td class="num">1943</td><td><a href="https://leetcode.com/problems/describe-the-painting/" target="_blank" rel="noopener">Describe the Painting</a></td><td><span class="tag w">Medium</span></td><td>Coordinates to 10⁵ and sums to 10⁹ — sweep a <code>TreeMap</code> of events.</td><td>sparse events</td><td class="num">O(q log q) / O(q)</td></tr>
+        <tr><td class="num">2381</td><td><a href="https://leetcode.com/problems/shifting-letters-ii/" target="_blank" rel="noopener">Shifting Letters II</a></td><td><span class="tag w">Medium</span></td><td>The accumulated value is a letter shift, applied modulo 26.</td><td>template</td><td class="num">O(q + n) / O(n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 1109 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>For each booking, loop the flights it covers and add the seats. O(q · n), which at 2×10⁴ bookings over 2×10⁴ flights is 4×10⁸ — too slow, and the natural first attempt.</dd>
+          <dt>The observation</dt><dd>Nothing is read until every booking has been applied. So the intermediate arrays are wasted work: only the <em>net</em> effect matters.</dd>
+          <dt>The reformulation</dt><dd>Record where each booking starts contributing and where it stops. That is two cells regardless of how many flights it spans.</dd>
+          <dt>The indexing detail</dt><dd>Flights are 1-indexed in the statement and the array is 0-indexed, so flight <code>f</code> sits at <code>f − 1</code>. The rise goes at <code>first − 1</code> and the fall at <code>last</code>, which is already <code>(last − 1) + 1</code>.</dd>
+          <dt>Edge case</dt><dd>A booking ending at flight <code>n</code> writes to index <code>n</code>, which is why the array has <code>n + 1</code> slots.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 1109 · O(q + n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int[] corpFlightBookings(int[][] bookings, int n) {
+        // n + 1 so that a booking ending at flight n has somewhere
+        // to put its cancellation.
+        long[] D = new long[n + 1];
+
+        for (int[] b : bookings) {
+            int first = b[0], last = b[1], seats = b[2];
+
+            // Flights are 1-indexed; the array is 0-indexed.
+            D[first - 1] += seats;   // rise at the first flight
+            D[last]      -= seats;   // (last - 1) + 1 — just past the last
+        }
+
+        int[] out = new int[n];
+        long running = 0;
+
+        for (int i = 0; i &lt; n; i++) {
+            running += D[i];         // the running total is the seat count
+            out[i] = (int) running;
+        }
+        return out;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 1094 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>For each trip, add its passengers to every location it spans, then scan for a violation. O(q · M).</dd>
+          <dt>The alternative worth naming</dt><dd>Sort the pick-up and drop-off events and sweep them with a running count. That is the same algorithm; the difference array is simply the version that does not need a sort, because the statement bounds locations at 1000.</dd>
+          <dt>The detail that decides correctness</dt><dd>A passenger boards <em>at</em> <code>from</code> and leaves <em>at</em> <code>to</code>, so they are not in the car at <code>to</code> — the interval is half-open. The fall therefore goes at <code>to</code>, not <code>to + 1</code>.</dd>
+          <dt>Why that matters</dt><dd>Without it, two trips where one ends exactly where the next begins are counted as overlapping, and a car that is actually fine is reported as over capacity.</dd>
+          <dt>The early exit</dt><dd>You never need the finished array — only whether the running total ever breaks the limit. Return as soon as it does.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 1094 · O(q + M) time, O(M) space</div>
+<pre><code class="language-java">class Solution {
+    public boolean carPooling(int[][] trips, int capacity) {
+        // The statement bounds locations at 1000.
+        int[] D = new int[1001];
+
+        for (int[] t : trips) {
+            int num = t[0], from = t[1], to = t[2];
+
+            D[from] += num;
+            // The interval is HALF-OPEN: the passenger is gone by `to`,
+            // so the fall lands on `to` itself, not to + 1. This is what
+            // lets one trip end exactly where the next begins.
+            D[to]   -= num;
+        }
+
+        int onboard = 0;
+        for (int delta : D) {
+            onboard += delta;
+            if (onboard &gt; capacity) return false;   // no need to finish
+        }
+        return true;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>370 · Range Addition <span class="tag a">template</span> <span class="tag">Premium</span></h4><p><b>Path:</b> the statement is the pattern with no story around it — apply <code>k</code> range additions to a zero array and return the result.</p><p><b>Delta:</b> none. The template verbatim, with 0-indexed inclusive ranges, so the fall goes at <code>r + 1</code>.</p><p><b>Premium:</b> locked behind LeetCode's paywall. <b>1109 above is the same problem</b> and is free — solve that instead and you have covered this one entirely.</p></div>
+
+    <div class="card"><h4>1893 · Check if All Integers in a Range Are Covered <span class="tag a">template</span></h4><p><b>Path:</b> checking each value against every interval is O(q · range), which is fine at these limits — but the difference array makes it one pass and generalises.</p><p><b>Delta:</b> the array counts <b>coverage</b> rather than a value, so each interval contributes +1 and −1. After the sweep, the answer is "was the running total ever zero inside <code>[left, right]</code>?"</p><p><b>Watch for:</b> values run 1 to 50, so size the array 52 and use inclusive ranges — the fall at <code>end + 1</code>.</p></div>
+
+    <div class="card"><h4>1943 · Describe the Painting <span class="tag a">sparse events</span></h4><p><b>Path:</b> the coordinate range makes a dense array wasteful, and the output is a list of maximal stretches rather than per-index values.</p><p><b>Delta:</b> a <code>TreeMap</code> keyed on endpoints replaces the array; iterating it in key order is the sweep. Between consecutive keys the running total is constant, and that stretch becomes one output segment.</p><p><b>Watch for:</b> emit a segment only when the running total is <b>non-zero</b> — gaps between painted regions must not appear in the output. Sums reach 10⁹, so accumulate in <code>long</code>.</p></div>
+
+    <div class="card"><h4>2381 · Shifting Letters II <span class="tag a">template</span></h4><p><b>Path:</b> applying each shift character by character is O(q · n). The accumulated shift per position is exactly what a difference array computes.</p><p><b>Delta:</b> a shift is <code>+1</code> or <code>−1</code> depending on the direction flag, so the update value is <code>direction == 1 ? 1 : -1</code>. During the sweep, the running total is the net shift for that character.</p><p><b>Watch for:</b> the net shift can be large and negative, so normalise with <code>((shift % 26) + 26) % 26</code> before adding it to the letter — the same signed-remainder trap that appears whenever Java's <code>%</code> meets a negative operand.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>1109</b> and <b>1094</b>. 1109 is the template in its cleanest form and forces you to get the 1-indexed-to-0-indexed shift right. 1094 is the one that teaches the half-open distinction — whether the fall belongs at <code>r</code> or <code>r + 1</code> — which is the only genuinely subtle decision this pattern ever asks you to make.</div>
+</section>
+

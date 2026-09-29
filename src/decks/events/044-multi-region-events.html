@@ -1,0 +1,37 @@
+<!-- events 44 -->
+<section class="slide" data-sec="At scale" data-title="Multi-region events">
+  <h2>Events across regions</h2>
+  <p class="dek">The event equivalent of the multi-region question in the architecture deck, and the answer follows the same logic: decide where writes happen, and the rest falls out.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Regional ownership <span class="tag g">preferred</span></h3>
+      <p>Each region owns a partition of the business — EU orders in the EU cluster, US orders in the US cluster. Events replicate outward for read-only consumers (analytics, global search) but each entity has exactly one writing region.</p>
+      <ul class="tight" style="margin-top:6px">
+        <li>No conflicts, because no key is written in two places.</li>
+        <li>Ordering per key is preserved, because it is produced in one place.</li>
+        <li>Residency rules are natural to express.</li>
+      </ul>
+      <p style="color:var(--text-3)">The hard part is routing: a customer must reach the region that owns their data, which is a gateway and identity concern, not a Kafka one.</p>
+    </div>
+    <div class="card">
+      <h3>Global topics with bidirectional replication</h3>
+      <p>Both regions produce to the "same" logical topic, replicated in both directions with prefixes to avoid cycles. Consumers read both.</p>
+      <ul class="tight" style="margin-top:6px">
+        <li>Any region can accept any write — highest availability.</li>
+        <li><b>Ordering across regions is gone.</b> Two events for one order produced in two regions have no defined order.</li>
+        <li>Conflict resolution becomes a domain rule you must write down.</li>
+      </ul>
+      <p style="color:var(--text-3)">Only take this on with a genuine active-active requirement and a domain where conflicts are resolvable — last-write-wins on a payment is not acceptable.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="note warn"><span class="lbl">Cross-region replication is a cost line</span>Every replicated byte is inter-region egress, priced per gigabyte, on top of the intra-cluster replication factor. Replicating a 20 MB/s topic across two regions is roughly 50 TB a month of egress before compression. Replicate <b>selected topics</b>, not everything, and make that an explicit decision per topic in the catalogue.</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Keep the analytics path one-way</span>The commonest legitimate multi-region flow is not active-active at all: every region replicates its events into one analytics cluster or lake, one direction only. No conflicts, no offset translation, no ordering requirement — and it satisfies most of what people ask multi-region for.</div>
+      <div class="note"><span class="lbl">Residency in the topic design</span>If EU personal data may not leave the EU, that is a per-topic replication rule <em>and</em> an argument for keeping personal fields out of widely-replicated events. A thin event with an id, replicated globally, plus a fat event kept regional, is a common shape in regulated estates.</div>
+    </div>
+  </div>
+</section>
+

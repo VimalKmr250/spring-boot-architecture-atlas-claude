@@ -1,0 +1,45 @@
+<!-- streams 26 -->
+<section class="slide" data-sec="Collectors" data-title="Collecting into lists, sets and collections">
+  <h2>Five collectors for plain collections</h2>
+  <p class="dek"><code>toList</code>, <code>toSet</code> and <code>toCollection</code> build a collection you can change, although only <code>toCollection</code> promises it. <code>toUnmodifiableList</code> and <code>toUnmodifiableSet</code> (Java 10) build one you cannot. The only real decisions are mutability, nulls and order.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">One of each</div>
+<pre><code class="language-java">List&lt;String&gt; customers = orders.stream().map(Order::customer)
+        .collect(Collectors.toList());
+
+Set&lt;String&gt; statuses = orders.stream().map(Order::status)
+        .collect(Collectors.toSet());                         // no order
+
+TreeSet&lt;String&gt; sortedCustomers = orders.stream().map(Order::customer)
+        .collect(Collectors.toCollection(TreeSet::new));      // sorted, deduplicated
+
+Set&lt;String&gt; firstSeen = orders.stream().map(Order::customer)
+        .collect(Collectors.toCollection(LinkedHashSet::new)); // deduplicated, in order
+
+List&lt;String&gt; frozen = orders.stream().map(Order::id)
+        .collect(Collectors.toUnmodifiableList());            // 10
+
+Stream.of("a", "a").collect(Collectors.toUnmodifiableSet());  // [a]: no error</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Collector</th><th>Gives you</th><th>Nulls</th><th>Order</th></tr></thead>
+        <tbody>
+          <tr><td><code>toList()</code></td><td>An <code>ArrayList</code> today; the type, mutability and thread-safety are unspecified</td><td>Allowed</td><td>Kept</td></tr>
+          <tr><td><code>toSet()</code></td><td>A <code>HashSet</code> today; likewise unspecified</td><td>One allowed</td><td>None</td></tr>
+          <tr><td><code>toCollection(supplier)</code></td><td>Exactly what the supplier creates</td><td>As that class allows</td><td>As that class keeps</td></tr>
+          <tr><td><code>toUnmodifiableList()</code> <span class="tag a">10</span></td><td>An unmodifiable list</td><td><code>NullPointerException</code></td><td>Kept</td></tr>
+          <tr><td><code>toUnmodifiableSet()</code> <span class="tag a">10</span></td><td>An unmodifiable set; one of each group of duplicates is kept</td><td><code>NullPointerException</code></td><td>None</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">"Unspecified" is a real word here</span>The Javadoc for <code>toList()</code> and <code>toSet()</code> says there are no guarantees on the type, mutability, serializability or thread-safety of the result. Today's JDK returns an <code>ArrayList</code> and a <code>HashSet</code>, and plenty of code relies on that. If your code mutates the result, <code>toCollection(ArrayList::new)</code> turns an accident into a contract.</div>
+    <div class="note tip"><span class="lbl">Which list ending to pick</span>For a result nobody should change, use <code>Stream.toList()</code>, which also accepts nulls. For an unmodifiable list with nulls rejected, use <code>toUnmodifiableList()</code>. For a list the caller will change, use <code>toCollection(ArrayList::new)</code>. Inside a grouping you still need <code>Collectors.toList()</code>: <code>Stream.toList()</code> is a terminal operation, not a collector, so it cannot go downstream.</div>
+  </div>
+</section>
+

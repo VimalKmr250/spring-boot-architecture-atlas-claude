@@ -1,0 +1,49 @@
+<!-- deck 13 -->
+<section class="slide" data-sec="Modular monolith" data-title="Events that cannot be lost">
+  <h2>The in-process event that survives a crash</h2>
+  <p class="dek">A plain <code>ApplicationEventPublisher</code> event is lost if the JVM dies between commit and listener. Spring Modulith's event publication registry writes the event into <em>your</em> database inside the same transaction — the transactional outbox, without the boilerplate.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">order/internal/app/PlaceOrderUseCase.java</div>
+<pre><code class="language-java">@Transactional
+public OrderId place(PlaceOrderCommand cmd) {
+    var order = Order.place(cmd.customerId(), cmd.lines(), pricing.quote(cmd));
+    repository.save(order);
+
+    // written to event_publication in THIS transaction
+    events.publishEvent(new OrderPlaced(
+            order.id().value(), order.customerId().value(),
+            order.total(), Instant.now()));
+
+    return order.id();            // commit → listeners fire
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">inventory/internal/OrderPlacedListener.java</div>
+<pre><code class="language-java">@Component
+class OrderPlacedListener {
+
+    // runs AFTER commit, in a NEW transaction
+    @ApplicationModuleListener
+    void on(OrderPlaced event) {
+        inventory.reserve(event.orderId(), event.lines());
+    }
+    // success  → completion_date is SET on the event_publication row
+    //            (default completion-mode = UPDATE; the row stays for
+    //             inspection. DELETE or ARCHIVE if you want it purged)
+    // throws   → row keeps completion_date = null
+    //            and is retried on restart / by the republish job
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>@ApplicationModuleListener</code></h4><p>Is just <code>@Async</code> + <code>@Transactional(REQUIRES_NEW)</code> + <code>@TransactionalEventListener(AFTER_COMMIT)</code> in one annotation — the three you would otherwise forget one of.</p></div>
+    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.republish-outstanding-events-on-restart=true</code> replays anything stuck. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
+    <div class="card"><h4>Externalising later</h4><p>Add <code>@Externalized("order.placed::#{#this.orderId}")</code> and the same event goes to Kafka with the key you name. Nothing in the producing code changes.</p></div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Ordering caveat</span>The registry guarantees <b>at-least-once</b>, not ordering and not exactly-once. Listeners must be idempotent — reserve inventory keyed on <code>orderId</code>, not by incrementing a counter.</div>
+</section>
+

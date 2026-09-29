@@ -1,0 +1,93 @@
+<!-- dsa · pattern 12 · structure -->
+<section class="slide" data-sec="12 · Intervals" data-title="The reusable structure">
+  <h2>Three skeletons, split by what the question wants</h2>
+  <p class="dek">Merge (sort by start, extend or append), count simultaneous (sort by start, evict finished with a heap), and keep-the-most (sort by end, greedily accept). Each is under fifteen lines once the sort is chosen.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton A · merge overlapping (LC 56, 57)</div>
+<pre><code class="language-java">// Sort by START. Then exactly two cases arise per interval.
+int[][] merge(int[][] intervals) {
+    Arrays.sort(intervals, (a, b) -&gt; Integer.compare(a[0], b[0]));
+
+    List&lt;int[]&gt; out = new ArrayList&lt;&gt;();
+
+    for (int[] cur : intervals) {
+        int[] last = out.isEmpty() ? null : out.get(out.size() - 1);
+
+        if (last != null &amp;&amp; cur[0] &lt;= last[1]) {
+            // Overlap: extend. max() matters — cur may be CONTAINED
+            // in last, and then cur[1] is smaller.
+            last[1] = Math.max(last[1], cur[1]);
+        } else {
+            // Disjoint: start a new interval. Copy it — never alias
+            // the input array, or a later merge mutates the source.
+            out.add(new int[]{ cur[0], cur[1] });
+        }
+    }
+    return out.toArray(new int[0][]);
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Skeleton B · count simultaneous (LC 253)</div>
+<pre><code class="language-java">// Sort by START; a min-heap of END times holds the rooms in use.
+// The heap root is the meeting that frees up soonest.
+int minMeetingRooms(int[][] meetings) {
+    Arrays.sort(meetings, (a, b) -&gt; Integer.compare(a[0], b[0]));
+
+    PriorityQueue&lt;Integer&gt; endTimes = new PriorityQueue&lt;&gt;();
+
+    for (int[] m : meetings) {
+        // A room whose meeting ENDED by the time this one starts
+        // can be reused. Note &lt;= : a room frees AT its end time.
+        if (!endTimes.isEmpty() &amp;&amp; endTimes.peek() &lt;= m[0]) {
+            endTimes.poll();
+        }
+        endTimes.offer(m[1]);
+    }
+    return endTimes.size();       // peak concurrency
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton C · keep the most / remove the fewest (LC 435, 452)</div>
+<pre><code class="language-java">// Sort by END. The greedy: always take the interval that finishes
+// earliest, because it leaves the most room for everything after.
+//
+// Exchange argument: any optimal set can have its first interval
+// swapped for the earliest finisher without creating a conflict,
+// so the greedy choice is never worse.
+int maxNonOverlapping(int[][] intervals) {
+    Arrays.sort(intervals, (a, b) -&gt; Integer.compare(a[1], b[1]));
+
+    int kept = 0;
+    long lastEnd = Long.MIN_VALUE;
+
+    for (int[] iv : intervals) {
+        if (iv[0] &gt;= lastEnd) {   // no conflict with what we kept
+            kept++;
+            lastEnd = iv[1];
+        }
+    }
+    return kept;                  // removals = intervals.length - kept
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Choosing the skeleton</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>"merge", "insert"</dt><dd>A. Sort by start; extend or append.</dd>
+          <dt>"how many rooms / how many at once"</dt><dd>B. Sort by start, heap of ends. Equivalently, sweep +1/−1 events — same answer, and worth naming as the alternative.</dd>
+          <dt>"remove the fewest", "the minimum arrows"</dt><dd>C. Sort by end, greedy accept. Both phrasings are the same problem.</dd>
+          <dt>"can one person attend all"</dt><dd>A, reduced: sort by start and return false at the first overlap.</dd>
+        </dl>
+      </div>
+      <div class="note warn"><span class="lbl">The <code>&lt;</code> versus <code>&lt;=</code> decision</span>In LC 56, <code>[1,2]</code> and <code>[2,3]</code> <b>do</b> merge — so the test is <code>cur[0] &lt;= last[1]</code>. In LC 253, a meeting ending at 2 and another starting at 2 <b>do not</b> conflict, because the room frees at the end instant — so the reuse test is <code>peek() &lt;= start</code>. In LC 452, an arrow at a shared endpoint <b>does</b> burst both balloons. Each of these is stated or implied by the examples; read them rather than guessing.</div>
+    </div>
+  </div>
+
+  <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Forgetting <code>Math.max</code> when extending</b> — a contained interval shortens the merged end, and the failure only appears on inputs with nesting. <b>Integer overflow in the comparator</b> — <code>a[0] - b[0]</code> overflows when coordinates span the <code>int</code> range, which LC 452 tests directly; use <code>Integer.compare</code>. <b>Sorting by the wrong end</b> — sorting by start in an activity-selection problem picks a long early interval and loses several short ones, which passes the first example and fails the rest.</div>
+</section>
+

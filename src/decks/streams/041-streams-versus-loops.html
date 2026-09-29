@@ -1,0 +1,43 @@
+<!-- streams 41 -->
+<section class="slide" data-sec="Pitfalls and performance" data-title="Streams versus loops">
+  <h2>Stream or loop: readability first, then measure</h2>
+  <p class="dek">A stream is not faster than a loop. For small collections it is usually a little slower, because it builds a pipeline and calls lambdas. It is often much clearer. Choose on clarity, and argue about speed only where a profiler shows the code is hot.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The same revenue report, twice</div>
+<pre><code class="language-java">// Loop: the mechanics are on the page
+Map&lt;String, Double&gt; byLoop = new HashMap&lt;&gt;();
+for (Order o : orders) {
+    if ("PAID".equals(o.status())) {
+        byLoop.merge(o.customer(), o.total(), Double::sum);
+    }
+}
+
+// Stream: the intent is on the page
+Map&lt;String, Double&gt; byStream = orders.stream()
+        .filter(o -&gt; "PAID".equals(o.status()))
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.summingDouble(Order::total)));</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Prefer a stream when</th><th>Prefer a loop when</th></tr></thead>
+        <tbody>
+          <tr><td>The shape is filter, transform, collect</td><td>You must stop early on complex state</td></tr>
+          <tr><td>You are grouping, partitioning or aggregating</td><td>The body calls methods that throw checked exceptions</td></tr>
+          <tr><td>Each step can be named and reused</td><td>Several variables change together on each iteration</td></tr>
+          <tr><td>The source may be large or lazy, or read only once</td><td>It is a tight numeric loop over an array, on a hot path</td></tr>
+          <tr><td>Parallelism might be wanted later</td><td>You need to step through it in a debugger, line by line</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Where the cost really is</h4><p>A pipeline allocates a few small objects up front. Per element, lambdas are called through interfaces, and the JIT usually inlines those once the code is hot. The two costs that actually show up are <b>boxing</b> in numeric pipelines, and <b>unnecessary parallelism</b>.</p></div>
+    <div class="card"><h4>Where streams are genuinely cheaper</h4><p>Laziness and short-circuiting: <code>anyMatch</code> over a lazily loaded source stops at the first hit, and no intermediate collections are built between steps. A loop gets the same only if you write the <code>break</code> and fuse the steps by hand.</p></div>
+    <div class="card"><h4>Readability cuts both ways</h4><p>A six-stage pipeline with nested collectors can be harder to read than the loop it replaced. When a pipeline needs a comment to explain it, extract the steps into named methods or predicates, or write the loop.</p></div>
+  </div>
+</section>
+

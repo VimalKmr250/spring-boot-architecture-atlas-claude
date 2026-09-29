@@ -1,0 +1,49 @@
+<!-- streams 28 -->
+<section class="slide" data-sec="Collectors" data-title="joining, counting and the numeric collectors">
+  <h2>Collectors that produce a string, a count or a statistic</h2>
+  <p class="dek">These reduce a whole stream, or a whole group, to one value. On a plain stream most have a shorter terminal equivalent. Their real value is downstream of <code>groupingBy</code>, where no terminal operation can reach.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Collector</th><th>Result type</th><th>Empty stream</th><th>On a plain stream, prefer</th></tr></thead>
+      <tbody>
+        <tr><td><code>joining()</code> · <code>joining(", ")</code> · <code>joining(", ", "[", "]")</code></td><td><code>String</code></td><td><code>""</code>, or <code>"[]"</code> with prefix and suffix</td><td>—</td></tr>
+        <tr><td><code>counting()</code></td><td><b><code>Long</code></b></td><td><code>0</code></td><td><code>count()</code></td></tr>
+        <tr><td><code>summingInt</code> · <code>summingLong</code> · <code>summingDouble</code></td><td><code>Integer</code> · <code>Long</code> · <code>Double</code></td><td><code>0</code></td><td><code>mapToInt(f).sum()</code></td></tr>
+        <tr><td><code>averagingInt</code> · <code>averagingLong</code> · <code>averagingDouble</code></td><td><b><code>Double</code></b></td><td><b><code>0.0</code></b></td><td><code>mapToInt(f).average()</code>, which is honest about empty</td></tr>
+        <tr><td><code>summarizingInt</code> · <code>summarizingLong</code> · <code>summarizingDouble</code></td><td><code>IntSummaryStatistics</code> …</td><td>count 0, min <code>MAX_VALUE</code></td><td><code>mapToInt(f).summaryStatistics()</code></td></tr>
+        <tr><td><code>minBy(cmp)</code> · <code>maxBy(cmp)</code></td><td><code>Optional&lt;T&gt;</code></td><td><code>Optional.empty</code></td><td><code>min(cmp)</code> · <code>max(cmp)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Where they earn their keep: one value per group</div>
+<pre><code class="language-java">String csv = orders.stream().map(Order::id).collect(Collectors.joining(","));
+
+Map&lt;String, Long&gt; ordersPerCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer, Collectors.counting()));
+
+Map&lt;String, Double&gt; avgTotalPerStatus = orders.stream()
+        .collect(Collectors.groupingBy(Order::status,
+                 Collectors.averagingDouble(Order::total)));
+
+Map&lt;String, DoubleSummaryStatistics&gt; statsPerCustomer = orders.stream()
+        .collect(Collectors.groupingBy(Order::customer,
+                 Collectors.summarizingDouble(Order::total)));</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Mistake</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><code>Map&lt;String, Integer&gt; m = …counting()</code></td><td>Does not compile: <code>counting()</code> yields <code>Long</code>. Declare <code>Map&lt;String, Long&gt;</code>, or use <code>summingInt(x -&gt; 1)</code> for an <code>Integer</code></td></tr>
+          <tr><td><code>joining()</code> on a <code>Stream&lt;Integer&gt;</code></td><td>Does not compile: it needs <code>CharSequence</code> elements. <code>map(String::valueOf)</code> first</td></tr>
+          <tr><td><code>averagingDouble</code> for a group that can be empty</td><td>Reports <code>0.0</code>, indistinguishable from a real zero. Only an issue with <code>filtering</code> downstream, or outside a grouping</td></tr>
+          <tr><td><code>maxBy</code> downstream of <code>groupingBy</code></td><td>An <code>Optional</code> in every group, although a group is never empty. The next slides remove it</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+

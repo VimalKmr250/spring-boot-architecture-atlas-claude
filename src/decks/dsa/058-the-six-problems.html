@@ -1,0 +1,117 @@
+<!-- dsa · pattern 09 · problems -->
+<section class="slide" data-sec="09 · Monotonic stack" data-title="The six problems">
+  <h2>Six stacks, four of them the same loop</h2>
+  <p class="dek">739, 496, 503 and 901 are the template with the comparison or the traversal adjusted. 84 uses the pop moment to recover both boundaries of a rectangle, and 85 reduces to 84 applied row by row.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Form</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">739</td><td><a href="https://leetcode.com/problems/daily-temperatures/" target="_blank" rel="noopener">Daily Temperatures</a></td><td><span class="tag w">Medium</span></td><td>The baseline. The answer is a distance, so indices are essential.</td><td>next greater</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">496</td><td><a href="https://leetcode.com/problems/next-greater-element-i/" target="_blank" rel="noopener">Next Greater Element I</a></td><td><span class="tag g">Easy</span></td><td>Solve it on the big array, then look the answers up in a map.</td><td>next greater</td><td class="num">O(n + m) / O(n)</td></tr>
+        <tr><td class="num">503</td><td><a href="https://leetcode.com/problems/next-greater-element-ii/" target="_blank" rel="noopener">Next Greater Element II</a></td><td><span class="tag w">Medium</span></td><td>Circular — walk <code>2n</code> and take <code>i % n</code>.</td><td>circular</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">901</td><td><a href="https://leetcode.com/problems/online-stock-span/" target="_blank" rel="noopener">Online Stock Span</a></td><td><span class="tag w">Medium</span></td><td>Streaming: the stack survives between calls and carries merged spans.</td><td>previous greater</td><td class="num">O(1) amortised</td></tr>
+        <tr><td class="num">84</td><td><a href="https://leetcode.com/problems/largest-rectangle-in-histogram/" target="_blank" rel="noopener">Largest Rectangle in Histogram</a></td><td><span class="tag b">Hard</span></td><td>The pop moment gives both boundaries. The sentinel removes the cleanup.</td><td>rectangle</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">85</td><td><a href="https://leetcode.com/problems/maximal-rectangle/" target="_blank" rel="noopener">Maximal Rectangle</a></td><td><span class="tag b">Hard</span></td><td>Build a histogram per row, then call 84 on each.</td><td>rectangle × rows</td><td class="num">O(rows·cols) / O(cols)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 739 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>For each day, scan forward for the first warmer one. O(n²), which at n = 10⁵ is 10¹⁰ and hopeless.</dd>
+          <dt>What the brute force wastes</dt><dd>On a long cold spell, every day rescans the same run of cold days. The scan is repeatedly re-deriving something already known.</dd>
+          <dt>The observation</dt><dd>If day <code>j</code> is warmer than day <code>i</code> and comes after it, then day <code>i</code> can never be the answer for anything to the right of <code>j</code> — <code>j</code> is closer and warmer. So <code>i</code> can be discarded permanently the moment <code>j</code> appears.</dd>
+          <dt>What "discard" means</dt><dd>A stack of days still waiting, kept decreasing in temperature. Each arriving day pops everything it beats, settling those answers.</dd>
+          <dt>Why indices</dt><dd>The answer is <em>how many days</em>, so you need <code>i − poppedIndex</code>. Storing temperatures alone makes that impossible.</dd>
+          <dt>Edge case</dt><dd>Days never warmed stay on the stack and keep the 0 default — which is exactly what the problem asks for.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 739 · O(n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int[] dailyTemperatures(int[] temperatures) {
+        int n = temperatures.length;
+        int[] ans = new int[n];                    // zeros are the correct default
+
+        // Indices of days still waiting; their temperatures
+        // decrease from the bottom of the stack to the top.
+        Deque&lt;Integer&gt; stack = new ArrayDeque&lt;&gt;();
+
+        for (int i = 0; i &lt; n; i++) {
+
+            // Today is warmer than the day on top, so that day's
+            // wait ends here. Settle it and keep going — today may
+            // settle several days at once.
+            while (!stack.isEmpty() &amp;&amp; temperatures[stack.peek()] &lt; temperatures[i]) {
+                int day = stack.pop();
+                ans[day] = i - day;                // the distance, hence indices
+            }
+
+            stack.push(i);
+        }
+        // Days left on the stack never warmed: ans stays 0.
+        return ans;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 84 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Every pair <code>(l, r)</code>, taking the minimum height between them. O(n³), or O(n²) carrying a running minimum.</dd>
+          <dt>The reframing</dt><dd>Stop enumerating rectangles. Instead ask, for <b>each bar</b>, what is the widest rectangle whose height is exactly that bar? Every maximal rectangle is limited by its shortest bar, so this enumeration is complete.</dd>
+          <dt>What that needs</dt><dd>For each bar, the first shorter bar to its left and the first shorter bar to its right. Those two indices give the width directly.</dd>
+          <dt>The insight</dt><dd>Both boundaries fall out of a single pass. When a bar is popped, the arriving element <em>is</em> its right boundary, and the item now exposed on the stack <em>is</em> its left boundary. No second pass is needed.</dd>
+          <dt>The sentinel</dt><dd>Iterate to <code>n</code> inclusive with a virtual bar of height 0. It forces every remaining bar to pop with the correct right boundary, removing the drain loop and the bugs that live in it.</dd>
+          <dt>Width, carefully</dt><dd><code>i − left − 1</code>, where <code>left</code> is <code>−1</code> when the stack empties. Deriving that from the trace once is worth more than memorising it.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 84 · O(n) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int largestRectangleArea(int[] heights) {
+        int n = heights.length, best = 0;
+        Deque&lt;Integer&gt; stack = new ArrayDeque&lt;&gt;();
+
+        // i == n is a VIRTUAL bar of height 0 that drains the stack.
+        for (int i = 0; i &lt;= n; i++) {
+            int cur = (i == n) ? 0 : heights[i];
+
+            while (!stack.isEmpty() &amp;&amp; heights[stack.peek()] &gt;= cur) {
+                int height = heights[stack.pop()];
+
+                // Right boundary is i. Left boundary is whatever the
+                // pop exposed — or -1 if this bar reaches index 0.
+                int left  = stack.isEmpty() ? -1 : stack.peek();
+                int width = i - left - 1;
+
+                best = Math.max(best, height * width);
+            }
+            stack.push(i);
+        }
+        return best;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>496 · Next Greater Element I <span class="tag a">next greater</span></h4><p><b>Path:</b> the nested-loop version is O(n·m) and passes at these limits, so say it first. The point of the problem is the decomposition, not the speed.</p><p><b>Delta:</b> run the template over <code>nums2</code> to get every element's next greater, storing results in a <code>HashMap&lt;value, answer&gt;</code> — the statement guarantees distinct values, which is what makes keying by value safe. Then map <code>nums1</code> through it.</p><p><b>Watch for:</b> elements left on the stack have no greater element, so their map entry must be <code>−1</code>. Easiest is to drain the stack after the loop.</p></div>
+
+    <div class="card"><h4>503 · Next Greater Element II <span class="tag a">circular</span></h4><p><b>Path:</b> the naive fix duplicates the array and runs the template on <code>2n</code> elements. That works and costs O(n) extra space — worth mentioning before the cleaner version.</p><p><b>Delta:</b> loop <code>i</code> from 0 to <code>2n</code> and index with <code>i % n</code>. <b>Push only while <code>i &lt; n</code></b>: the second pass exists solely to settle leftovers, and pushing again would let elements wait forever.</p><p><b>Watch for:</b> the answer here is the <em>value</em>, not the distance, so record <code>a[j]</code> rather than <code>j</code>.</p></div>
+
+    <div class="card"><h4>901 · Online Stock Span <span class="tag a">previous greater</span></h4><p><b>Path:</b> keeping every price and scanning back is O(n) per call, O(n²) overall. The span is really "distance to the previous greater price", which is this pattern in streaming form.</p><p><b>Delta:</b> the stack is a <b>field</b>, surviving between calls. Push <code>(price, span)</code> pairs; when popping, <b>absorb the popped span into your own</b> — that merged count is what makes the amortised O(1) work without storing the whole history.</p><p><b>Watch for:</b> pop while <code>topPrice &lt;= price</code>, inclusive. The problem counts days with a price equal to today's as part of the span.</p></div>
+
+    <div class="card"><h4>85 · Maximal Rectangle <span class="tag a">rectangle × rows</span></h4><p><b>Path:</b> enumerating all sub-rectangles is O((rows·cols)²). The reduction is the whole problem: treat each row as the base of a histogram whose bar heights are the counts of consecutive 1s above.</p><p><b>Delta:</b> maintain one <code>heights[]</code> array across rows — <code>heights[c] = matrix[r][c] == '1' ? heights[c] + 1 : 0</code> — and call the LC 84 routine on it after each row.</p><p><b>Watch for:</b> the reset to 0 on a '0' cell is what makes the histogram correct; incrementing unconditionally silently merges rectangles across gaps. Solve 84 first — this problem is unreasonable without it.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>739</b> and <b>84</b>. 739 makes the push-once-pop-once argument concrete and forces you to store indices. 84 is where the pattern earns its reputation: the realisation that a single pop yields <em>both</em> boundaries is the idea that makes the Hard tag disappear, and 85 becomes a ten-line wrapper once you have it.</div>
+</section>
+

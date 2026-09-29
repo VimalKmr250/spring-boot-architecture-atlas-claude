@@ -1,0 +1,130 @@
+<!-- dsa · pattern 14 · problems -->
+<section class="slide" data-sec="14 · Linked list manipulation" data-title="The six problems">
+  <h2>Six rewirings, two primitives</h2>
+  <p class="dek">21 is the merge primitive; 23 applies it k times with a heap. 24 and 92 are bounded reversals. 25 is the general case. 138 is the odd one out — an interleave rather than a reversal.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Primitive</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">21</td><td><a href="https://leetcode.com/problems/merge-two-sorted-lists/" target="_blank" rel="noopener">Merge Two Sorted Lists</a></td><td><span class="tag g">Easy</span></td><td>The merge primitive. Attach the remainder whole, do not loop it.</td><td>merge</td><td class="num">O(n+m) / O(1)</td></tr>
+        <tr><td class="num">24</td><td><a href="https://leetcode.com/problems/swap-nodes-in-pairs/" target="_blank" rel="noopener">Swap Nodes in Pairs</a></td><td><span class="tag w">Medium</span></td><td>Reverse in groups of exactly 2 — the simplest case of LC 25.</td><td>reverse</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">92</td><td><a href="https://leetcode.com/problems/reverse-linked-list-ii/" target="_blank" rel="noopener">Reverse Linked List II</a></td><td><span class="tag w">Medium</span></td><td>One segment by position. A dummy removes the <code>left == 1</code> case.</td><td>reverse</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">23</td><td><a href="https://leetcode.com/problems/merge-k-sorted-lists/" target="_blank" rel="noopener">Merge k Sorted Lists</a></td><td><span class="tag b">Hard</span></td><td>A heap of heads, or pairwise merging. Both are O(n log k).</td><td>merge × k</td><td class="num">O(n log k) / O(k)</td></tr>
+        <tr><td class="num">25</td><td><a href="https://leetcode.com/problems/reverse-nodes-in-k-group/" target="_blank" rel="noopener">Reverse Nodes in k-Group</a></td><td><span class="tag b">Hard</span></td><td>The general reversal, with a short remainder left untouched.</td><td>reverse</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">138</td><td><a href="https://leetcode.com/problems/copy-list-with-random-pointer/" target="_blank" rel="noopener">Copy List with Random Pointer</a></td><td><span class="tag w">Medium</span></td><td>Interleave copies among originals so position encodes the mapping.</td><td>interleave</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 25 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Copy values into an array, reverse each block of k, write them back. O(n) time and O(n) space — but the statement forbids modifying values, so it is ruled out by the problem itself.</dd>
+          <dt>The decomposition</dt><dd>Two known procedures: find the k-th node ahead, and reverse a segment. Everything else is reconnecting the seam.</dd>
+          <dt>The three references</dt><dd><code>groupPrev</code> (the node before the group), <code>kth</code> (its last node), and <code>nextGroup</code> (what follows). Naming these before writing any code is what makes the problem manageable.</dd>
+          <dt>The key fact</dt><dd>After reversing, the group's <b>old head is its new tail</b>. So it becomes <code>groupPrev</code> for the following iteration — no extra walk is needed.</dd>
+          <dt>The free reconnection</dt><dd>Seeding the reversal with <code>prev = nextGroup</code> leaves the old head already pointing at the next group, removing one of the two seam repairs.</dd>
+          <dt>Edge case</dt><dd>When fewer than k nodes remain, <code>walk</code> returns null and the loop exits, leaving the tail in its original order — exactly what the problem requires.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 25 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public ListNode reverseKGroup(ListNode head, int k) {
+        ListNode dummy = new ListNode(0, head);
+        ListNode groupPrev = dummy;
+
+        while (true) {
+            // The group's last node, or null if fewer than k remain.
+            ListNode kth = walk(groupPrev, k);
+            if (kth == null) break;            // leave the short tail alone
+
+            ListNode nextGroup = kth.next;     // SAVE before any rewiring
+            ListNode oldHead = groupPrev.next; // becomes the group's new TAIL
+
+            // Seeding prev with nextGroup means oldHead ends up
+            // pointing at the next group automatically.
+            ListNode prev = nextGroup, cur = oldHead;
+            while (cur != nextGroup) {
+                ListNode next = cur.next;
+                cur.next = prev;
+                prev = cur;
+                cur = next;
+            }
+
+            groupPrev.next = kth;    // kth is now the group's first node
+            groupPrev = oldHead;     // oldHead is now its last
+        }
+        return dummy.next;
+    }
+
+    private ListNode walk(ListNode from, int k) {
+        while (from != null &amp;&amp; k &gt; 0) { from = from.next; k--; }
+        return from;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 138 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Why it is hard</dt><dd>The <code>random</code> pointer may target a node you have not created yet, so a single naive pass cannot resolve it.</dd>
+          <dt>Solution one — a map</dt><dd>Pass 1 creates every copy and stores <code>original → copy</code> in a <code>HashMap</code>. Pass 2 sets <code>copy.next</code> and <code>copy.random</code> by looking up the originals. O(n) time, O(n) space, and completely correct. <b>Give this first.</b></dd>
+          <dt>The follow-up</dt><dd>Do it in O(1) extra space. The map exists only to answer "which copy corresponds to this original?" — so encode that relationship in the list's own structure instead.</dd>
+          <dt>The interleave</dt><dd>Put each copy <em>directly after</em> its original: <code>A → A' → B → B' → C → C'</code>. Now the copy of any node <code>x</code> is simply <code>x.next</code>, which is O(1) with no storage at all.</dd>
+          <dt>Then three passes</dt><dd>Weave the copies in; set <code>copy.random = original.random.next</code>; unweave the two lists apart.</dd>
+          <dt>Edge cases</dt><dd><code>random</code> may be null, so guard the second pass. The unweave must restore the original list exactly — leaving it damaged is a common and easily missed failure.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 138 · O(n) time, O(1) extra space</div>
+<pre><code class="language-java">class Solution {
+    public Node copyRandomList(Node head) {
+        if (head == null) return null;
+
+        // 1 · weave each copy in directly after its original,
+        //     so copyOf(x) is always x.next — no map needed.
+        for (Node cur = head; cur != null; cur = cur.next.next) {
+            Node copy = new Node(cur.val);
+            copy.next = cur.next;
+            cur.next = copy;
+        }
+
+        // 2 · random pointers. The copy of cur.random is exactly
+        //     cur.random.next, thanks to the interleaving.
+        for (Node cur = head; cur != null; cur = cur.next.next) {
+            cur.next.random = (cur.random != null) ? cur.random.next : null;
+        }
+
+        // 3 · unweave, restoring the original list intact.
+        Node copyHead = head.next;
+        for (Node cur = head; cur != null; cur = cur.next) {
+            Node copy = cur.next;
+            cur.next = copy.next;                       // restore original
+            copy.next = (copy.next != null) ? copy.next.next : null;
+        }
+        return copyHead;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>21 · Merge Two Sorted Lists <span class="tag a">merge</span></h4><p><b>Path:</b> collecting all values, sorting and rebuilding is O(n log n) and wastes the fact that both inputs are already sorted.</p><p><b>Delta:</b> the merge primitive verbatim. Dummy plus tail, attach the smaller head each step.</p><p><b>Watch for:</b> when one list empties, attach the <em>whole</em> remainder with <code>tail.next = a != null ? a : b</code>. Looping the rest node by node works but is needless, and forgetting it entirely truncates the answer.</p></div>
+
+    <div class="card"><h4>24 · Swap Nodes in Pairs <span class="tag a">reverse</span></h4><p><b>Path:</b> swapping the <code>val</code> fields is two lines and passes — but the follow-up forbids it, and the point is the pointer work.</p><p><b>Delta:</b> this is LC 25 with <code>k = 2</code>. Writing the general version once covers both, and is barely longer than the special case.</p><p><b>Watch for:</b> an odd-length list leaves a single trailing node untouched. The <code>walk</code> returning null handles that without a branch.</p></div>
+
+    <div class="card"><h4>92 · Reverse Linked List II <span class="tag a">reverse</span></h4><p><b>Path:</b> one segment, given by 1-based positions <code>left</code> and <code>right</code>. Walk to the node before <code>left</code>, reverse <code>right − left + 1</code> nodes, reconnect.</p><p><b>Delta:</b> a dummy is what removes the <code>left == 1</code> special case, where the head itself moves. With it, the code is uniform.</p><p><b>Watch for:</b> positions are <b>1-based</b>. Walking <code>left</code> steps instead of <code>left − 1</code> reverses the wrong segment, and the off-by-one is invisible on symmetric test cases.</p></div>
+
+    <div class="card"><h4>23 · Merge k Sorted Lists <span class="tag a">merge × k</span></h4><p><b>Path:</b> merging one at a time into an accumulator is O(n·k) — the accumulator is re-traversed each round. Say that, then improve it.</p><p><b>Delta:</b> two ways to reach O(n log k). A min-heap of the k current heads, popping the smallest and pushing its successor; or pairwise merging in rounds, halving the list count each time. The heap is easier to explain; the pairwise version needs no extra structure.</p><p><b>Watch for:</b> skip null lists when seeding the heap, or <code>poll</code> returns a null and throws on the first step.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>25</b> and <b>138</b>. 25 forces the full save-before-rewire discipline and the realisation that the old head becomes the new tail — after it, 24 and 92 are five-minute problems. 138 teaches the interleave trick, which is the one idea in this family that is not a reversal and the one most likely to appear as a follow-up you have not seen before.</div>
+</section>
+

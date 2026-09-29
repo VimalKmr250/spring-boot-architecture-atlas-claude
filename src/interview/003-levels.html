@@ -1,0 +1,23 @@
+    <section class="ivsec" id="levels">
+      <h2>What changes with the level</h2>
+      <p class="dek">The questions barely change between mid-level, senior and staff loops. The bar does. Interviewers calibrate on the scope of what you reason about — one component, one system, or several systems and the teams that own them — far more than on vocabulary.</p>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Signal</th><th>Mid-level</th><th>Senior</th><th>Staff / principal</th></tr></thead>
+          <tbody>
+            <tr><td>Scope</td><td>One component, built correctly</td><td>A system, including how it fails</td><td>Several systems, and the organisation that builds them</td></tr>
+            <tr><td>Trade-offs</td><td>Knows the options</td><td>Picks one, names its cost, and says what would change the choice</td><td>Frames the decision so that others can make it; separates reversible choices from irreversible ones</td></tr>
+            <tr><td>Failure</td><td>Handles errors when prompted</td><td>Volunteers the failure mode and the recovery</td><td>Designs the operating model: SLOs, on-call, blast radius</td></tr>
+            <tr><td>Evidence</td><td>"I've used it"</td><td>"We ran it at this volume, and this is what broke"</td><td>"We changed how several teams do this, and this is how we measured it"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 style="font-size:16px">One question at three levels: "a downstream service is slow"</h3>
+      <div class="grid3">
+        <div class="card"><h4>Mid-level</h4><p>"I'd add a timeout and a retry, and wrap the call in a Resilience4j circuit breaker."</p><p>Correct, and it would pass a mid-level bar. What is missing is <em>why</em> each piece is there and what happens when it fires.</p></div>
+        <div class="card"><h4>Senior</h4><p>"Timeout first, sized from the dependency's p99 and our own latency budget. Retries only on idempotent calls, with jitter. A breaker with a fallback we have agreed with product. A bulkhead so it cannot take all our threads. And an alert when the breaker opens."</p></div>
+        <div class="card accent"><h4>Staff</h4><p>All of the senior answer, then: "Why is this synchronous at all? If it is not on the critical path of the user's action, it should be an event. And across the organisation, a shared client library with these defaults, so the next forty services don't each rediscover them."</p></div>
+      </div>
+      <div class="note"><span class="lbl">Aim one level up, not two</span>Answer at the level you are interviewing for, and reach one level higher where it comes naturally. A senior candidate who closes with the shared-library point is showing staff-level reach. A mid-level candidate who opens with organisation design has skipped the part that is being assessed.</div>
+    </section>
+

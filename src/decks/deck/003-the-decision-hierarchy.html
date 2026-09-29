@@ -1,0 +1,25 @@
+<!-- deck 03 -->
+<section class="slide" data-sec="Foundations" data-title="The decision hierarchy">
+  <h2>Six decisions, in this order</h2>
+  <p class="dek">Most architecture arguments are people debating level 4 while disagreeing about level 1. Decide top-down; each level constrains the one below it, and reversing a level costs roughly ten times what the level below costs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Decision</th><th>Our answer for the order platform</th><th>Cost to reverse</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Deployment style</td><td>Modular monolith, one deployable, extract on evidence</td><td class="num">months</td></tr>
+        <tr><td>2</td><td>Module boundaries</td><td>Eight bounded contexts from the domain, not from the org chart</td><td class="num">weeks–months</td></tr>
+        <tr><td>3</td><td>Inter-module contract</td><td>Published API for queries, domain events for reactions</td><td class="num">weeks</td></tr>
+        <tr><td>4</td><td>Data ownership</td><td>Schema per module in one PostgreSQL cluster, no cross-schema joins</td><td class="num">weeks</td></tr>
+        <tr><td>5</td><td>Internal layering</td><td>Ports and adapters inside each module</td><td class="num">days</td></tr>
+        <tr><td>6</td><td>Frameworks &amp; libraries</td><td>Spring Boot 4.1, JPA + JdbcClient, Kafka, Angular SPA + BFF</td><td class="num">days</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">Common failure</span>Teams start at level 6 ("we'll use Kafka and Kubernetes"), then discover at level 2 that their modules share a <code>customer</code> table and cannot be separated at all. Infrastructure never fixes a boundary problem.</div>
+    <div class="note good"><span class="lbl">Why order matters</span>Levels 1–4 are architecture: expensive, slow, political. Levels 5–6 are design: a competent team changes them in a sprint. Spend your review time at the top.</div>
+  </div>
+</section>
+

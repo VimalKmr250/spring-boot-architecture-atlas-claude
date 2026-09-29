@@ -1,0 +1,142 @@
+<!-- dsa · pattern 27 · streams -->
+<section class="slide" data-sec="27 · 1D DP basics" data-title="The six, in streams">
+  <h2>Fixed lookback is a record; a table that reads itself is state</h2>
+  <p class="dek">When a recurrence looks back a fixed number of steps, the whole state fits in a small record, and <code>Stream.iterate(seed, step).skip(n)</code> applies the step exactly n times. That covers 70, 198 and 213. Each step returns a new record, so all three are clean. 322, 279 and 300 look back an unbounded distance, so they need the whole table. Each entry is still a clean pipeline, a min or a max over the choices, but it reads entries that earlier elements of the same stream wrote. That is state, and it makes them correct only sequentially.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">70</td><td><a href="https://leetcode.com/problems/climbing-stairs/" target="_blank" rel="noopener">Climbing Stairs</a></td><td>A two-field record holds the ways to reach i − 1 and i. <code>iterate(seed, Ways::climb).skip(n - 1)</code>.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">198</td><td><a href="https://leetcode.com/problems/house-robber/" target="_blank" rel="noopener">House Robber</a></td><td>A record (i, prev, cur). Each step applies f(i) = max(f(i − 1), f(i − 2) + a[i]) and returns a new record.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">213</td><td><a href="https://leetcode.com/problems/house-robber-ii/" target="_blank" rel="noopener">House Robber II</a></td><td>198's fold twice: once without the last house, once without the first.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(1)</td><td class="num">same</td></tr>
+        <tr><td class="num">322</td><td><a href="https://leetcode.com/problems/coin-change/" target="_blank" rel="noopener">Coin Change</a></td><td>Fill <code>best[a]</code> in order. Each entry is a min over the coins, read from entries the stream has already written.</td><td><span class="tag w">stateful</span></td><td class="num">O(amount·coins) / O(amount)</td><td class="num">same</td></tr>
+        <tr><td class="num">279</td><td><a href="https://leetcode.com/problems/perfect-squares/" target="_blank" rel="noopener">Perfect Squares</a></td><td>The same fill, over squares: <code>best[i]</code> = 1 + the min of <code>best[i - j*j]</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(n√n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">300</td><td><a href="https://leetcode.com/problems/longest-increasing-subsequence/" target="_blank" rel="noopener">Longest Increasing Subsequence</a></td><td><code>lis[i]</code> = 1 + the max <code>lis[j]</code> over earlier, smaller values. The O(n log n) patience version is a loop.</td><td><span class="tag w">stateful</span></td><td class="num">O(n²) / O(n)</td><td class="num">O(n²) or O(n log n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 70 · Climbing Stairs · clean</div>
+<pre><code class="language-java">class Solution {
+    public int climbStairs(int n) {
+        // (ways to reach i - 1, ways to reach i). One more step
+        // shifts the pair: (a, b) becomes (b, a + b).
+        record Ways(int prev, int cur) {
+            Ways climb() { return new Ways(cur, prev + cur); }
+        }
+        return Stream.iterate(new Ways(1, 1), Ways::climb)
+                .skip(n - 1).findFirst().get().cur();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 198 · House Robber · clean</div>
+<pre><code class="language-java">class Solution {
+    public int rob(int[] nums) {
+        return robRange(nums, 0, nums.length);
+    }
+
+    // f(i) = max(f(i - 1), f(i - 2) + a[i]): cur and prev are
+    // the best totals for the houses before i and before i - 1.
+    private record Best(int i, int prev, int cur) {
+        Best next(int[] a) {
+            int best = Math.max(cur, prev + a[i]);
+            return new Best(i + 1, cur, best);
+        }
+    }
+
+    private static int robRange(int[] a, int from, int to) {
+        Best start = new Best(from, 0, 0);
+        return Stream.iterate(start, b -&gt; b.next(a))
+                .skip(to - from).findFirst().get().cur();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 213 · House Robber II · clean</div>
+<pre><code class="language-java">class Solution {
+    public int rob(int[] nums) {
+        int n = nums.length;
+        // The first and last houses touch: rob all but the last
+        // or all but the first, and keep the better total.
+        return n == 1 ? nums[0]
+                : Math.max(robRange(nums, 0, n - 1),
+                           robRange(nums, 1, n));
+    }
+
+    // f(i) = max(f(i - 1), f(i - 2) + a[i]): cur and prev are
+    // the best totals for the houses before i and before i - 1.
+    private record Best(int i, int prev, int cur) {
+        Best next(int[] a) {
+            int best = Math.max(cur, prev + a[i]);
+            return new Best(i + 1, cur, best);
+        }
+    }
+
+    private static int robRange(int[] a, int from, int to) {
+        Best start = new Best(from, 0, 0);
+        return Stream.iterate(start, b -&gt; b.next(a))
+                .skip(to - from).findFirst().get().cur();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 322 · Coin Change · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int coinChange(int[] coins, int amount) {
+        // best[a]: the fewest coins making a, or -1. It reads
+        // best[a - c], which earlier elements of this stream
+        // wrote, so it is correct only sequentially.
+        int[] best = new int[amount + 1];
+        IntStream.rangeClosed(1, amount).forEach(a -&gt;
+                best[a] = Arrays.stream(coins)
+                        .filter(c -&gt; c &lt;= a &amp;&amp; best[a - c] &gt;= 0)
+                        .map(c -&gt; best[a - c] + 1)
+                        .min().orElse(-1));
+        return best[amount];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 279 · Perfect Squares · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int numSquares(int n) {
+        int[] best = new int[n + 1];
+        // best[i] = 1 + min over j of best[i - j*j]. Like 322,
+        // it reads entries that this stream wrote earlier.
+        IntStream.rangeClosed(1, n).forEach(i -&gt; best[i] = 1 +
+                IntStream.rangeClosed(1, (int) Math.sqrt(i))
+                        .map(j -&gt; best[i - j * j])
+                        .min().getAsInt());
+        return best[n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 300 · Longest Increasing Subsequence · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int lengthOfLIS(int[] nums) {
+        int n = nums.length;
+        int[] lis = new int[n];
+        // lis[i] is the longest increasing run ending at i.
+        // It reads lis[j] for j &lt; i, which this stream wrote.
+        IntStream.range(0, n).forEach(i -&gt; lis[i] = 1 +
+                IntStream.range(0, i)
+                        .filter(j -&gt; nums[j] &lt; nums[i])
+                        .map(j -&gt; lis[j])
+                        .max().orElse(0));
+        return Arrays.stream(lis).max().getAsInt();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">skip(n) is the loop counter</span><code>Stream.iterate(seed, step).skip(n).findFirst()</code> returns the seed after exactly n steps. It is the stream spelling of <code>for (int i = 0; i &lt; n; i++) state = step(state);</code>. 70 starts from (ways to 0, ways to 1), so n − 1 steps reach (ways to n − 1, ways to n). The record in 198 carries the index i as well as the two totals, which is what lets 213 run the same fold over two index ranges without copying the array.</div>
+  <div class="note warn"><span class="lbl">The table is the state</span><code>forEach(a -&gt; best[a] = …)</code> is correct only because a sequential stream visits a in increasing order, so <code>best[a - c]</code> is already filled when <code>best[a]</code> needs it. In parallel, some entries would read zeros that have not been written yet and report wrong answers. That is the honest cost of streaming an unbounded-lookback DP. The pipeline inside each entry is still the clearest statement of the recurrence, but the loop around it is the same code with the ordering made explicit.</div>
+</section>
+
+

@@ -1,0 +1,122 @@
+<!-- dsa · pattern 24 · structure -->
+<section class="slide" data-sec="24 · MST / graph greedy" data-title="The reusable structure">
+  <h2>Sort and union, or grow and pop</h2>
+  <p class="dek">Kruskal is union-find with a sorted edge list. Prim is Dijkstra with the distance replaced by the single edge weight. Both are short; the choice between them is about the input shape.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Kruskal — sort, then take non-cycling edges (LC 1584, 1135)</div>
+<pre><code class="language-java">/**
+ * Sort every edge, take each one whose endpoints are not yet
+ * connected. Union-find answers that test in near-constant time.
+ * Stop at n-1 edges: the tree is then complete.
+ */
+int kruskal(int n, int[][] edges) {       // edges: {u, v, w}
+    Arrays.sort(edges, (a, b) -&gt; Integer.compare(a[2], b[2]));
+
+    DSU dsu = new DSU(n);
+    int total = 0, taken = 0;
+
+    for (int[] e : edges) {
+        // false means the endpoints already share a component,
+        // so this edge would close a cycle.
+        if (dsu.union(e[0], e[1])) {
+            total += e[2];
+            if (++taken == n - 1) break;     // spanning tree complete
+        }
+    }
+    return taken == n - 1 ? total : -1;      // -1 if the graph is disconnected
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Prim — grow one tree from any start (LC 1584 on points)</div>
+<pre><code class="language-java">/**
+ * Better when the graph is DENSE or IMPLICIT — with n points every
+ * pair is an edge, so materialising all n^2/2 of them is wasteful.
+ *
+ * This is Dijkstra with one change: the key is the single edge
+ * weight, not the accumulated distance.
+ */
+int primOnPoints(int[][] points) {
+    int n = points.length;
+    boolean[] inTree = new boolean[n];
+    int[] best = new int[n];                 // cheapest edge into the tree
+    Arrays.fill(best, Integer.MAX_VALUE);
+    best[0] = 0;
+
+    int total = 0;
+
+    for (int iter = 0; iter &lt; n; iter++) {
+        // Pick the cheapest node not yet in the tree. With n &lt;= 1000
+        // a linear scan is O(n^2) overall and simpler than a heap.
+        int u = -1;
+        for (int v = 0; v &lt; n; v++)
+            if (!inTree[v] &amp;&amp; (u == -1 || best[v] &lt; best[u])) u = v;
+
+        inTree[u] = true;
+        total += best[u];
+
+        // Relax: the key is the EDGE weight, not best[u] + weight.
+        for (int v = 0; v &lt; n; v++) {
+            if (inTree[v]) continue;
+            int d = Math.abs(points[u][0] - points[v][0])
+                  + Math.abs(points[u][1] - points[v][1]);
+            if (d &lt; best[v]) best[v] = d;
+        }
+    }
+    return total;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The virtual node — turning a per-node cost into an edge (LC 1168)</div>
+<pre><code class="language-java">/**
+ * Each house can either dig its OWN well at cost wells[i], or lay a
+ * pipe to a neighbour. Two different kinds of cost, which is not an
+ * MST — until you notice the trick.
+ *
+ * Invent node 0 as "the water source". A well at house i becomes an
+ * EDGE from 0 to i with weight wells[i]. Now every cost is an edge,
+ * and the answer is an ordinary MST over n+1 nodes.
+ */
+int minCostToSupplyWater(int n, int[] wells, int[][] pipes) {
+    List&lt;int[]&gt; edges = new ArrayList&lt;&gt;();
+
+    // Wells become edges from the virtual source.
+    for (int i = 0; i &lt; n; i++) edges.add(new int[]{0, i + 1, wells[i]});
+
+    // Pipes are ordinary edges.
+    for (int[] p : pipes) edges.add(new int[]{p[0], p[1], p[2]});
+
+    edges.sort((a, b) -&gt; Integer.compare(a[2], b[2]));
+
+    DSU dsu = new DSU(n + 1);        // +1 for the virtual node
+    int total = 0, taken = 0;
+
+    for (int[] e : edges) {
+        if (dsu.union(e[0], e[1])) {
+            total += e[2];
+            if (++taken == n) break;  // n+1 nodes, so n edges span them
+        }
+    }
+    return total;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Choosing, and the variants</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Edge list given</dt><dd>Kruskal. The sort is already the natural first move.</dd>
+          <dt>Points or a dense graph</dt><dd>Prim with a linear scan when <code>n ≤ 1000</code>, avoiding the <code>n²</code> edge list entirely.</dd>
+          <dt>Two kinds of cost</dt><dd>Look for a virtual node that converts the odd one into an edge. It is the single most reusable trick here.</dd>
+          <dt>Minimax path</dt><dd>Sort edges ascending and union until the two endpoints connect. The last edge added is the smallest possible bottleneck.</dd>
+          <dt>Critical edges</dt><dd>Compute the MST weight, then for each edge: force-exclude it and see whether the weight rises (critical), or force-include it and see whether the weight is unchanged (pseudo-critical).</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Forgetting the disconnected case</b> — if fewer than <code>n − 1</code> edges are accepted the graph cannot be spanned, and the answer is −1 rather than a partial total. <b>Off-by-one with a virtual node</b> — the DSU must be sized <code>n + 1</code> and the stopping count becomes <code>n</code>, not <code>n − 1</code>. <b>Treating Prim's key as a distance</b> — relaxing with <code>best[u] + weight</code> makes it Dijkstra and produces a shortest-path tree, which is a different and more expensive tree.</div>
+    </div>
+  </div>
+</section>
+

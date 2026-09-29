@@ -1,0 +1,53 @@
+<!-- deck 33 -->
+<section class="slide" data-sec="Middleware" data-title="Consumers done right">
+  <h2>The consumer that survives a bad Tuesday</h2>
+  <p class="dek">Four properties make a Kafka consumer operable: bounded retry, a dead-letter path, idempotency, and manual offset commit. Missing any one of them produces an incident that ends with "we replayed the whole topic".</p>
+
+  <div class="codewrap">
+    <div class="codelabel">inventory/internal/kafka/OrderPlacedConsumer.java</div>
+<pre><code class="language-java">@Component
+class OrderPlacedConsumer {
+
+    @KafkaListener(topics = "orders.placed.v1", groupId = "inventory",
+                   concurrency = "6")
+    @Transactional
+    public void handle(@Payload OrderPlaced event,
+                       @Header(RECEIVED_KEY) String key,
+                       Acknowledgment ack) {
+
+        // idempotency: the natural business key, not an offset
+        if (reservations.existsByOrderId(event.orderId())) {
+            ack.acknowledge();                 // already done — a duplicate, not an error
+            return;
+        }
+        inventory.reserve(event.orderId(), event.lines());
+        ack.acknowledge();                     // commit offset only after the work committed
+    }
+}
+
+@Configuration
+class KafkaErrorConfig {
+    @Bean DefaultErrorHandler errorHandler(KafkaTemplate&lt;?, ?&gt; template) {
+        // partition -1 lets Kafka choose: the DLT may have fewer partitions
+        // than the source topic, and pinning record.partition() then throws.
+        var recoverer = new DeadLetterPublishingRecoverer(template,
+                (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
+
+        var handler = new DefaultErrorHandler(recoverer,
+                new ExponentialBackOffWithMaxRetries(3));   // 3 tries, then DLT — never infinite
+        handler.addNotRetryableExceptions(
+                DeserializationException.class,             // a poison pill never gets better
+                IllegalArgumentException.class);
+        return handler;
+    }
+}</code></pre>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">Know which default you have</span>The <b>raw Kafka client</b> defaults to <code>enable.auto.commit=true</code>, which commits on a timer regardless of whether your handler succeeded. Spring's listener container overrides it to <code>false</code> (since 2.3) and uses <code>AckMode.BATCH</code> — offsets commit after the whole poll is processed. So the risk is not the framework default; it is someone putting <code>enable-auto-commit: true</code> back in the YAML, or a batch where record 3 of 500 fails. Set <code>ack-mode: MANUAL_IMMEDIATE</code> and commit per record when each record's work must be durable before its offset moves.</div>
+    <div class="note bad"><span class="lbl">Infinite retry = stopped partition</span>A message that can never succeed, retried forever, blocks its partition and every message behind it. Bound the retries, publish to the DLT, alert, move on. Ordering is preserved for everything that <em>can</em> proceed.</div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Consumer lag is your real SLI</span>Alert on <code>kafka_consumergroup_lag</code> and on DLT depth, not on CPU. Lag rising steadily means consumers cannot keep up — scale to the partition count, then increase partitions. Lag flat but non-zero at a fixed number usually means one stuck partition.</div>
+</section>
+

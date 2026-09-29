@@ -1,0 +1,47 @@
+<!-- streams 01 -->
+<section class="slide" data-sec="Orientation" data-title="What this tab covers">
+  <h2>The whole Stream API, and the failure behind each method</h2>
+  <p class="lede">A reference for <code>java.util.stream</code> as it stands in JDK 25. It covers every method on <code>Stream</code> and the primitive streams, all 44 <code>Collectors</code>, the Gatherers that became final in Java 24, and the <code>Optional</code> that the search and reduce operations return. It ends with the stream questions interviewers ask most often, and the coding problems they set, solved.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">57</span><p>methods on <code>Stream</code>: 40 instance, 9 static and 8 inherited from <code>BaseStream</code>. Every one is in the index on slide 3, linked to the slide that covers it.</p></div>
+    <div class="card lift"><span class="bignum">44</span><p>factory methods on <code>Collectors</code>, from <code>toList</code> to <code>teeing</code>. Slide 4 lists them all, along with the five Gatherers and every <code>Optional</code> method.</p></div>
+    <div class="card lift"><span class="bignum">25</span><p>JDK 25, the current LTS, is the target. JDK 26 ships the identical stream API. Anything added after Java 8 carries a <span class="tag a">since</span> tag.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The fifteen sections</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Orientation</dt><dd>the pipeline model, and the whole API as two index tables</dd>
+        <dt>How a stream runs</dt><dd>laziness, short-circuiting, state, order, the rules, the internals</dd>
+        <dt>Creating streams</dt><dd>collections and values, infinite generators, the JDK methods that return streams</dd>
+        <dt>Intermediate ops</dt><dd><code>filter</code>, <code>map</code>, <code>flatMap</code>, <code>mapMulti</code>, <code>distinct</code>, <code>sorted</code>, the slicing ops, the flag ops</dd>
+        <dt>Terminal ops</dt><dd><code>forEach</code>, <code>collect</code>, <code>toList</code>, <code>toArray</code>, <code>reduce</code>, match, find, count, min, max</dd>
+        <dt>Primitive streams</dt><dd><code>IntStream</code>, <code>LongStream</code>, <code>DoubleStream</code> and their statistics</dd>
+        <dt>Optional</dt><dd>the result type of the search and reduce operations</dd>
+        <dt>Collectors</dt><dd>all 44, from collections to grouping to <code>teeing</code>, and writing your own</dd>
+        <dt>Gatherers</dt><dd>custom intermediate operations, and the five built in</dd>
+        <dt>Lambdas &amp; comparators</dt><dd>the functional interfaces and the <code>Comparator</code> combinators every pipeline uses</dd>
+        <dt>Parallel streams</dt><dd>how they split, when they pay off, how they break</dd>
+        <dt>Pitfalls</dt><dd>streams versus loops, checked exceptions, the mistakes that reach production</dd>
+        <dt>Version history</dt><dd>what each release from Java 8 to 26 added</dd>
+        <dt>Interview questions</dt><dd>twenty-seven questions, each with a 30-second answer</dd>
+        <dt>Coding drills</dt><dd>the stream problems interviews set, solved and explained</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>How to use it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each topic is its own section.</li>
+          <li><span class="tag a">since 16</span> marks an API added after Java 8, with the release that added it. No tag means Java 8.</li>
+          <li>Slide 5 runs a real pipeline <b>one element at a time</b>. Step through it before reading the rest of How a stream runs; the next five slides assume you have.</li>
+          <li>Preparing for an interview? Read <b>Interview questions</b>, then work the <b>Coding drills</b> with the solutions covered. Every answer links back to the slide that goes deeper.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">How the API slides are written</span>Every method gets three things: <b>what it does</b>, <b>a real line of code</b>, and <b>the failure it causes when used wrongly</b>. The examples compile on JDK 25; the two listings marked "trimmed" or "simplified" show only the shape of JDK internals. Where a slide quotes an output or an exception message, it is what the JVM actually printed.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,47 @@
+<!-- events 12 -->
+<section class="slide" data-sec="Guarantees" data-title="The dual-write problem">
+  <h2>The dual-write problem, and the only three answers</h2>
+  <p class="dek">You must change your database and publish an event. There is no transaction spanning both. Every event-driven system meets this on day one, and most meet it by pretending it is not there.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Three failure paths: publishing before commit can emit an event for a rolled-back change, committing before publishing can lose the event on a crash, and the outbox writes both in one transaction with a relay publishing afterwards">
+        <text x="14" y="16" font-size="10.5" font-weight="600" fill="#A22636">✕ SEND THEN COMMIT</text>
+        <rect x="14" y="26" width="250" height="52" rx="8" fill="#A22636" fill-opacity="0.07" stroke="#A22636"></rect>
+        <text x="30" y="46" font-size="9.5" font-family="monospace" fill="currentColor">kafka.send(event);  ← published</text>
+        <text x="30" y="62" font-size="9.5" font-family="monospace" fill="currentColor">tx.commit();        ← ROLLS BACK</text>
+        <text x="276" y="48" font-size="10" fill="#A22636">Consumers act on an order that</text>
+        <text x="276" y="64" font-size="10" fill="#A22636">does not exist. Unrecoverable.</text>
+
+        <text x="14" y="102" font-size="10.5" font-weight="600" fill="#A22636">✕ COMMIT THEN SEND</text>
+        <rect x="14" y="112" width="250" height="52" rx="8" fill="#A22636" fill-opacity="0.07" stroke="#A22636"></rect>
+        <text x="30" y="132" font-size="9.5" font-family="monospace" fill="currentColor">tx.commit();        ← order saved</text>
+        <text x="30" y="148" font-size="9.5" font-family="monospace" fill="currentColor">kafka.send(event);  ← pod dies</text>
+        <text x="276" y="134" font-size="10" fill="#A22636">Order exists; nobody is told. Silent,</text>
+        <text x="276" y="150" font-size="10" fill="#A22636">and found weeks later by reconciliation.</text>
+
+        <text x="14" y="188" font-size="10.5" font-weight="600" fill="#2C7448">✓ OUTBOX — one transaction, then a relay</text>
+        <rect x="14" y="198" width="250" height="44" rx="8" fill="#2C7448" fill-opacity="0.08" stroke="#2C7448"></rect>
+        <text x="30" y="217" font-size="9.5" font-family="monospace" fill="currentColor">tx { save(order); save(outboxRow); }</text>
+        <text x="30" y="233" font-size="9.5" font-family="monospace" fill="currentColor">relay: read unsent → publish → mark</text>
+        <line x1="268" y1="220" x2="300" y2="220" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <rect x="306" y="198" width="120" height="44" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="366" y="224" text-anchor="middle" font-size="10.5" fill="currentColor">Kafka</text>
+        <text x="444" y="212" font-size="10" fill="#2C7448">Crash anywhere after commit → the row is still</text>
+        <text x="444" y="228" font-size="10" fill="#2C7448">there, so it publishes again. At-least-once,</text>
+        <text x="444" y="244" font-size="10" fill="#2C7448">which is exactly what the consumers expect.</text>
+
+        <rect x="600" y="26" width="266" height="138" rx="9" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.22"></rect>
+        <text x="618" y="48" font-size="11" font-weight="600" fill="currentColor">Why not a distributed transaction?</text>
+        <text x="618" y="70" font-size="10" fill="currentColor" opacity="0.75">XA across PostgreSQL and Kafka is not</text>
+        <text x="618" y="85" font-size="10" fill="currentColor" opacity="0.75">supported — Kafka has no XA resource</text>
+        <text x="618" y="100" font-size="10" fill="currentColor" opacity="0.75">manager. Even where 2PC exists it blocks</text>
+        <text x="618" y="115" font-size="10" fill="currentColor" opacity="0.75">on coordinator failure and couples the</text>
+        <text x="618" y="130" font-size="10" fill="currentColor" opacity="0.75">availability of both systems together.</text>
+        <text x="618" y="152" font-size="10" fill="#D26A3F">The outbox is not a workaround. It is the answer.</text>
+      </svg>
+    </div>
+    <figcaption>Note that the outbox does not remove the failure — it converts an impossible atomicity problem into an ordinary local transaction plus a retry loop, at the cost of duplicates. Which is affordable precisely because every consumer is already idempotent.</figcaption>
+  </figure>
+</section>
+

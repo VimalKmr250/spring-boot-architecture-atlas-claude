@@ -1,0 +1,110 @@
+<!-- dsa · pattern 26 · problems -->
+<section class="slide" data-sec="26 · Bit manipulation" data-title="The six problems">
+  <h2>Six bit problems, three shapes</h2>
+  <p class="dek">136 and 268 are XOR folds. 137 generalises to modulo 3. 191, 338 and 190 are about counting and rearranging bits rather than cancelling them.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Shape</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">136</td><td><a href="https://leetcode.com/problems/single-number/" target="_blank" rel="noopener">Single Number</a></td><td><span class="tag g">Easy</span></td><td>The XOR fold in one line.</td><td>parity</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">268</td><td><a href="https://leetcode.com/problems/missing-number/" target="_blank" rel="noopener">Missing Number</a></td><td><span class="tag g">Easy</span></td><td>XOR indices against values; everything pairs but the gap.</td><td>parity</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">137</td><td><a href="https://leetcode.com/problems/single-number-ii/" target="_blank" rel="noopener">Single Number II</a></td><td><span class="tag w">Medium</span></td><td>Three copies, so count each lane modulo 3.</td><td>count mod k</td><td class="num">O(32n) / O(1)</td></tr>
+        <tr><td class="num">191</td><td><a href="https://leetcode.com/problems/number-of-1-bits/" target="_blank" rel="noopener">Number of 1 Bits</a></td><td><span class="tag g">Easy</span></td><td><code>n &amp; (n−1)</code> loops once per set bit.</td><td>counting</td><td class="num">O(set bits) / O(1)</td></tr>
+        <tr><td class="num">338</td><td><a href="https://leetcode.com/problems/counting-bits/" target="_blank" rel="noopener">Counting Bits</a></td><td><span class="tag g">Easy</span></td><td>DP on <code>i &gt;&gt; 1</code> — a strictly smaller, already-solved index.</td><td>DP on bits</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">190</td><td><a href="https://leetcode.com/problems/reverse-bits/" target="_blank" rel="noopener">Reverse Bits</a></td><td><span class="tag g">Easy</span></td><td>32 fixed steps; <code>&gt;&gt;&gt;</code> is mandatory.</td><td>rearranging</td><td class="num">O(32) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 136 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>A <code>HashMap</code> of counts, or a <code>HashSet</code> toggled by add and remove. O(n) time but O(n) space — and the problem explicitly demands constant space.</dd>
+          <dt>Sorting</dt><dd>Sort and scan for the element without a neighbour. O(n log n) time, O(1) space, and it mutates the input. A reasonable second answer.</dd>
+          <dt>The observation</dt><dd>You need an operation that makes identical values <b>annihilate</b> each other while leaving a lone value intact. XOR is exactly that: <code>x ^ x = 0</code> and <code>x ^ 0 = x</code>.</dd>
+          <dt>Why order does not matter</dt><dd>XOR is commutative and associative, so the pairs cancel wherever they sit. No grouping, no sorting, one pass.</dd>
+          <dt>Seeding with 0</dt><dd>Zero is XOR's identity, so it is the correct accumulator start — the same reason you seed a sum with 0 and a product with 1.</dd>
+          <dt>The generalisation</dt><dd>If two values were unique instead of one, XOR everything, isolate a set bit of the result with <code>x &amp; (-x)</code>, and partition the array on that bit. Each half then has exactly one unique value. Worth mentioning.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 136 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int singleNumber(int[] nums) {
+        // x ^ x == 0 makes pairs annihilate.
+        // x ^ 0 == x leaves the lone value untouched.
+        // XOR is commutative and associative, so order is irrelevant.
+        int unique = 0;
+        for (int v : nums) unique ^= v;
+        return unique;
+    }
+}
+
+// The two-unique-values generalisation, for the follow-up:
+//   int x = 0; for (int v : nums) x ^= v;        // x == a ^ b
+//   int bit = x &amp; (-x);                          // a bit where a and b differ
+//   int a = 0, b = 0;
+//   for (int v : nums) { if ((v &amp; bit) != 0) a ^= v; else b ^= v; }</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 137 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Why XOR fails</dt><dd>Three copies of a value XOR down to one copy of it, not zero. The cancellation property is specific to <em>pairs</em>, so the fold leaves noise behind.</dd>
+          <dt>The reframing</dt><dd>Stop thinking about values and think about <b>bit lanes</b>. Each of the 32 positions is an independent counter, and XOR is really a per-lane count modulo 2.</dd>
+          <dt>The generalisation</dt><dd>If values appear three times, count each lane modulo <b>3</b>. Triplicated values contribute a multiple of 3 to every lane and vanish; the unique value's bits are exactly the non-zero remainders.</dd>
+          <dt>The implementation</dt><dd>Two nested loops — 32 bit positions by n values. O(32n), which is linear in n and uses O(1) space.</dd>
+          <dt>The compressed form</dt><dd>Two integers, <code>ones</code> and <code>twos</code>, acting as a modulo-3 state machine. Same computation, far less readable. Present the counting version first, then offer this.</dd>
+          <dt>Negative numbers</dt><dd>Use <code>&gt;&gt;&gt;</code> for the extraction and the two's-complement representation handles negatives correctly — bit 31 is simply another lane.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 137 · O(32n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int singleNumber(int[] nums) {
+        int result = 0;
+
+        // Each bit position is an INDEPENDENT counter. Values that
+        // appear three times add a multiple of 3 to every lane, so
+        // the remainder isolates the unique value's bits.
+        for (int bit = 0; bit &lt; 32; bit++) {
+            int count = 0;
+            for (int v : nums) {
+                count += (v &gt;&gt;&gt; bit) &amp; 1;    // &gt;&gt;&gt; so bit 31 works for negatives
+            }
+            if (count % 3 != 0) result |= (1 &lt;&lt; bit);
+        }
+        return result;
+    }
+}
+
+// The O(1)-pass state machine — same computation, compressed.
+// Offer it only AFTER explaining the counting version above.
+//   int ones = 0, twos = 0;
+//   for (int v : nums) {
+//       ones = (ones ^ v) &amp; ~twos;
+//       twos = (twos ^ v) &amp; ~ones;
+//   }
+//   return ones;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>268 · Missing Number <span class="tag a">parity</span></h4><p><b>Path:</b> summing <code>0..n</code> and subtracting the array total is the obvious O(n) answer — mention that it can overflow for large n, which is why XOR is preferred.</p><p><b>Delta:</b> XOR every index <code>0..n</code> together with every value. Each present number appears exactly twice — once as an index, once as a value — and cancels. The missing one appears once and survives.</p><p><b>Watch for:</b> the loop must cover indices <code>0</code> through <code>n</code> inclusive, which is one more than the array length. Missing that leaves the wrong survivor.</p></div>
+
+    <div class="card"><h4>191 · Number of 1 Bits <span class="tag a">counting</span></h4><p><b>Path:</b> checking all 32 positions works and is O(1) by any practical measure. <code>n &amp; (n − 1)</code> is faster when the value is sparse.</p><p><b>Delta:</b> that expression clears the lowest set bit, so looping until <code>n == 0</code> runs exactly once per set bit — 3 iterations for a value with 3 ones, not 32.</p><p><b>Watch for:</b> the input is treated as unsigned, so the loop must use <code>n != 0</code> rather than <code>n &gt; 0</code>. A negative input has bit 31 set and <code>n &gt; 0</code> exits immediately.</p></div>
+
+    <div class="card"><h4>338 · Counting Bits <span class="tag a">DP on bits</span></h4><p><b>Path:</b> calling the LC 191 routine for every value is O(32n) and passes. The follow-up asks for a single linear pass without a built-in.</p><p><b>Delta:</b> <code>dp[i] = dp[i &gt;&gt; 1] + (i &amp; 1)</code>. Dropping the last bit gives a strictly smaller index whose answer is already computed; add back the bit you dropped.</p><p><b>Watch for:</b> <code>dp[i] = dp[i &amp; (i-1)] + 1</code> is an equally valid recurrence using the clearing trick instead. Both are one line; knowing why each works is the point.</p></div>
+
+    <div class="card"><h4>190 · Reverse Bits <span class="tag a">rearranging</span></h4><p><b>Path:</b> shift bits out of the bottom of the input and into the bottom of the result, which builds the reversal automatically over 32 steps.</p><p><b>Delta:</b> <code>result = (result &lt;&lt; 1) | (n &amp; 1)</code> then <code>n &gt;&gt;&gt;= 1</code>. All 32 iterations must run even after <code>n</code> reaches zero, or the remaining shifts are skipped and the answer is misaligned.</p><p><b>Watch for:</b> <code>&gt;&gt;&gt;</code> is mandatory — <code>&gt;&gt;</code> on a negative input copies the sign bit forever. The repeated-call follow-up is a 256-entry byte lookup table, which is the expected answer there.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>136</b> and <b>137</b>. 136 establishes the XOR fold and the O(1)-space habit. 137 is where the pattern becomes understanding rather than recall: seeing XOR as a per-lane parity counter, and therefore seeing modulo-3 counting as the natural generalisation, is what lets you handle a variant you have never met.</div>
+</section>
+

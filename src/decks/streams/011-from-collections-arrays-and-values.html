@@ -1,0 +1,41 @@
+<!-- streams 11 -->
+<section class="slide" data-sec="Creating streams" data-title="From collections, arrays and values">
+  <h2>Most streams start from something you already hold</h2>
+  <p class="dek">A collection, an array, a handful of values, a map's entries. Each has one idiomatic factory. Each factory also has a trap that looks fine until the shape of the data changes.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">One line per factory</div>
+<pre><code class="language-java">Stream&lt;Order&gt; fromList   = orders.stream();                  // ordered, like the list
+IntStream     fromInts   = Arrays.stream(new int[]{3, 1, 4});  // primitive: no boxing
+Stream&lt;String&gt; middle    = Arrays.stream(skus, 1, 3);         // indices 1 and 2
+Stream&lt;String&gt; literals  = Stream.of("NEW", "PAID", "SHIPPED");
+Stream&lt;Map.Entry&lt;String, Integer&gt;&gt; stock = stockBySku.entrySet().stream();
+
+Stream&lt;Integer&gt; maybe = Stream.ofNullable(stockBySku.get("X-9"));   // empty when null (9)
+Stream&lt;String&gt; none  = Stream.empty();
+Stream&lt;String&gt; built = Stream.&lt;String&gt;builder().add("a").add("b").build();
+Stream&lt;Order&gt;  both  = Stream.concat(open.stream(), archived.stream());</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Factory</th><th>Watch for</th></tr></thead>
+        <tbody>
+          <tr><td><code>collection.stream()</code></td><td>Ordered only if the collection is. A <code>HashSet</code> gives no order to keep.</td></tr>
+          <tr><td><code>parallelStream()</code></td><td>A request, not a promise. See the parallel section before reaching for it.</td></tr>
+          <tr><td><code>map.entrySet().stream()</code></td><td>There is no <code>Map.stream()</code>. Stream the entries, keys or values.</td></tr>
+          <tr><td><code>Arrays.stream(a, from, to)</code></td><td>Half-open: <code>to</code> is excluded, like <code>substring</code>.</td></tr>
+          <tr><td><code>Stream.ofNullable(x)</code> <span class="tag a">9</span></td><td>Zero or one element. Pairs well with <code>flatMap</code> over a nullable field.</td></tr>
+          <tr><td><code>Stream.builder()</code></td><td>One use: <code>add</code> after <code>build()</code> throws <code>IllegalStateException</code>.</td></tr>
+          <tr><td><code>Stream.concat(a, b)</code></td><td>Parallel if either input is. Closing it closes both inputs.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl"><code>Stream.of(int[])</code> is not an IntStream</span><code>Stream.of(new int[]{1, 2, 3}).count()</code> returns <b>1</b>. Varargs cannot take an <code>int[]</code> as <code>T...</code>, because <code>T</code> must be a reference type, so the whole array becomes one element of a <code>Stream&lt;int[]&gt;</code>. Use <code>Arrays.stream(int[])</code> or <code>IntStream.of(1, 2, 3)</code>. <code>Arrays.asList(int[])</code> has the same trap.</div>
+    <div class="note bad"><span class="lbl">Concatenating in a loop</span>Each <code>concat</code> wraps the previous stream, so reading the first element walks down the whole chain. On JDK 25, 100,000 nested <code>concat</code> calls threw <code>StackOverflowError</code> on the first element read. To join many streams, stream the collection of sources and <code>flatMap</code>: <code>sources.stream().flatMap(List::stream)</code>.</div>
+  </div>
+</section>
+

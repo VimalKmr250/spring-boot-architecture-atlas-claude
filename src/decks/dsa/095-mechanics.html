@@ -1,0 +1,72 @@
+<!-- dsa · pattern 17 · mechanics -->
+<section class="slide" data-sec="17 · BST problems" data-title="Mechanics">
+  <h2>The ordering is the data structure — use it or you have a plain tree</h2>
+  <p class="dek">A binary search tree guarantees that <b>everything</b> in the left subtree is smaller and everything on the right is larger. Two consequences follow, and every problem here is one of them: you can <b>discard half the tree</b> at each step, and an <b>in-order traversal emits sorted values</b>.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Consequence one — halving</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Comparing a target against <code>node.val</code> tells you which side it must be on, so the other side is discarded outright. Searching, inserting, deleting and finding a lowest common ancestor are all <b>O(h)</b> rather than O(n).</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">On a balanced tree <code>h</code> is log n. On a degenerate one — values inserted in sorted order — it is n, and every operation degrades to a linear scan. Say that when asked about complexity.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Written iteratively, these are O(1) space, which is usually worth preferring.</p>
+    </div>
+    <div class="panel">
+      <h3>Consequence two — in-order is sorted</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Visit left, then the node, then right, and the values come out in ascending order. That single fact solves most of this family:</p>
+      <ul class="checks tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li><b>Validation</b> — the sequence must be strictly increasing.</li>
+        <li><b>The k-th smallest</b> — stop after k emissions.</li>
+        <li><b>Recovery</b> — exactly two elements are out of order in a sorted sequence.</li>
+      </ul>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">When a BST problem looks hard, ask what the in-order sequence would look like. The answer is usually the algorithm.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 254" role="img" aria-label="A BST showing the valid range propagated to each subtree, and the sorted in-order sequence">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">VALIDATION IS A RANGE, NOT A PARENT COMPARISON</text>
+
+        <circle cx="230" cy="48" r="21" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.7"></circle>
+        <text x="230" y="54" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">5</text>
+        <text x="230" y="24" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.5">(−inf, +inf)</text>
+        <path d="M213 63 L157 92" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+        <path d="M247 63 L303 92" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"></path>
+
+        <circle cx="140" cy="108" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="140" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="80" y="100" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">(−inf, 5)</text>
+
+        <circle cx="320" cy="108" r="21" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="320" y="114" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">8</text>
+        <text x="382" y="100" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">(5, +inf)</text>
+        <path d="M303 123 L262 152" stroke="#D26A3F" stroke-width="1.5"></path>
+
+        <circle cx="244" cy="168" r="21" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="4 3"></circle>
+        <text x="244" y="174" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">4</text>
+        <text x="160" y="176" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#D26A3F">(5, 8) — 4 violates it</text>
+
+        <text x="440" y="48" font-size="11" fill="currentColor" opacity="0.75">Node 4 is correctly smaller than its parent 8,</text>
+        <text x="440" y="66" font-size="11" fill="currentColor" opacity="0.75">so a parent-only check <tspan font-weight="600" fill="#D26A3F">passes</tspan> — wrongly.</text>
+        <text x="440" y="90" font-size="11" fill="currentColor" opacity="0.75">But it sits in the right subtree of 5, so every</text>
+        <text x="440" y="108" font-size="11" fill="currentColor" opacity="0.75">value there must exceed 5. The <em>range</em> catches it.</text>
+        <text x="440" y="136" font-size="11" fill="currentColor" opacity="0.72">Going left tightens the upper bound;</text>
+        <text x="440" y="154" font-size="11" fill="currentColor" opacity="0.72">going right tightens the lower bound.</text>
+
+        <line x1="14" y1="196" x2="866" y2="196" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">IN-ORDER OF A VALID BST IS SORTED — AND THAT IS THE OTHER HALF OF THE PATTERN</text>
+        <text x="14" y="240" font-size="11.5" font-family="monospace" fill="currentColor" opacity="0.8">left subtree  →  node  →  right subtree      emits  1, 3, 4, 5, 7, 8, 9  …  strictly increasing</text>
+      </svg>
+    </div>
+    <figcaption>The counter-example is the whole reason range validation exists. Node 4 satisfies its parent but violates its grandparent, and only a bound carried down from above can detect that.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The tree is stated to be a BST. That word is the licence to use ordering — without it you have an ordinary binary tree and must visit every node.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>The tree is unbalanced in a way that matters and you need guaranteed logarithmic bounds — that is an AVL or red-black tree. Also when duplicates are allowed, since the problem must then define which side they go on.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(h)</b> for search, insert, delete and lowest common ancestor — log n balanced, <b>n</b> degenerate. <b>O(n)</b> for anything requiring a full in-order pass. Space is O(1) iteratively, O(h) recursively.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"a valid binary search tree"</b> · <b>"the k-th smallest element in a BST"</b> · <b>"exactly two nodes were swapped by mistake"</b> · <b>"the lowest common ancestor of a BST"</b> (the BST version is far easier than the general one) · <b>"delete a node"</b> · <b>"search in a BST"</b>. The phrase <b>"without changing its structure"</b> in LC 99 is what forces the in-order approach rather than a rebuild.</div>
+</section>
+

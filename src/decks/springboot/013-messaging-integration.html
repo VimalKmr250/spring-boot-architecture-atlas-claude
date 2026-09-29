@@ -1,0 +1,40 @@
+<!-- springboot 13 -->
+<section class="slide" data-sec="Starters" data-title="Messaging & integration">
+  <h2>Messaging and integration starters</h2>
+  <p class="dek">The middleware half of an enterprise stack. Each one auto-configures a template, a listener container, and a set of health indicators you should be alerting on.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Starter / dependency</th><th>Auto-configures</th><th>Use it for</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td><code>spring-kafka</code></td><td><code>KafkaTemplate</code>, <code>@KafkaListener</code> containers, <code>DefaultErrorHandler</code></td><td>Event backbone, high throughput, replay</td><td>The container disables auto-commit for you and acks per <em>poll</em> (<code>AckMode.BATCH</code>) — use <code>ack-mode: MANUAL_IMMEDIATE</code> when each record must be durable before its offset moves</td></tr>
+        <tr><td><code>-activemq</code> / <code>-artemis</code> / IBM MQ starter</td><td><code>JmsTemplate</code>, <code>@JmsListener</code>, <code>ConnectionFactory</code></td><td>Classic enterprise queues, XA, request/reply</td><td>JMS transactions are not your JPA transaction unless you configure XA — usually you should not</td></tr>
+        <tr><td><code>-amqp</code></td><td><code>RabbitTemplate</code>, <code>@RabbitListener</code>, admin</td><td>Routing-heavy workloads, work queues</td><td>Dead-letter exchange must be declared explicitly — it is not automatic</td></tr>
+        <tr><td><code>spring-integration</code></td><td>Channels, adapters, <code>IntegrationFlow</code> DSL</td><td>File pickup, SFTP, protocol bridging, EIP patterns</td><td>Easy to build an unreadable flow; keep business logic out of it</td></tr>
+        <tr><td><code>spring-cloud-stream</code></td><td>Binder abstraction over Kafka/Rabbit, functional handlers</td><td>Swapping brokers, standardising across many teams</td><td>The abstraction leaks the moment you need broker-specific behaviour</td></tr>
+        <tr><td><code>-mail</code></td><td><code>JavaMailSender</code></td><td>Notification module</td><td>Never send inside a transaction — it is not rollback-able</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The Kafka settings an enterprise service should not leave at default</div>
+<pre><code class="language-yaml">spring.kafka:
+  bootstrap-servers: ${KAFKA_BROKERS}
+  producer:
+    acks: all                       # client default since Kafka 3.0 — pin it anyway,
+    properties.enable.idempotence: true   # so an inherited config cannot weaken it
+  consumer:
+    group-id: inventory
+    auto-offset-reset: earliest     # default 'latest' SILENTLY skips a backlog
+    enable-auto-commit: false       # the container already does this; be explicit
+    isolation-level: read_committed
+  listener:
+    ack-mode: MANUAL_IMMEDIATE      # container default is BATCH (per poll)
+    observation-enabled: true       # propagates the trace across the async hop</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">The default that still causes real incidents</span><b><code>auto-offset-reset: latest</code></b> means a brand-new consumer group skips everything already on the topic, so a new service quietly starts from "now" and nobody notices until reconciliation. <b>What is <em>no longer</em> true:</b> <code>acks</code> defaulted to <code>1</code> only before Kafka 3.0 — since then the client defaults to <code>acks=all</code> with <code>enable.idempotence=true</code>. Set both explicitly regardless, because the failure mode is someone weakening them for throughput and nobody noticing until a leader election.</div>
+  </div>
+</section>
+

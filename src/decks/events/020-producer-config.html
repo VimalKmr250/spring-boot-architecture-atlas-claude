@@ -1,0 +1,30 @@
+<!-- events 20 -->
+<section class="slide" data-sec="Kafka internals" data-title="Producer config">
+  <h2>Producer settings that actually matter</h2>
+  <p class="dek">Fifteen or so of the hundred-odd options carry almost all the behaviour. These are the ones worth knowing by heart and defending in a review.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Setting</th><th>Default</th><th>Set it to</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td><code>acks</code></td><td><code>all</code> (since 3.0)</td><td><code>all</code></td><td>Anything less can lose an acknowledged write on leader failover</td></tr>
+        <tr><td><code>enable.idempotence</code></td><td><code>true</code></td><td>leave on</td><td>De-duplicates retries; required for transactions</td></tr>
+        <tr><td><code>linger.ms</code></td><td><code>5</code> (since 4.0; <code>0</code> before)</td><td><code>5–20</code></td><td>Bigger batches: better compression, far better throughput, a few ms of latency. Pin it if you run 3.x clients</td></tr>
+        <tr><td><code>batch.size</code></td><td>16 KB</td><td>32–128 KB</td><td>An upper bound per partition batch, not a wait condition</td></tr>
+        <tr><td><code>compression.type</code></td><td><code>none</code></td><td><code>lz4</code> or <code>zstd</code></td><td>Typically 3–5× less network and disk; <code>zstd</code> compresses hardest, <code>lz4</code> is cheapest on CPU</td></tr>
+        <tr><td><code>max.in.flight.requests</code></td><td>5</td><td>≤ 5</td><td>Above 5 disables idempotence guarantees</td></tr>
+        <tr><td><code>delivery.timeout.ms</code></td><td>120 s</td><td>match your SLA</td><td>The real end-to-end bound: covers all retries. <code>retries</code> alone does not</td></tr>
+        <tr><td><code>request.timeout.ms</code></td><td>30 s</td><td>10–30 s</td><td>Per attempt</td></tr>
+        <tr><td><code>max.block.ms</code></td><td>60 s</td><td>5–10 s</td><td>How long <code>send()</code> blocks when the buffer is full — your only backpressure signal</td></tr>
+        <tr><td><code>buffer.memory</code></td><td>32 MB</td><td>size for burst × record size</td><td>Total accumulator budget across all partitions</td></tr>
+        <tr><td><code>transactional.id</code></td><td>—</td><td>set for EOS</td><td>Enables transactions; must be stable per logical producer</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note warn"><span class="lbl"><code>retries</code> is the wrong knob</span>Since Kafka 2.1 the producer retries until <code>delivery.timeout.ms</code> expires, so setting <code>retries=3</code> does far less than people expect. Tune the <b>timeout</b> to the latency your caller can tolerate and leave retries at its default.</div>
+    <div class="note tip"><span class="lbl">Where a producer blocks, and why it matters</span>Buffer full → <code>send()</code> blocks up to <code>max.block.ms</code> on <b>your request thread</b>. With a 60-second default, a broker problem becomes a thread-pool exhaustion outage in your web tier. Drop it to a few seconds so you fail fast and can shed load deliberately.</div>
+  </div>
+</section>
+

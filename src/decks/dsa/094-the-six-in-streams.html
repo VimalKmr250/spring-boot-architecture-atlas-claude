@@ -1,0 +1,202 @@
+<!-- dsa · pattern 16 · streams -->
+<section class="slide" data-sec="16 · Tree BFS" data-title="The six, in streams">
+  <h2>Level order is what <code>Stream.iterate</code> was made for</h2>
+  <p class="dek"><code>Stream.iterate(firstLevel, l -&gt; !l.isEmpty(), nextLevel)</code> produces the levels one list at a time, with no queue and no size-snapshot loop. Every problem here is then a <code>map</code> over each level: its values, its average, its maximum, or its last node. After hashing, this is the cleanest pattern in the deck.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">102</td><td><a href="https://leetcode.com/problems/binary-tree-level-order-traversal/" target="_blank" rel="noopener">Binary Tree Level Order Traversal</a></td><td>Each level, mapped to its values.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">same</td></tr>
+        <tr><td class="num">637</td><td><a href="https://leetcode.com/problems/average-of-levels-in-binary-tree/" target="_blank" rel="noopener">Average of Levels in Binary Tree</a></td><td><code>mapToInt(…).average()</code> per level. It sums in a <code>long</code> internally, so there is no overflow.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">same</td></tr>
+        <tr><td class="num">515</td><td><a href="https://leetcode.com/problems/find-largest-value-in-each-tree-row/" target="_blank" rel="noopener">Find Largest Value in Each Tree Row</a></td><td><code>max()</code> per level.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">same</td></tr>
+        <tr><td class="num">199</td><td><a href="https://leetcode.com/problems/binary-tree-right-side-view/" target="_blank" rel="noopener">Binary Tree Right Side View</a></td><td>The last node of each level.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">same</td></tr>
+        <tr><td class="num">103</td><td><a href="https://leetcode.com/problems/binary-tree-zigzag-level-order-traversal/" target="_blank" rel="noopener">Binary Tree Zigzag Level Order Traversal</a></td><td>Number the levels with <code>IntStream.range</code> and read every odd one backwards.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">same</td></tr>
+        <tr><td class="num">116</td><td><a href="https://leetcode.com/problems/populating-next-right-pointers-in-each-node/" target="_blank" rel="noopener">Populating Next Right Pointers in Each Node</a></td><td>For each level, point node <code>i</code> at node <code>i + 1</code>. The walk reads only <code>left</code> and <code>right</code>, so writing <code>next</code> is safe.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(w)</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 102 · Binary Tree Level Order Traversal · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; levelOrder(TreeNode root) {
+        // Each level, mapped to its values: no queue, and no
+        // size snapshot to get wrong.
+        return levels(root)
+                .map(l -&gt; l.stream().map(n -&gt; n.val).toList())
+                .toList();
+    }
+
+    // ---- the same level walk in all six ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 637 · Average of Levels in Binary Tree · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;Double&gt; averageOfLevels(TreeNode root) {
+        // IntStream.average() sums in a long internally, so a
+        // row of values near 2^31 cannot overflow.
+        return levels(root)
+                .map(l -&gt; l.stream().mapToInt(n -&gt; n.val)
+                        .average().getAsDouble())
+                .toList();
+    }
+
+    // ---- the same level walk in all six ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 515 · Find Largest Value in Each Tree Row · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;Integer&gt; largestValues(TreeNode root) {
+        return levels(root)
+                .map(l -&gt; l.stream().mapToInt(n -&gt; n.val)
+                        .max().getAsInt())
+                .toList();
+    }
+
+    // ---- the same level walk in all six ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 199 · Binary Tree Right Side View · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;Integer&gt; rightSideView(TreeNode root) {
+        // The node you see from the right is each level's last.
+        return levels(root)
+                .map(l -&gt; l.get(l.size() - 1).val)
+                .toList();
+    }
+
+    // ---- the same level walk in all six ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 103 · Binary Tree Zigzag Level Order Traversal · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; zigzagLevelOrder(TreeNode root) {
+        List&lt;List&lt;TreeNode&gt;&gt; lv = levels(root).toList();
+        // Number the levels, and read every odd one backwards.
+        return IntStream.range(0, lv.size())
+                .mapToObj(d -&gt; {
+                    List&lt;TreeNode&gt; l = lv.get(d);
+                    int w = l.size();
+                    return IntStream.range(0, w)
+                            .mapToObj(i -&gt; l.get(d % 2 == 0
+                                    ? i : w - 1 - i).val)
+                            .toList();
+                })
+                .toList();
+    }
+
+    // ---- the same level walk in all six ----
+    static Stream&lt;List&lt;TreeNode&gt;&gt; levels(TreeNode root) {
+        List&lt;TreeNode&gt; first = root == null ? List.of()
+                                            : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;TreeNode&gt; below(List&lt;TreeNode&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 116 · Populating Next Right Pointers in Each Node · clean</div>
+<pre><code class="language-java">class Solution {
+    public Node connect(Node root) {
+        // Within each level, node i points at node i + 1. The
+        // walk reads left/right only, so setting next is safe.
+        levels(root).forEach(l -&gt; IntStream.range(1, l.size())
+                .forEach(i -&gt; l.get(i - 1).next = l.get(i)));
+        return root;
+    }
+
+    // ---- the same level walk in all six, over Node here ----
+    static Stream&lt;List&lt;Node&gt;&gt; levels(Node root) {
+        List&lt;Node&gt; first = root == null ? List.of()
+                                        : List.of(root);
+        return Stream.iterate(first, l -&gt; !l.isEmpty(),
+                              Solution::below);
+    }
+
+    // the next level down: every child of this one, in order
+    static List&lt;Node&gt; below(List&lt;Node&gt; level) {
+        return level.stream()
+                .flatMap(n -&gt; Stream.of(n.left, n.right))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">No queue, no size snapshot</span>The classic bug in the loop version is reading <code>queue.size()</code> inside the level loop instead of before it. Here, a level is an immutable <code>List</code> built from the previous one. There is no queue whose size can change underneath you, so there is nothing to snapshot.</div>
+  <div class="note warn"><span class="lbl">What it costs</span>Each level is held as a <code>List</code>, O(w) memory, the same as the queue. 116's follow-up asks for O(1) extra space, which you get by walking the <code>next</code> pointers already built on the level above. That is a loop over two pointers, and no pipeline expresses it.</div>
+</section>
+
+

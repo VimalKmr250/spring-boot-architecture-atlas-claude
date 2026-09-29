@@ -1,0 +1,72 @@
+<!-- dsa · pattern 11 · mechanics -->
+<section class="slide" data-sec="11 · Heap / top K" data-title="Mechanics">
+  <h2>Keep only k things, and know which one is worst</h2>
+  <p class="dek">To find the k largest of n items you do not need to sort n things. Keep a heap of size <b>k</b>, and make it a <b>min</b>-heap — so its root is the weakest of your current best k. Every new item is compared against that root alone: beat it and you are in, fail and you are discarded immediately.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The inversion that trips everyone</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">For the <b>k largest</b>, use a <b>min</b>-heap. For the <b>k smallest</b>, use a <b>max</b>-heap. This feels backwards and is the single most common mistake in the pattern.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">The reason: the root must be the item you are most willing to throw away. When collecting the largest values, the one you would sacrifice first is the smallest of those you hold — so that must sit at the root where it can be inspected and evicted in O(log k).</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Java's <code>PriorityQueue</code> is a min-heap by default, so "k largest" needs no comparator at all — which is a useful tell that you have picked the right direction.</p>
+    </div>
+    <div class="panel">
+      <h3>The invariant, and the cost</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">After processing any prefix of the input, the heap contains exactly the best <code>k</code> items seen so far — never more.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Maintaining it costs one comparison against the root, plus an O(log k) push-and-pop only when the newcomer qualifies. Total <b>O(n log k)</b>, against O(n log n) for sorting.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">When k is small that gap is large — and more importantly the heap needs only <b>O(k)</b> memory, so it works on a stream whose length you never learn.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 244" role="img" aria-label="A size-k min-heap retaining the k largest elements, with the root acting as the admission threshold">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">A MIN-HEAP OF SIZE k = 3, HOLDING THE THREE LARGEST SO FAR</text>
+
+        <circle cx="200" cy="52" r="22" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="200" y="58" text-anchor="middle" font-size="13" font-family="monospace" font-weight="600" fill="currentColor">5</text>
+        <text x="200" y="28" text-anchor="middle" font-size="10" font-family="monospace" fill="#D26A3F">root = the weakest one held</text>
+        <path d="M184 68 L150 96" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M216 68 L250 96" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="138" cy="112" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="138" y="118" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor">9</text>
+        <circle cx="262" cy="112" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="262" y="118" text-anchor="middle" font-size="13" font-family="monospace" fill="currentColor">7</text>
+
+        <text x="100" y="158" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">the heap is NOT sorted —</text>
+        <text x="100" y="172" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">only the root is guaranteed</text>
+
+        <line x1="340" y1="28" x2="340" y2="180" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="376" y="46" font-size="11.5" font-weight="600" fill="currentColor">Each arrival costs one comparison</text>
+
+        <rect x="376" y="58" width="220" height="44" rx="7" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="390" y="76" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">8 arrives — 8 &gt; 5</text>
+        <text x="390" y="92" font-size="10.5" fill="currentColor" opacity="0.7">evict the root, insert 8. O(log k)</text>
+
+        <rect x="376" y="112" width="220" height="44" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="390" y="130" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">3 arrives — 3 &lt; 5</text>
+        <text x="390" y="146" font-size="10.5" fill="currentColor" opacity="0.7">discard immediately. O(1)</text>
+
+        <text x="628" y="76" font-size="10.5" fill="currentColor" opacity="0.65">The root is the admission</text>
+        <text x="628" y="92" font-size="10.5" fill="currentColor" opacity="0.65">threshold, and it only rises.</text>
+        <text x="628" y="130" font-size="10.5" fill="currentColor" opacity="0.65">Most arrivals fail this test,</text>
+        <text x="628" y="146" font-size="10.5" fill="currentColor" opacity="0.65">so the common case is O(1).</text>
+
+        <line x1="14" y1="192" x2="866" y2="192" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="212" font-size="11" fill="currentColor" opacity="0.75"><tspan font-weight="600" fill="#D26A3F">k largest → min-heap.</tspan>  The root is the one you are most willing to lose, so it must be the smallest you hold.</text>
+        <text x="14" y="232" font-size="11" fill="currentColor" opacity="0.75"><tspan font-weight="600" fill="#3AA79B">k smallest → max-heap.</tspan>  Same logic, mirrored. Java's PriorityQueue is a min-heap, so "k largest" needs no comparator.</text>
+      </svg>
+    </div>
+    <figcaption>The heap is only partially ordered — the root is the smallest, but the rest is unspecified. That is enough, because the root is the only element the algorithm ever inspects.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>You need the <b>top k</b> by some score, the <b>k-th</b> element, or a running best over a stream. Also when items arrive continuously and the total count is unknown, which rules out sorting entirely.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>You need the full sorted order (just sort), or k is close to n (sorting is simpler and no slower). Also when a count bounds the values — bucketing by frequency is O(n) and beats the log factor.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n log k)</b> time, <b>O(k)</b> space. Quickselect gives O(n) average for a single k-th query but O(n²) worst case and destroys the input; a heap is the safer default and the one to offer first.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"the k-th largest"</b> · <b>"the top k frequent"</b> · <b>"the k closest"</b> · <b>"return any k of them"</b> · <b>"design a class that returns the k-th largest so far"</b> (a stream, so O(k) memory is mandatory) · <b>"repeatedly take the two heaviest"</b>. The phrase <b>"k-th"</b> next to a large n is the clearest signal in this deck.</div>
+</section>
+

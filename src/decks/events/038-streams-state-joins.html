@@ -1,0 +1,54 @@
+<!-- events 38 -->
+<section class="slide" data-sec="At scale" data-title="Streams: state & joins">
+  <h2>State stores, joins and windows</h2>
+  <p class="dek">The three capabilities that justify Streams, and the operational consequences each one brings.</p>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>The state store, and how it survives</h3>
+      <p>Each task keeps a local RocksDB store on disk. Every write also goes to a <b>compacted changelog topic</b> in Kafka.</p>
+      <p>On restart or reassignment, the task rebuilds its store by replaying that changelog — which for a large store can take minutes. <code>num.standby.replicas: 1</code> keeps a warm copy on another instance so failover is fast instead of slow.</p>
+      <p style="color:var(--text-3)">This is the operational cost people underestimate: a stateful Streams app needs disk, and a rebalance is not free.</p>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Join</th><th>Meaning</th><th>Needs</th></tr></thead>
+        <tbody>
+          <tr><td>KStream–KTable</td><td>Enrich each event with the current value for its key</td><td>Co-partitioned; same key, same partition count. <b>The common one</b></td></tr>
+          <tr><td>KStream–GlobalKTable</td><td>Enrich from a fully replicated lookup table</td><td>No co-partitioning needed; every instance holds the whole table</td></tr>
+          <tr><td>KStream–KStream</td><td>Correlate two event streams</td><td>A window — both sides must be buffered for its duration</td></tr>
+          <tr><td>KTable–KTable</td><td>Join two changelogs into a derived table</td><td>Co-partitioned</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Enrich orders with customer data — no service call</div>
+<pre><code class="language-java">KTable&lt;String, Customer&gt; customers =
+    builder.table("customers.customer.snapshot.v1");      // compacted topic
+
+KStream&lt;String, OrderPlaced&gt; orders = builder.stream("orders.order.placed.v1");
+
+orders.selectKey((k, o) -&gt; o.customerId())
+      .join(customers, OrderEnricher::withCustomer)       // local lookup, microseconds
+      .to("orders.order.enriched.v1");
+
+// Windowed: 5 failed payments from one card in 10 minutes
+payments.filter((k, p) -&gt; p.declined())
+        .groupBy((k, p) -&gt; p.cardFingerprint())
+        .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMinutes(10), Duration.ofMinutes(2)))
+        .count()
+        .filter((windowedKey, count) -&gt; count &gt;= 5)
+        .toStream()
+        .to("risk.card.velocity.v1");</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Event time, not wall-clock time</span>Windows are driven by the record's timestamp, so a replay produces the same results as the original run — which is the property that makes Streams reproducible. Set <code>timestampExtractor</code> to read your business <code>occurredAt</code>, not the broker's ingestion time, or a backlog will land everything in one window.</div>
+      <div class="note warn"><span class="lbl">Grace period and late records</span>A window closes after its grace period; records arriving later are dropped and counted in <code>dropped-records</code>. Pick the grace from real observed lateness and <b>alert on that metric</b> — silently dropped records in a risk calculation is exactly the failure nobody notices.</div>
+      <div class="note"><span class="lbl">Co-partitioning is a hard requirement</span>A KStream–KTable join needs both topics keyed the same way with the same partition count, or Streams fails at startup. A GlobalKTable avoids this by replicating everything to every instance — fine for a few hundred thousand reference rows, not for a customer table with fifty million.</div>
+    </div>
+  </div>
+</section>
+

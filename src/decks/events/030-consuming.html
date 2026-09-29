@@ -1,0 +1,41 @@
+<!-- events 30 -->
+<section class="slide" data-sec="Spring" data-title="Consuming">
+  <h2><code>@KafkaListener</code> in depth</h2>
+  <p class="dek">The annotation is small; the container behind it has about thirty settings that matter. These are the ones that change behaviour rather than performance.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">Three listener shapes, and what each is for</div>
+<pre><code class="language-java">// 1. Record listener — the default. One message, one method call.
+@KafkaListener(topics = "orders.order.placed.v1", groupId = "inventory",
+               concurrency = "6")                 // 6 threads, ≤ partition count
+public void onOrder(@Payload OrderPlaced event,
+                    @Header(KafkaHeaders.RECEIVED_KEY) String key,
+                    @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+                    @Header(KafkaHeaders.OFFSET) long offset,
+                    @Header(name = "eventId", required = false) String eventId,
+                    Acknowledgment ack) {
+    inventory.reserve(event);
+    ack.acknowledge();
+}
+
+// 2. Batch listener — for bulk database writes; far higher throughput
+@KafkaListener(topics = "orders.order.placed.v1", groupId = "projection",
+               containerFactory = "batchFactory")
+public void onBatch(List&lt;OrderPlaced&gt; events, Acknowledgment ack) {
+    projections.upsertAll(events);                // ONE round trip instead of 500
+    ack.acknowledge();                            // commits the whole batch
+}
+
+// 3. Explicit partition assignment — no group, no rebalancing
+@KafkaListener(topicPartitions = @TopicPartition(topic = "orders.order.placed.v1",
+                partitionOffsets = @PartitionOffset(partition = "0", initialOffset = "0")))
+public void replayPartitionZero(OrderPlaced event) { ... }</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>concurrency</code> is per listener</h4><p>It creates that many consumers in the group <em>from this application</em>. Six pods × concurrency 6 = 36 consumers; with 12 partitions, 24 of them idle. Set it to <code>partitions / expected pods</code>, not to a number that feels fast.</p></div>
+    <div class="card"><h4>Batch listeners change error handling</h4><p>A failure in the middle of a batch means the whole batch is retried, so every handler must be idempotent at batch granularity. <code>BatchListenerFailedException</code> lets you tell the error handler which record failed so only that one goes to the DLT.</p></div>
+    <div class="card"><h4>Do not fan out to a thread pool</h4><p>Handing records to an executor inside the listener destroys ordering and breaks the offset contract — you acknowledge work that has not happened. Use <code>concurrency</code>, which parallelises by partition and keeps both properties.</p></div>
+  </div>
+</section>
+

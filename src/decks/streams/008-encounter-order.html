@@ -1,0 +1,44 @@
+<!-- streams 08 -->
+<section class="slide" data-sec="How a stream runs" data-title="Encounter order">
+  <h2>A stream is ordered only if its source is</h2>
+  <p class="dek">A stream has an <b>encounter order</b> when its source has one. A <code>List</code>, an array, <code>Stream.of</code>, <code>iterate</code> and <code>IntStream.range</code> are ordered. A <code>HashSet</code>, a <code>HashMap</code>'s views and <code>generate</code> are not. Most operations keep whatever order there is; <code>sorted()</code> imposes one, and <code>unordered()</code> drops it. Sequentially this rarely matters. In parallel, it decides what is correct and what is fast.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The same eight ids, four terminal operations, run in parallel</div>
+<pre><code class="language-java">List&lt;Integer&gt; ids = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+ids.parallelStream().forEach(System.out::print);
+// 65378421, and different on the next run
+
+ids.parallelStream().forEachOrdered(System.out::print);
+// 12345678, always
+
+ids.parallelStream().map(i -&gt; i * 10).toList();
+// [10, 20, 30, 40, 50, 60, 70, 80]: collecting keeps order
+
+ids.parallelStream().findAny();
+// whichever chunk answers first: often not 1</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Operation</th><th>What order means to it</th></tr></thead>
+        <tbody>
+          <tr><td><code>findFirst</code> vs <code>findAny</code></td><td>First by encounter order, versus any element at all. <code>findAny</code> is cheaper in parallel.</td></tr>
+          <tr><td><code>forEach</code> vs <code>forEachOrdered</code></td><td><code>forEach</code> ignores order in parallel, by design.</td></tr>
+          <tr><td><code>limit</code> · <code>skip</code></td><td>The first n, or all but the first n, by position.</td></tr>
+          <tr><td><code>distinct</code></td><td>Keeps the first occurrence of each element when ordered.</td></tr>
+          <tr><td><code>sorted(cmp)</code></td><td>Stable (ties keep their input order) only when the stream is ordered.</td></tr>
+          <tr><td><code>toList</code> · <code>toArray</code> · <code>joining</code></td><td>Results in encounter order, even in parallel.</td></tr>
+          <tr><td><code>collect(toSet())</code> · <code>groupingBy</code> keys</td><td>The container decides; a <code>HashMap</code> has no order to keep.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">The order that was never there</span>A test asserts <code>List.of("a", "b")</code> against <code>set.stream().map(…).toList()</code>, where <code>set</code> is a <code>HashSet</code>. It passes for years, then fails after a JDK upgrade or a change in element count, because a hash set's iteration order depends on capacity and hash codes. Assert on a set, sort first, or use a <code>LinkedHashSet</code> on purpose.</div>
+    <div class="note tip"><span class="lbl">unordered() is a performance hint</span>On a parallel stream, <code>.unordered().distinct()</code> and <code>.unordered().limit(n)</code> can skip the bookkeeping that preserves position. Use it only when any n elements, or any survivor of a duplicate set, is genuinely acceptable. It changes which elements you get, not just the speed.</div>
+  </div>
+</section>
+

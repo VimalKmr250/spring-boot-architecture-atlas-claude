@@ -1,0 +1,82 @@
+<!-- streams 57 -->
+<section class="slide" data-sec="Coding drills" data-title="Strings: characters">
+  <h2>Strings: character counting, without the traps</h2>
+  <p class="dek">The input is <code>String s = "programming"</code>. Nearly every character question is a frequency map in disguise, so build that first. Remember that <code>chars()</code> yields <code>int</code>s, not <code>char</code>s.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Drills 26–31</div>
+<pre><code class="language-java">// 26 · Frequency of each character, in order of first appearance
+Map&lt;Character, Long&gt; freq = s.chars()
+        .mapToObj(c -&gt; (char) c)
+        .collect(groupingBy(Function.identity(), LinkedHashMap::new, counting()));
+// {p=1, r=2, o=1, g=2, a=1, m=2, i=1, n=1}
+
+// 27 · First non-repeated character
+freq.entrySet().stream()
+    .filter(e -&gt; e.getValue() == 1)
+    .map(Map.Entry::getKey)
+    .findFirst();                                   // Optional[p]
+
+// 28 · Every character that repeats
+freq.entrySet().stream()
+    .filter(e -&gt; e.getValue() &gt; 1)
+    .map(Map.Entry::getKey)
+    .toList();                                      // [r, g, m]
+
+// 29 · First character seen for the second time
+Set&lt;Character&gt; seen = new HashSet&lt;&gt;();
+s.chars().mapToObj(c -&gt; (char) c)
+ .filter(c -&gt; !seen.add(c))
+ .findFirst();                                      // Optional[r]  (sequential only)
+
+// 30 · The most frequent character
+freq.entrySet().stream().max(Map.Entry.comparingByValue());   // Optional[r=2]
+
+// 31 · Count the vowels
+s.chars().filter(c -&gt; "aeiou".indexOf(c) &gt;= 0).count();     // 3</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Drills 32–36</div>
+<pre><code class="language-java">// 32 · Reverse the string
+new StringBuilder(s).reverse().toString();          // gnimmargorp
+IntStream.range(0, s.length())
+         .mapToObj(i -&gt; String.valueOf(s.charAt(s.length() - 1 - i)))
+         .collect(joining());                       // gnimmargorp, the stream way
+
+// 33 · Is it a palindrome?
+String r = "racecar";
+IntStream.range(0, r.length() / 2)
+         .allMatch(i -&gt; r.charAt(i) == r.charAt(r.length() - 1 - i));   // true
+
+// 34 · Are two words anagrams?
+Arrays.equals("listen".chars().sorted().toArray(),
+              "silent".chars().sorted().toArray());                    // true
+
+// 35 · Remove duplicate characters, keeping order
+s.chars().distinct()
+ .mapToObj(c -&gt; String.valueOf((char) c))
+ .collect(joining());                               // progamin
+
+// 36 · Count upper case, lower case and digits in "Java25Streams!"
+String t = "Java25Streams!";
+t.chars().filter(Character::isUpperCase).count();   // 2
+t.chars().filter(Character::isLowerCase).count();   // 9
+t.chars().filter(Character::isDigit).count();       // 2</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>The follow-up they ask</th><th>What to say</th></tr></thead>
+      <tbody>
+        <tr><td class="num">26</td><td>Why <code>LinkedHashMap::new</code>?</td><td>Drill 27 needs the <em>first</em> non-repeated character. A plain <code>groupingBy</code> uses a <code>HashMap</code>, which forgets the order of appearance.</td></tr>
+        <tr><td class="num">29</td><td>What is wrong with the <code>Set</code> version?</td><td>The filter lambda mutates shared state. It works sequentially and is wrong in parallel. For "first repeated", a plain loop with early exit is honest and O(n).</td></tr>
+        <tr><td class="num">30</td><td><code>r</code>, <code>g</code> and <code>m</code> all appear twice. Why <code>r</code>?</td><td><code>max</code> keeps the first of equal elements it meets, and the map is in appearance order. If ties matter, say what the rule should be.</td></tr>
+        <tr><td class="num">32</td><td>Should you use a stream to reverse a string?</td><td>No. <code>StringBuilder.reverse()</code> is the answer; the stream version shows you know <code>IntStream.range</code>. Reversing with <code>reduce("", (a, c) -&gt; c + a)</code> is O(n²).</td></tr>
+        <tr><td class="num">—</td><td>What about emoji?</td><td><code>chars()</code> splits characters outside the Basic Multilingual Plane into two surrogate code units. Use <code>codePoints()</code> and <code>Character.toString(int)</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

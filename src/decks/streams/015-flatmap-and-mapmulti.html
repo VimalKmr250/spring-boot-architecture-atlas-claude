@@ -1,0 +1,84 @@
+<!-- streams 15 -->
+<section class="slide" data-sec="Intermediate operations" data-title="flatMap and mapMulti">
+  <h2>One element in, any number out</h2>
+  <p class="dek"><code>map</code> is one-to-one. When each element expands into zero, one or many results — an order into its lines, a sentence into words, an optional value into zero or one — use <code>flatMap</code>. Since Java 16, <code>mapMulti</code> does the same job imperatively.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Two orders with two lines and one line. map produces a stream of two lists. flatMap produces one stream of the three lines.">
+        <text x="14" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SOURCE</text>
+        <text x="330" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">map(Order::lines)</text>
+        <text x="630" y="18" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">flatMap(o -&gt; o.lines().stream())</text>
+        <rect x="14" y="34" width="120" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="59" text-anchor="middle" font-size="12" fill="currentColor">order A</text>
+        <rect x="14" y="94" width="120" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="74" y="119" text-anchor="middle" font-size="12" fill="currentColor">order B</text>
+        <line x1="134" y1="54" x2="326" y2="54" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="134" y1="114" x2="326" y2="114" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="330" y="34" width="250" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="455" y="59" text-anchor="middle" font-size="12" fill="currentColor">[ line A1, line A2 ]</text>
+        <rect x="330" y="94" width="250" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="455" y="119" text-anchor="middle" font-size="12" fill="currentColor">[ line B1 ]</text>
+        <text x="455" y="158" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">Stream&lt;List&lt;Line&gt;&gt;: 2 elements, each a List</text>
+        <rect x="630" y="30" width="256" height="30" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="758" y="50" text-anchor="middle" font-size="12" fill="currentColor">line A1</text>
+        <rect x="630" y="66" width="256" height="30" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="758" y="86" text-anchor="middle" font-size="12" fill="currentColor">line A2</text>
+        <rect x="630" y="102" width="256" height="30" rx="7" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="758" y="122" text-anchor="middle" font-size="12" fill="currentColor">line B1</text>
+        <text x="758" y="158" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">Stream&lt;Line&gt;: 3 elements, each a Line</text>
+        <line x1="14" y1="172" x2="886" y2="172" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="186" font-size="10.5" fill="currentColor" opacity="0.62">flatMap = map to a stream per element, then splice those streams into one. The nesting disappears.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">flatMap, flatMapToInt and flattening Optionals</div>
+<pre><code class="language-java">List&lt;String&gt; skus = orders.stream()
+        .flatMap(o -&gt; o.lines().stream())   // Stream&lt;Line&gt;
+        .map(Line::sku)
+        .distinct()
+        .toList();
+
+int totalUnits = orders.stream()
+        .flatMapToInt(o -&gt; o.lines().stream().mapToInt(Line::qty))
+        .sum();
+
+List&lt;String&gt; emails = customers.stream()
+        .map(directory::findEmail)          // Stream&lt;Optional&lt;String&gt;&gt;
+        .flatMap(Optional::stream)          // drop the empties (9)
+        .toList();</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">mapMulti: push results instead of building streams (16)</div>
+<pre><code class="language-java">List&lt;Line&gt; bulkLines = orders.stream()
+        .&lt;Line&gt;mapMulti((order, sink) -&gt; {
+            for (Line l : order.lines())
+                if (l.qty() &gt;= 10) sink.accept(l);
+        })
+        .toList();
+
+// Zero or one per element, with a type test
+List&lt;Refund&gt; refunds = events.stream()
+        .&lt;Refund&gt;mapMulti((e, sink) -&gt; {
+            if (e instanceof Refund r) sink.accept(r);
+        })
+        .toList();</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Mistake</th><th>What happens</th><th>Write instead</th></tr></thead>
+      <tbody>
+        <tr><td><code>map(o -&gt; o.lines().stream())</code></td><td>A <code>Stream&lt;Stream&lt;Line&gt;&gt;</code>. Printing it shows <code>java.util.stream.ReferencePipeline$Head@…</code></td><td><code>flatMap</code></td></tr>
+        <tr><td><code>mapMulti</code> without <code>&lt;Line&gt;</code></td><td>The result type cannot be inferred from the lambda, so it becomes <code>Stream&lt;Object&gt;</code>, and assigning it to <code>List&lt;Line&gt;</code> does not compile</td><td>Give the type witness: <code>.&lt;Line&gt;mapMulti(…)</code></td></tr>
+        <tr><td><code>flatMap</code> function returns <code>null</code></td><td>Allowed: <code>null</code> is treated as an empty stream</td><td>Return <code>Stream.empty()</code>, which says what you mean</td></tr>
+        <tr><td>A <code>flatMap</code> that creates a stream for each of millions of elements, for 0 or 1 results</td><td>A stream object per element</td><td><code>mapMulti</code>, which the Javadoc recommends for small numbers of results</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

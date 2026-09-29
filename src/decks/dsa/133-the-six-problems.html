@@ -1,0 +1,137 @@
+<!-- dsa · pattern 24 · problems -->
+<section class="slide" data-sec="24 · MST / graph greedy" data-title="The six problems">
+  <h2>Six connection problems</h2>
+  <p class="dek">1584 and 1135 are plain MSTs. 1168 needs the virtual node. 1489 runs the MST repeatedly. 778 and 1102 are minimax rather than total-weight, and both yield to sorted edges with union-find. Three of the six are behind LeetCode's paywall, with free equivalents noted.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Algorithm</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1584</td><td><a href="https://leetcode.com/problems/min-cost-to-connect-all-points/" target="_blank" rel="noopener">Min Cost to Connect All Points</a></td><td><span class="tag w">Medium</span></td><td>An implicit complete graph — Prim avoids building <code>n²</code> edges.</td><td>Prim or Kruskal</td><td class="num">O(n²) / O(n)</td></tr>
+        <tr><td class="num">1135</td><td><a href="https://leetcode.com/problems/connecting-cities-with-minimum-cost/" target="_blank" rel="noopener">Connecting Cities With Minimum Cost</a> <span class="tag">Premium</span></td><td><span class="tag w">Medium</span></td><td>Textbook Kruskal with a disconnected check.</td><td>Kruskal</td><td class="num">O(E log E) / O(n)</td></tr>
+        <tr><td class="num">1168</td><td><a href="https://leetcode.com/problems/optimize-water-distribution-in-a-village/" target="_blank" rel="noopener">Optimize Water Distribution in a Village</a> <span class="tag">Premium</span></td><td><span class="tag b">Hard</span></td><td>The virtual-node trick turns well costs into edges.</td><td>Kruskal + virtual</td><td class="num">O(E log E) / O(n)</td></tr>
+        <tr><td class="num">1489</td><td><a href="https://leetcode.com/problems/find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree/" target="_blank" rel="noopener">Find Critical and Pseudo-Critical Edges in MST</a></td><td><span class="tag b">Hard</span></td><td>Run Kruskal once per edge, forcing it out then in.</td><td>Kruskal × E</td><td class="num">O(E²·α) / O(n)</td></tr>
+        <tr><td class="num">778</td><td><a href="https://leetcode.com/problems/swim-in-rising-water/" target="_blank" rel="noopener">Swim in Rising Water</a></td><td><span class="tag b">Hard</span></td><td>Minimise the maximum cell on a path — bottleneck, not total.</td><td>sorted union-find</td><td class="num">O(n² log n) / O(n²)</td></tr>
+        <tr><td class="num">1102</td><td><a href="https://leetcode.com/problems/path-with-maximum-minimum-value/" target="_blank" rel="noopener">Path With Maximum Minimum Value</a> <span class="tag">Premium</span></td><td><span class="tag w">Medium</span></td><td>The mirror of 778 — maximise the minimum instead.</td><td>sorted union-find</td><td class="num">O(n² log n) / O(n²)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 1584 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The restatement</dt><dd>Every pair of points can be joined at a cost equal to their Manhattan distance, and you must connect them all as cheaply as possible. That is a minimum spanning tree on a complete graph.</dd>
+          <dt>Kruskal's cost here</dt><dd>The graph is complete, so there are <code>n(n−1)/2</code> edges — about 500,000 at <code>n = 1000</code>. Building and sorting them is O(n² log n) and does pass.</dd>
+          <dt>Why Prim is better</dt><dd>Prim never materialises the edge list. It keeps, for each node outside the tree, the cheapest edge <em>into</em> the tree — an array of <code>n</code> values that is refreshed after each addition.</dd>
+          <dt>Linear scan instead of a heap</dt><dd>With <code>n ≤ 1000</code>, scanning for the minimum is O(n) and the whole algorithm is O(n²) — simpler than a heap and no lazy deletion to get right.</dd>
+          <dt>The one distinction</dt><dd>Prim's key is the <b>edge weight alone</b>, not an accumulated distance. Adding <code>best[u]</code> to it turns this into Dijkstra and builds the wrong tree.</dd>
+          <dt>Edge case</dt><dd>A single point needs no edges and costs 0, which the loop handles because <code>best[0]</code> starts at 0.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 1584 · O(n²) time, O(n) space</div>
+<pre><code class="language-java">class Solution {
+    public int minCostConnectPoints(int[][] points) {
+        int n = points.length;
+
+        boolean[] inTree = new boolean[n];
+        int[] best = new int[n];              // cheapest edge INTO the tree
+        Arrays.fill(best, Integer.MAX_VALUE);
+        best[0] = 0;                          // start anywhere
+
+        int total = 0;
+
+        for (int iter = 0; iter &lt; n; iter++) {
+            // Cheapest node not yet attached. O(n) scan beats a heap
+            // here, because the graph is complete anyway.
+            int u = -1;
+            for (int v = 0; v &lt; n; v++)
+                if (!inTree[v] &amp;&amp; (u == -1 || best[v] &lt; best[u])) u = v;
+
+            inTree[u] = true;
+            total += best[u];
+
+            for (int v = 0; v &lt; n; v++) {
+                if (inTree[v]) continue;
+
+                int d = Math.abs(points[u][0] - points[v][0])
+                      + Math.abs(points[u][1] - points[v][1]);
+
+                // The key is the EDGE weight alone. Writing
+                // best[u] + d would make this Dijkstra.
+                if (d &lt; best[v]) best[v] = d;
+            }
+        }
+        return total;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 778 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The restatement</dt><dd>You may swim between adjacent cells once the water level reaches both. The answer is the smallest level at which the top-left and bottom-right become connected — a <b>bottleneck</b>, not a sum.</dd>
+          <dt>Why not Dijkstra on sums</dt><dd>The cost of a path is its <em>maximum</em> cell, so adding cell values is meaningless. Dijkstra still applies with <code>max</code> in place of <code>+</code>, and that is one good solution.</dd>
+          <dt>The union-find view</dt><dd>Sort the cells by height. Raise the water level one cell at a time, unioning each newly submerged cell with its already-submerged neighbours. The first moment the two corners share a component is the answer.</dd>
+          <dt>Why that is correct</dt><dd>Adding cells in increasing height means the level when they connect is exactly the largest cell either path must cross — which is the definition of the bottleneck.</dd>
+          <dt>The third solution</dt><dd>Binary search the answer and run a flood fill to test connectivity. O(n² log n) as well, and worth naming.</dd>
+          <dt>Edge case</dt><dd>The answer is at least <code>max(grid[0][0], grid[n-1][n-1])</code> — both corners must be submerged before any swim is possible.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 778 · O(n² log n) time, O(n²) space</div>
+<pre><code class="language-java">class Solution {
+    public int swimInWater(int[][] grid) {
+        int n = grid.length;
+
+        // Where each height lives — heights are a permutation of 0..n*n-1.
+        int[] cellOfHeight = new int[n * n];
+        for (int r = 0; r &lt; n; r++)
+            for (int c = 0; c &lt; n; c++)
+                cellOfHeight[grid[r][c]] = r * n + c;
+
+        DSU dsu = new DSU(n * n);
+        boolean[] submerged = new boolean[n * n];
+        int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
+
+        // Raise the water one height at a time.
+        for (int t = 0; t &lt; n * n; t++) {
+            int cell = cellOfHeight[t];
+            int r = cell / n, c = cell % n;
+            submerged[cell] = true;
+
+            // Join to any neighbour already under water.
+            for (int[] d : DIRS) {
+                int nr = r + d[0], nc = c + d[1];
+                if (nr &lt; 0 || nr &gt;= n || nc &lt; 0 || nc &gt;= n) continue;
+                if (submerged[nr * n + nc]) dsu.union(cell, nr * n + nc);
+            }
+
+            // Because cells are added in increasing height, the moment
+            // the corners connect, t IS the smallest sufficient level.
+            if (dsu.connected(0, n * n - 1)) return t;
+        }
+        return -1;   // unreachable: every cell is eventually submerged
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>1135 · Connecting Cities With Minimum Cost <span class="tag a">Kruskal</span> <span class="tag">Premium</span></h4><p><b>Path:</b> the textbook statement — an edge list with weights, connect everything as cheaply as possible.</p><p><b>Delta:</b> Kruskal verbatim. Sort, union, accumulate, and return −1 if fewer than <code>n − 1</code> edges were accepted.</p><p><b>Premium:</b> paywalled. <b>LC 1584 above is the same algorithm</b> on an implicit graph, and <b>1584 plus 1168's virtual-node idea covers everything this problem teaches</b>.</p></div>
+
+    <div class="card"><h4>1168 · Optimize Water Distribution <span class="tag a">virtual node</span> <span class="tag">Premium</span></h4><p><b>Path:</b> two different cost types — a well at a house, or a pipe between houses — which looks like it is not an MST at all.</p><p><b>Delta:</b> invent node 0 as "the water source" and turn each well into an edge from 0 to that house. Every cost is now an edge, and an ordinary MST over <code>n + 1</code> nodes gives the answer.</p><p><b>Premium:</b> paywalled, but the trick is the most transferable idea in this pattern — whenever one cost is per-node rather than per-edge, look for the virtual node that converts it.</p></div>
+
+    <div class="card"><h4>1489 · Critical and Pseudo-Critical Edges <span class="tag a">Kruskal × E</span></h4><p><b>Path:</b> compute the MST weight once as a baseline. Then classify each edge by forcing it out and forcing it in.</p><p><b>Delta:</b> an edge is <b>critical</b> if excluding it raises the MST weight or disconnects the graph. It is <b>pseudo-critical</b> if including it first still yields the baseline weight. Everything else matters not at all.</p><p><b>Watch for:</b> tag each edge with its original index before sorting, or you cannot report which edges you classified. With <code>E ≤ 200</code>, running Kruskal 2E times is comfortably fast.</p></div>
+
+    <div class="card"><h4>1102 · Path With Maximum Minimum Value <span class="tag a">sorted union-find</span> <span class="tag">Premium</span></h4><p><b>Path:</b> the exact mirror of 778 — maximise the smallest cell on a path instead of minimising the largest.</p><p><b>Delta:</b> add cells in <b>decreasing</b> value, unioning with already-added neighbours. The value at which the two corners connect is the answer. A max-heap Dijkstra with <code>min</code> in place of <code>+</code> works equally well.</p><p><b>Premium:</b> paywalled. <b>778 above is the same problem mirrored</b>, and solving it gives you this one for free — flip the sort direction and the comparison.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>1584</b> and <b>778</b>. 1584 fixes both MST algorithms and the distinction between Prim's edge-weight key and Dijkstra's accumulated distance. 778 teaches the bottleneck reframing — that "minimise the maximum along a path" is a connectivity question in disguise, answered by adding edges in sorted order and watching for the moment two nodes join.</div>
+</section>
+

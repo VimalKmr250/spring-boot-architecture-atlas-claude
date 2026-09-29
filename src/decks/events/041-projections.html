@@ -1,0 +1,47 @@
+<!-- events 41 -->
+<section class="slide" data-sec="At scale" data-title="Projections">
+  <h2>Projections: read models built from events</h2>
+  <p class="dek">The most common productive use of an event stream. A projection is just a consumer that maintains a table — the engineering is all in the operational properties.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A projection with the four properties that matter</div>
+<pre><code class="language-java">@Component
+class OrderHistoryProjection {
+
+    @KafkaListener(topics = { "orders.order.placed.v1", "orders.order.statuschanged.v1" },
+                   groupId = "projection-order-history")   // ← its OWN group: replayable
+    @Transactional
+    void on(ConsumerRecord&lt;String, Object&gt; record, Acknowledgment ack) {
+
+        var view = views.findById(key(record)).orElseGet(OrderHistoryView::empty);
+
+        // 1. ORDERED + 2. IDEMPOTENT: one guard does both
+        if (version(record) &lt;= view.appliedVersion()) { ack.acknowledge(); return; }
+
+        view.apply(record.value());
+        view.setAppliedVersion(version(record));
+        views.save(view);
+
+        // 3. OBSERVABLE: publish end-to-end staleness, not just lag
+        meters.timer("projection.staleness", "name", "order-history")
+              .record(Duration.between(occurredAt(record), Instant.now()));
+
+        ack.acknowledge();
+    }
+}
+// 4. REBUILDABLE: truncate the table, reset the group to earliest, let it run.
+//    That must be a documented, tested, boring operation.</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>Why the projection gets its own consumer group</h3>
+        <p>Because rebuilding it must not affect anything else. Resetting <code>projection-order-history</code> to the earliest offset replays the whole topic into this table and touches no other consumer.</p>
+        <p>Sharing a group across two projections means you can never rebuild one without rebuilding the other — and you will need to, the first time you add a field.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Rebuild needs retention to reach back far enough</span>A projection can only be rebuilt from the events still on the topic. Seven days of retention means you cannot rebuild from scratch — you can only catch up. If full rebuild is a requirement, you need long or infinite retention (tiered storage makes that affordable), a compacted snapshot topic, or a periodic snapshot you can seed from.</div>
+      <div class="note tip"><span class="lbl">Rebuild without downtime</span>Build the new version into a <b>second table</b> under a new consumer group, let it catch up, verify it against the old one, then switch reads with a flag. The old table stays until you are confident. This is expand/contract applied to a read model.</div>
+    </div>
+  </div>
+</section>
+

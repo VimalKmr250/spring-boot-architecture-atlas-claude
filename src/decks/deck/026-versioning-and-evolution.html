@@ -1,0 +1,44 @@
+<!-- deck 26 -->
+<section class="slide" data-sec="Backend" data-title="Versioning and evolution">
+  <h2>Evolve the API without a v2 rewrite</h2>
+  <p class="dek">Spring Framework 7 made API versioning first-class on both server and client. But the version you never have to cut is cheaper than the one you route perfectly.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Spring 7 / Boot 4 — version-aware mappings</div>
+<pre><code class="language-java">@Configuration
+class ApiVersionConfig implements WebMvcConfigurer {
+    @Override public void configureApiVersioning(ApiVersionConfigurer c) {
+        c.useRequestHeader("X-API-Version")
+         .addSupportedVersions("1", "2")
+         .setDefaultVersion("1");
+    }
+}
+
+@RestController
+@RequestMapping("/api/orders")
+class OrderController {
+
+    @GetMapping(value = "/{id}", version = "1")
+    OrderViewV1 getV1(@PathVariable UUID id) { ... }
+
+    @GetMapping(value = "/{id}", version = "2")     // v2 splits address into a nested object
+    OrderViewV2 getV2(@PathVariable UUID id) { ... }
+}</code></pre>
+      </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>The compatibility rules that avoid versions entirely</h3>
+        <ul class="tight">
+          <li><b>Additive only:</b> new optional fields, never a removed or renamed one.</li>
+          <li><b>Never repurpose a field.</b> <code>status</code> gaining a new enum value breaks every client with an exhaustive switch — add <code>statusV2</code> or document the open set from day one.</li>
+          <li><b>Tolerant reader</b> on every consumer: ignore unknown fields (<code>FAIL_ON_UNKNOWN_PROPERTIES=false</code>).</li>
+          <li><b>Expand / contract</b> for breaking changes: add the new field, dual-write, migrate clients, then remove — three releases, zero downtime.</li>
+        </ul>
+      </div>
+      <div class="note"><span class="lbl">Version in the header or the path?</span>Path (<code>/v2/orders</code>) is obvious in logs, gateways and curl, and is what most enterprises pick. Header is cleaner REST and what Spring 7 optimises for. Either works; <b>having three schemes across eight teams</b> does not. Decide once, in a standard.</div>
+      <div class="note warn"><span class="lbl">Deprecation with teeth</span>Ship <code>Deprecation</code> and <code>Sunset</code> headers, emit a metric tagged by client id and version, and mail the top consumers. Without usage data, no version is ever removed and you maintain v1 forever.</div>
+    </div>
+  </div>
+</section>
+

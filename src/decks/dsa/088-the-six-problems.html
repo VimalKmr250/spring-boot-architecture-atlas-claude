@@ -1,0 +1,123 @@
+<!-- dsa · pattern 15 · problems -->
+<section class="slide" data-sec="15 · Tree DFS" data-title="The six problems">
+  <h2>Six traversals, three shapes</h2>
+  <p class="dek">104, 226 and 112 are pure returns and should take two minutes each. 113 adds path backtracking. 543 and 124 need the return-versus-record split, and are the two worth real time.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Shape</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">104</td><td><a href="https://leetcode.com/problems/maximum-depth-of-binary-tree/" target="_blank" rel="noopener">Maximum Depth of Binary Tree</a></td><td><span class="tag g">Easy</span></td><td>The contract in its simplest form. Write it from memory.</td><td>A</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">226</td><td><a href="https://leetcode.com/problems/invert-binary-tree/" target="_blank" rel="noopener">Invert Binary Tree</a></td><td><span class="tag g">Easy</span></td><td>Save one child before overwriting it.</td><td>A</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">112</td><td><a href="https://leetcode.com/problems/path-sum/" target="_blank" rel="noopener">Path Sum</a></td><td><span class="tag g">Easy</span></td><td>The leaf test is the whole problem — null is not a leaf.</td><td>A</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">113</td><td><a href="https://leetcode.com/problems/path-sum-ii/" target="_blank" rel="noopener">Path Sum II</a></td><td><span class="tag w">Medium</span></td><td>Carry the path down, copy on success, undo on the way out.</td><td>C</td><td class="num">O(n·h) / O(h)</td></tr>
+        <tr><td class="num">543</td><td><a href="https://leetcode.com/problems/diameter-of-binary-tree/" target="_blank" rel="noopener">Diameter of Binary Tree</a></td><td><span class="tag g">Easy</span></td><td>Easy tag, Medium content: the first return/record split.</td><td>B</td><td class="num">O(n) / O(h)</td></tr>
+        <tr><td class="num">124</td><td><a href="https://leetcode.com/problems/binary-tree-maximum-path-sum/" target="_blank" rel="noopener">Binary Tree Maximum Path Sum</a></td><td><span class="tag b">Hard</span></td><td>The same split plus negative clamping.</td><td>B</td><td class="num">O(n) / O(h)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 124 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>For every node, compute the best path through it by exploring its whole subtree. O(n²) on a balanced tree and worse on a chain.</dd>
+          <dt>The definition</dt><dd>A path is a sequence of connected nodes with no repeats. Crucially it may <b>bend</b> at one node — down the left branch, up through the node, down the right.</dd>
+          <dt>The observation</dt><dd>Every path bends at exactly one node: its highest point. So if each node computes the best path bending at itself, the maximum over all nodes is the answer, and each node's computation uses only its two child results.</dd>
+          <dt>The split</dt><dd>The bent value <code>val + l + r</code> cannot be passed up — a parent attaching to it would revisit this node. So record it in a field, and return <code>val + max(l, r)</code>, which the parent <em>can</em> extend.</dd>
+          <dt>The clamp</dt><dd><code>Math.max(0, childGain)</code>. A branch with a negative total should be dropped rather than included, since the path may simply end at this node.</dd>
+          <dt>Edge cases</dt><dd>Initialise <code>best</code> to <code>Integer.MIN_VALUE</code>, not 0 — a tree of all-negative values has a negative answer, and 0 would wrongly win.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 124 · O(n) time, O(h) space</div>
+<pre><code class="language-java">class Solution {
+    private int best;
+
+    public int maxPathSum(TreeNode root) {
+        // Values can all be negative, so 0 is not a safe floor.
+        best = Integer.MIN_VALUE;
+        gain(root);
+        return best;
+    }
+
+    /** CONTRACT: best sum of a path descending from node, or 0. */
+    private int gain(TreeNode node) {
+        if (node == null) return 0;
+
+        // A negative branch is better left unused — the path can
+        // simply stop here instead of descending into it.
+        int l = Math.max(0, gain(node.left));
+        int r = Math.max(0, gain(node.right));
+
+        // RECORD: the path bending at this node uses BOTH branches,
+        // so it is complete here and no parent can extend it.
+        best = Math.max(best, node.val + l + r);
+
+        // RETURN: one branch only, so the parent can build on it.
+        return node.val + Math.max(l, r);
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 113 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The difference from LC 112</dt><dd>112 asks whether a path exists, so it can short-circuit. 113 wants every path, so it must explore the whole tree and carry the route it took.</dd>
+          <dt>The naive approach</dt><dd>Build a fresh list at every node and pass copies down. Correct, but it allocates O(n) lists and is wasteful.</dd>
+          <dt>Backtracking</dt><dd>Carry <b>one</b> mutable list. Add the node on the way down, recurse, then remove it on the way out. At any moment the list holds exactly the route from the root to the current node.</dd>
+          <dt>Why the undo is unconditional</dt><dd>It runs whether or not the subtree produced a result. Placing it inside an <code>if</code> leaves stale entries behind and corrupts every subsequent path.</dd>
+          <dt>Why the copy is mandatory</dt><dd><code>out.add(path)</code> stores a reference to a list that keeps mutating — by the end every entry is the same empty list. <code>new ArrayList&lt;&gt;(path)</code> snapshots it.</dd>
+          <dt>Edge cases</dt><dd>The leaf test must check both children. A null root returns an empty list, which falls out of the base case.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 113 · O(n·h) time, O(h) space</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;Integer&gt;&gt; pathSum(TreeNode root, int targetSum) {
+        List&lt;List&lt;Integer&gt;&gt; out = new ArrayList&lt;&gt;();
+        dfs(root, targetSum, new ArrayList&lt;&gt;(), out);
+        return out;
+    }
+
+    private void dfs(TreeNode node, int remaining,
+                     List&lt;Integer&gt; path, List&lt;List&lt;Integer&gt;&gt; out) {
+        if (node == null) return;
+
+        path.add(node.val);                    // CHOOSE
+
+        if (node.left == null &amp;&amp; node.right == null) {
+            // A real leaf — both children absent.
+            if (remaining == node.val) {
+                // COPY: `path` keeps mutating after this returns.
+                out.add(new ArrayList&lt;&gt;(path));
+            }
+        } else {
+            dfs(node.left,  remaining - node.val, path, out);
+            dfs(node.right, remaining - node.val, path, out);
+        }
+
+        // UNDO — unconditionally, on every exit from this node.
+        path.remove(path.size() - 1);
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>104 · Maximum Depth <span class="tag a">shape A</span></h4><p><b>Path:</b> there is nothing to derive — this is the contract in its purest form, and its value is as a template for everything else in the pattern.</p><p><b>Delta:</b> base case 0, combine with <code>1 + max(left, right)</code>. Three lines.</p><p><b>Watch for:</b> the iterative version is a level-order traversal counting levels. Worth knowing if the interviewer asks you to avoid recursion because of stack depth.</p></div>
+
+    <div class="card"><h4>226 · Invert Binary Tree <span class="tag a">shape A</span></h4><p><b>Path:</b> swap the children at every node. The recursion handles the rest.</p><p><b>Delta:</b> the only care needed is saving one child before overwriting it — <code>node.left = invert(node.right)</code> destroys <code>node.left</code> if you have not stored it. This is the same save-before-rewire discipline that list problems require.</p><p><b>Watch for:</b> a null root must return null rather than throwing. It is the base case, and it is easy to omit on a problem this short.</p></div>
+
+    <div class="card"><h4>112 · Path Sum <span class="tag a">shape A</span></h4><p><b>Path:</b> subtract as you descend, and test at the leaves. The subtlety is entirely in what counts as a leaf.</p><p><b>Delta:</b> a leaf has <b>both</b> children null. Testing <code>node == null</code> instead treats a single-child node as a leaf, so a path that stops halfway down is wrongly accepted — and the bug only appears on unbalanced trees.</p><p><b>Watch for:</b> negative values mean you cannot prune when the remainder goes below zero. That optimisation is only valid when all values are positive.</p></div>
+
+    <div class="card"><h4>543 · Diameter of Binary Tree <span class="tag a">shape B</span></h4><p><b>Path:</b> the diameter is the longest path between any two nodes, measured in edges. It need not pass through the root, which is the signal for the split.</p><p><b>Delta:</b> identical structure to LC 124 with sums replaced by counts — record <code>l + r</code> (the bent path's edge count), return <code>1 + max(l, r)</code>.</p><p><b>Watch for:</b> the answer counts <b>edges</b>, not nodes, so a single-node tree has diameter 0. Returning the node count gives an answer one too large everywhere. Solve this before 124 — it is the same idea with easier arithmetic.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>543</b> and <b>124</b>. They are the same problem twice, and together they fix the return-versus-record distinction that governs every hard tree question. 543 is gentler because the arithmetic is just counting; 124 adds negative clamping and an initial value that cannot be zero. Once both are automatic, 104, 226, 112 and 113 are mechanical.</div>
+</section>
+

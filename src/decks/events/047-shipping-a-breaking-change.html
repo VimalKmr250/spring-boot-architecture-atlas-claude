@@ -1,0 +1,39 @@
+<!-- events 47 -->
+<section class="slide" data-sec="At scale" data-title="Shipping a breaking change">
+  <h2>Shipping a breaking schema change</h2>
+  <p class="dek">Sooner or later a change is genuinely incompatible. The playbook is expand/contract again — the same shape as a database migration, run across consumers you may not control.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Phase</th><th>Producer</th><th>Consumers</th><th>Duration</th></tr></thead>
+      <tbody>
+        <tr><td>0 · Measure</td><td>List every consumer group on the topic; contact the owners</td><td>—</td><td>Before anything else</td></tr>
+        <tr><td>1 · Expand</td><td>Add the new field alongside the old; populate both</td><td>Unchanged — the schema is still compatible</td><td>One release</td></tr>
+        <tr><td>2 · Migrate</td><td>Unchanged</td><td>Each consumer switches to the new field on its own schedule</td><td>Weeks — the long pole</td></tr>
+        <tr><td>3 · Verify</td><td>Metric: is anyone still reading the old field?</td><td>—</td><td>Until the metric is zero</td></tr>
+        <tr><td>4 · Contract</td><td>Stop populating the old field, then remove it</td><td>Unaffected — nobody reads it</td><td>One release</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="card accent">
+      <h3>When expand/contract is impossible</h3>
+      <p>A change to the meaning of the topic itself — different granularity, a different key, a fundamentally different shape. Then it is a <b>new topic</b>:</p>
+      <ol class="tight">
+        <li>Create <code>orders.order.placed.v2</code>.</li>
+        <li><b>Dual-publish</b> to v1 and v2 from the same transaction.</li>
+        <li>Consumers migrate one at a time and confirm.</li>
+        <li>Monitor v1 consumer groups until none remain active.</li>
+        <li>Announce a sunset date, stop publishing v1, delete it later.</li>
+      </ol>
+      <p style="margin-top:4px;color:var(--text-3)">The version in the topic name is what makes this routine instead of a coordinated outage.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">What not to do</span>Change the schema, tell people in a chat channel, deploy on Friday. The consumers you know about will cope; the batch job that runs monthly and the partner integration nobody documented will fail silently, and you will hear about it in three weeks from a finance reconciliation.</div>
+      <div class="note tip"><span class="lbl">The metric that makes step 3 possible</span>Monitor active consumer groups per topic and per schema version. Without it, "has everyone migrated?" is answered by asking around, which means v1 is never retired and you maintain both forever.</div>
+      <div class="note warn"><span class="lbl">Dual-publish from one transaction</span>Both records go into the same outbox transaction, so v1 and v2 can never diverge. Publishing v2 from a separate job that reads v1 introduces lag and a second failure mode at exactly the moment you need confidence.</div>
+    </div>
+  </div>
+</section>
+

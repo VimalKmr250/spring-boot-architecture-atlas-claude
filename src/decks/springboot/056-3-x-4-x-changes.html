@@ -1,0 +1,32 @@
+<!-- springboot 56 -->
+<section class="slide" data-sec="Reference" data-title="3.x → 4.x changes">
+  <h2>What moved between Spring Boot 3 and 4</h2>
+  <p class="dek">The changes worth being able to name — in an upgrade discussion or an interview. Everything in this tab is written against 3.x; this is the delta.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Area</th><th>Spring Boot 3.x</th><th>Spring Boot 4.0 / Framework 7</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline</td><td>Java 17, Jakarta EE 10</td><td>Java 17 still (25 recommended), Jakarta EE 11, Servlet 6.1</td></tr>
+        <tr><td>Module layout</td><td>Few large jars</td><td>Finer-grained modules — <b>the most common upgrade surprise</b>; imports move</td></tr>
+        <tr><td>Auto-config registry</td><td><code>AutoConfiguration.imports</code> only — <code>spring.factories</code> registration was already removed in <b>Boot 3.0</b></td><td>Unchanged. Worth knowing the removal date: a starter that silently contributes nothing broke at 3.0, not at 4.0</td></tr>
+        <tr><td>HTTP clients</td><td><code>RestClient</code>, <code>HttpServiceProxyFactory</code> by hand</td><td><code>@ImportHttpServices</code> — declarative groups with shared config</td></tr>
+        <tr><td>API versioning</td><td>Roll your own, or a gateway</td><td>First class: <code>@GetMapping(version = "2")</code> + <code>ApiVersionConfigurer</code></td></tr>
+        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code></td></tr>
+        <tr><td>Null safety</td><td>Spring's own <code>@Nullable</code> (JSR-305 style)</td><td>JSpecify — <code>@NullMarked</code> at package level, real tooling support</td></tr>
+        <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — ISO-8601 dates by default, unchecked exceptions</td></tr>
+        <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — queries generated at build time, notably faster startup</td></tr>
+        <tr><td>Test mocks</td><td><code>@MockBean</code> (deprecated in 3.4)</td><td><code>@MockitoBean</code> / <code>@MockitoSpyBean</code></td></tr>
+        <tr><td>Testing API</td><td>MockMvc, WebTestClient, TestRestTemplate</td><td>Unified <code>RestTestClient</code> across all three</td></tr>
+        <tr><td>Removals</td><td>—</td><td>Spring JCL, <code>javax.annotation</code>, Undertow WebSocket, legacy path matching</td></tr>
+        <tr><td>4.1 additions</td><td>—</td><td>Spring gRPC, lazy JDBC connections, <code>InetAddressFilter</code> SSRF mitigation, <code>@RedisListener</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">If you are asked "should we upgrade?"</span>The honest answer names a driver: support window, a CVE in a pinned transitive, startup cost in a scale-to-zero environment, or a feature you would otherwise hand-build (API versioning, resilience). "It's the latest" is not a driver, and saying so is itself a good signal.</div>
+    <div class="note"><span class="lbl">Upgrade order that works</span>Get onto the latest 3.x first and make the build green. Remove every deprecation warning. Then move to 4.x, where the remaining failures are almost all module-layout imports and Jackson defaults — both mechanical, both findable by the compiler.</div>
+  </div>
+</section>
+

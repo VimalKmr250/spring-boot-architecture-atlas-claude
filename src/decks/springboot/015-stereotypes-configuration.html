@@ -1,0 +1,43 @@
+<!-- springboot 15 -->
+<section class="slide" data-sec="Core annotations" data-title="Stereotypes & configuration">
+  <h2>Stereotypes and configuration</h2>
+  <p class="dek">All the stereotypes are <code>@Component</code> underneath. The differences that actually matter are exception translation on <code>@Repository</code> and proxying on <code>@Configuration</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Stereotypes</div>
+<pre><code class="language-java">@Component        // generic managed bean — the base for all of these
+@Service          // semantic only; marks application/domain logic
+@Repository       // + translates JDBC/Hibernate exceptions into Spring's
+                  //   DataAccessException hierarchy. Not cosmetic.
+@Controller       // returns view names
+@RestController   // = @Controller + @ResponseBody on every method
+@Configuration    // bean definitions live here; see proxyBeanMethods below
+@ControllerAdvice // cross-controller @ExceptionHandler / @ModelAttribute</code></pre>
+      <div class="codelabel" style="margin-top:14px">Configuration and bean registration</div>
+<pre><code class="language-java">@Configuration(proxyBeanMethods = false)   // set this on your own configs
+class OrderConfig {
+
+    @Bean                                   // method name = bean name
+    OrderService orderService(OrderRepository repo) { ... }
+
+    @Bean(initMethod = "start", destroyMethod = "close")
+    ReportGenerator reports() { ... }
+}
+
+@Import(SharedInfraConfig.class)      // pull in another @Configuration explicitly
+@ComponentScan(basePackages = "com.retailco.shop",
+               excludeFilters = @Filter(type = ASSIGNABLE_TYPE, classes = LegacyJob.class))</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3><code>proxyBeanMethods</code> — the one people never set</h3>
+        <p>By default, <code>@Configuration</code> is CGLIB-proxied so that calling <code>orderService()</code> from another <code>@Bean</code> method returns the <em>singleton</em> rather than a new object. Convenient, but it costs a proxy per config class at startup.</p>
+        <p>If your <code>@Bean</code> methods never call each other — which is the norm when you take dependencies as method parameters — set <code>proxyBeanMethods = false</code>. Every Boot auto-configuration class does. Measurably faster startup, and it is what native-image compilation wants.</p>
+      </div>
+      <div class="note warn"><span class="lbl"><code>@Repository</code> is not decorative</span>Without it, a unique-constraint violation surfaces as a Hibernate <code>ConstraintViolationException</code>; with it, as Spring's <code>DataIntegrityViolationException</code>. Your catch blocks and your <code>@Retryable</code> rules are written against the second one. Spring Data repositories get this automatically; hand-written DAOs do not.</div>
+      <div class="note"><span class="lbl">Scanning</span><code>@SpringBootApplication</code> scans its own package and below. That is why the main class belongs at the root package — a class in a sibling package is silently never registered, and the symptom is a confusing "no qualifying bean" at startup.</div>
+    </div>
+  </div>
+</section>
+

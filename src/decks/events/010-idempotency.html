@@ -1,0 +1,43 @@
+<!-- events 10 -->
+<section class="slide" data-sec="Guarantees" data-title="Idempotency">
+  <h2>Making a consumer idempotent — four patterns</h2>
+  <p class="dek">Since you are designing for at-least-once, every consumer will see duplicates. Not "might" — will: on rebalance, on redeploy, on retry, on replay. The question is only whether the second delivery does damage.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">1 · Natural idempotency — the best kind, needs no state</div>
+<pre><code class="language-java">// Setting a value is idempotent; incrementing is not.
+order.setStatus(SHIPPED);        // safe to apply twice
+counter.increment();             // NOT safe — this is the bug</code></pre>
+      <div class="codelabel" style="margin-top:12px">2 · Business-key check — the everyday pattern</div>
+<pre><code class="language-java">@KafkaListener(topics = "orders.order.placed.v1", groupId = "inventory")
+@Transactional
+public void on(OrderPlaced event, Acknowledgment ack) {
+    if (reservations.existsByOrderId(event.orderId())) {   // already done
+        ack.acknowledge();
+        return;                                            // a duplicate is not an error
+    }
+    inventory.reserve(event.orderId(), event.lines());
+    ack.acknowledge();
+}</code></pre>
+      <div class="codelabel" style="margin-top:12px">3 · Dedupe table on the event id — when there is no natural key</div>
+<pre><code class="language-sql">-- processed in the SAME transaction as the work
+INSERT INTO processed_events (event_id, consumer_group, processed_at)
+VALUES (?, 'inventory', now());          -- PK violation = already handled
+-- retention: delete rows older than the topic's retention + a margin</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">4 · Version guard — also fixes out-of-order</div>
+<pre><code class="language-java">// Carry the aggregate version in the event, ignore anything you have passed
+if (event.aggregateVersion() &lt;= projection.lastAppliedVersion()) return;
+projection.apply(event);
+projection.setLastAppliedVersion(event.aggregateVersion());</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl">The trap: idempotent write, non-idempotent side effect</span>The database check is inside a transaction; the email is not. A retry after a commit failure re-sends the email even though the row was never written — or worse, writes the row twice because the send succeeded and the commit did not.
+      <p style="margin-top:8px">Side effects that cannot be undone (emails, payments, SMS) go through their own outbox with their own idempotency key, so the effect is attempted exactly once even when the handler runs three times.</p></div>
+      <div class="note tip"><span class="lbl">Make it testable</span>Write the test that delivers the same event twice and asserts one reservation, one email, one ledger entry. It takes ten minutes, it is the only proof the property holds, and it fails loudly the day someone adds a counter increment.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,133 @@
+<!-- dsa · pattern 23 · problems -->
+<section class="slide" data-sec="23 · Shortest path" data-title="The six problems">
+  <h2>Six shortest paths, four cost models</h2>
+  <p class="dek">743 is textbook Dijkstra. 1514 maximises a product, 1631 minimises a maximum, 1976 counts the optima. 787 needs a hop limit, and 1334 is all-pairs on a graph small enough for Floyd–Warshall.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Algorithm</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">743</td><td><a href="https://leetcode.com/problems/network-delay-time/" target="_blank" rel="noopener">Network Delay Time</a></td><td><span class="tag w">Medium</span></td><td>Textbook Dijkstra; the answer is the maximum finalised distance.</td><td>Dijkstra</td><td class="num">O(E log E) / O(V+E)</td></tr>
+        <tr><td class="num">787</td><td><a href="https://leetcode.com/problems/cheapest-flights-within-k-stops/" target="_blank" rel="noopener">Cheapest Flights Within K Stops</a></td><td><span class="tag w">Medium</span></td><td>The hop limit breaks Dijkstra's invariant — use rounds.</td><td>Bellman-Ford</td><td class="num">O(k·E) / O(V)</td></tr>
+        <tr><td class="num">1514</td><td><a href="https://leetcode.com/problems/path-with-maximum-probability/" target="_blank" rel="noopener">Path with Maximum Probability</a></td><td><span class="tag w">Medium</span></td><td>Maximise a product — max-heap, and multiply rather than add.</td><td>Dijkstra, max</td><td class="num">O(E log E) / O(V+E)</td></tr>
+        <tr><td class="num">1631</td><td><a href="https://leetcode.com/problems/path-with-minimum-effort/" target="_blank" rel="noopener">Path With Minimum Effort</a></td><td><span class="tag w">Medium</span></td><td>Minimax — the cost is the worst step, not the total.</td><td>Dijkstra, minimax</td><td class="num">O(mn log mn) / O(mn)</td></tr>
+        <tr><td class="num">1334</td><td><a href="https://leetcode.com/problems/find-the-city-with-the-smallest-number-of-neighbors-at-a-threshold-distance/" target="_blank" rel="noopener">Find the City With the Smallest Number of Neighbors</a></td><td><span class="tag w">Medium</span></td><td>All pairs with <code>n ≤ 100</code> — three nested loops.</td><td>Floyd–Warshall</td><td class="num">O(V³) / O(V²)</td></tr>
+        <tr><td class="num">1976</td><td><a href="https://leetcode.com/problems/number-of-ways-to-arrive-at-destination/" target="_blank" rel="noopener">Number of Ways to Arrive at Destination</a></td><td><span class="tag w">Medium</span></td><td>Carry a path count alongside the distance.</td><td>Dijkstra + count</td><td class="num">O(E log E) / O(V+E)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 743 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The restatement</dt><dd>The signal reaches a node along its shortest path, so the time for <em>all</em> nodes is the <b>maximum</b> shortest-path distance from the source. Two standard pieces, composed.</dd>
+          <dt>Why not BFS</dt><dd>Edge weights differ, so a queue no longer produces nodes in distance order. BFS would report hop counts rather than travel times.</dd>
+          <dt>The substitution</dt><dd>Replace the queue with a priority queue ordered by distance. Everything else about BFS is unchanged, which is a useful way to remember Dijkstra.</dd>
+          <dt>Lazy deletion</dt><dd>Java cannot decrease a key, so push a new entry on improvement and skip stale ones with <code>if (d &gt; dist[node]) continue;</code>.</dd>
+          <dt>The answer</dt><dd>The maximum over <code>dist[1..n]</code>. If any entry is still infinite, that node is unreachable and the answer is −1.</dd>
+          <dt>Edge cases</dt><dd>Nodes are 1-indexed, so size the arrays <code>n + 1</code> and ignore index 0. Multiple edges between the same pair are fine — the relaxation keeps the best.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 743 · O(E log E) time, O(V + E) space</div>
+<pre><code class="language-java">class Solution {
+    public int networkDelayTime(int[][] times, int n, int k) {
+        // node -> list of (neighbour, weight). 1-indexed, so n + 1.
+        List&lt;int[]&gt;[] adj = new List[n + 1];
+        for (int i = 1; i &lt;= n; i++) adj[i] = new ArrayList&lt;&gt;();
+        for (int[] t : times) adj[t[0]].add(new int[]{t[1], t[2]});
+
+        int[] dist = new int[n + 1];
+        Arrays.fill(dist, Integer.MAX_VALUE);
+        dist[k] = 0;
+
+        PriorityQueue&lt;int[]&gt; pq =
+                new PriorityQueue&lt;&gt;((a, b) -&gt; Integer.compare(a[1], b[1]));
+        pq.offer(new int[]{k, 0});
+
+        while (!pq.isEmpty()) {
+            int[] cur = pq.poll();
+            int node = cur[0], d = cur[1];
+
+            // Stale entry: we already recorded a shorter route here.
+            if (d &gt; dist[node]) continue;
+
+            for (int[] e : adj[node]) {
+                int next = e[0], cand = d + e[1];
+                if (cand &lt; dist[next]) {
+                    dist[next] = cand;
+                    pq.offer(new int[]{next, cand});   // push, not update
+                }
+            }
+        }
+
+        int worst = 0;
+        for (int i = 1; i &lt;= n; i++) {
+            if (dist[i] == Integer.MAX_VALUE) return -1;   // unreachable
+            worst = Math.max(worst, dist[i]);
+        }
+        return worst;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 787 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Why Dijkstra fails</dt><dd>Its invariant is that a popped node is final. With a stop limit that breaks: reaching a node cheaply but using all your stops can be <em>worse</em> than reaching it expensively with stops to spare. A single distance per node no longer captures the state.</dd>
+          <dt>Fix one — add a dimension</dt><dd>Run Dijkstra over <code>(node, stopsUsed)</code> pairs. Correct, and worth mentioning, but the state space is larger and the bookkeeping is fiddlier.</dd>
+          <dt>Fix two — Bellman-Ford</dt><dd>Relax every edge, <code>k + 1</code> times. After round <code>r</code>, <code>dist[]</code> holds the cheapest cost using <b>at most <code>r</code> edges</b> — so the hop limit is simply the number of rounds. Much simpler to get right.</dd>
+          <dt>Why <code>k + 1</code></dt><dd><code>k</code> stops means <code>k + 1</code> flights. Off-by-one here is the most common wrong answer on this problem.</dd>
+          <dt>Why the snapshot</dt><dd><code>prev = dist.clone()</code> before each round. Relaxing in place lets a route discovered earlier in the same round be extended again, chaining two edges in one round and exceeding the hop bound.</dd>
+          <dt>Edge case</dt><dd>Skip relaxation from unreachable nodes, or <code>MAX_VALUE + price</code> overflows into a negative and looks like a bargain.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 787 · O(k·E) time, O(V) space</div>
+<pre><code class="language-java">class Solution {
+    public int findCheapestPrice(int n, int[][] flights, int src, int dst, int k) {
+        int[] dist = new int[n];
+        Arrays.fill(dist, Integer.MAX_VALUE);
+        dist[src] = 0;
+
+        // k STOPS means k + 1 FLIGHTS, hence k + 1 rounds.
+        for (int round = 0; round &lt;= k; round++) {
+
+            // Snapshot: relaxing in place would let a route found
+            // earlier in THIS round be extended again, using more
+            // edges than the round count permits.
+            int[] prev = dist.clone();
+
+            for (int[] f : flights) {
+                int from = f[0], to = f[1], price = f[2];
+
+                // Unreachable so far — and MAX_VALUE + price overflows.
+                if (prev[from] == Integer.MAX_VALUE) continue;
+
+                dist[to] = Math.min(dist[to], prev[from] + price);
+            }
+        }
+        return dist[dst] == Integer.MAX_VALUE ? -1 : dist[dst];
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>1514 · Path with Maximum Probability <span class="tag a">Dijkstra, max</span></h4><p><b>Path:</b> maximise a product of probabilities rather than minimise a sum. Since every factor is in [0,1], extending a path can only shrink it — which is the same monotonicity Dijkstra relies on, just mirrored.</p><p><b>Delta:</b> a <b>max</b>-heap on probability, <code>double[] best</code> initialised to 0, and <code>prob * edgeProb</code> in place of <code>d + w</code>. Return as soon as the destination is popped.</p><p><b>Watch for:</b> the graph is undirected, so add both directions. Taking <code>-log</code> of each probability turns it back into a standard minimisation — a nice thing to mention, though the direct version is simpler.</p></div>
+
+    <div class="card"><h4>1631 · Path With Minimum Effort <span class="tag a">minimax</span></h4><p><b>Path:</b> the cost of a path is its <em>worst</em> single step, not the total. That is still monotone — extending a path can only keep or raise the maximum — so Dijkstra applies unchanged.</p><p><b>Delta:</b> <code>cand = max(effortSoFar, |h[next] − h[cur]|)</code> replaces the addition. The grid is the graph, with four-directional neighbours.</p><p><b>Watch for:</b> binary search on the answer plus a connectivity check is an equally good alternative, as is union-find over edges sorted by weight. Naming all three shows you see the shape rather than one recipe.</p></div>
+
+    <div class="card"><h4>1334 · City With Smallest Number of Neighbors <span class="tag a">Floyd–Warshall</span></h4><p><b>Path:</b> you need distances between <em>all</em> pairs. Running Dijkstra from every node is O(V·E log E) and works; with <code>n ≤ 100</code> there is something much shorter.</p><p><b>Delta:</b> Floyd–Warshall — three nested loops with <code>k</code> outermost, relaxing <code>d[i][j] = min(d[i][j], d[i][k] + d[k][j])</code>. Then count reachable cities per node and take the smallest count, breaking ties by the largest index.</p><p><b>Watch for:</b> <code>k</code> must be the <b>outer</b> loop — it is the "intermediate vertex allowed" dimension, and reordering the loops silently produces wrong distances. Use a finite sentinel such as 10⁹ rather than <code>MAX_VALUE</code> to avoid overflow in the addition.</p></div>
+
+    <div class="card"><h4>1976 · Number of Ways to Arrive at Destination <span class="tag a">Dijkstra + count</span></h4><p><b>Path:</b> ordinary Dijkstra finds the shortest time; the question additionally asks how many distinct routes achieve it.</p><p><b>Delta:</b> carry <code>long[] ways</code> next to <code>dist[]</code>. On a strictly shorter route, <b>replace</b> the count with the predecessor's. On an equally short one, <b>add</b> it. Take everything modulo 10⁹+7.</p><p><b>Watch for:</b> times sum to more than <code>int</code> range, so <code>dist[]</code> must be <code>long</code>. And the equal-distance branch must <em>not</em> push to the heap again — the node's distance has not changed, so re-expanding it would double-count.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>743</b> and <b>787</b>. 743 fixes the heap loop, the lazy-deletion skip, and the habit of reading Dijkstra as "BFS with a priority queue". 787 is the one that teaches the boundary of the pattern — recognising that an added constraint invalidates the finality invariant, and that the fix is either an extra state dimension or a different algorithm entirely.</div>
+</section>
+

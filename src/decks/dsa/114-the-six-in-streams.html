@@ -1,0 +1,280 @@
+<!-- dsa · pattern 20 · streams -->
+<section class="slide" data-sec="20 · Graph BFS / DFS" data-title="The six, in streams">
+  <h2>BFS levels are a <code>Stream.iterate</code>; the visited mark is the one stateful lambda</h2>
+  <p class="dek">A grid search needs a visited set, and a stream stage cannot own one. So every solution here keeps exactly one stateful lambda, <code>claim</code>, which tests a cell and marks it in the same step. Everything around it is structure: <code>Stream.iterate</code> produces the BFS levels, and <code>mapToLong</code> turns each cell into the size of the island it starts. Nothing recurses, so a 300 × 300 snake-shaped island costs no stack.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">733</td><td><a href="https://leetcode.com/problems/flood-fill/" target="_blank" rel="noopener">Flood Fill</a></td><td>Painting a cell is what marks it as visited; <code>flood</code> walks the levels from the start.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(mn)</td><td class="num">same</td></tr>
+        <tr><td class="num">200</td><td><a href="https://leetcode.com/problems/number-of-islands/" target="_blank" rel="noopener">Number of Islands</a></td><td>Each cell maps to the size of the island it starts, 0 if it starts none; count the sizes above 0.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(mn)</td><td class="num">same</td></tr>
+        <tr><td class="num">695</td><td><a href="https://leetcode.com/problems/max-area-of-island/" target="_blank" rel="noopener">Max Area of Island</a></td><td>The same mapping, reduced with <code>max()</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(mn)</td><td class="num">same</td></tr>
+        <tr><td class="num">1254</td><td><a href="https://leetcode.com/problems/number-of-closed-islands/" target="_blank" rel="noopener">Number of Closed Islands</a></td><td>Sink every island that touches the edge, then count what remains.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(mn)</td><td class="num">same</td></tr>
+        <tr><td class="num">994</td><td><a href="https://leetcode.com/problems/rotting-oranges/" target="_blank" rel="noopener">Rotting Oranges</a></td><td>Multi-source BFS: the first level is every rotten orange, and each later level is one minute.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(mn)</td><td class="num">same</td></tr>
+        <tr><td class="num">1091</td><td><a href="https://leetcode.com/problems/shortest-path-in-binary-matrix/" target="_blank" rel="noopener">Shortest Path in Binary Matrix</a></td><td>8-way levels; <code>takeWhile</code> counts the levels before the one that holds the target.</td><td><span class="tag w">stateful</span></td><td class="num">O(n²) / O(n²)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 733 · Flood Fill · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int[][] floodFill(int[][] image, int sr, int sc,
+                             int color) {
+        int m = image.length, n = image[0].length;
+        int old = image[sr][sc];
+        if (old == color) return image;
+        // Painting a cell is what marks it as visited.
+        IntPredicate paint = x -&gt; {
+            if (image[x / n][x % n] != old) return false;
+            image[x / n][x % n] = color;
+            return true;
+        };
+        int start = sr * n + sc;
+        paint.test(start);
+        flood(start, m, n, paint).count();   // runs the walk
+        return image;
+    }
+
+    // ---- the same two helpers in 733, 200, 695 and 1254 ----
+    // The 4 neighbours of cell x = r * n + c, inside the grid.
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // BFS level by level from start. claim tests AND marks a
+    // cell: the stateful lambda. Returns every cell reached.
+    static Stream&lt;Integer&gt; flood(int start, int m, int n,
+                                 IntPredicate claim) {
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around(x, m, n)
+                                        .filter(claim).boxed())
+                                .toList())
+                .flatMap(List::stream);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 200 · Number of Islands · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int numIslands(char[][] grid) {
+        int m = grid.length, n = grid[0].length;
+        // Claiming a cell sinks it; that write is the visited
+        // set, and the one stateful lambda here.
+        IntPredicate claim = x -&gt; {
+            if (grid[x / n][x % n] != '1') return false;
+            grid[x / n][x % n] = '0';
+            return true;
+        };
+        // Each cell maps to the size of the island it starts:
+        // 0 unless it is land nobody has claimed yet.
+        return (int) IntStream.range(0, m * n)
+                .mapToLong(x -&gt; claim.test(x)
+                        ? flood(x, m, n, claim).count() : 0)
+                .filter(size -&gt; size &gt; 0)
+                .count();
+    }
+
+    // ---- the same two helpers in 733, 200, 695 and 1254 ----
+    // The 4 neighbours of cell x = r * n + c, inside the grid.
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // BFS level by level from start. claim tests AND marks a
+    // cell: the stateful lambda. Returns every cell reached.
+    static Stream&lt;Integer&gt; flood(int start, int m, int n,
+                                 IntPredicate claim) {
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around(x, m, n)
+                                        .filter(claim).boxed())
+                                .toList())
+                .flatMap(List::stream);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 695 · Max Area of Island · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maxAreaOfIsland(int[][] grid) {
+        int m = grid.length, n = grid[0].length;
+        IntPredicate claim = x -&gt; {
+            if (grid[x / n][x % n] != 1) return false;
+            grid[x / n][x % n] = 0;
+            return true;
+        };
+        // 200 with max() instead of count(): each cell maps
+        // to the area of the island it starts.
+        return (int) IntStream.range(0, m * n)
+                .mapToLong(x -&gt; claim.test(x)
+                        ? flood(x, m, n, claim).count() : 0)
+                .max().orElse(0);
+    }
+
+    // ---- the same two helpers in 733, 200, 695 and 1254 ----
+    // The 4 neighbours of cell x = r * n + c, inside the grid.
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // BFS level by level from start. claim tests AND marks a
+    // cell: the stateful lambda. Returns every cell reached.
+    static Stream&lt;Integer&gt; flood(int start, int m, int n,
+                                 IntPredicate claim) {
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around(x, m, n)
+                                        .filter(claim).boxed())
+                                .toList())
+                .flatMap(List::stream);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1254 · Number of Closed Islands · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int closedIsland(int[][] grid) {
+        int m = grid.length, n = grid[0].length;
+        // Here land is 0; claiming turns it into water (1).
+        IntPredicate claim = x -&gt; {
+            if (grid[x / n][x % n] != 0) return false;
+            grid[x / n][x % n] = 1;
+            return true;
+        };
+        IntToLongFunction island = x -&gt; claim.test(x)
+                ? flood(x, m, n, claim).count() : 0;
+        IntPredicate edge = x -&gt; x / n == 0 || x / n == m - 1
+                || x % n == 0 || x % n == n - 1;
+        // First sink every island that touches the edge, then
+        // count the islands that remain: those are closed.
+        IntStream.range(0, m * n).filter(edge).mapToLong(island)
+                .sum();
+        return (int) IntStream.range(0, m * n).mapToLong(island)
+                .filter(size -&gt; size &gt; 0)
+                .count();
+    }
+
+    // ---- the same two helpers in 733, 200, 695 and 1254 ----
+    // The 4 neighbours of cell x = r * n + c, inside the grid.
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+
+    // BFS level by level from start. claim tests AND marks a
+    // cell: the stateful lambda. Returns every cell reached.
+    static Stream&lt;Integer&gt; flood(int start, int m, int n,
+                                 IntPredicate claim) {
+        return Stream.iterate(List.of(start), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around(x, m, n)
+                                        .filter(claim).boxed())
+                                .toList())
+                .flatMap(List::stream);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 994 · Rotting Oranges · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int orangesRotting(int[][] grid) {
+        int m = grid.length, n = grid[0].length;
+        // fresh -&gt; rotten; the write also marks it visited
+        IntPredicate rot = x -&gt; {
+            if (grid[x / n][x % n] != 1) return false;
+            grid[x / n][x % n] = 2;
+            return true;
+        };
+        List&lt;Integer&gt; rotten = IntStream.range(0, m * n)
+                .filter(x -&gt; grid[x / n][x % n] == 2)
+                .boxed().toList();
+        // Multi-source BFS: every level after the first is one
+        // minute of spreading.
+        long levels = Stream.iterate(rotten, l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around(x, m, n)
+                                        .filter(rot).boxed())
+                                .toList())
+                .count();
+        boolean fresh = Arrays.stream(grid)
+                .flatMapToInt(Arrays::stream)
+                .anyMatch(v -&gt; v == 1);
+        return fresh ? -1 : (int) Math.max(0, levels - 1);
+    }
+
+    // The 4 neighbours of cell x = r * n + c, inside the grid.
+    static IntStream around(int x, int m, int n) {
+        int c = x % n;
+        int left = c &gt; 0 ? x - 1 : -1;
+        int right = c &lt; n - 1 ? x + 1 : -1;
+        return IntStream.of(x - n, x + n, left, right)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; m * n);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1091 · Shortest Path in Binary Matrix · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int shortestPathBinaryMatrix(int[][] grid) {
+        int n = grid.length, target = n * n - 1;
+        if (grid[0][0] != 0 || grid[n - 1][n - 1] != 0)
+            return -1;
+        IntPredicate claim = x -&gt; {       // open -&gt; visited
+            if (grid[x / n][x % n] != 0) return false;
+            grid[x / n][x % n] = 1;
+            return true;
+        };
+        claim.test(0);
+        // Level k holds the cells a path of k + 1 cells reaches
+        // first. Count the levels before the target's.
+        long before = Stream
+                .iterate(List.of(0), l -&gt; !l.isEmpty(),
+                        l -&gt; l.stream()
+                                .flatMap(x -&gt; around8(x, n)
+                                        .filter(claim).boxed())
+                                .toList())
+                .takeWhile(l -&gt; !l.contains(target))
+                .count();
+        return grid[n - 1][n - 1] == 1 ? (int) before + 1 : -1;
+    }
+
+    // the 8 neighbours of cell x = r * n + c, inside the grid
+    static IntStream around8(int x, int n) {
+        int r = x / n, c = x % n;
+        return IntStream.rangeClosed(r - 1, r + 1)
+                .filter(y -&gt; y &gt;= 0 &amp;&amp; y &lt; n)
+                .flatMap(y -&gt; IntStream
+                        .rangeClosed(c - 1, c + 1)
+                        .filter(z -&gt; z &gt;= 0 &amp;&amp; z &lt; n)
+                        .map(z -&gt; y * n + z))
+                .filter(y -&gt; y != x);
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Why the mark goes inside the filter</span><code>claim</code> must test and mark in one step. Two cells on the same level can share a neighbour. If the mark came later, that neighbour would enter the next level twice. The loop marks a cell when it is enqueued, for the same reason. Here that rule becomes "the filter that admits a cell is the one that marks it", which is correct only because the stream runs sequentially.</div>
+  <div class="note good"><span class="lbl">One mapping, three problems</span>200, 695 and 1254 are the same pipeline with a different ending. Each cell maps to the size of the island it starts: <code>count</code> the sizes above zero, take the <code>max</code>, or sink the edge islands first. Spotting that shared shape is the real lesson of the pattern, and the stream makes it visible because the ending is the only line that changes.</div>
+</section>
+
+

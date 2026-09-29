@@ -1,0 +1,54 @@
+<!-- streams 35 -->
+<section class="slide" data-sec="Gatherers" data-title="Writing your own gatherer">
+  <h2>Writing a gatherer: state, integrate, push</h2>
+  <p class="dek">Most custom gatherers need three decisions: what state to keep, what to push for each element, and whether to stop. The factories on <code>Gatherer</code> take exactly those pieces. The examples compile and run on JDK 25.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">distinctBy: the first element for each key</div>
+<pre><code class="language-java">static &lt;T, K&gt; Gatherer&lt;T, ?, T&gt; distinctBy(Function&lt;? super T, ? extends K&gt; key) {
+    return Gatherer.ofSequential(
+        () -&gt; new HashSet&lt;K&gt;(),                       // state: keys seen so far
+        Gatherer.Integrator.ofGreedy((seen, t, down) -&gt; {
+            if (seen.add(key.apply(t))) return down.push(t);
+            return true;                               // a repeat: skip it, keep going
+        }));
+}
+
+List&lt;Order&gt; firstPerCustomer = orders.stream()
+        .gather(distinctBy(Order::customer))
+        .toList();</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">withinBudget: stateful short-circuit</div>
+<pre><code class="language-java">// Pass orders until the running total would exceed the budget, then stop
+static Gatherer&lt;Order, ?, Order&gt; withinBudget(double budget) {
+    return Gatherer.ofSequential(
+        () -&gt; new double[1],                           // state: amount spent
+        (spent, order, down) -&gt; {
+            if (spent[0] + order.total() &gt; budget) return false;  // stop pulling
+            spent[0] += order.total();
+            return down.push(order);
+        });
+}
+
+orders.stream().gather(withinBudget(1_000)).toList();</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Factory</th><th>Pieces</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td><code>Gatherer.ofSequential(integrator)</code></td><td>Stateless</td><td>A one-to-many map that must see elements in order</td></tr>
+        <tr><td><code>Gatherer.ofSequential(initializer, integrator)</code></td><td>State</td><td><code>distinctBy</code>, budgets, de-duplicating runs</td></tr>
+        <tr><td><code>Gatherer.ofSequential(initializer, integrator, finisher)</code></td><td>State + flush</td><td>Batching: push the last partial batch in the finisher</td></tr>
+        <tr><td><code>Gatherer.of(integrator)</code> · <code>of(integrator, finisher)</code></td><td>Stateless, parallel-capable</td><td>Element-wise transforms that should keep running in parallel</td></tr>
+        <tr><td><code>Gatherer.of(initializer, integrator, combiner, finisher)</code></td><td>State, parallel</td><td>Stateful work whose partial states can be merged</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note bad"><span class="lbl">State belongs in the initializer</span>A gatherer that keeps its <code>HashSet</code> in a field, or captures one from the enclosing method, shares that state across every stream that uses it, and across threads. The second run then starts with the first run's keys. The <code>initializer</code> exists so that each evaluation gets fresh state; always keep mutable state there.</div>
+</section>
+

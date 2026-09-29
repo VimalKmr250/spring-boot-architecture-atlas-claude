@@ -1,0 +1,59 @@
+<!-- springboot 24 -->
+<section class="slide" data-sec="JPA" data-title="Inheritance">
+  <h2>Inheritance: three strategies, three different tables</h2>
+  <p class="dek">Payment types — card, bank transfer, store credit — are the canonical case. The choice is a schema decision you will not casually reverse, so make it on the query pattern.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Strategy</th><th>Schema</th><th>Wins</th><th>Costs</th></tr></thead>
+      <tbody>
+        <tr><td><code>SINGLE_TABLE</code> <span class="tag g">default</span></td><td>One table, all columns, a discriminator</td><td>Fastest — no joins, polymorphic queries are one scan</td><td>Subclass columns must be nullable, so the database cannot enforce "card payments must have a last4"</td></tr>
+        <tr><td><code>JOINED</code></td><td>Parent table + one table per subclass, sharing the PK</td><td>Properly normalised; <code>NOT NULL</code> works per subclass</td><td>A join per subclass on every read; polymorphic queries join everything</td></tr>
+        <tr><td><code>TABLE_PER_CLASS</code></td><td>One full table per concrete subclass</td><td>No joins for a known type</td><td>Polymorphic queries become a <code>UNION ALL</code>; shared sequences get awkward. Rarely the right answer</td></tr>
+        <tr><td><code>@MappedSuperclass</code></td><td>Not inheritance at all — column reuse</td><td>Share <code>createdAt</code>/<code>version</code> across unrelated entities</td><td>Cannot query the superclass; it is not an entity</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SINGLE_TABLE, the usual enterprise choice</div>
+<pre><code class="language-java">@Entity
+@Table(name = "payments", schema = "payment")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "payment_type", length = 20)
+abstract class PaymentEntity {
+    @Id UUID id;
+    long amountMinor;
+    @Enumerated(STRING) PaymentStatus status;
+}
+
+@Entity @DiscriminatorValue("CARD")
+class CardPaymentEntity extends PaymentEntity {
+    String last4;                 // nullable in the DB — enforce in the domain instead
+    String schemeToken;
+}
+
+@Entity @DiscriminatorValue("TRANSFER")
+class BankTransferEntity extends PaymentEntity {
+    String iban;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">How to choose in one question</span>Do you query across all subtypes often ("show me every payment for this order")? → <b>SINGLE_TABLE</b>. Do subtypes have many distinct fields and integrity you need the database to enforce? → <b>JOINED</b>. Neither strongly? → SINGLE_TABLE, because it is the cheapest to live with.</div>
+      <div class="card">
+        <h3>The <code>@MappedSuperclass</code> you will actually write</h3>
+<pre style="margin-top:6px"><code class="language-java">@MappedSuperclass
+public abstract class Auditable {
+    @CreatedDate    Instant createdAt;
+    @CreatedBy      String  createdBy;
+    @LastModifiedDate Instant updatedAt;
+    @LastModifiedBy   String  updatedBy;
+    @Version        long version;
+}</code></pre>
+        <p style="margin-top:6px">Every entity extends it; no table for <code>Auditable</code> exists. The next slide wires the values.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
