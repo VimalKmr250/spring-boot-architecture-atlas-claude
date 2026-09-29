@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Foundations" data-title="The Java 21 toolkit for LLD">
+  <h2>Records, sealed types and pattern matching make models shorter and safer</h2>
+  <p class="dek">Modern Java changes what an LLD answer looks like. A value object is one line. A closed family of types is a sealed interface, and a <code>switch</code> over it must handle every case or it does not compile. Say what you are using and why: "sealed, so adding a vehicle type breaks the build instead of silently falling through".</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Feature</th><th>Since</th><th>What it replaces in a design</th></tr></thead>
+        <tbody>
+          <tr><td>Records</td><td>16</td><td>Hand-written value objects with <code>equals</code>, <code>hashCode</code>, <code>toString</code></td></tr>
+          <tr><td>Sealed classes and interfaces</td><td>17</td><td>Open hierarchies that anyone can extend; <code>default</code> branches that hide missing cases</td></tr>
+          <tr><td>Pattern matching for <code>instanceof</code></td><td>16</td><td>The cast after the check</td></tr>
+          <tr><td>Switch expressions</td><td>14</td><td>Fall-through bugs; a variable assigned in every branch</td></tr>
+          <tr><td>Text blocks</td><td>15</td><td>Concatenated multi-line strings in demos and tests</td></tr>
+          <tr><td>Pattern matching for <code>switch</code></td><td><span class="tag a">since 21</span></td><td>An <code>instanceof</code> chain; the visitor pattern for closed hierarchies</td></tr>
+          <tr><td>Record patterns</td><td><span class="tag a">since 21</span></td><td>Calling accessors after matching; nested matching</td></tr>
+          <tr><td>Sequenced collections</td><td><span class="tag a">since 21</span></td><td><code>list.get(list.size() - 1)</code>; reversing by copying</td></tr>
+          <tr><td>Virtual threads</td><td><span class="tag a">since 21</span></td><td>Thread pools sized to avoid running out of threads on blocking I/O</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Toolkit.java · sealed types, record patterns, sequenced collections</div>
+<pre><code class="language-java">import java.util.*;
+
+sealed interface Vehicle permits Car, Motorbike, Truck {
+    String plate();                        // records implement it for free
+}
+record Car(String plate, boolean electric) implements Vehicle {}
+record Motorbike(String plate) implements Vehicle {}
+record Truck(String plate, int axles) implements Vehicle {}
+
+enum SpotSize { SMALL, MEDIUM, LARGE }
+
+public class Toolkit {
+    static SpotSize sizeFor(Vehicle v) {
+        return switch (v) {                // exhaustive: no default, and a
+            case Motorbike m -&gt; SpotSize.SMALL;  // new Vehicle will not compile
+            case Car c       -&gt; SpotSize.MEDIUM;
+            case Truck t     -&gt; SpotSize.LARGE;
+        };
+    }
+
+    static int hourlyRate(Vehicle v) {
+        return switch (v) {
+            case Car(String p, boolean e) when e -&gt; 3;   // record pattern + guard
+            case Car c                           -&gt; 4;
+            case Motorbike m                     -&gt; 2;
+            case Truck(String p, int axles)      -&gt; 5 + 2 * axles;
+        };
+    }
+
+    public static void main(String[] args) {
+        List&lt;Vehicle&gt; queue = List.of(new Car("KA-01", false),
+                new Car("KA-02", true), new Motorbike("KA-03"),
+                new Truck("KA-04", 3));
+        Map&lt;SpotSize, List&lt;String&gt;&gt; bySize = new EnumMap&lt;&gt;(SpotSize.class);
+        for (Vehicle v : queue) {
+            bySize.computeIfAbsent(sizeFor(v), k -&gt; new ArrayList&lt;&gt;())
+                  .add(v.plate());
+            System.out.println(v + " -&gt; " + hourlyRate(v) + "/h");
+        }
+        System.out.println(bySize);
+        System.out.println("first " + queue.getFirst().plate()
+                + ", last " + queue.getLast().plate()
+                + ", reversed " + queue.reversed().stream()
+                        .map(Vehicle::plate).toList());
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Output on JDK 21 · Toolkit.java</div>
+<pre><code class="language-plaintext">Car[plate=KA-01, electric=false] -&gt; 4/h
+Car[plate=KA-02, electric=true] -&gt; 3/h
+Motorbike[plate=KA-03] -&gt; 2/h
+Truck[plate=KA-04, axles=3] -&gt; 11/h
+{SMALL=[KA-03], MEDIUM=[KA-01, KA-02], LARGE=[KA-04]}
+first KA-01, last KA-04, reversed [KA-04, KA-03, KA-02, KA-01]</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">Sealed type or interface with a method?</span>Both are right for different problems. Use a sealed type and <code>switch</code> when the <b>set of types</b> is fixed but <b>operations</b> keep being added (pricing, sizing, reporting). Use an ordinary interface and polymorphic methods when new <b>types</b> keep arriving and the operations are fixed. Say which axis you expect to change; that is the design decision. The <a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">visitor</a> slide returns to this.</div>
+  </div>
+</section>

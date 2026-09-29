@@ -1,0 +1,44 @@
+<section class="slide" data-sec="Parking lot" data-title="Parking lot · requirements">
+  <h2>Parking lot: pin the scope down before drawing a single class</h2>
+  <p class="dek">"Design a parking lot" is the most common LLD opener because it looks easy and has many directions to go wrong in. Spend the first five minutes asking questions and writing the answers down. The answers below are the ones this solution assumes. Say yours out loud, because the interviewer will often change one of them later.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>The lot has several floors; each floor has spots of three sizes: <b>small, medium, large</b>.</li>
+        <li>Vehicles are <b>motorbikes, cars and trucks</b>, needing small, medium and large spots.</li>
+        <li>A vehicle may take a <b>larger spot</b> when its own size is full, but never a smaller one.</li>
+        <li>Entry assigns the <b>smallest free spot that fits</b>, lowest floor first, and issues a ticket.</li>
+        <li>Exit takes the ticket, frees the spot and computes the fee: an <b>hourly rate per vehicle type</b>, with part hours rounded up and a one-hour minimum.</li>
+        <li>The lot can switch <b>pricing</b> (for example to a flat event rate). A ticket keeps the pricing in force when it was issued.</li>
+        <li>Show <b>free spots</b> per floor and size, for the entrance display.</li>
+        <li>Reject a vehicle whose plate is <b>already inside</b>, and a ticket used twice.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>One lot or many?</dt><dd>One lot, one process. Many lots is a scale follow-up.</dd>
+          <dt>Entry gates?</dt><dd>Several, so <code>park</code> is called concurrently.</dd>
+          <dt>Payment?</dt><dd>Out of scope: compute the fee, assume it is paid.</dd>
+          <dt>Reservations?</dt><dd>No. Drive-up only.</dd>
+          <dt>EV charging, disabled spots?</dt><dd>Not now; the design should allow them.</dd>
+          <dt>Lost ticket?</dt><dd>Out of scope; mention a daily maximum as the usual rule.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">ParkingLot</span><span class="tag a">ParkingFloor</span><span class="tag a">ParkingSpot</span><span class="tag a">Ticket</span><span class="tag a">Receipt</span>
+          <span class="tag s">Vehicle · record</span><span class="tag s">VehicleType · enum</span><span class="tag s">SpotSize · enum</span>
+          <span class="tag">PricingStrategy · interface</span><span class="tag">Clock · injected</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes: <i>gate</i>, <i>attendant</i>, <i>display board</i>. They are callers of the lot, not parts of its model. <i>Payment</i> is out of scope.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Why vehicle type is an enum here</span>Motorbikes, cars and trucks differ only in which spot they need and what they pay, and both are data. A class hierarchy would add three classes with no behaviour. If trucks later need a permit check, promote the enum to a sealed interface. See <a data-deck="lld" data-slide="DRY, KISS, YAGNI">KISS</a>.</div>
+</section>

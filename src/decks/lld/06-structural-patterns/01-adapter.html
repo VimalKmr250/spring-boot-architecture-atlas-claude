@@ -1,0 +1,61 @@
+<section class="slide" data-sec="Structural patterns" data-title="Adapter">
+  <h2>Adapter: make the vendor's interface fit the one your design wants</h2>
+  <p class="dek">Your domain declares the interface it needs, such as <code>PaymentGateway.charge(orderId, paise)</code>. The vendor's SDK has a different shape: amounts in rupees as strings, results in a map, failure as a status code. An adapter implements your interface by translating to theirs, so the vendor's quirks stay in one class.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">AdapterDemo.java · translating units, results and errors</div>
+<pre><code class="language-java">import java.math.BigDecimal;
+import java.util.Map;
+
+record PaymentResult(boolean ok, String reference, String error) {}
+
+interface PaymentGateway {                    // what our domain wants
+    PaymentResult charge(String orderId, long amountPaise);
+}
+
+final class LegacyPayClient {                 // the vendor SDK: we cannot
+    Map&lt;String, String&gt; doTxn(String ref, String rupees) {   // change it
+        if (new BigDecimal(rupees).compareTo(new BigDecimal("50000")) &gt; 0)
+            return Map.of("status", "E42", "msg", "limit exceeded");
+        return Map.of("status", "00", "txnId", "LP-" + ref);
+    }
+}
+
+final class LegacyPayAdapter implements PaymentGateway {
+    private final LegacyPayClient client;     // composition: object adapter
+    LegacyPayAdapter(LegacyPayClient client) { this.client = client; }
+
+    public PaymentResult charge(String orderId, long paise) {
+        String rupees = BigDecimal.valueOf(paise, 2).toPlainString(); // units
+        Map&lt;String, String&gt; r = client.doTxn(orderId, rupees);
+        return "00".equals(r.get("status"))                          // result
+                ? new PaymentResult(true, r.get("txnId"), null)
+                : new PaymentResult(false, null,                     // errors
+                        r.get("status") + " " + r.get("msg"));
+    }
+}
+
+public class AdapterDemo {
+    public static void main(String[] args) {
+        PaymentGateway gateway = new LegacyPayAdapter(new LegacyPayClient());
+        System.out.println(gateway.charge("A-1", 125_050));      // 1250.50
+        System.out.println(gateway.charge("A-2", 6_000_000));    // 60000.00
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · AdapterDemo.java</div>
+<pre><code class="language-plaintext">PaymentResult[ok=true, reference=LP-A-1, error=null]
+PaymentResult[ok=false, reference=null, error=E42 limit exceeded]</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Object adapter</h4><p>Holds the adaptee as a field, as above. Works with final classes and can adapt a whole family. This is the one to write.</p></div>
+        <div class="card"><h4>Class adapter</h4><p>Extends the adaptee and implements the target. Java allows only one superclass, and it exposes all the adaptee's methods, so it is rarely right.</p></div>
+      </div>
+      <div class="note"><span class="lbl">Keep the translation complete</span>Units, time zones, enums, null conventions and exceptions all get translated at the adapter. If a vendor exception type leaks past it, the vendor is back in your domain. In DDD this layer is the <b>anti-corruption layer</b>.</div>
+      <div class="note tip"><span class="lbl">In the JDK</span><code>Arrays.asList</code> adapts an array to <code>List</code>; <code>InputStreamReader</code> adapts bytes to characters; <code>Collections.enumeration</code> adapts a collection to the old <code>Enumeration</code>.</div>
+    </div>
+  </div>
+</section>

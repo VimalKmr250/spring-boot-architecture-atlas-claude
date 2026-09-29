@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Splitwise" data-title="Splitwise · requirements">
+  <h2>Splitwise: exact arithmetic, four ways to split, and one real algorithm</h2>
+  <p class="dek">Splitwise is a favourite machine-coding problem because it has a precise input format, an exact expected output, and a trap in every line: money that does not divide evenly, splits that do not add up, and debts that should net off against each other. It ends with the question every interviewer asks: "can you settle everyone with fewer payments?"</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>An <b>expense</b> has one payer, a total, and a <b>split</b> among participants (the payer may or may not be one).</li>
+        <li>Split types: <b>EQUAL</b>; <b>EXACT</b> amounts, which must add up to the total; <b>PERCENT</b>, which must add up to 100; <b>SHARES</b> in a ratio (1:2).</li>
+        <li>Amounts are rupees with paise. Shares must add up to the total <b>to the paisa</b>: ₹100 three ways is 33.34 + 33.33 + 33.33, with the extra paisa assigned by a fixed rule.</li>
+        <li><b>Show</b> balances: who owes whom, with debts in both directions between two people netted off.</li>
+        <li><b>Settle up</b>: record a payment from one user to another.</li>
+        <li><b>Simplify</b>: a list of payments that settles every balance, using as few payments as practical.</li>
+        <li>Commands arrive as text lines, as in most machine-coding rounds: <code>EXPENSE ana 1200.00 EQUAL ana bo cy</code>.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Groups?</dt><dd>One global ledger here; groups are a follow-up.</dd>
+          <dt>Several payers?</dt><dd>One payer per expense. Several payers is a follow-up.</dd>
+          <dt>Currency?</dt><dd>One currency, two decimal places.</dd>
+          <dt>Rounding rule?</dt><dd>Split exactly, then give leftover paise to participants in the order listed.</dd>
+          <dt>Edit or delete an expense?</dt><dd>A follow-up: it needs the ledger to be rebuilt from expenses.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">Ledger</span><span class="tag a">DebtSimplifier</span>
+          <span class="tag s">Expense · record</span><span class="tag s">Transfer · record</span>
+          <span class="tag">SplitRule · sealed, 4 records</span><span class="tag">SplitRules · factory</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes here: <i>user</i> (a string id until users have profiles), <i>group</i>, <i>currency</i>. <i>Balance</i> is a map the ledger derives, never stored separately.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The first decision: never a double</span>₹999.99 split 50/50 is 499.995 each. A <code>double</code> cannot represent either number exactly, and totals drift after a few hundred expenses. Store paise in a <code>long</code>, so all arithmetic is exact and the rounding rule is explicit. See <a data-deck="lld" data-slide="Value objects, equals and hashCode">value objects</a>.</div>
+</section>

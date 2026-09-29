@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Elevator" data-title="Elevator · class diagram">
+  <h2>Elevator: the car routes itself, the dispatcher picks the car, the system owns the clock</h2>
+  <p class="dek">Each car owns its floor, direction and sorted set of stops, and decides its next move with LOOK. The dispatcher sees all cars and a hall call, and returns one car; it never moves anything. The system is the controller: it takes button presses, advances time, and tells subscribers what happened.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">ElevatorSystem</span>                   <span class="c">the controller</span>
+  - floors : int
+  - cars : List&lt;ElevatorCar&gt;
+  - dispatcher : Dispatcher
+  - listeners : List&lt;ArrivalListener&gt;
+  - tick : int
+  + hallCall(floor, Direction) : carId
+  + carCall(carId, floor)
+  + tick()
+  + useDispatcher(Dispatcher)
+  + subscribe(ArrivalListener)
+  ◆── 1..* ElevatorCar
+  ──> 1    Dispatcher
+  ──> *    ArrivalListener
+
+<span class="h">ElevatorCar</span>
+  - id   - floor   - direction : Direction
+  - stops : NavigableSet&lt;Integer&gt;   <span class="c">TreeSet: higher(), lower()</span>
+  + addStop(floor)
+  + step(tick, listener)            <span class="c">LOOK: move one floor or stop</span>
+
+<span class="h">«interface» Dispatcher</span>
+  + choose(cars, HallCall) : ElevatorCar
+  ┄┄▷ NearestCarDispatcher   <span class="c">cost: distance, or detour</span>
+  ┄┄▷ ZonedDispatcher        <span class="c">each car owns a band of floors</span>
+
+<span class="h">«record» HallCall</span>   floor, direction
+<span class="h">«enum» Direction</span>     UP, DOWN, IDLE
+<span class="h">«interface» ArrivalListener</span>  stopped(tick, carId, floor)</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td><code>ElevatorCar</code></td><td>Which way to go next, and when to stop</td></tr>
+            <tr><td><code>Dispatcher</code></td><td>Which car answers a hall call</td></tr>
+            <tr><td><code>ElevatorSystem</code></td><td>Validating input, advancing time, publishing arrivals</td></tr>
+            <tr><td><code>ArrivalListener</code></td><td>What to do about an arrival: a display, a log, a chime</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why stops are a <code>TreeSet</code></span>LOOK asks two questions every tick: is there a stop above me, and is there one below? <code>higher(floor)</code> and <code>lower(floor)</code> answer each in O(log n). A set also merges duplicate presses of the same button for free.</div>
+      <div class="note"><span class="lbl">Why the car could be a State</span>A car idles, moves up, moves down, and (in a fuller version) holds its doors open or is out of service. Here the direction enum is enough, because only <code>step</code> depends on it. Once door states and maintenance arrive, the <a data-deck="lld" data-slide="State">State pattern</a> is the natural refactoring.</div>
+    </div>
+  </div>
+</section>

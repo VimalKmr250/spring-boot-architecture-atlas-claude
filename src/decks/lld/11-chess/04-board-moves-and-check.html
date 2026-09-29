@@ -1,0 +1,160 @@
+<section class="slide" data-sec="Chess" data-title="Chess · board, moves and check">
+  <h2>Chess: legal moves are the ones that leave your own king safe</h2>
+  <p class="dek"><code>legalMoves</code> takes every square a piece could reach, applies the move, asks the board whether the mover's king is attacked, and undoes it. What survives is legal. Checkmate and stalemate then need no special code: the side to move has no legal moves, and is or is not in check.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChessDemo.java · 2 of 3 · board, move and game</div>
+<pre><code class="language-java">final class Pieces {                             // factory: letter to piece
+    private Pieces() {}
+    static Piece of(char c) {
+        Color color = Character.isUpperCase(c) ? Color.WHITE : Color.BLACK;
+        return switch (Character.toUpperCase(c)) {
+            case 'K' -&gt; new King(color);
+            case 'Q' -&gt; new Queen(color);
+            case 'R' -&gt; new Rook(color);
+            case 'B' -&gt; new Bishop(color);
+            case 'N' -&gt; new Knight(color);
+            case 'P' -&gt; new Pawn(color);
+            default -&gt; throw new IllegalArgumentException("no piece '" + c + "'");
+        };
+    }
+}
+
+final class Board {
+    private final Piece[][] grid = new Piece[8][8];            // [rank][file]
+
+    static Board fromRows(String... rows) {                    // rank 8 first
+        Board b = new Board();
+        for (int r = 0; r &lt; 8; r++)
+            for (int f = 0; f &lt; 8; f++) {
+                char c = rows[7 - r].charAt(f);
+                if (c != '.') b.put(new Position(f, r), Pieces.of(c));
+            }
+        return b;
+    }
+    static Board standard() {
+        return fromRows("rnbqkbnr", "pppppppp", "........", "........",
+                        "........", "........", "PPPPPPPP", "RNBQKBNR");
+    }
+
+    Piece at(Position p) { return grid[p.rank()][p.file()]; }
+    void put(Position p, Piece piece) { grid[p.rank()][p.file()] = piece; }
+
+    List&lt;Position&gt; squaresOf(Color c) {
+        List&lt;Position&gt; out = new ArrayList&lt;&gt;();
+        for (int r = 0; r &lt; 8; r++)
+            for (int f = 0; f &lt; 8; f++)
+                if (grid[r][f] != null &amp;&amp; grid[r][f].color == c) out.add(new Position(f, r));
+        return out;
+    }
+
+    boolean isAttacked(Position square, Color by) {
+        for (Position p : squaresOf(by))
+            if (at(p).attacks(this, p, square)) return true;
+        return false;
+    }
+
+    boolean inCheck(Color c) {
+        Position king = squaresOf(c).stream().filter(p -&gt; at(p) instanceof King)
+                .findFirst().orElseThrow();
+        return isAttacked(king, c.opposite());
+    }
+
+    String render() {
+        StringBuilder s = new StringBuilder();
+        for (int r = 7; r &gt;= 0; r--) {
+            s.append(r + 1).append(' ');
+            for (int f = 0; f &lt; 8; f++) s.append(grid[r][f] == null ? '.' : grid[r][f].symbol());
+            s.append('\n');
+        }
+        return s.append("  abcdefgh").toString();
+    }
+}
+
+record Move(Position from, Position to, Piece moved, Piece captured, Piece placed) {
+    void apply(Board b) { b.put(to, placed); b.put(from, null); }
+    void undo(Board b)  { b.put(from, moved); b.put(to, captured); }
+    @Override public String toString() {
+        return "" + moved.letter() + from + (captured == null ? "-" : "x") + to
+                + (placed == moved ? "" : "=" + placed.letter());
+    }
+}
+
+final class Game {
+    private final Board board;
+    private final Deque&lt;Move&gt; history = new ArrayDeque&lt;&gt;();
+    private Color turn = Color.WHITE;
+    private Status status = Status.ACTIVE;
+
+    Game(Board board) { this.board = board; }
+    Color turn() { return turn; }
+    Status status() { return status; }
+    String render() { return board.render(); }
+
+    Move move(String fromSquare, String toSquare) {
+        if (status == Status.CHECKMATE || status == Status.STALEMATE)
+            throw new IllegalStateException("game over: " + status);
+        Position from = Position.of(fromSquare), to = Position.of(toSquare);
+        Piece p = board.at(from);
+        if (p == null) throw new IllegalArgumentException("no piece on " + from);
+        if (p.color != turn) throw new IllegalArgumentException("it is " + turn + "'s turn");
+        if (!p.targets(board, from).contains(to))
+            throw new IllegalArgumentException(p.letter() + " cannot move " + from + "-" + to);
+        Move m = legalMoves(turn).stream()
+                .filter(x -&gt; x.from().equals(from) &amp;&amp; x.to().equals(to)).findFirst()
+                .orElseThrow(() -&gt; new IllegalArgumentException("that leaves your king in check"));
+        m.apply(board);
+        history.push(m);
+        turn = turn.opposite();
+        status = computeStatus();
+        return m;
+    }
+
+    void undo() {
+        if (history.isEmpty()) throw new IllegalStateException("nothing to undo");
+        history.pop().undo(board);
+        turn = turn.opposite();
+        status = computeStatus();
+    }
+
+    List&lt;Move&gt; legalMoves(Color c) {
+        List&lt;Move&gt; out = new ArrayList&lt;&gt;();
+        for (Position from : board.squaresOf(c)) {
+            Piece p = board.at(from);
+            for (Position to : p.targets(board, from)) {
+                boolean promotes = p instanceof Pawn &amp;&amp; (to.rank() == 0 || to.rank() == 7);
+                Piece placed = promotes ? Pieces.of(c == Color.WHITE ? 'Q' : 'q') : p;
+                Move m = new Move(from, to, p, board.at(to), placed);
+                m.apply(board);                         // try it
+                boolean kingSafe = !board.inCheck(c);
+                m.undo(board);                          // and take it back
+                if (kingSafe) out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private Status computeStatus() {
+        boolean check = board.inCheck(turn);
+        if (!legalMoves(turn).isEmpty()) return check ? Status.CHECK : Status.ACTIVE;
+        return check ? Status.CHECKMATE : Status.STALEMATE;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">move("e2", "d3") with the bishop pinned</span>
+  1. a piece on e2?          yes, B
+  2. white to move?          yes
+  3. d3 in B.targets(e2)?    yes    <span class="c">it moves like that</span>
+  4. in legalMoves(WHITE)?
+       apply  B e2-d3
+       inCheck(WHITE)?       yes    <span class="c">rook e8 sees e1</span>
+       undo
+     so not legal           <span class="c">refused</span></div>
+      <div class="note"><span class="lbl">Why the checks come in that order</span>Each check gives the player a better reason than the one after it: "no piece there" beats "cannot move that way", which beats "that leaves your king in check". The last is also the only expensive one, so the cheap refusals return first.</div>
+      <div class="note"><span class="lbl">Cost</span><code>legalMoves</code> tries about 30 moves, each with an attack scan of about 16 pieces. That is a few thousand operations per move, trivial for a game and too slow for a chess engine. An engine keeps attack maps up to date incrementally; say that if asked about AI.</div>
+      <div class="note tip"><span class="lbl">The factory earns its place</span><code>Pieces.of</code> is the only code that names the six piece classes. Parsing a position, loading a saved game and promotion all go through it, and the <code>switch</code>'s <code>default</code> rejects bad input at the boundary.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,24 @@
+<section class="slide" data-sec="Foundations" data-title="LLD versus HLD">
+  <h2>High-level design draws the boxes; low-level design writes what is inside one</h2>
+  <p class="dek">High-level design (HLD, or system design) picks the services, stores and channels, and the way data flows between them. LLD zooms into one of those boxes and designs its classes. The two rounds need different preparation and are scored on different things.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>High-level design</th><th>Low-level design</th></tr></thead>
+      <tbody>
+        <tr><td>Typical prompt</td><td>Design Twitter's timeline. Design a URL shortener for 100M users.</td><td>Design a parking lot. Design Splitwise. Design an elevator controller.</td></tr>
+        <tr><td>Unit of design</td><td>Services, databases, caches, queues, CDNs</td><td>Classes, interfaces, enums, methods</td></tr>
+        <tr><td>What you draw</td><td>Boxes and arrows for request and data flow</td><td>A class diagram with relationships and multiplicities</td></tr>
+        <tr><td>What you write</td><td>APIs, a data model, back-of-envelope numbers</td><td>Compilable code for the core use cases</td></tr>
+        <tr><td>Key questions</td><td>How many requests per second? What happens when this node dies? Where is the bottleneck?</td><td>Who owns this state? What changes when a new vehicle type arrives? Is this method thread-safe?</td></tr>
+        <tr><td>Main trade-offs</td><td>Consistency against availability, latency against cost, SQL against NoSQL</td><td>Inheritance against composition, flexibility against simplicity, lock granularity</td></tr>
+        <tr><td>Classic failure</td><td>No numbers; one database for everything; no failure handling</td><td>One god class; a switch on type in five places; getters and setters and nothing else</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note"><span class="lbl">Where they meet</span>An LLD question often ends with a scale follow-up: "the parking lot now spans 200 sites". The right answer is not to redraw everything. Say which object becomes a service, which in-memory map becomes a table, and which lock becomes a database constraint. <a data-deck="lld" data-slide="From one JVM to many">Scale and distribution</a> covers this.</div>
+    <div class="note tip"><span class="lbl">Elsewhere in the atlas</span>The <a data-deck="deck" data-slide="What this atlas is">Reference deck</a> is high-level design for one Spring Boot system, and the <a data-deck="ed" data-sec="Foundations">Event-driven</a> tab covers the channels between services. This tab stays inside one process until section 16.</div>
+  </div>
+</section>

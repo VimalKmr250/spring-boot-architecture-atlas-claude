@@ -1,0 +1,87 @@
+<section class="slide" data-sec="Structural patterns" data-title="Facade">
+  <h2>Facade: one simple entry point in front of several collaborating services</h2>
+  <p class="dek">Booking a ticket touches seat inventory, payments and email, in a set order, with a compensating step when payment fails. Callers should not have to know that sequence. A facade offers one method, <code>book(user, seats)</code>, and keeps the choreography in one place. The subsystems stay public for callers who need more control.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FacadeDemo.java · hold, charge, then confirm or release</div>
+<pre><code class="language-java">import java.util.*;
+
+final class SeatInventory {
+    private final Map&lt;String, String&gt; holds = new TreeMap&lt;&gt;();  // seat -&gt; user
+    private final Set&lt;String&gt; sold = new TreeSet&lt;&gt;();
+    boolean hold(String user, List&lt;String&gt; seats) {
+        for (String s : seats)
+            if (sold.contains(s) || holds.containsKey(s)) return false;
+        seats.forEach(s -&gt; holds.put(s, user));
+        return true;
+    }
+    void confirm(List&lt;String&gt; seats) {
+        seats.forEach(s -&gt; { holds.remove(s); sold.add(s); });
+    }
+    void release(List&lt;String&gt; seats) { seats.forEach(holds::remove); }
+    String state() { return "sold " + sold + ", held " + holds.keySet(); }
+}
+
+final class Payments {
+    boolean charge(String user, long amount) { return !user.equals("bob"); }
+}
+
+final class Mailer {
+    final List&lt;String&gt; sent = new ArrayList&lt;&gt;();
+    void ticket(String user, List&lt;String&gt; seats) { sent.add(user + " " + seats); }
+}
+
+final class BookingFacade {
+    private static final long PRICE = 250;
+    private final SeatInventory inventory;
+    private final Payments payments;
+    private final Mailer mailer;
+    BookingFacade(SeatInventory i, Payments p, Mailer m) {
+        inventory = i; payments = p; mailer = m;
+    }
+
+    String book(String user, List&lt;String&gt; seats) {
+        if (!inventory.hold(user, seats))
+            return user + ": seats unavailable";
+        if (!payments.charge(user, PRICE * seats.size())) {
+            inventory.release(seats);                 // compensate
+            return user + ": payment declined, seats released";
+        }
+        inventory.confirm(seats);
+        mailer.ticket(user, seats);
+        return user + ": booked " + seats;
+    }
+}
+
+public class FacadeDemo {
+    public static void main(String[] args) {
+        var inventory = new SeatInventory();
+        var mailer = new Mailer();
+        var booking = new BookingFacade(inventory, new Payments(), mailer);
+
+        System.out.println(booking.book("ana", List.of("A1", "A2")));
+        System.out.println(booking.book("bob", List.of("B1")));
+        System.out.println(booking.book("cy", List.of("A2", "A3")));
+        System.out.println(booking.book("cy", List.of("A3", "B1")));
+        System.out.println(inventory.state());
+        System.out.println("emails: " + mailer.sent);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · FacadeDemo.java</div>
+<pre><code class="language-plaintext">ana: booked [A1, A2]
+bob: payment declined, seats released
+cy: seats unavailable
+cy: booked [A3, B1]
+sold [A1, A2, A3, B1], held []
+emails: [ana [A1, A2], cy [A3, B1]]</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Facade or god class?</span>A facade coordinates; it does not decide. Seat rules stay in <code>SeatInventory</code> and the charge in <code>Payments</code>. If the facade starts computing prices and checking seat adjacency, it has become the god class the pattern was meant to prevent.</div>
+      <div class="note tip"><span class="lbl">It is the service layer</span>In LLD answers the facade is usually the application service (<code>BookingService</code>, <code>ParkingLotService</code>): the one class the demo's <code>main</code> talks to. Name it after the use case, not after the pattern.</div>
+      <div class="note warn"><span class="lbl">This version is single-threaded</span><code>hold</code> checks and then writes, so two threads could both hold A3. The <a data-deck="lld" data-slide="Movie booking · decisions and follow-ups">movie booking</a> problem makes the hold atomic.</div>
+    </div>
+  </div>
+</section>

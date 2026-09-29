@@ -1,0 +1,138 @@
+<section class="slide" data-sec="Concurrency" data-title="Thread-safe LRU cache: code">
+  <h2>LRU cache: the hand-written version, one lock, and a check that the structure survives contention</h2>
+  <p class="dek">Every public method takes the lock, does its O(1) work on the map and the list together, and releases it in <code>finally</code>. The demo first shows the eviction order, then runs 20,000 random operations from virtual threads. Which keys survive varies from run to run, so it checks the invariants instead: the map and the list agree, and the size never exceeds capacity.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LruCacheDemo.java · the cache and its demo</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
+
+final class LruCache&lt;K, V&gt; {
+    private static final class Node&lt;K, V&gt; {
+        final K key;
+        V value;
+        Node&lt;K, V&gt; prev, next;
+        Node(K key, V value) { this.key = key; this.value = value; }
+    }
+
+    private final int capacity;
+    private final Map&lt;K, Node&lt;K, V&gt;&gt; index = new HashMap&lt;&gt;();
+    private final Node&lt;K, V&gt; head = new Node&lt;&gt;(null, null);  // sentinels
+    private final Node&lt;K, V&gt; tail = new Node&lt;&gt;(null, null);
+    private final ReentrantLock lock = new ReentrantLock();
+    private long hits, misses, evictions;
+
+    LruCache(int capacity) {
+        if (capacity &lt; 1) throw new IllegalArgumentException("capacity");
+        this.capacity = capacity;
+        head.next = tail;
+        tail.prev = head;
+    }
+
+    Optional&lt;V&gt; get(K key) {
+        lock.lock();
+        try {
+            Node&lt;K, V&gt; n = index.get(key);
+            if (n == null) { misses++; return Optional.empty(); }
+            hits++;
+            moveToFront(n);                      // a read is a write
+            return Optional.of(n.value);
+        } finally { lock.unlock(); }
+    }
+
+    void put(K key, V value) {
+        lock.lock();
+        try {
+            Node&lt;K, V&gt; n = index.get(key);
+            if (n != null) { n.value = value; moveToFront(n); return; }
+            if (index.size() == capacity) {
+                Node&lt;K, V&gt; lru = tail.prev;
+                unlink(lru);
+                index.remove(lru.key);
+                evictions++;
+            }
+            n = new Node&lt;&gt;(key, value);
+            index.put(key, n);
+            addFront(n);
+        } finally { lock.unlock(); }
+    }
+
+    List&lt;K&gt; keysByRecency() {
+        lock.lock();
+        try {
+            List&lt;K&gt; keys = new ArrayList&lt;&gt;();
+            for (Node&lt;K, V&gt; n = head.next; n != tail; n = n.next) keys.add(n.key);
+            return keys;
+        } finally { lock.unlock(); }
+    }
+
+    boolean consistent() {                       // for tests
+        List&lt;K&gt; keys = keysByRecency();
+        lock.lock();
+        try {
+            return keys.size() == index.size() &amp;&amp; keys.size() &lt;= capacity
+                &amp;&amp; index.keySet().containsAll(keys);
+        } finally { lock.unlock(); }
+    }
+
+    long lookups() {
+        lock.lock();
+        try { return hits + misses; } finally { lock.unlock(); }
+    }
+
+    private void unlink(Node&lt;K, V&gt; n) { n.prev.next = n.next; n.next.prev = n.prev; }
+    private void addFront(Node&lt;K, V&gt; n) {
+        n.next = head.next; n.prev = head;
+        head.next.prev = n; head.next = n;
+    }
+    private void moveToFront(Node&lt;K, V&gt; n) { unlink(n); addFront(n); }
+}
+
+public class LruCacheDemo {
+    public static void main(String[] args) {
+        var cache = new LruCache&lt;String, Integer&gt;(3);
+        cache.put("a", 1); cache.put("b", 2); cache.put("c", 3);
+        cache.get("a");                           // a becomes most recent
+        cache.put("d", 4);                        // evicts b, the least recent
+        System.out.println("recency: " + cache.keysByRecency());
+        System.out.println("get b: " + cache.get("b") + ", get c: " + cache.get("c"));
+        System.out.println("recency: " + cache.keysByRecency());
+
+        var shared = new LruCache&lt;Integer, Integer&gt;(100);
+        var gets = new AtomicInteger();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int t = 0; t &lt; 20; t++) {
+                long seed = t;
+                pool.submit(() -&gt; {
+                    var random = new Random(seed);
+                    for (int i = 0; i &lt; 1_000; i++) {
+                        int key = random.nextInt(300);
+                        if (random.nextBoolean()) shared.put(key, i);
+                        else { shared.get(key); gets.incrementAndGet(); }
+                    }
+                });
+            }
+        }
+        System.out.println("after 20,000 concurrent ops: consistent " + shared.consistent()
+                + ", size " + shared.keysByRecency().size()
+                + ", lookups counted " + (shared.lookups() == gets.get()));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · LruCacheDemo.java</div>
+<pre><code class="language-plaintext">recency: [d, a, c]
+get b: Optional.empty, get c: Optional[3]
+recency: [c, d, a]
+after 20,000 concurrent ops: consistent true, size 100, lookups counted true</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Why <code>ReentrantLock</code> and not <code>synchronized</code></span>Either is correct here. <code>ReentrantLock</code> leaves room for <code>tryLock</code> with a timeout, and on JDK 21 it does not pin a virtual thread's carrier if a loader is later called inside the lock. The <code>try</code>/<code>finally</code> is mandatory: an exception between <code>lock()</code> and <code>unlock()</code> would otherwise leave the cache locked forever.</div>
+      <div class="note"><span class="lbl">Why test invariants, not contents</span>Under concurrency the final contents depend on scheduling, but the invariants must hold after every run. Tests that assert invariants catch torn updates reliably; tests that assert exact contents are flaky. The same approach applies to the booking race.</div>
+      <div class="note tip"><span class="lbl">The follow-up: a loading cache</span>"On a miss, load from the database, but only once per key even if a hundred threads miss together." Do not load while holding the cache lock. Keep a <code>ConcurrentHashMap&lt;K, CompletableFuture&lt;V&gt;&gt;</code> of in-flight loads: the first thread starts one with <code>computeIfAbsent</code>, and the rest wait on the same future.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,36 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Coupling, cohesion, Demeter and GRASP">
+  <h2>Low coupling, high cohesion, and knowing which class should own a job</h2>
+  <p class="dek"><b>Coupling</b> is how much one class knows about others; keep it low. <b>Cohesion</b> is how closely the parts of one class belong together; keep it high. The Law of Demeter and the GRASP patterns are practical rules for getting both, and GRASP's <b>information expert</b> is the most useful single rule in an LLD round.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Law of Demeter · talk to your friends, not their friends</div>
+<pre><code class="language-java">// Before: the caller walks the object graph, and
+// breaks when any link in the chain changes
+long rate = ticket.getSpot().getFloor().getLot()
+                  .getPricing().getHourlyRate();
+
+// After: tell, don't ask. The ticket knows its lot
+// and asks it; the caller knows only the ticket.
+long fee = ticket.feeAt(exitTime);</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Demeter, precisely</span>A method may call methods on <code>this</code>, its parameters, objects it creates, and its own fields. Chains on value objects and fluent builders (<code>stream().map().toList()</code>) are fine, because they return the same kind of thing rather than reaching into another object's parts.</div>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>GRASP pattern</th><th>The question it answers</th></tr></thead>
+        <tbody>
+          <tr><td>Information expert</td><td>Who should do this? The class that has the data. <code>ParkingSpot.canFit(vehicle)</code>, not <code>Manager.fits(spot, vehicle)</code>.</td></tr>
+          <tr><td>Creator</td><td>Who creates B? The class that contains, aggregates or closely uses B. A <code>ParkingFloor</code> creates its spots.</td></tr>
+          <tr><td>Controller</td><td>Who first receives a use case from the UI? A thin service per use case, such as <code>BookingService</code>.</td></tr>
+          <tr><td>Low coupling · high cohesion</td><td>The two tests every choice is scored against.</td></tr>
+          <tr><td>Polymorphism</td><td>How to handle behaviour that varies by type? Subtypes, not conditionals.</td></tr>
+          <tr><td>Pure fabrication</td><td>No domain class fits? Invent one: a repository, a <code>DebtSimplifier</code>.</td></tr>
+          <tr><td>Indirection</td><td>How to decouple two classes? Put an intermediary between them, such as an interface or an event.</td></tr>
+          <tr><td>Protected variations</td><td>How to protect code from change? Wrap the unstable part behind a stable interface. This is OCP by another name.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

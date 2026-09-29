@@ -1,0 +1,28 @@
+<section class="slide" data-sec="Design patterns" data-title="Choosing a pattern from the problem">
+  <h2>Start from the symptom in the requirements, never from the pattern</h2>
+  <p class="dek">Interviewers mark down "I'll use the factory, strategy and observer patterns" said in the first minute, before any requirement justifies them. Mark them up for "pricing varies by lot and may change, so it goes behind an interface; that is the strategy pattern". The pattern name comes last, as a label for a decision you already made.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>When the requirement says…</th><th>Reach for</th><th>Seen in</th></tr></thead>
+      <tbody>
+        <tr><td>"The rule may differ", "pricing depends on…", "support several algorithms"</td><td>Strategy</td><td>Parking fees, split types, elevator scheduling, seat pricing</td></tr>
+        <tr><td>"It behaves differently when it is…", a status field checked in every method</td><td>State</td><td>ATM, vending machine, booking lifecycle, elevator</td></tr>
+        <tr><td>"Notify", "when X happens, update Y and Z"</td><td>Observer</td><td>Displays, reservation alerts, waiting lists</td></tr>
+        <tr><td>"Undo", "replay", "queue the request", "audit every action"</td><td>Command</td><td>Chess moves, editor, ATM transaction log</td></tr>
+        <tr><td>"Create the right kind of X from input"</td><td>Factory method, or a static factory</td><td>Vehicles, pieces, notifiers, splits</td></tr>
+        <tr><td>Many optional fields; an object that must be valid once built</td><td>Builder</td><td>Search queries, bookings, test fixtures</td></tr>
+        <tr><td>"Integrate with the vendor's library"</td><td>Adapter</td><td>Payment gateways, SMS providers</td></tr>
+        <tr><td>Add-ons that stack: "plus a discount, plus logging, plus retry"</td><td>Decorator</td><td>Pricing rules, notifier retry, I/O streams</td></tr>
+        <tr><td>"Try each handler until one accepts", approval levels</td><td>Chain of responsibility</td><td>ATM note dispensing, request validation, expense approval</td></tr>
+        <tr><td>A part-whole tree that should be treated uniformly</td><td>Composite</td><td>File systems, menus, group expenses</td></tr>
+        <tr><td>"One entry point for the client" over several services</td><td>Facade</td><td>Booking service over seats, payments and notifications</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">Pattern-itis</span>A <code>VehicleFactoryFactory</code>, an observer with one listener that will never have a second, a strategy interface with one implementation. Each adds a class and an indirection, and buys nothing. If you cannot name the second implementation, leave the interface out.</div>
+    <div class="note tip"><span class="lbl">Lambdas are patterns too</span>In modern Java a strategy with one method is often just a <code>Function</code> or a custom functional interface filled by a lambda. The same goes for commands (<code>Runnable</code>) and observers (<code>Consumer</code>). Give the interface a domain name when it carries domain meaning, such as <code>PricingStrategy</code>.</div>
+  </div>
+</section>

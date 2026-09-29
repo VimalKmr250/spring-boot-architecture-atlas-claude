@@ -1,0 +1,36 @@
+<section class="slide" data-sec="Movie booking" data-title="Movie booking · decisions and follow-ups">
+  <h2>Movie booking: the choices to defend, and the follow-ups to expect</h2>
+  <p class="dek">Every follow-up on this problem is really "what if this runs on ten servers?" In-process atomics protect one JVM. Across servers, the same three operations (claim if free, take over if dead, release if mine) become conditional updates in a database or in Redis, and the design keeps its shape.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>Per-seat atomic claims</td><td>No lock, and holds on different seats never wait for each other. The alternative, <code>synchronized</code> on the show, is simpler and fine for one screen; it serialises every user on a hot release.</td></tr>
+          <tr><td>Claim in sorted order</td><td>Two overlapping requests cannot each take half and both fail. Same rule as lock ordering.</td></tr>
+          <tr><td>Lazy expiry</td><td>Correct the instant a hold lapses, with no job to schedule or monitor. A sweeper can still tidy up.</td></tr>
+          <tr><td>Charge, then confirm, then refund if late</td><td>Confirming is instant and cannot fail except by expiry; charging is slow and can. The reverse order confirms seats that may never be paid for.</td></tr>
+          <tr><td>Booking-level lock for transitions</td><td>"Confirm" and "expire" race on the same booking; a small lock makes exactly one win.</td></tr>
+          <tr><td>Facade service</td><td>The client calls <code>hold</code> and <code>confirm</code>; the claim protocol stays inside. See <a data-deck="lld" data-slide="Facade">Facade</a>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">The same protocol in SQL</span>Claim: <code>INSERT INTO seat_claim(show_id, seat, booking_id) …</code> with a unique key on <code>(show_id, seat)</code>; a duplicate-key error means taken. Take over a dead hold: <code>UPDATE seat_claim SET booking_id=:new WHERE show_id=:s AND seat=:x AND booking_id=:old</code>, and check that one row changed. Release: <code>DELETE … WHERE booking_id=:mine</code>. With Redis, <code>SET seat:S1:B1 BK7 NX PX 480000</code> claims with a built-in expiry. See <a data-deck="lld" data-slide="Distributed locks and leases">Distributed locks and leases</a>.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>Payment callback arrives after a timeout</td><td>Payments are confirmed by a webhook, not a return value. Key the webhook by booking id; confirm or refund is decided by <code>tryConfirm</code> exactly as now, and a repeated webhook is ignored because the booking is no longer <code>HELD</code>.</td></tr>
+        <tr><td>Cancel a paid booking</td><td>A <code>REFUND_PENDING</code> state, a refund policy strategy (full refund up to 2 hours before the show), then release the seats.</td></tr>
+        <tr><td>No single empty seat between bookings</td><td>A <code>SeatSelectionRule</code> checked in <code>hold</code> before claiming. It reads the seat map, so it is advisory under concurrency; the claim is still the authority.</td></tr>
+        <tr><td>Dynamic pricing</td><td>A <code>PricingStrategy</code> that reads occupancy. The price is fixed on the booking at hold time, so it cannot change during payment.</td></tr>
+        <tr><td>Coupons and offers</td><td>Decorators around the pricing strategy, or a discount step in <code>confirm</code> with its own validation.</td></tr>
+        <tr><td>Live seat map for 10,000 viewers</td><td>Publish claim and release events; clients subscribe over WebSockets. The map is a read model and can lag; the claim is what counts.</td></tr>
+        <tr><td>A virtual waiting room at release time</td><td>Admit users in batches before they reach <code>hold</code>. This is a rate limiter in front of the service; see the <a data-deck="lld" data-slide="Token-bucket rate limiter">token bucket</a>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

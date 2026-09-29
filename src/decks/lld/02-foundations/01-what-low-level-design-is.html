@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Foundations" data-title="What low-level design is">
+  <h2>Low-level design turns a requirement into classes and the code inside them</h2>
+  <p class="lede">Low-level design (LLD) decides which classes exist, what each one is responsible for, how they relate, and what their key methods do. Its output is code a teammate could extend without breaking: an interface where the behaviour varies, an enum where the values are fixed, and one owner for each piece of state.</p>
+
+  <div class="grid3">
+    <div class="card"><h4>Machine coding round</h4><p>60 to 120 minutes to write a working program at your own machine, often with a console demo or unit tests. The interviewer then reads the code and asks for a change. Scored on correctness, structure and how easily it extends.</p><div class="tagrow"><span class="tag a">runnable code</span></div></div>
+    <div class="card"><h4>Object-oriented design interview</h4><p>45 to 60 minutes at a whiteboard or in a shared editor: requirements, a class diagram, and the code for the two or three methods that matter. Scored on the model and the reasoning, not on compiling.</p><div class="tagrow"><span class="tag s">diagram + key code</span></div></div>
+    <div class="card"><h4>Design discussion in a coding round</h4><p>A coding question with a design follow-up: "now support three pricing rules", "make it thread-safe". Scored on whether your first version bends or has to be rewritten.</p><div class="tagrow"><span class="tag">extension</span></div></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>What you hand over by the end</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Requirements</b>: the use cases in scope, the ones you left out, and the assumptions you made.</li>
+        <li><b>Entities</b>: the nouns that hold state, and the enums and value objects around them.</li>
+        <li><b>Class diagram</b>: the classes, their relationships and multiplicities, and the interfaces where behaviour varies.</li>
+        <li><b>Code</b>: the model, the service that runs the main use case, and a demo or test that proves it.</li>
+        <li><b>Trade-offs</b>: what you would change for concurrency, persistence, or the next requirement.</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h3>What it is not</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Not system design.</b> No load balancers, no sharding, no capacity estimates, unless you are asked how the design scales.</li>
+        <li><b>Not a pattern quiz.</b> Patterns are a vocabulary for the choices you made. Using five of them where one would do costs marks.</li>
+        <li><b>Not a database schema.</b> Tables may come up, but the model is objects and behaviour, not rows.</li>
+        <li><b>Not an algorithm puzzle.</b> Each problem has one algorithmic core (the elevator scheduler, the debt simplifier), but most of the marks are for the structure around it.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">One sentence to remember</span>A good low-level design puts each decision in exactly one place, so when the requirement changes, one class changes.</div>
+</section>

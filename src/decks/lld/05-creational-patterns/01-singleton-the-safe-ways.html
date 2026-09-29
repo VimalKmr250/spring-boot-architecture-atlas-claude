@@ -1,0 +1,84 @@
+<section class="slide" data-sec="Creational patterns" data-title="Singleton: the safe ways">
+  <h2>Singleton: one instance, created safely, and usually better injected</h2>
+  <p class="dek">A singleton guarantees one instance of a class and a global way to reach it. Interviewers ask for it for two reasons: to see whether you can write a thread-safe one, and to see whether you know why you usually should not. There are three correct ways to write it. Most of the code people write from memory is a fourth, broken way.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SingletonDemo.java · enum, holder idiom, double-checked locking</div>
+<pre><code class="language-java">import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+
+enum IdGenerator {                       // 1. enum: simplest, and safe against
+    INSTANCE;                            //    reflection and serialization
+    private final AtomicLong next = new AtomicLong(1);
+    long nextId() { return next.getAndIncrement(); }
+}
+
+final class Config {                     // 2. holder idiom: lazy, no locks.
+    private Config() { System.out.println("Config created"); }
+    private static final class Holder {  // the JVM runs Holder's static init
+        static final Config INSTANCE = new Config();   // once, on first use
+    }
+    static Config get() { return Holder.INSTANCE; }
+}
+
+final class Registry {                   // 3. double-checked locking
+    private static volatile Registry instance;    // volatile is essential
+    private Registry() {}
+    static Registry get() {
+        Registry r = instance;           // one volatile read on the fast path
+        if (r == null) {
+            synchronized (Registry.class) {
+                r = instance;            // check again: another thread
+                if (r == null) instance = r = new Registry();  // may have won
+            }
+        }
+        return r;
+    }
+}
+
+public class SingletonDemo {
+    public static void main(String[] args) {
+        System.out.println("before the first get()");
+        System.out.println("same Config: " + (Config.get() == Config.get()));
+
+        Set&lt;Registry&gt; registries = ConcurrentHashMap.newKeySet();
+        Set&lt;Long&gt; ids = ConcurrentHashMap.newKeySet();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 10_000; i++) {
+                pool.submit(() -&gt; {
+                    registries.add(Registry.get());
+                    ids.add(IdGenerator.INSTANCE.nextId());
+                });
+            }
+        }                                // close() waits for every task
+        System.out.println("Registry instances seen: " + registries.size());
+        System.out.println("unique ids from 10,000 threads: " + ids.size());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · SingletonDemo.java</div>
+<pre><code class="language-plaintext">before the first get()
+Config created
+same Config: true
+Registry instances seen: 1
+unique ids from 10,000 threads: 10000</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">The broken version people write from memory</div>
+<pre><code class="language-java">private static Registry instance;         // not volatile
+static Registry get() {
+    if (instance == null)                 // two threads both see null
+        instance = new Registry();        // and both create one; or one
+    return instance;                      // sees a half-built object
+}</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Why volatile matters</span>Without it, the write to <code>instance</code> can become visible to another thread before the constructor's writes do, so that thread sees a non-null reference to an object that is not fully built. <code>volatile</code> forbids that reordering. The demo uses virtual threads <span class="tag a">since 21</span>; the pattern itself works on any Java since 5.</div>
+      <div class="note tip"><span class="lbl">Which to write</span>Say "enum" first: it is one line and handles serialization and reflection for you. Use the holder idiom if the class must extend something, since an enum cannot.</div>
+    </div>
+  </div>
+</section>

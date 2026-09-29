@@ -1,0 +1,63 @@
+<section class="slide" data-sec="ATM" data-title="ATM · class diagram">
+  <h2>ATM: a context, four states, a chain of note slots, and a bank behind an interface</h2>
+  <p class="dek">The <code>Atm</code> holds the current state and forwards every button press to it; each state returns the next state. The cash dispenser is a chain of slots, one per note value. The bank is an interface, because the ATM must be testable without a real bank and will be connected to several.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">Atm</span>                              <span class="c">the context</span>
+  - state : AtmState
+  - card : Card (0..1)
+  - bank : Bank
+  - dispenser : CashDispenser
+  + insertCard(Card)  + enterPin(String)
+  + balance()  + withdraw(int)  + eject()
+  ◆── 1 AtmState   ──> 1 Bank   ◆── 1 CashDispenser
+
+<span class="h">«interface» AtmState</span>             <span class="c">default: refuse politely</span>
+  + insertCard(Atm, Card) : AtmState
+  + enterPin(Atm, String) : AtmState
+  + balance(Atm) : AtmState
+  + withdraw(Atm, int) : AtmState
+  + eject(Atm) : AtmState
+  ┄┄▷ Idle  ┄┄▷ CardInserted  ┄┄▷ Authenticated
+  ┄┄▷ OutOfService
+
+<span class="h">CashDispenser</span>
+  + plan(amount) : Optional&lt;Map&lt;note, count&gt;&gt;
+  + dispense(plan)             <span class="c">may fail: hardware</span>
+  ◆── 1..* NoteSlot
+
+<span class="h">NoteSlot</span>                         <span class="c">chain of responsibility</span>
+  - denomination  - count
+  ──> 0..1 NoteSlot            <span class="c">next, smaller note</span>
+
+<span class="h">«interface» Bank</span>
+  + verifyPin(Card, pin) : boolean
+  + balance(Card) : long
+  + debit(Card, amount) : txnId
+  + reverse(txnId)
+  ┄┄▷ InMemoryBank</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">State transitions</span>
+  Idle          ──insertCard──>  CardInserted
+  CardInserted  ──right PIN──>   Authenticated
+  CardInserted  ──3rd wrong──>   Idle          <span class="c">card kept</span>
+  CardInserted  ──eject──>       Idle
+  Authenticated ──withdraw──>    Authenticated
+  Authenticated ──last note──>   OutOfService  <span class="c">card returned</span>
+  Authenticated ──eject──>       Idle
+  OutOfService  ──insertCard──>  OutOfService  <span class="c">refused</span></div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td>Each <code>AtmState</code></td><td>Which actions are allowed now, and what state comes next</td></tr>
+            <tr><td><code>CardInserted</code></td><td>The PIN attempt count, which dies with the state</td></tr>
+            <tr><td><code>NoteSlot</code></td><td>How many of its notes to use</td></tr>
+            <tr><td><code>Bank</code></td><td>Whether the money exists, and whether a debit stands</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why the attempt counter lives in the state</span>A new <code>CardInserted</code> object is created for each card, so the count starts at 3 automatically and cannot leak to the next customer. A field on <code>Atm</code> would need resetting in every path back to <code>Idle</code>, and one path would be missed.</div>
+    </div>
+  </div>
+</section>

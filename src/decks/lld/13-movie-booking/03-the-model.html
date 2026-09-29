@@ -1,0 +1,114 @@
+<section class="slide" data-sec="Movie booking" data-title="Movie booking · the model">
+  <h2>Movie booking: atomic seat claims on the show, one-way transitions on the booking</h2>
+  <p class="dek">The show exposes exactly three ways to change a seat's owner, and each is a single atomic call on <code>ConcurrentHashMap</code>. The booking's transitions are <code>synchronized</code> and each checks the clock. So "confirm" and "expire" can never both succeed on the same booking, whichever thread gets there first.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">BookingDemo.java · 1 of 3 · the model</div>
+<pre><code class="language-java">import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+enum SeatCategory {
+    REGULAR(200), PREMIUM(350), RECLINER(600);
+    final long basePrice;
+    SeatCategory(long basePrice) { this.basePrice = basePrice; }
+}
+
+record Seat(char row, int number, SeatCategory category) implements Comparable&lt;Seat&gt; {
+    private static final Comparator&lt;Seat&gt; ORDER =
+            Comparator.comparing(Seat::row).thenComparingInt(Seat::number);
+    public int compareTo(Seat other) { return ORDER.compare(this, other); }
+    @Override public String toString() { return "" + row + number; }
+}
+
+record Movie(String title, int minutes) {}
+
+final class Show {
+    private final String id;
+    private final Movie movie;
+    private final LocalDateTime start;
+    private final SortedMap&lt;String, Seat&gt; seats = new TreeMap&lt;&gt;();
+    private final ConcurrentMap&lt;Seat, String&gt; claims = new ConcurrentHashMap&lt;&gt;();
+
+    Show(String id, Movie movie, LocalDateTime start, Map&lt;Character, SeatCategory&gt; rows, int perRow) {
+        this.id = id; this.movie = movie; this.start = start;
+        rows.forEach((row, cat) -&gt; {
+            for (int n = 1; n &lt;= perRow; n++) seats.put("" + row + n, new Seat(row, n, cat));
+        });
+    }
+    String id() { return id; }
+    Movie movie() { return movie; }
+    LocalDateTime start() { return start; }
+    Collection&lt;Seat&gt; seats() { return seats.values(); }
+    Seat seat(String label) {
+        Seat s = seats.get(label);
+        if (s == null) throw new IllegalArgumentException("no seat " + label);
+        return s;
+    }
+
+    String claimant(Seat s) { return claims.get(s); }
+    boolean claim(Seat s, String bookingId) { return claims.putIfAbsent(s, bookingId) == null; }
+    boolean reclaim(Seat s, String fromId, String toId) { return claims.replace(s, fromId, toId); }
+    void release(Seat s, String bookingId) { claims.remove(s, bookingId); }  // only if still ours
+}
+
+enum BookingStatus { HELD, CONFIRMED, EXPIRED, CANCELLED }
+
+final class Booking {
+    private final String id, user;
+    private final Show show;
+    private final List&lt;Seat&gt; seats;
+    private final long amount;
+    private final Instant heldUntil;
+    private BookingStatus status = BookingStatus.HELD;
+    private String paymentRef;
+
+    Booking(String id, String user, Show show, List&lt;Seat&gt; seats, long amount, Instant heldUntil) {
+        this.id = id; this.user = user; this.show = show;
+        this.seats = List.copyOf(seats); this.amount = amount; this.heldUntil = heldUntil;
+    }
+    String id() { return id; }
+    String user() { return user; }
+    Show show() { return show; }
+    List&lt;Seat&gt; seats() { return seats; }
+    long amount() { return amount; }
+    synchronized BookingStatus status() { return status; }
+
+    synchronized boolean tryConfirm(Instant now, String ref) {
+        if (status == BookingStatus.HELD &amp;&amp; !now.isBefore(heldUntil)) status = BookingStatus.EXPIRED;
+        if (status != BookingStatus.HELD) return false;
+        status = BookingStatus.CONFIRMED;
+        paymentRef = ref;
+        return true;
+    }
+
+    synchronized boolean tryExpire(Instant now) {      // may its seats be taken?
+        if (status == BookingStatus.HELD &amp;&amp; !now.isBefore(heldUntil)) status = BookingStatus.EXPIRED;
+        return status == BookingStatus.EXPIRED || status == BookingStatus.CANCELLED;
+    }
+
+    synchronized boolean isLive(Instant now) {         // for display only
+        return status == BookingStatus.HELD &amp;&amp; now.isBefore(heldUntil);
+    }
+
+    synchronized boolean cancel() {
+        if (status != BookingStatus.HELD) return false;
+        status = BookingStatus.CANCELLED;
+        return true;
+    }
+
+    @Override public synchronized String toString() {
+        return id + " " + user + " " + seats + " " + amount + " " + status
+                + (paymentRef == null ? "" : " " + paymentRef);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">Three atomic operations, nothing else</span><code>putIfAbsent</code> claims a free seat. <code>replace(seat, old, new)</code> takes a seat from a dead booking only if it still belongs to that booking. <code>remove(seat, id)</code> releases a seat only if it is still ours, so a late cancel cannot free a seat someone else has since claimed. There is no check-then-act anywhere, so there is no race window.</div>
+      <div class="note"><span class="lbl">Why expiry is lazy</span>A hold is dead the moment its time passes, whether or not anything noticed. <code>tryExpire</code> records that when a competing user asks for the seat. A cleanup job can still sweep old holds to tidy the map, but correctness never depends on it running on time.</div>
+      <div class="note warn"><span class="lbl">Why <code>Seat</code> is <code>Comparable</code></span>A multi-seat hold claims seats in sorted order. If two users hold {A1, A2} and {A2, A1} and each claimed in the order given, each could get one seat and fail on the other. Both would then roll back, and could keep doing so under load. A fixed order, the same idea that prevents deadlocks, makes one of them win outright.</div>
+    </div>
+  </div>
+</section>

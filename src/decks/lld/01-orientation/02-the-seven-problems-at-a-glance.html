@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Orientation" data-title="The seven problems at a glance">
+  <h2>Seven problems, chosen for the ideas each one forces</h2>
+  <p class="dek">These seven cover most LLD prompts. A new prompt is usually one of them in disguise: a hotel booking is the movie-booking problem, a vending machine is the ATM, a snake-and-ladder game is a smaller chess. Learn what each one teaches, not just its code.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Problem</th><th>The idea it forces</th><th>Patterns used</th><th>The hard follow-up</th><th>Start</th></tr></thead>
+      <tbody>
+        <tr><td>Parking lot</td><td>Modelling a hierarchy of things, and a pricing rule that changes</td><td>Strategy, factory, singleton (and why to avoid it)</td><td>Two cars take the last spot at the same moment</td><td><div class="xrefs"><a data-deck="lld" data-slide="Parking lot · requirements">Requirements</a></div></td></tr>
+        <tr><td>Library</td><td>Separating a title from its copies; rules that depend on the member</td><td>Repository, observer, strategy</td><td>Reservations and a waiting list</td><td><div class="xrefs"><a data-deck="lld" data-slide="Library · requirements">Requirements</a></div></td></tr>
+        <tr><td>ATM</td><td>A machine that allows different actions in different states</td><td>State, chain of responsibility</td><td>The cash is dispensed but the debit fails</td><td><div class="xrefs"><a data-deck="lld" data-slide="ATM · requirements">Requirements</a></div></td></tr>
+        <tr><td>Chess</td><td>Polymorphic rules, and game state that must stay consistent</td><td>Template method, command, factory</td><td>Undo, check detection, and castling</td><td><div class="xrefs"><a data-deck="lld" data-slide="Chess · requirements">Requirements</a></div></td></tr>
+        <tr><td>Elevator</td><td>A scheduling algorithm that must be swappable</td><td>Strategy, state, observer</td><td>Which car answers a hall call?</td><td><div class="xrefs"><a data-deck="lld" data-slide="Elevator · requirements">Requirements</a></div></td></tr>
+        <tr><td>Movie booking</td><td>Concurrency on shared inventory: two users, one seat</td><td>Facade, strategy, state</td><td>Seat holds that expire, and payment that times out</td><td><div class="xrefs"><a data-deck="lld" data-slide="Movie booking · requirements">Requirements</a></div></td></tr>
+        <tr><td>Splitwise</td><td>Getting the arithmetic exactly right, and one algorithm hidden in the model</td><td>Strategy, factory</td><td>Simplifying debts so the fewest payments settle everyone</td><td><div class="xrefs"><a data-deck="lld" data-slide="Splitwise · requirements">Requirements</a></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>The same five steps each time</h4><p>Each problem runs through the same slides: requirements, class diagram and responsibilities, the domain model in code, the services with a demo and its output, then the decisions and follow-ups. That is the order to use in the interview, too.</p></div>
+    <div class="card"><h4>Scoped to fit the hour</h4><p>Each solution is the size you can write in a 45 to 90 minute round: about 150 to 250 lines. The last slide of each problem lists what was left out and how you would add it, which is usually the interviewer's next question.</p></div>
+    <div class="card"><h4>How to practise</h4><p>Read only the requirements slide. Spend 40 minutes on your own diagram and code. Then compare, looking first at the <b>responsibilities</b> (which class owns which decision), not the syntax.</p></div>
+  </div>
+</section>

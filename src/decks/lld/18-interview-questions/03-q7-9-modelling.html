@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q7–9 · Modelling">
+  <h2>Three modelling questions that test how you think, not what you remember</h2>
+  <p class="dek">These come up at the start of a round ("how would you approach this?") or after it ("why is this an enum?"). Answer with the method, then one example from a problem you know well.</p>
+
+  <article class="q"><header><i>Q7</i><h3>How do you get from a problem statement to classes?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>First pin down the use cases and assumptions. Then list the nouns and filter them: things with identity and changing state become classes, values become records, fixed options become enums, varying rules become interfaces, properties become fields, and outside actors become callers. Then give each verb to the class that has the data it needs, and keep a thin service per use case to coordinate.</div>
+    <p class="deeper"><b>Go deeper:</b> Show a filtering decision that matters. In the library, "book" is two things: a <code>Book</code> you search and reserve, and a <code>Copy</code> you borrow. In the parking lot, "attendant" and "gate" are callers, not classes. Then mention the check against a god class: one line of responsibilities per class, split any class with more than three, and merge any with none.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="From nouns to classes">From nouns to classes</a><a data-deck="lld" data-slide="Library · requirements">Library</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q8</i><h3>Enum, class hierarchy or sealed interface: how do you choose?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>An enum when the variants differ only in data: vehicle types that differ in spot size and rate. A sealed interface with records when the set is closed but each variant carries different data, and operations are added by switching over it. An open interface with classes when new variants keep arriving and each brings its own behaviour, such as pricing strategies.</div>
+    <p class="deeper"><b>Go deeper:</b> Frame it as which axis changes. New types but fixed operations favours polymorphic methods on an interface. Fixed types but new operations favours a sealed type and <code>switch</code>, which the compiler checks for exhaustiveness. Say the migration path out loud: "an enum now; if trucks need their own rules, it becomes a sealed interface, and only the classes that switch on it change."</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="The Java 21 toolkit for LLD">Java 21 toolkit</a><a data-deck="lld" data-slide="DRY, KISS, YAGNI">KISS</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q9</i><h3>How do you handle money and time in a design?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Money is never a <code>double</code>. Use a <code>long</code> of minor units or <code>BigDecimal</code> with a fixed scale, inside a value object that validates and knows its currency, and make rounding an explicit rule that keeps totals exact. Time is never read from inside the logic. Inject a <code>Clock</code>, so fees, expiries and due dates can be tested by moving time rather than sleeping.</div>
+    <p class="deeper"><b>Go deeper:</b> Give a rounding example: ₹100 three ways is 33.34, 33.33, 33.33, with the extra paisa assigned by a stated rule. Mention <code>BigDecimal.equals</code> comparing scale, so 10.5 and 10.50 differ unless you normalise. For time, name the distributed version: compare expiries against database time, because server clocks drift.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Value objects, equals and hashCode">Value objects</a><a data-deck="lld" data-slide="Splitwise · the model">Splitwise rounding</a></p>
+  </div></article>
+</section>

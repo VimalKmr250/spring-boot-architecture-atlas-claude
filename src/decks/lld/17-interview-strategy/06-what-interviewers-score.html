@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Interview strategy" data-title="What interviewers score">
+  <h2>What interviewers score, and what each score looks like from their side of the table</h2>
+  <p class="dek">Rubrics differ by company, but the dimensions are stable. Most interviewers write notes under five or six headings and decide from the pattern. Knowing the headings tells you where the minutes should go: a flawless diagram with no code scores well on one heading and badly on three.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Dimension</th><th>Weak signal</th><th>Strong signal</th></tr></thead>
+      <tbody>
+        <tr><td>Requirements</td><td>Starts coding at once; or asks twenty questions</td><td>Five sharp questions, a written scope, stated assumptions</td></tr>
+        <tr><td>Object modelling</td><td>A god class; anaemic entities; one class for title and copy</td><td>Behaviour next to data; values as records; the right splits</td></tr>
+        <tr><td>Design principles</td><td>Patterns named with no reason; or a <code>switch</code> on type everywhere</td><td>Interfaces exactly at the stated variation points, and a reason for each</td></tr>
+        <tr><td>Code quality</td><td>Public fields, setters for everything, <code>double</code> for money, no validation</td><td>Encapsulated state, validated boundaries, clear names, small methods</td></tr>
+        <tr><td>Correctness</td><td>Never runs it; misses the double-redeem or the rounding case</td><td>Demo or test for the main flow and two edges, unprompted</td></tr>
+        <tr><td>Extensibility</td><td>The change request touches everything</td><td>Names the classes that change before editing; the change is local</td></tr>
+        <tr><td>Concurrency (mid/senior)</td><td><code>synchronized</code> on everything, or nothing</td><td>Names shared state, the invariant and the atomic unit; picks the tool</td></tr>
+        <tr><td>Communication</td><td>Silent typing, or defensive when challenged</td><td>Narrates decisions, invites correction, handles pushback with trade-offs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note"><span class="lbl">By level</span>Junior: modelling and working code carry the decision. Mid-level: add clean principles and edge cases. Senior: all of that plus concurrency, failure handling and extension, raised by you rather than drawn out by questions. See <a data-deck="lld" data-slide="Why companies interview for it">Why companies interview for it</a>.</div>
+    <div class="note tip"><span class="lbl">The tie-breaker</span>When two candidates both produce working designs, the one who pointed out a weakness in their own design, and said how they would fix it, almost always gets the stronger write-up.</div>
+  </div>
+</section>

@@ -1,0 +1,24 @@
+<section class="slide" data-sec="Interview questions" data-title="Q1–3 · Principles">
+  <h2>Three principle questions that open many LLD rounds</h2>
+  <p class="dek">These twelve questions are the conceptual ones that come up around a design problem, before it or as follow-ups. Each has a <b>30-second answer</b> to give first and a <b>go deeper</b> paragraph for the follow-up. The links go to the slides that cover the topic; the browser's Back button returns you here.</p>
+
+  <div class="note"><span class="lbl">How to practise with these</span>Read the question, look away, and answer out loud for thirty seconds with an example from one of the seven problems. Then compare. An answer with a concrete class name in it ("the ticket keeps the pricing strategy") is worth more than a textbook definition.</div>
+
+  <article class="q"><header><i>Q1</i><h3>Composition or inheritance: how do you choose?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Default to composition: hold the collaborator as a field behind an interface, so it can be swapped at runtime and tested with a fake. Use inheritance only for a genuine "is-a" inside code you control, where the parent was designed to be extended, such as chess pieces sharing a move-generation loop. Inheriting just to reuse code couples you to the parent's implementation.</div>
+    <p class="deeper"><b>Go deeper:</b> Give the classic failure. A <code>HashSet</code> subclass that counts additions in both <code>add</code> and <code>addAll</code> double-counts, because <code>addAll</code> calls <code>add</code> internally, a detail the subclass never agreed to. A wrapper does not have the problem. Then say where inheritance is right: a sealed hierarchy where the loop is shared and only the data differs, as with sliding and stepping pieces.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Composition over inheritance; interface or abstract class">Composition over inheritance</a><a data-deck="lld" data-slide="Chess · pieces and movement">Chess pieces</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q2</i><h3>What does the open/closed principle mean in practice?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>When a change you expected arrives, you add a class instead of editing working code. In practice that means an interface at each point the requirements say will vary: a new pricing rule is a new <code>PricingStrategy</code>, not another <code>case</code> in a switch. You cannot be closed against every change, so choose the seams from the requirements and say which ones you chose.</div>
+    <p class="deeper"><b>Go deeper:</b> Be honest that one place still changes: whatever picks the strategy, whether a factory, configuration or <code>main</code>. OCP moves change to where it is cheap. Then give the other axis. If the <i>types</i> are fixed and the <i>operations</i> grow, a sealed type with an exhaustive <code>switch</code> is closed in a different way, because the compiler finds every switch that needs a new case.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Open/closed">Open/closed</a><a data-deck="lld" data-slide="The Java 21 toolkit for LLD">Sealed types</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q3</i><h3>Interface or abstract class, in modern Java?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>An interface is the default for a point of variation: a class can implement several, and default methods cover small shared helpers. Choose an abstract class when subtypes share state or a fixed algorithm with steps to fill in, which is the template method pattern. Choose a sealed interface when the set of implementations is closed and you want exhaustive switches.</div>
+    <p class="deeper"><b>Go deeper:</b> Name the constraints. Interfaces cannot hold instance state or constructors; abstract classes can, but a class extends only one. Since Java 8 the gap is smaller, so the question is really about state and about who may implement it. Records implement interfaces but cannot extend classes, which pushes value types towards interfaces.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Composition over inheritance; interface or abstract class">Interface or abstract class</a><a data-deck="lld" data-slide="Template method">Template method</a></p>
+  </div></article>
+</section>

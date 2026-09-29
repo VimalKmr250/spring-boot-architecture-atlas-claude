@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Chess" data-title="Chess · requirements">
+  <h2>Chess: polymorphic rules, and a game state that must never go inconsistent</h2>
+  <p class="dek">Nobody expects all of chess in an hour. The interviewer wants six piece types whose movement differs but whose callers do not care, a rule (you may not leave your own king in check) that cuts across all of them, and a game that knows whose turn it is and when it is over. Agree the scope first; castling and en passant are the classic "and now add…".</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>Two players, <b>white and black</b>, alternate turns on an 8×8 board, white first.</li>
+        <li>Six piece types: king, queen, rook, bishop, knight, pawn, each with its own <b>movement</b>. Only the knight jumps.</li>
+        <li>A move names a <b>from</b> and <b>to</b> square (<code>e2</code>, <code>e4</code>). It is refused if the piece is not the player's, cannot move that way, or would <b>leave the player's own king in check</b>.</li>
+        <li>Pawns move one square forward, two from their start rank, capture diagonally, and <b>promote to a queen</b> on the last rank.</li>
+        <li>After each move the game reports <b>check</b>, <b>checkmate</b> (in check, no legal move) or <b>stalemate</b> (not in check, no legal move).</li>
+        <li>Moves can be <b>undone</b>, one at a time, back to the start.</li>
+        <li>A game can start from the standard layout or from any <b>position</b> given as text, for tests and puzzles.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Castling, en passant?</dt><dd>Not in the code; each is a follow-up with a known shape.</dd>
+          <dt>Promotion choice?</dt><dd>Always a queen for now.</dd>
+          <dt>Draw rules?</dt><dd>Stalemate only. Repetition and the 50-move rule are follow-ups.</dd>
+          <dt>Clock, online play, AI?</dt><dd>Out of scope. The model must not stop them being added.</dd>
+          <dt>Input format?</dt><dd>Two squares per move, not algebraic notation.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">Game</span><span class="tag a">Board</span><span class="tag a">Piece · sealed</span><span class="tag a">6 piece classes</span>
+          <span class="tag s">Position · record</span><span class="tag s">Move · record, a command</span><span class="tag s">Color · enum</span><span class="tag s">Status · enum</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes: <i>square</i> (a <code>Position</code> plus whatever the board holds there), <i>player</i> (just a <code>Color</code> until players have names, ratings or clocks).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The one rule to design around</span>"May not leave your own king in check" is the only rule that is not about one piece. Do not try to encode it in each piece. Generate each piece's moves ignoring check, try each move on the board, and keep the ones after which your king is not attacked. That single idea handles pins, moving into check and escaping check.</div>
+</section>

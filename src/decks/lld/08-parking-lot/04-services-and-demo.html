@@ -1,0 +1,152 @@
+<section class="slide" data-sec="Parking lot" data-title="Parking lot · services and demo">
+  <h2>Parking lot: the pricing strategies, the lot service, and a run through every rule</h2>
+  <p class="dek">The lot tries floors in order, records the ticket, and on exit removes the ticket <b>before</b> anything else, so a ticket can be redeemed only once even if two exit gates scan it together. Time comes from an injected <code>Clock</code>, so the demo can move time forward and print the same fees on every run.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ParkingLotDemo.java · 2 of 3 · pricing and the lot</div>
+<pre><code class="language-java">interface PricingStrategy {
+    long fee(VehicleType type, Duration stayed);
+}
+
+final class HourlyPricing implements PricingStrategy {
+    private final Map&lt;VehicleType, Long&gt; perHour;
+    HourlyPricing(Map&lt;VehicleType, Long&gt; perHour) { this.perHour = new EnumMap&lt;&gt;(perHour); }
+    public long fee(VehicleType type, Duration stayed) {
+        long hours = Math.max(1, (stayed.toMinutes() + 59) / 60);  // started hours
+        return hours * perHour.get(type);
+    }
+}
+
+record FlatPricing(long amount) implements PricingStrategy {
+    public long fee(VehicleType type, Duration stayed) { return amount; }
+}
+
+final class ParkingLot {
+    private final Map&lt;Integer, ParkingFloor&gt; floors = new LinkedHashMap&lt;&gt;();
+    private final Clock clock;
+    private volatile PricingStrategy pricing;
+    private final Map&lt;String, Ticket&gt; active = new ConcurrentHashMap&lt;&gt;();
+    private final Set&lt;String&gt; platesInside = ConcurrentHashMap.newKeySet();
+    private final AtomicInteger nextTicket = new AtomicInteger(1);
+
+    ParkingLot(List&lt;ParkingFloor&gt; floors, PricingStrategy pricing, Clock clock) {
+        floors.forEach(f -&gt; this.floors.put(f.number(), f));
+        this.pricing = Objects.requireNonNull(pricing);
+        this.clock = Objects.requireNonNull(clock);
+    }
+
+    void changePricing(PricingStrategy p) { pricing = Objects.requireNonNull(p); }
+
+    Optional&lt;Ticket&gt; park(Vehicle v) {
+        if (!platesInside.add(v.plate()))                  // atomic check-and-add
+            throw new IllegalStateException(v.plate() + " is already inside");
+        for (ParkingFloor floor : floors.values()) {
+            Optional&lt;ParkingSpot&gt; spot = floor.claim(v);
+            if (spot.isPresent()) {
+                var t = new Ticket("T-%03d".formatted(nextTicket.getAndIncrement()), v,
+                        floor.number(), spot.get().id(), clock.instant(), pricing);
+                active.put(t.id(), t);
+                return Optional.of(t);
+            }
+        }
+        platesInside.remove(v.plate());                    // full: undo
+        return Optional.empty();
+    }
+
+    Receipt leave(String ticketId) {
+        Ticket t = active.remove(ticketId);                // first: one use only
+        if (t == null) throw new IllegalArgumentException("unknown or used ticket " + ticketId);
+        floors.get(t.floor()).release(t.spotId());
+        platesInside.remove(t.vehicle().plate());
+        Duration stayed = Duration.between(t.entry(), clock.instant());
+        return new Receipt(t.id(), t.vehicle().plate(), t.spotId(), stayed,
+                t.pricing().fee(t.vehicle().type(), stayed));
+    }
+
+    List&lt;String&gt; availability() {
+        return floors.values().stream().map(ParkingFloor::freeSummary).toList();
+    }
+}
+
+final class MutableClock extends Clock {                   // a clock the demo moves
+    private Instant now;
+    MutableClock(Instant start) { now = start; }
+    void advance(Duration d) { now = now.plus(d); }
+    @Override public Instant instant() { return now; }
+    @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+    @Override public Clock withZone(ZoneId zone) { throw new UnsupportedOperationException(); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">ParkingLotDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class ParkingLotDemo {
+    static final Map&lt;String, String&gt; ticketOf = new HashMap&lt;&gt;();   // plate -&gt; id
+
+    static void park(ParkingLot lot, Vehicle v) {
+        String result = lot.park(v).map(t -&gt; {
+            ticketOf.put(v.plate(), t.id());
+            return t.id() + " at " + t.spotId();
+        }).orElse("lot full for " + v.type());
+        System.out.println("park  " + v.plate() + ": " + result);
+    }
+
+    public static void main(String[] args) {
+        var clock = new MutableClock(Instant.parse("2026-10-02T09:00:00Z"));
+        var lot = new ParkingLot(List.of(
+                new ParkingFloor(1, Map.of(SpotSize.SMALL, 1, SpotSize.MEDIUM, 1)),
+                new ParkingFloor(2, Map.of(SpotSize.MEDIUM, 1, SpotSize.LARGE, 1))),
+            new HourlyPricing(Map.of(VehicleType.MOTORBIKE, 10L,
+                    VehicleType.CAR, 40L, VehicleType.TRUCK, 100L)),
+            clock);
+
+        var bike = new Vehicle("BIKE-1", VehicleType.MOTORBIKE);
+        park(lot, bike);
+        park(lot, new Vehicle("CAR-A", VehicleType.CAR));
+        park(lot, new Vehicle("CAR-B", VehicleType.CAR));
+        park(lot, new Vehicle("TRUCK-1", VehicleType.TRUCK));
+        park(lot, new Vehicle("CAR-C", VehicleType.CAR));        // no room
+
+        clock.advance(Duration.ofMinutes(130));
+        System.out.println("leave " + lot.leave(ticketOf.get("CAR-A")));
+        clock.advance(Duration.ofMinutes(40));
+        System.out.println("leave " + lot.leave(ticketOf.get("TRUCK-1")));
+
+        lot.changePricing(new FlatPricing(250));                 // event starts
+        park(lot, new Vehicle("CAR-C", VehicleType.CAR));
+        park(lot, new Vehicle("CAR-D", VehicleType.CAR));        // takes LARGE
+        try { lot.park(bike); }
+        catch (IllegalStateException e) { System.out.println("park  rejected: " + e.getMessage()); }
+        System.out.println(lot.availability());
+
+        clock.advance(Duration.ofHours(3));
+        System.out.println("leave " + lot.leave(ticketOf.get("CAR-C")));   // flat
+        System.out.println("leave " + lot.leave(ticketOf.get("CAR-B")));   // hourly
+        try { lot.leave(ticketOf.get("CAR-B")); }
+        catch (IllegalArgumentException e) { System.out.println("leave rejected: " + e.getMessage()); }
+        System.out.println(lot.availability());
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ParkingLotDemo.java</div>
+<pre><code class="language-plaintext">park  BIKE-1: T-001 at F1-S1
+park  CAR-A: T-002 at F1-M1
+park  CAR-B: T-003 at F2-M1
+park  TRUCK-1: T-004 at F2-L1
+park  CAR-C: lot full for CAR
+leave T-002 CAR-A from F1-M1, 130 min, pays 120
+leave T-004 TRUCK-1 from F2-L1, 170 min, pays 300
+park  CAR-C: T-005 at F1-M1
+park  CAR-D: T-006 at F2-L1
+park  rejected: BIKE-1 is already inside
+[F1 free SMALL=0 MEDIUM=0 LARGE=0, F2 free SMALL=0 MEDIUM=0 LARGE=0]
+leave T-005 CAR-C from F1-M1, 180 min, pays 250
+leave T-003 CAR-B from F2-M1, 350 min, pays 240
+leave rejected: unknown or used ticket T-003
+[F1 free SMALL=0 MEDIUM=1 LARGE=0, F2 free SMALL=0 MEDIUM=1 LARGE=0]</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

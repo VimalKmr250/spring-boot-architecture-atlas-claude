@@ -1,0 +1,83 @@
+<section class="slide" data-sec="Structural patterns" data-title="Decorator">
+  <h2>Decorator: stack behaviour by wrapping, in any combination</h2>
+  <p class="dek">A decorator implements the same interface as the object it wraps, delegates to it, and adds something before or after. Three add-ons as subclasses would need up to seven classes to cover every combination. As decorators they need three, combined at runtime. The order of wrapping is part of the behaviour, so choose it on purpose.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DecoratorDemo.java · parking pricing with stackable rules</div>
+<pre><code class="language-java">import java.time.*;
+
+record Stay(boolean electric, LocalDateTime in, LocalDateTime out) {
+    long startedHours() {                       // any part hour counts
+        long minutes = Duration.between(in, out).toMinutes();
+        return Math.max(1, (minutes + 59) / 60);
+    }
+}
+
+interface Pricing {
+    long fee(Stay s);
+    String describe();
+}
+
+record Hourly(long rate) implements Pricing {
+    public long fee(Stay s) { return s.startedHours() * rate; }
+    public String describe() { return "hourly " + rate; }
+}
+
+record WeekendSurcharge(Pricing inner) implements Pricing {     // +25%
+    public long fee(Stay s) {
+        long base = inner.fee(s);
+        DayOfWeek d = s.out().getDayOfWeek();
+        boolean weekend = d == DayOfWeek.SATURDAY || d == DayOfWeek.SUNDAY;
+        return weekend ? base * 125 / 100 : base;
+    }
+    public String describe() { return inner.describe() + " &gt; weekend+25%"; }
+}
+
+record EvDiscount(Pricing inner) implements Pricing {           // -20%
+    public long fee(Stay s) {
+        long base = inner.fee(s);
+        return s.electric() ? base * 80 / 100 : base;
+    }
+    public String describe() { return inner.describe() + " &gt; ev-20%"; }
+}
+
+record DailyCap(Pricing inner, long cap) implements Pricing {
+    public long fee(Stay s) { return Math.min(inner.fee(s), cap); }
+    public String describe() { return inner.describe() + " &gt; cap " + cap; }
+}
+
+public class DecoratorDemo {
+    public static void main(String[] args) {
+        var sat = LocalDateTime.of(2026, 10, 3, 10, 0);          // a Saturday
+        var stay = new Stay(true, sat, sat.plusHours(3).plusMinutes(20));
+
+        Pricing[] rules = {
+            new Hourly(40),
+            new WeekendSurcharge(new Hourly(40)),
+            new EvDiscount(new WeekendSurcharge(new Hourly(40))),
+            new DailyCap(new EvDiscount(new WeekendSurcharge(new Hourly(40))), 150),
+            new EvDiscount(new DailyCap(new WeekendSurcharge(new Hourly(40)), 150)),
+        };
+        System.out.println("stay: " + stay.startedHours() + " started hours, EV, Saturday");
+        for (Pricing p : rules)
+            System.out.printf("%4d  %s%n", p.fee(stay), p.describe());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · DecoratorDemo.java</div>
+<pre><code class="language-plaintext">stay: 4 started hours, EV, Saturday
+ 160  hourly 40
+ 200  hourly 40 &gt; weekend+25%
+ 160  hourly 40 &gt; weekend+25% &gt; ev-20%
+ 150  hourly 40 &gt; weekend+25% &gt; ev-20% &gt; cap 150
+ 120  hourly 40 &gt; weekend+25% &gt; cap 150 &gt; ev-20%</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Order is behaviour</span>The last two lines use the same three rules and give different fees. Capping before the EV discount lets electric cars pay less than the cap. Whether that is right is a business question, so ask it, and build the chain in one place (a factory) so the order is decided once.</div>
+      <div class="note"><span class="lbl">Decorator or strategy?</span>A strategy <b>replaces</b> the algorithm; a decorator <b>adds to</b> whatever it wraps. Hourly and flat-rate pricing are strategies. The weekend surcharge and EV discount are decorators, because they apply on top of either.</div>
+      <div class="note tip"><span class="lbl">In the JDK</span><code>new BufferedReader(new InputStreamReader(new FileInputStream(f)))</code> is three decorators. <code>Collections.unmodifiableList</code> and <code>synchronizedMap</code> are decorators too.</div>
+    </div>
+  </div>
+</section>

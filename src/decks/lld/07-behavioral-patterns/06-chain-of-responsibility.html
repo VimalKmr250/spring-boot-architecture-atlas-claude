@@ -1,0 +1,82 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Chain of responsibility">
+  <h2>Chain of responsibility: pass the request along until a handler takes it</h2>
+  <p class="dek">Each handler either deals with the request or hands it to the next one. The sender knows only the first handler, and the chain can be reordered or extended without touching it. Approval limits, request validation, servlet filters and the ATM's note dispenser (50s, then 20s, then 10s) are all chains.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChainDemo.java · expense approval, then the same chain as functions</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.function.Function;
+
+record Expense(String who, long amount, String category) {}
+
+abstract class Approver {
+    private Approver next;
+    Approver then(Approver next) { this.next = next; return next; }   // fluent
+
+    final String handle(Expense e) {
+        String verdict = decide(e);
+        if (verdict != null) return verdict;                  // handled
+        return next != null ? next.handle(e)                  // pass it on
+                            : "rejected: nobody can approve " + e.amount();
+    }
+    protected abstract String decide(Expense e);              // null = pass
+}
+
+final class PolicyCheck extends Approver {
+    protected String decide(Expense e) {
+        return e.category().equals("gift") ? "rejected by policy" : null;
+    }
+}
+
+final class Limit extends Approver {
+    private final String role;
+    private final long max;
+    Limit(String role, long max) { this.role = role; this.max = max; }
+    protected String decide(Expense e) {
+        return e.amount() &lt;= max ? "approved by " + role : null;
+    }
+}
+
+public class ChainDemo {
+    public static void main(String[] args) {
+        Approver chain = new PolicyCheck();
+        chain.then(new Limit("team lead", 1_000))
+             .then(new Limit("manager", 10_000))
+             .then(new Limit("director", 100_000));
+
+        var expenses = List.of(new Expense("ana", 400, "travel"),
+                new Expense("bo", 7_500, "hardware"), new Expense("cy", 250, "gift"),
+                new Expense("di", 60_000, "training"), new Expense("ed", 250_000, "travel"));
+        expenses.forEach(e -&gt; System.out.printf(Locale.ROOT, "%-3s %,8d  %s%n",
+                e.who(), e.amount(), chain.handle(e)));
+
+        List&lt;Function&lt;Expense, Optional&lt;String&gt;&gt;&gt; handlers = List.of(   // the
+            e -&gt; e.category().equals("gift") ? Optional.of("policy") : Optional.empty(),
+            e -&gt; e.amount() &lt;= 1_000 ? Optional.of("team lead") : Optional.empty(),
+            e -&gt; Optional.of("finance review"));                   // lambda form
+        System.out.println("functional: " + handlers.stream()
+                .map(h -&gt; h.apply(expenses.get(1)))
+                .flatMap(Optional::stream).findFirst().orElseThrow());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ChainDemo.java</div>
+<pre><code class="language-plaintext">ana      400  approved by team lead
+bo     7,500  approved by manager
+cy       250  rejected by policy
+di    60,000  approved by director
+ed   250,000  rejected: nobody can approve 250000
+functional: finance review</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Pure chain</h4><p>Exactly one handler deals with the request and the rest never see it, as with approval limits above.</p></div>
+        <div class="card"><h4>Pipeline</h4><p>Every handler does its part and passes it on: servlet filters, Spring Security's filter chain, middleware. Each can still stop the request.</p></div>
+      </div>
+      <div class="note warn"><span class="lbl">Say what happens at the end</span>A request that falls off the end of the chain must produce a defined result, like the "nobody can approve" line above. Silent drops are the classic bug. Build the chain in one place so its order is visible.</div>
+      <div class="note tip"><span class="lbl">In the ATM</span>Dispensing from ₹500, ₹200 and ₹100 slots is a chain: each slot takes as many notes as it can and passes the remainder on. With limited notes, "as many as it can" is not always right, so the ATM's chain backs off and retries. See <a data-deck="lld" data-slide="ATM · the model">ATM · the model</a>.</div>
+    </div>
+  </div>
+</section>

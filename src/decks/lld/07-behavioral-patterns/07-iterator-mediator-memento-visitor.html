@@ -1,0 +1,131 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Iterator, mediator, memento, visitor">
+  <h2>Four patterns you should recognise, and write when asked</h2>
+  <p class="dek">These come up less often as the centre of a design, but interviewers use them as follow-ups. "How would you let callers walk your collection?" is iterator. "The flights all talk to each other" is mediator. "Add undo without exposing the state" is memento. "Add operations to this closed hierarchy" is visitor, which Java 21's pattern-matching <code>switch</code> mostly replaces.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FourPatterns.java · 1 of 2 · iterator and mediator</div>
+<pre><code class="language-java">import java.util.*;
+
+record Range(int from, int to, int step) implements Iterable&lt;Integer&gt; {
+    public Iterator&lt;Integer&gt; iterator() {          // ITERATOR: callers walk
+        return new Iterator&lt;&gt;() {                  // it, never see its insides
+            private int next = from;
+            public boolean hasNext() { return next &lt; to; }
+            public Integer next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                int v = next;
+                next += step;
+                return v;
+            }
+        };
+    }
+}
+
+final class Tower {                                // MEDIATOR: flights talk
+    private final List&lt;Flight&gt; flights = new ArrayList&lt;&gt;();   // to the tower,
+    private Flight onRunway;                                  // not each other
+    void register(Flight f) { flights.add(f); }
+    void requestLanding(Flight f) {
+        if (onRunway == null) { onRunway = f; f.hear("cleared to land"); }
+        else f.hear("hold, runway busy with " + onRunway.id());
+    }
+    void landed(Flight f) {
+        onRunway = null;
+        for (Flight o : flights) if (o != f) o.hear(f.id() + " has vacated the runway");
+    }
+}
+
+record Flight(String id, Tower tower) {
+    void land()   { tower.requestLanding(this); }
+    void landed() { tower.landed(this); }
+    void hear(String msg) { System.out.println("  " + id + " &lt;- " + msg); }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">FourPatterns.java · 2 of 2 · memento and visitor</div>
+<pre><code class="language-java">final class TextBox {                              // MEMENTO: the originator
+    private String text = "";
+    private int cursor;
+    void type(String s) {
+        text = text.substring(0, cursor) + s + text.substring(cursor);
+        cursor += s.length();
+    }
+    Snapshot save() { return new Snapshot(text, cursor); }
+    void restore(Snapshot s) { text = s.text; cursor = s.cursor; }
+    @Override public String toString() { return text + " (cursor " + cursor + ")"; }
+
+    static final class Snapshot {                  // opaque to the caretaker:
+        private final String text;                 // no public accessors
+        private final int cursor;
+        private Snapshot(String text, int cursor) { this.text = text; this.cursor = cursor; }
+    }
+}
+
+sealed interface Expr permits Num, Add, Mul {
+    &lt;R&gt; R accept(ExprVisitor&lt;R&gt; v);                // VISITOR: double dispatch
+}
+record Num(int v) implements Expr { public &lt;R&gt; R accept(ExprVisitor&lt;R&gt; x) { return x.num(this); } }
+record Add(Expr l, Expr r) implements Expr { public &lt;R&gt; R accept(ExprVisitor&lt;R&gt; x) { return x.add(this); } }
+record Mul(Expr l, Expr r) implements Expr { public &lt;R&gt; R accept(ExprVisitor&lt;R&gt; x) { return x.mul(this); } }
+
+interface ExprVisitor&lt;R&gt; { R num(Num n); R add(Add a); R mul(Mul m); }
+
+final class Show implements ExprVisitor&lt;String&gt; {  // one operation per class
+    public String num(Num n) { return String.valueOf(n.v()); }
+    public String add(Add a) { return "(" + a.l().accept(this) + " + " + a.r().accept(this) + ")"; }
+    public String mul(Mul m) { return a(m.l()) + " * " + a(m.r()); }
+    private String a(Expr e) { return e.accept(this); }
+}
+
+public class FourPatterns {
+    static int eval(Expr e) {                      // the Java 21 alternative:
+        return switch (e) {                        // a sealed switch with
+            case Num(int v) -&gt; v;                  // record patterns
+            case Add(Expr l, Expr r) -&gt; eval(l) + eval(r);
+            case Mul(Expr l, Expr r) -&gt; eval(l) * eval(r);
+        };
+    }
+
+    public static void main(String[] args) {
+        List&lt;Integer&gt; seen = new ArrayList&lt;&gt;();
+        for (int i : new Range(0, 10, 3)) seen.add(i);
+        System.out.println("iterator: " + seen);
+
+        System.out.println("mediator:");
+        var tower = new Tower();
+        var a = new Flight("AI101", tower);
+        var b = new Flight("6E202", tower);
+        tower.register(a); tower.register(b);
+        a.land(); b.land(); a.landed(); b.land();
+
+        var box = new TextBox();
+        box.type("hello");
+        var saved = box.save();
+        box.type(" world");
+        System.out.print("memento: " + box);
+        box.restore(saved);
+        System.out.println(" -&gt; " + box);
+
+        Expr e = new Mul(new Add(new Num(2), new Num(3)), new Num(4));
+        System.out.println("visitor: " + e.accept(new Show()) + " = " + eval(e));
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Output on JDK 21 · FourPatterns.java</div>
+<pre><code class="language-plaintext">iterator: [0, 3, 6, 9]
+mediator:
+  AI101 &lt;- cleared to land
+  6E202 &lt;- hold, runway busy with AI101
+  6E202 &lt;- AI101 has vacated the runway
+  6E202 &lt;- cleared to land
+memento: hello world (cursor 11) -&gt; hello (cursor 5)
+visitor: (2 + 3) * 4 = 20</code></pre>
+    </div>
+    <div class="note"><span class="lbl">Visitor in modern Java</span>The visitor exists because older Java could not switch on type safely. With a sealed hierarchy, <code>eval</code> above does the same job in five lines, and the compiler still rejects a <code>switch</code> that misses a new subtype. Mention the visitor, then say you would use the sealed <code>switch</code> <span class="tag a">since 21</span>. Keep the visitor for code that must compile on Java 17 or earlier.</div>
+  </div>
+</section>

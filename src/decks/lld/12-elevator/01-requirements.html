@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Elevator" data-title="Elevator · requirements">
+  <h2>Elevator system: two kinds of request, and a scheduling rule that must be swappable</h2>
+  <p class="dek">The elevator problem is about separating two decisions. <b>Dispatch</b>: which car answers a call from a floor? <b>Routing</b>: in what order does one car visit its stops? Buildings change the dispatch rule (zones at rush hour, nearest car at night) far more often than they change how a car moves, so dispatch goes behind an interface.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>A building has <b>N floors</b> (0 to N−1) and <b>M cars</b>, each starting on a given floor.</li>
+        <li>A <b>hall call</b> is a button on a floor with a direction: "floor 4, going down". The system assigns it to one car.</li>
+        <li>A <b>car call</b> is a button inside a car: "take me to 8". It goes to that car only.</li>
+        <li>A car keeps moving in its current direction while it has stops ahead, then reverses (the <b>LOOK</b> algorithm). With no stops it goes idle.</li>
+        <li>The <b>dispatch strategy</b> is configurable and can change while the system runs: nearest suitable car, or fixed zones.</li>
+        <li>Displays and logs learn about arrivals by <b>subscribing</b>; cars do not know who is listening.</li>
+        <li>Time advances in <b>ticks</b>: each tick a car either moves one floor or opens its doors.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Capacity, weight?</dt><dd>Ignored: every car can always take one more.</dd>
+          <dt>Door timing, speeds?</dt><dd>One tick per floor and per stop. Real timings are a follow-up.</dd>
+          <dt>Emergency, maintenance?</dt><dd>A car can be taken out of service in the follow-ups.</dd>
+          <dt>Destination dispatch?</dt><dd>No: classic up/down buttons. Keypads in the lobby are a follow-up.</dd>
+          <dt>Real time or simulated?</dt><dd>Simulated ticks, so the design and the demo are deterministic.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">ElevatorSystem</span><span class="tag a">ElevatorCar</span>
+          <span class="tag s">HallCall · record</span><span class="tag s">Direction · enum</span>
+          <span class="tag">Dispatcher · strategy</span><span class="tag">ArrivalListener · observer</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes: <i>button</i> and <i>floor</i> (a button press is a method call; a floor is an int), <i>door</i> (one tick of the car's cycle until door faults are asked for).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Name the algorithm</span>SCAN (the "elevator algorithm" from disk scheduling) runs to the end of the shaft before reversing. LOOK reverses at the last stop, which is what real cars do. First-come-first-served zig-zags and starves distant floors. Naming these three shows you know the trade-off, not just one answer.</div>
+</section>

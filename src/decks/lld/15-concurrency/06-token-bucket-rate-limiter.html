@@ -1,0 +1,105 @@
+<section class="slide" data-sec="Concurrency" data-title="Token-bucket rate limiter">
+  <h2>Rate limiter: a token bucket per client, refilled from the clock, never by a timer</h2>
+  <p class="dek">A bucket holds up to <i>capacity</i> tokens and gains <i>rate</i> tokens per second. Each request takes one token, or is refused if none are left. Bursts up to the capacity are allowed and the long-run average is the rate. Refill is computed from the elapsed time whenever a request arrives, so there is no background thread, and an injected clock makes it testable to the nanosecond.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">RateLimiterDemo.java · integer arithmetic, a fake clock, one bucket per user</div>
+<pre><code class="language-java">import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
+
+final class TokenBucket {
+    private static final long NANOS = 1_000_000_000L;
+    private final long capacity, perSecond;
+    private final LongSupplier nanoTime;
+    private long tokens, lastRefill;
+
+    TokenBucket(long capacity, long perSecond, LongSupplier nanoTime) {
+        this.capacity = capacity;
+        this.perSecond = perSecond;
+        this.nanoTime = nanoTime;
+        this.tokens = capacity;                    // start full: allow a burst
+        this.lastRefill = nanoTime.getAsLong();
+    }
+
+    synchronized boolean tryAcquire() {
+        refill();
+        if (tokens == 0) return false;
+        tokens--;
+        return true;
+    }
+
+    private void refill() {                        // lazy: no timer thread
+        long now = nanoTime.getAsLong();
+        long earned = (now - lastRefill) * perSecond / NANOS;
+        if (earned == 0) return;                   // keep the fraction for later
+        tokens = Math.min(capacity, tokens + earned);
+        lastRefill = tokens == capacity ? now : lastRefill + earned * NANOS / perSecond;
+    }
+}
+
+final class RateLimiter {
+    private final ConcurrentHashMap&lt;String, TokenBucket&gt; buckets = new ConcurrentHashMap&lt;&gt;();
+    private final long capacity, perSecond;
+    private final LongSupplier nanoTime;
+    RateLimiter(long capacity, long perSecond, LongSupplier nanoTime) {
+        this.capacity = capacity; this.perSecond = perSecond; this.nanoTime = nanoTime;
+    }
+    boolean allow(String client) {
+        return buckets.computeIfAbsent(client,
+                k -&gt; new TokenBucket(capacity, perSecond, nanoTime)).tryAcquire();
+    }
+}
+
+public class RateLimiterDemo {
+    static long now = 0;                           // the fake clock, in nanos
+
+    static void burst(RateLimiter limiter, String client, int requests) {
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i &lt; requests; i++) s.append(limiter.allow(client) ? 'Y' : 'n');
+        System.out.printf(Locale.ROOT, "t=%.2fs %-4s %s%n", now / 1e9, client, s);
+    }
+
+    public static void main(String[] args) {
+        var limiter = new RateLimiter(5, 2, () -&gt; now);   // burst 5, then 2 per second
+        burst(limiter, "ana", 7);
+        burst(limiter, "bo", 1);
+        now += 500_000_000L;
+        burst(limiter, "ana", 2);
+        now += 250_000_000L;
+        burst(limiter, "ana", 1);
+        now += 250_000_000L;
+        burst(limiter, "ana", 1);
+        now += 3_000_000_000L;
+        burst(limiter, "ana", 7);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · RateLimiterDemo.java</div>
+<pre><code class="language-plaintext">t=0.00s ana  YYYYYnn
+t=0.00s bo   Y
+t=0.50s ana  Yn
+t=0.75s ana  n
+t=1.00s ana  Y
+t=4.00s ana  YYYYYnn</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Algorithm</th><th>Behaviour</th></tr></thead>
+          <tbody>
+            <tr><td>Fixed window</td><td>Count per calendar minute. Simple; allows 2× the limit across a window boundary.</td></tr>
+            <tr><td>Sliding log</td><td>Keep every timestamp. Exact; memory grows with the limit.</td></tr>
+            <tr><td>Sliding window counter</td><td>Weight this window and the last. Close to exact, two counters per client.</td></tr>
+            <tr><td>Token bucket</td><td>Bursts up to capacity, then a steady rate. Two numbers per client. The usual answer.</td></tr>
+            <tr><td>Leaky bucket</td><td>A queue drained at a fixed rate. Smooths output; adds latency instead of refusing.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why integer maths, and why the fraction is kept</span>With a <code>double</code>, 0.5 s × 2 tokens/s can come out as 0.999…, and a request that should pass is refused. Integer nanoseconds are exact. Advancing <code>lastRefill</code> only by the time actually converted into tokens keeps the leftover fraction, so at t = 0.75 s the half-token earned since 0.5 s is not lost.</div>
+      <div class="note warn"><span class="lbl">Across many servers</span>Each server has its own buckets, so ten servers allow ten times the rate. Keep the bucket in Redis and update it with one Lua script (read, refill, take, write), which runs atomically. Or give each server 1/<i>n</i> of the rate and accept the imprecision.</div>
+    </div>
+  </div>
+</section>

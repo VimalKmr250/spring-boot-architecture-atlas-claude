@@ -1,0 +1,92 @@
+<section class="slide" data-sec="Concurrency" data-title="Locks, atomics and concurrent collections">
+  <h2>The toolbox, and the check-then-act bug every tool exists to prevent</h2>
+  <p class="dek">Almost every concurrency bug in an LLD answer is a check-then-act: read something, decide, then write, while another thread changes it in between. The demo forces that interleaving with two latches, so it goes wrong on every run. It then does the same withdrawals 10,000 times from virtual threads, safely.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">RaceDemo.java · a forced lost update, then two fixes</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+
+final class Account {
+    private int balance;
+    Account(int balance) { this.balance = balance; }
+    synchronized boolean withdraw(int amount) {    // check and act, one lock
+        if (balance &lt; amount) return false;
+        balance -= amount;
+        return true;
+    }
+    synchronized int balance() { return balance; }
+}
+
+public class RaceDemo {
+    static int unsafeBalance = 100;
+
+    static void await(CountDownLatch l) {
+        try { l.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        var aChecked = new CountDownLatch(1);
+        var bDone = new CountDownLatch(1);
+        Thread a = Thread.ofPlatform().start(() -&gt; {
+            if (unsafeBalance &gt;= 80) {              // A checks: 100 &gt;= 80
+                aChecked.countDown();
+                await(bDone);                       // A is paused here...
+                unsafeBalance -= 80;                // ...and acts on a stale check
+            }
+        });
+        Thread b = Thread.ofPlatform().start(() -&gt; {
+            await(aChecked);
+            if (unsafeBalance &gt;= 80) unsafeBalance -= 80;   // B: 100 -&gt; 20
+            bDone.countDown();
+        });
+        a.join();
+        b.join();
+        System.out.println("check-then-act, no lock: balance " + unsafeBalance);
+
+        var account = new Account(5_000);
+        var ok = new AtomicInteger();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 10_000; i++)
+                pool.submit(() -&gt; { if (account.withdraw(1)) ok.incrementAndGet(); });
+        }
+        System.out.println("synchronized: " + ok.get() + " withdrawals, balance " + account.balance());
+
+        var counts = new ConcurrentHashMap&lt;String, Integer&gt;();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 10_000; i++) {
+                String key = i % 3 == 0 ? "fizz" : "other";
+                pool.submit(() -&gt; counts.merge(key, 1, Integer::sum));   // atomic per key
+            }
+        }
+        System.out.println("ConcurrentHashMap.merge: " + new TreeMap&lt;&gt;(counts));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · RaceDemo.java</div>
+<pre><code class="language-plaintext">check-then-act, no lock: balance -60
+synchronized: 5000 withdrawals, balance 0
+ConcurrentHashMap.merge: {fizz=3334, other=6666}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Tool</th><th>Use it for</th></tr></thead>
+          <tbody>
+            <tr><td><code>synchronized</code></td><td>The default. Short critical sections on one object. Re-entrant, released automatically.</td></tr>
+            <tr><td><code>ReentrantLock</code></td><td>When you need <code>tryLock</code> with a timeout, interruptible waits, or several conditions.</td></tr>
+            <tr><td><code>ReadWriteLock</code></td><td>Many readers, rare writers, and reads that really do not mutate. Not an LRU cache, where every read moves an entry.</td></tr>
+            <tr><td><code>AtomicInteger</code>, <code>AtomicReference</code></td><td>A single variable updated with compare-and-set. <code>LongAdder</code> for hot counters.</td></tr>
+            <tr><td><code>ConcurrentHashMap</code></td><td>Maps shared between threads. <code>compute</code>, <code>merge</code>, <code>putIfAbsent</code> are atomic per key; <code>get</code> then <code>put</code> is not.</td></tr>
+            <tr><td><code>CopyOnWriteArrayList</code></td><td>Listener lists: read constantly, changed rarely.</td></tr>
+            <tr><td><code>BlockingQueue</code></td><td>Hand-offs between producer and consumer threads, with back-pressure.</td></tr>
+            <tr><td><code>Semaphore</code></td><td>Limit how many threads do something at once, such as calls to a slow service.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

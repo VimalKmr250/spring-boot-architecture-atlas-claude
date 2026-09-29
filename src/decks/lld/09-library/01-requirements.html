@@ -1,0 +1,43 @@
+<section class="slide" data-sec="Library" data-title="Library · requirements">
+  <h2>Library management: a title is not a copy, and the rules depend on the member</h2>
+  <p class="dek">The trap in this problem is modelling "book" as one class. A library owns several physical <b>copies</b> of one <b>title</b>: you borrow a copy, but you search for and reserve a title. Get that split right in the first five minutes, and loans, holds and the waiting list all fall into place.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>The catalogue holds <b>books</b> (ISBN, title, authors), each with one or more <b>copies</b> identified by a barcode.</li>
+        <li>Some copies are <b>reference only</b>: they can be read in the library but never borrowed.</li>
+        <li>Members have a <b>tier</b>: standard members may hold 3 loans for 14 days, premium members 5 loans for 28 days.</li>
+        <li>Returning late adds a <b>fine</b> of 10 per day, capped at 500. A member with unpaid fines cannot borrow.</li>
+        <li>When no copy of a title is available, a member can <b>reserve</b> it and join a first-come, first-served waiting list.</li>
+        <li>A returned copy with a waiting list goes <b>on hold</b> for the first member for 3 days, and that member is <b>notified</b>. No one else can borrow it meanwhile.</li>
+        <li><b>Search</b> by title or author, case-insensitive.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Branches?</dt><dd>One branch. Several is a follow-up.</dd>
+          <dt>Renewals?</dt><dd>Not now; the design should allow them.</dd>
+          <dt>Fine payment?</dt><dd>Recorded as paid in full; no payment gateway.</dd>
+          <dt>Reserve when a copy is on the shelf?</dt><dd>No: go and borrow it.</dd>
+          <dt>Hold expiry?</dt><dd>Stored on the copy; a daily job moves expired holds on. Out of scope for the code.</dd>
+          <dt>Notification channel?</dt><dd>Any; the library only raises the event.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">Library</span><span class="tag a">Copy</span><span class="tag a">Member</span>
+          <span class="tag s">Book · record</span><span class="tag s">Loan · record</span><span class="tag s">Tier · enum</span><span class="tag s">CopyStatus · enum</span>
+          <span class="tag">FinePolicy · interface</span><span class="tag">LibraryListener · interface</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes: <i>librarian</i> (a caller with more permissions), <i>shelf</i>, <i>rack</i> (a location field if asked). <i>Reservation</i> is a member id in a per-title queue until it needs data of its own.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say the title/copy split out loud</span>"A <code>Book</code> is the catalogue entry, one per ISBN. A <code>Copy</code> is a physical item with a barcode and a status. Loans point at copies; reservations point at books." It is the single sentence that most often separates a pass from a fail on this problem.</div>
+</section>

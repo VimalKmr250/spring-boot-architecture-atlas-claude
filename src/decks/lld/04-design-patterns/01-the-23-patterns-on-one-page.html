@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Design patterns" data-title="The 23 patterns on one page">
+  <h2>The 23 Gang of Four patterns, and the ones LLD rounds actually use</h2>
+  <p class="dek">The 1994 <i>Design Patterns</i> book named 23 recurring solutions in three families: <b>creational</b> (how objects get made), <b>structural</b> (how objects are put together) and <b>behavioural</b> (how objects share work). About ten of them come up in almost every LLD round. The <span class="tag a">core</span> ones are worth knowing well enough to write from memory.</p>
+
+  <div class="grid3">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Creational</th><th>Intent</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="lld" data-slide="Singleton: the safe ways">Singleton</a></td><td>One instance, one global access point. Mostly an anti-pattern now.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Factory method">Factory method</a> <span class="tag a">core</span></td><td>Let a method decide which class to instantiate.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Abstract factory">Abstract factory</a></td><td>Create families of related objects that must match.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Builder">Builder</a> <span class="tag a">core</span></td><td>Build a complex object step by step, validated once.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Prototype">Prototype</a></td><td>Create by copying a configured instance.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Structural</th><th>Intent</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="lld" data-slide="Adapter">Adapter</a> <span class="tag a">core</span></td><td>Make an existing interface fit the one you need.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Bridge and flyweight">Bridge</a></td><td>Vary an abstraction and its implementation independently.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Composite">Composite</a></td><td>Treat a tree of objects and a single object alike.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Decorator">Decorator</a> <span class="tag a">core</span></td><td>Add behaviour by wrapping, without subclassing.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Facade">Facade</a></td><td>One simple entry point to a subsystem.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Bridge and flyweight">Flyweight</a></td><td>Share immutable state across many small objects.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Proxy">Proxy</a></td><td>A stand-in that controls access: lazy, cached, remote, guarded.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Behavioural</th><th>Intent</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="lld" data-slide="Chain of responsibility">Chain of resp.</a></td><td>Pass a request along handlers until one deals with it.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Command">Command</a> <span class="tag a">core</span></td><td>A request as an object: queue it, log it, undo it.</td></tr>
+          <tr><td>Interpreter</td><td>A grammar as a class per rule. Rare in LLD rounds.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">Iterator</a></td><td>Walk a collection without exposing its structure.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">Mediator</a></td><td>Objects talk through a hub, not to each other.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">Memento</a></td><td>Save and restore state without exposing it.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Observer">Observer</a> <span class="tag a">core</span></td><td>Notify subscribers when something changes.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="State">State</a> <span class="tag a">core</span></td><td>Behaviour that changes with internal state.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Strategy">Strategy</a> <span class="tag a">core</span></td><td>Swap an algorithm behind an interface.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Template method">Template method</a></td><td>A fixed algorithm with steps subclasses fill in.</td></tr>
+          <tr><td><a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">Visitor</a></td><td>Add operations to a closed type hierarchy.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">How each pattern slide is laid out</span>The problem it solves, a complete program that compiles and runs, what it printed, and when <b>not</b> to use it. Patterns cost classes. Use one when it removes a conditional that would otherwise be repeated, or isolates a change you expect.</div>
+</section>

@@ -1,0 +1,173 @@
+<section class="slide" data-sec="Splitwise" data-title="Splitwise · services and demo">
+  <h2>Splitwise: netting debts per pair, simplifying them greedily, and a command-line run</h2>
+  <p class="dek">Recording "bo owes ana 300" first cancels against any "ana owes bo" that already exists, so each pair of people has at most one debt. The simplifier ignores pairs entirely. It works from each person's net balance and repeatedly lets the biggest debtor pay the biggest creditor. Each payment settles at least one person, so <i>n</i> people never need more than <i>n</i> − 1 payments.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SplitwiseDemo.java · 2 of 3 · the ledger and the simplifier</div>
+<pre><code class="language-java">final class Ledger {
+    private final Map&lt;String, Map&lt;String, Long&gt;&gt; owes = new TreeMap&lt;&gt;();  // debtor -&gt; creditor
+    private final List&lt;Expense&gt; expenses = new ArrayList&lt;&gt;();
+
+    synchronized Expense add(String payer, long total, SplitRule rule) {
+        if (total &lt;= 0) throw new IllegalArgumentException("total must be positive");
+        Map&lt;String, Long&gt; shares = rule.shares(total);           // validates first
+        var e = new Expense("E" + (expenses.size() + 1), payer, total, shares);
+        shares.forEach((person, share) -&gt; {
+            if (!person.equals(payer)) owe(person, payer, share);
+        });
+        expenses.add(e);
+        return e;
+    }
+
+    synchronized void settle(String from, String to, long amount) {
+        if (amount &lt;= 0) throw new IllegalArgumentException("amount must be positive");
+        owe(to, from, amount);                     // a payment is a debt reversed
+    }
+
+    private void owe(String debtor, String creditor, long amount) {
+        long reverse = owes.getOrDefault(creditor, Map.of()).getOrDefault(debtor, 0L);
+        long offset = Math.min(reverse, amount);   // cancel the opposite debt first
+        adjust(creditor, debtor, -offset);
+        adjust(debtor, creditor, amount - offset);
+    }
+
+    private void adjust(String debtor, String creditor, long delta) {
+        if (delta == 0) return;
+        Map&lt;String, Long&gt; row = owes.computeIfAbsent(debtor, k -&gt; new TreeMap&lt;&gt;());
+        if (row.merge(creditor, delta, Long::sum) == 0) row.remove(creditor);
+        if (row.isEmpty()) owes.remove(debtor);
+    }
+
+    synchronized List&lt;Transfer&gt; debts() {
+        List&lt;Transfer&gt; out = new ArrayList&lt;&gt;();
+        owes.forEach((d, row) -&gt; row.forEach((c, amt) -&gt; out.add(new Transfer(d, c, amt))));
+        return out;
+    }
+
+    synchronized Map&lt;String, Long&gt; netBalances() {                 // + is owed
+        Map&lt;String, Long&gt; net = new TreeMap&lt;&gt;();
+        owes.forEach((d, row) -&gt; row.forEach((c, amt) -&gt; {
+            net.merge(c, amt, Long::sum);
+            net.merge(d, -amt, Long::sum);
+        }));
+        return net;
+    }
+}
+
+final class DebtSimplifier {
+    private record Party(String who, long amount) {}
+
+    static List&lt;Transfer&gt; simplify(Map&lt;String, Long&gt; net) {
+        Comparator&lt;Party&gt; biggestFirst = Comparator.comparingLong(Party::amount)
+                .reversed().thenComparing(Party::who);             // ties: by name
+        var creditors = new PriorityQueue&lt;&gt;(biggestFirst);
+        var debtors = new PriorityQueue&lt;&gt;(biggestFirst);
+        net.forEach((who, amt) -&gt; {
+            if (amt &gt; 0) creditors.add(new Party(who, amt));
+            if (amt &lt; 0) debtors.add(new Party(who, -amt));
+        });
+        List&lt;Transfer&gt; out = new ArrayList&lt;&gt;();
+        while (!creditors.isEmpty() &amp;&amp; !debtors.isEmpty()) {
+            Party c = creditors.poll(), d = debtors.poll();
+            long amt = Math.min(c.amount(), d.amount());
+            out.add(new Transfer(d.who(), c.who(), amt));           // one settles fully
+            if (c.amount() &gt; amt) creditors.add(new Party(c.who(), c.amount() - amt));
+            if (d.amount() &gt; amt) debtors.add(new Party(d.who(), d.amount() - amt));
+        }
+        return out;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">SplitwiseDemo.java · 3 of 3 · the command runner</div>
+<pre><code class="language-java">public class SplitwiseDemo {
+    static final Ledger ledger = new Ledger();
+
+    static void run(String line) {
+        System.out.println("&gt; " + line);
+        String[] t = line.trim().split("\\s+");
+        try {
+            switch (t[0]) {
+                case "EXPENSE" -&gt; {                 // EXPENSE payer total TYPE args
+                    List&lt;String&gt; people = new ArrayList&lt;&gt;();
+                    List&lt;Long&gt; values = new ArrayList&lt;&gt;();
+                    for (int i = 4; i &lt; t.length; i++) {
+                        String[] kv = t[i].split("=");
+                        people.add(kv[0]);
+                        if (kv.length == 2)
+                            values.add(t[3].equals("EXACT") ? Money.parse(kv[1]) : Long.parseLong(kv[1]));
+                    }
+                    var e = ledger.add(t[1], Money.parse(t[2]), SplitRules.of(t[3], people, values));
+                    var parts = new StringJoiner(", ");
+                    e.shares().forEach((p, s) -&gt; parts.add(p + " " + Money.format(s)));
+                    System.out.println("  " + e.id() + " shares: " + parts);
+                }
+                case "SETTLE" -&gt; ledger.settle(t[1], t[2], Money.parse(t[3]));
+                case "SHOW" -&gt; ledger.debts().forEach(d -&gt; System.out.println(
+                        "  " + d.from() + " owes " + d.to() + " " + Money.format(d.amount())));
+                case "SIMPLIFY" -&gt; DebtSimplifier.simplify(ledger.netBalances())
+                        .forEach(x -&gt; System.out.println("  " + x));
+                default -&gt; throw new IllegalArgumentException("unknown command " + t[0]);
+            }
+        } catch (IllegalArgumentException | ArithmeticException e) {
+            System.out.println("  error: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        """
+        EXPENSE ana 1200.00 EQUAL ana bo cy
+        EXPENSE bo 1000.00 EXACT ana=300.00 bo=200.00 cy=500.00
+        EXPENSE cy 999.99 PERCENT ana=50 dee=50
+        EXPENSE dee 100.00 EQUAL ana bo dee
+        EXPENSE ana 600.00 SHARES bo=1 cy=2
+        EXPENSE ana 500.00 EXACT bo=100.00 cy=100.00
+        EXPENSE ana 500.00 PERCENT bo=60 cy=30
+        SHOW
+        SIMPLIFY
+        SETTLE cy ana 300.00
+        SHOW
+        """.lines().forEach(SplitwiseDemo::run);
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · SplitwiseDemo.java</div>
+<pre><code class="language-plaintext">&gt; EXPENSE ana 1200.00 EQUAL ana bo cy
+  E1 shares: ana 400.00, bo 400.00, cy 400.00
+&gt; EXPENSE bo 1000.00 EXACT ana=300.00 bo=200.00 cy=500.00
+  E2 shares: ana 300.00, bo 200.00, cy 500.00
+&gt; EXPENSE cy 999.99 PERCENT ana=50 dee=50
+  E3 shares: ana 500.00, dee 499.99
+&gt; EXPENSE dee 100.00 EQUAL ana bo dee
+  E4 shares: ana 33.34, bo 33.33, dee 33.33
+&gt; EXPENSE ana 600.00 SHARES bo=1 cy=2
+  E5 shares: bo 200.00, cy 400.00
+&gt; EXPENSE ana 500.00 EXACT bo=100.00 cy=100.00
+  error: exact amounts add up to 200.00, not 500.00
+&gt; EXPENSE ana 500.00 PERCENT bo=60 cy=30
+  error: percents add up to 90
+&gt; SHOW
+  ana owes dee 33.34
+  bo owes ana 300.00
+  bo owes dee 33.33
+  cy owes ana 300.00
+  cy owes bo 500.00
+  dee owes cy 499.99
+&gt; SIMPLIFY
+  dee pays ana 433.32
+  cy pays bo 166.67
+  cy pays ana 133.34
+&gt; SETTLE cy ana 300.00
+&gt; SHOW
+  ana owes dee 33.34
+  bo owes ana 300.00
+  bo owes dee 33.33
+  cy owes bo 500.00
+  dee owes cy 499.99</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

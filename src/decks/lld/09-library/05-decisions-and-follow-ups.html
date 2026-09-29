@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Library" data-title="Library · decisions and follow-ups">
+  <h2>Library: the choices to defend, and the follow-ups to expect</h2>
+  <p class="dek">The interviewer's follow-ups here are almost always about time: renewals, hold expiry, overdue reminders. Each one is a rule about dates, and the injected clock plus the one lock make every one of them straightforward to add and to test.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td><code>Book</code> and <code>Copy</code> split</td><td>Search and reserve work on titles; loans work on physical items. One class for both cannot represent two copies.</td></tr>
+          <tr><td>Waiting list per title</td><td>Any returned copy of the title serves the queue. A queue per copy would make a member wait for one copy while another sits on the shelf.</td></tr>
+          <tr><td>One lock on <code>Library</code></td><td>Borrow and return touch a copy, a member and a queue together. Finer locks invite deadlock for no measurable gain at library volumes.</td></tr>
+          <tr><td><code>FinePolicy</code> as a lambda</td><td>The rule is one function; the cap and the rate are its data. A class when fines depend on the member tier or the book.</td></tr>
+          <tr><td>Listener, not a notifier call</td><td>The domain raises an event; channels subscribe. Adding SMS changes no library code.</td></tr>
+          <tr><td>Exceptions for refusals</td><td>Each refusal has a reason the librarian's screen must show. A <code>Result</code> type with a reason is the alternative; say you would switch if refusals became part of normal flow.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">The subtle bug to mention</span>A member on the waiting list who then borrows another copy of the same title from the shelf is still in the queue. When a copy comes back, it goes on hold for someone who already has the book. Fix it in <code>borrow</code>: remove the member from that title's waiting list. It is a one-line change, and spotting it yourself is worth more than the line.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>Renew a loan</td><td><code>Library.renew(barcode)</code>: refused if the title has a waiting list or the renewal limit is reached; otherwise replace the <code>Loan</code> record with a later due date. A <code>renewals</code> count goes on <code>Loan</code>.</td></tr>
+        <tr><td>Holds expire after 3 days</td><td>A daily job asks each <code>ON_HOLD</code> copy whether <code>holdUntil</code> has passed, then gives it to the next in line or back to the shelf. The job takes the clock, so a test can move time forward.</td></tr>
+        <tr><td>Overdue reminders</td><td>The same daily job scans active loans due tomorrow or overdue, and publishes an event. The listeners do the sending.</td></tr>
+        <tr><td>Several branches</td><td>A <code>Branch</code> owns copies; search returns availability per branch. Transfers between branches make a copy <code>IN_TRANSIT</code>.</td></tr>
+        <tr><td>E-books with licence limits</td><td>A copy becomes a licence slot with no barcode. A sealed <code>Item</code> type with <code>PhysicalCopy</code> and <code>Licence</code> keeps the loan logic shared.</td></tr>
+        <tr><td>Full-text search at scale</td><td>Move search behind a <code>CatalogueSearch</code> interface; the in-memory filter becomes one implementation and a search engine another.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
