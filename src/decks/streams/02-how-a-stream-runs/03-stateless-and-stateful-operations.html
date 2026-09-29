@@ -1,0 +1,36 @@
+<section class="slide" data-sec="How a stream runs" data-title="Stateless and stateful operations">
+  <h2>Stateful operations remember, and memory costs</h2>
+  <p class="dek">A stateless operation decides about each element on its own: <code>filter</code>, <code>map</code>, <code>flatMap</code>, <code>peek</code>. A stateful one has to remember what it has already seen. <code>distinct</code> keeps a set of every element so far, <code>sorted</code> keeps every element, and <code>limit</code> and <code>skip</code> keep a count. The difference shows up in memory, in parallel speed, and on infinite streams.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Operation</th><th>Remembers</th><th>Memory</th><th>On an infinite stream</th><th>In parallel</th></tr></thead>
+      <tbody>
+        <tr><td><code>filter</code> · <code>map</code> · <code>flatMap</code> · <code>mapMulti</code> · <code>peek</code></td><td>Nothing</td><td class="num">O(1)</td><td>Fine</td><td>Splits cleanly</td></tr>
+        <tr><td><code>distinct()</code></td><td>Every distinct element so far</td><td class="num">O(distinct)</td><td>Runs, but its set grows without end</td><td>Costly when ordered; cheaper after <code>unordered()</code></td></tr>
+        <tr><td><code>sorted()</code></td><td>Every element</td><td class="num">O(n)</td><td>Never emits. It runs until <code>OutOfMemoryError</code></td><td>A full barrier: every chunk must finish first</td></tr>
+        <tr><td><code>limit(n)</code> · <code>skip(n)</code></td><td>A counter</td><td class="num">O(1)</td><td><code>limit</code> terminates it</td><td>Ordered: buffers to find the first n by position</td></tr>
+        <tr><td><code>takeWhile</code> · <code>dropWhile</code> <span class="tag a">9</span></td><td>A flag: has it failed yet?</td><td class="num">O(1)</td><td><code>takeWhile</code> can terminate it</td><td>Ordered: same buffering cost as <code>limit</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A stateful operation over a database stream</div>
+<pre><code class="language-java">// Every row is read into memory before the first one comes out of
+// sorted(): the limit(10) cannot help, because it runs after the barrier
+try (Stream&lt;Order&gt; all = jdbc.queryForStream("select * from orders", ORDER_ROW)) {
+    all.sorted(Comparator.comparingDouble(Order::total).reversed())
+       .limit(10)
+       .forEach(this::report);
+}
+
+// Sort where the index is, and read ten rows
+jdbc.query("select * from orders order by total desc limit 10", ORDER_ROW)
+    .forEach(this::report);</code></pre>
+    </div>
+    <div class="note bad"><span class="lbl">Stateful lambdas are a different thing, and a bug</span>A stateful <em>operation</em> is the library's business. A stateful <em>lambda</em> is yours, and it breaks things. The classic example deduplicates by key with <code>filter(seen::add)</code>, where <code>seen</code> is a <code>HashSet</code>. That works sequentially. In parallel, several threads write to an unsynchronised set, and which duplicate survives depends on thread timing. The Javadoc asks for lambdas whose result does not depend on state that changes while the pipeline runs. For "distinct by key", group or <code>toMap</code> by the key instead, or write a gatherer.</div>
+  </div>
+</section>
+

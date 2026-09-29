@@ -1,0 +1,87 @@
+<section class="slide" data-sec="Wrap-up" data-title="The whole picture">
+  <h2>The reference architecture, on one page</h2>
+  <p class="dek">Everything in this deck, assembled. Copper is the synchronous request path with a latency budget; teal is asynchronous and allowed to lag.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 420" role="img" aria-label="Full reference architecture: clients through CDN, gateway and BFF into a modular monolith with eight modules, backed by PostgreSQL schemas, Redis and OpenSearch, with Kafka and an outbox relay carrying events to consumers and external systems, and cross-cutting identity, config, observability and CI">
+        <!-- clients -->
+        <rect x="14" y="16" width="852" height="46" rx="9" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.28"></rect>
+        <text x="30" y="34" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">CLIENTS</text>
+        <text x="150" y="45" text-anchor="middle" font-size="11.5" fill="currentColor">Angular SPA</text>
+        <text x="320" y="45" text-anchor="middle" font-size="11.5" fill="currentColor">Mobile app</text>
+        <text x="490" y="45" text-anchor="middle" font-size="11.5" fill="currentColor">CSR console</text>
+        <text x="680" y="45" text-anchor="middle" font-size="11.5" fill="currentColor">Partner API clients</text>
+
+        <!-- edge -->
+        <rect x="14" y="78" width="418" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="223" y="103" text-anchor="middle" font-size="11.5" fill="currentColor">CDN + WAF  ·  TLS termination</text>
+        <rect x="448" y="78" width="418" height="40" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+        <text x="657" y="103" text-anchor="middle" font-size="11.5" fill="currentColor">API gateway — authn, rate limit, routing, circuit breaker</text>
+        <line x1="223" y1="64" x2="223" y2="74" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="657" y1="64" x2="657" y2="74" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+
+        <!-- bff -->
+        <rect x="14" y="134" width="200" height="44" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+        <text x="114" y="153" text-anchor="middle" font-size="11.5" fill="currentColor">BFF (web)</text>
+        <text x="114" y="169" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">session cookie · aggregation</text>
+        <rect x="232" y="134" width="200" height="44" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+        <text x="332" y="153" text-anchor="middle" font-size="11.5" fill="currentColor">BFF (mobile)</text>
+        <text x="332" y="169" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">fewer round trips</text>
+        <line x1="223" y1="120" x2="223" y2="130" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="332" y1="180" x2="400" y2="200" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="657" y1="120" x2="600" y2="198" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+
+        <!-- app tier -->
+        <rect x="14" y="200" width="620" height="122" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="30" y="220" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">ORDER PLATFORM — one Spring Boot artifact, three deployments (web / worker / batch)</text>
+        <rect x="30" y="230" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="100" y="253" text-anchor="middle" font-size="11" fill="currentColor">catalog</text>
+        <rect x="182" y="230" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="252" y="253" text-anchor="middle" font-size="11" fill="currentColor">pricing</text>
+        <rect x="334" y="230" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="404" y="253" text-anchor="middle" font-size="11" fill="currentColor">cart</text>
+        <rect x="486" y="230" width="136" height="38" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="554" y="253" text-anchor="middle" font-size="11" fill="currentColor">order</text>
+        <rect x="30" y="276" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="100" y="299" text-anchor="middle" font-size="11" fill="currentColor">inventory</text>
+        <rect x="182" y="276" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="252" y="299" text-anchor="middle" font-size="11" fill="currentColor">payment</text>
+        <rect x="334" y="276" width="140" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="404" y="299" text-anchor="middle" font-size="11" fill="currentColor">fulfilment</text>
+        <rect x="486" y="276" width="136" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="554" y="299" text-anchor="middle" font-size="11" fill="currentColor">notification</text>
+
+        <!-- integration -->
+        <rect x="652" y="200" width="214" height="122" rx="10" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="668" y="220" font-size="10" font-family="monospace" fill="#3AA79B">INTEGRATION</text>
+        <text x="759" y="244" text-anchor="middle" font-size="11" fill="currentColor">outbox relay → Kafka</text>
+        <text x="759" y="264" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">schema registry · DLT</text>
+        <text x="759" y="284" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">→ ERP · WMS · carriers</text>
+        <text x="759" y="304" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">→ marketing · warehouse</text>
+        <line x1="636" y1="250" x2="648" y2="250" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+
+        <!-- data -->
+        <rect x="14" y="338" width="620" height="68" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="30" y="358" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">DATA — one cluster, one schema per module, no cross-schema joins</text>
+        <text x="110" y="384" text-anchor="middle" font-size="10.5" fill="currentColor">PostgreSQL primary</text>
+        <text x="110" y="398" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">8 schemas + outbox</text>
+        <text x="270" y="384" text-anchor="middle" font-size="10.5" fill="currentColor">Read replica</text>
+        <text x="270" y="398" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">admin, exports</text>
+        <text x="410" y="384" text-anchor="middle" font-size="10.5" fill="currentColor">Redis</text>
+        <text x="410" y="398" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">L2 cache, rate limits</text>
+        <text x="552" y="384" text-anchor="middle" font-size="10.5" fill="currentColor">OpenSearch</text>
+        <text x="552" y="398" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">projection from events</text>
+        <line x1="324" y1="324" x2="324" y2="334" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+
+        <!-- cross-cutting -->
+        <rect x="652" y="338" width="214" height="68" rx="10" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="668" y="358" font-size="10" font-family="monospace" fill="currentColor" opacity="0.6">PLATFORM</text>
+        <text x="759" y="378" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">OIDC · Vault · OTel collector</text>
+        <text x="759" y="396" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Prometheus · CI/CD · flags</text>
+      </svg>
+    </div>
+    <figcaption>Two properties are worth noticing: the application tier is a single artifact yet has eight independently-owned modules, and every arrow leaving it to an external system is teal — no third party sits inside the customer's checkout latency budget except the payment gateway.</figcaption>
+  </figure>
+</section>
+

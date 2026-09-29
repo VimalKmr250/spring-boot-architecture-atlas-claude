@@ -1,0 +1,98 @@
+<section class="slide" data-sec="03 · Fast/slow pointers" data-title="Dry run">
+  <h2>LC 142 traced on <code>3 → 2 → 0 → −4 → (back to 2)</code></h2>
+  <p class="dek">Four nodes; the tail links back to index 1, so the cycle is <code>2 → 0 → −4 →</code> and the entrance is the node holding 2. Here L = 1 and C = 3. Watch phase 1 meet at <code>−4</code> — not at the entrance — and phase 2 convert that into the answer in a single step.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 302" role="img" aria-label="Step by step trace of Floyd's algorithm on a four node list with a cycle, showing both phases">
+        <!-- the list -->
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE LIST</text>
+        <circle cx="60" cy="56" r="18" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="60" y="61" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="60" y="88" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.4">A · idx 0</text>
+        <path d="M80 56 L112 56" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="132" cy="56" r="18" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.7"></circle>
+        <text x="132" y="61" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">2</text>
+        <text x="132" y="88" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#D26A3F">B · the answer</text>
+        <path d="M152 56 L184 56" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="204" cy="56" r="18" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="204" y="61" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">0</text>
+        <text x="204" y="88" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.4">C · idx 2</text>
+        <path d="M224 56 L256 56" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="276" cy="56" r="18" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="276" y="61" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">−4</text>
+        <text x="276" y="88" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.4">D · idx 3</text>
+        <path d="M276 34 C 276 8, 132 8, 132 34" stroke="#3AA79B" stroke-width="1.4" fill="none" marker-end="url(#arwB)"></path>
+        <text x="204" y="18" text-anchor="middle" font-size="10" font-family="monospace" fill="#3AA79B">tail links back to B</text>
+        <text x="330" y="50" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">L = 1   (A → B)</text>
+        <text x="330" y="66" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">C = 3   (B, C, D)</text>
+        <text x="330" y="82" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">k = 2   (B → D, once they meet)</text>
+        <text x="500" y="50" font-size="11" font-family="monospace" fill="#3AA79B">check:  L + k = 3 = 1·C   ✓</text>
+        <text x="500" y="66" font-size="11" font-family="monospace" fill="#3AA79B">so      L = nC − k = 3 − 2 = 1   ✓</text>
+        <text x="500" y="86" font-size="10.5" fill="currentColor" opacity="0.6">one step from the head, one step from M</text>
+
+        <line x1="14" y1="106" x2="866" y2="106" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <!-- phase 1 -->
+        <text x="14" y="126" font-size="11.5" font-weight="600" fill="#D26A3F">PHASE 1 · find a meeting point</text>
+        <text x="14" y="148" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">STEP</text>
+        <text x="110" y="148" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">SLOW (+1)</text>
+        <text x="280" y="148" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">FAST (+2)</text>
+        <text x="470" y="148" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">GAP ALONG THE CYCLE</text>
+        <text x="700" y="148" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">MET?</text>
+
+        <text x="14" y="168" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">start</text>
+        <text x="110" y="168" font-size="11" font-family="monospace" fill="currentColor">A (3)</text>
+        <text x="280" y="168" font-size="11" font-family="monospace" fill="currentColor">A (3)</text>
+        <text x="470" y="168" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">—</text>
+        <text x="700" y="168" font-size="11" fill="currentColor" opacity="0.5">both at head</text>
+
+        <text x="14" y="188" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="110" y="188" font-size="11" font-family="monospace" fill="currentColor">B (2)</text>
+        <text x="280" y="188" font-size="11" font-family="monospace" fill="currentColor">C (0)</text>
+        <text x="470" y="188" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">1</text>
+        <text x="700" y="188" font-size="11" fill="currentColor" opacity="0.5">no</text>
+
+        <text x="14" y="208" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="110" y="208" font-size="11" font-family="monospace" fill="currentColor">C (0)</text>
+        <text x="280" y="208" font-size="11" font-family="monospace" fill="currentColor">B (2)</text>
+        <text x="470" y="208" font-size="11" font-family="monospace" fill="currentColor" opacity="0.7">2   (fast lapped past)</text>
+        <text x="700" y="208" font-size="11" fill="currentColor" opacity="0.5">no</text>
+
+        <text x="14" y="228" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="110" y="228" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">D (−4)</text>
+        <text x="280" y="228" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">D (−4)</text>
+        <text x="470" y="228" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">0</text>
+        <text x="700" y="228" font-size="11" font-weight="600" fill="#3AA79B">MEET at M = D</text>
+
+        <line x1="14" y1="242" x2="866" y2="242" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <!-- phase 2 -->
+        <text x="14" y="262" font-size="11.5" font-weight="600" fill="#D26A3F">PHASE 2 · reset one pointer to the head, then step both by one</text>
+        <text x="14" y="282" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="110" y="282" font-size="11" font-family="monospace" fill="currentColor">A → B</text>
+        <text x="280" y="282" font-size="11" font-family="monospace" fill="currentColor">D → B</text>
+        <text x="470" y="282" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">both at B — the cycle entrance</text>
+        <text x="700" y="282" font-size="11" font-weight="600" fill="#D26A3F">answer: node 2</text>
+        <text x="14" y="298" font-size="10.5" fill="currentColor" opacity="0.6">L = 1, so exactly one step. Phase 2 always takes exactly L steps, never more.</text>
+      </svg>
+    </div>
+    <figcaption>Note that M (the node holding −4) is <em>not</em> the answer. Returning the meeting point is the classic wrong answer to LC 142, and it passes the cycle-detection tests of LC 141, which is why people miss it.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Phase</th><th class="num">Step</th><th>slow</th><th>fast</th><th>What just happened</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">0</td><td>A (3)</td><td>A (3)</td><td>Both start at the head. The loop tests <em>after</em> moving, so this does not count as a meeting.</td></tr>
+        <tr><td>1</td><td class="num">1</td><td>B (2)</td><td>C (0)</td><td>slow enters the cycle; fast is one node ahead of it around the loop.</td></tr>
+        <tr><td>1</td><td class="num">2</td><td>C (0)</td><td>B (2)</td><td>fast wraps D → B. The gap measured along the cycle is now 2.</td></tr>
+        <tr><td>1</td><td class="num">3</td><td>D (−4)</td><td>D (−4)</td><td>Gap closes by one per step, so it hits zero exactly. <b>Meeting point M = D.</b></td></tr>
+        <tr><td>2</td><td class="num">1</td><td>B (2)</td><td>B (2)</td><td>One pointer restarts at the head. After L = 1 step both stand on the entrance. <b>Return node B.</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why they cannot step over each other</span>Once both pointers are inside the cycle, fast gains exactly one node on slow per step, so the gap runs <code>… 3, 2, 1, 0</code> and must land on zero — it can never skip from 1 to −1. This is why the speeds must be 1 and 2. With speeds 1 and 3 the gap falls by two, and on an even-length cycle with an odd starting gap the two pointers can pass each other forever without meeting.</div>
+</section>
+

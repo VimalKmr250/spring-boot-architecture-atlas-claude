@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Operations" data-title="What it costs">
+  <h2>What an event-driven system costs to run</h2>
+  <p class="dek">The line items that appear on the bill and in the on-call rota. Useful for a business case, and for answering "why is this more expensive than the monolith".</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Worked monthly estimate</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Volume</dt><dd>20,000 events/s × 1 KB ≈ 50 TB/month written</dd>
+        <dt>Replication</dt><dd>× 3 for RF=3 → 150 TB of writes</dd>
+        <dt>Storage</dt><dd>7 days retained, lz4 at ~4× → ~9 TB on disk</dd>
+        <dt>Read amplification</dt><dd>5 consumer groups → 5× read traffic, and cross-AZ reads are charged</dd>
+        <dt>Brokers</dt><dd>6 instances sized for network, not CPU</dd>
+        <dt>Plus</dt><dd>schema registry, Connect cluster, monitoring, and the consumers themselves</dd>
+      </dl>
+      <p style="margin-top:12px;font-size:13.5px;color:var(--text-2)">Divide by orders processed and you have <b>cost per 1,000 orders for the event path</b> — directly comparable to the synchronous alternative.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>The costs that surprise people</h3>
+        <ul class="tight">
+          <li><b>Cross-AZ traffic.</b> Replication and consumption across zones is charged per gigabyte and can exceed the compute bill. Rack-aware follower fetching helps.</li>
+          <li><b>Retention creep.</b> "Let's keep 30 days just in case" quadruples storage and nobody revisits it.</li>
+          <li><b>Read amplification.</b> Each new consumer group re-reads everything. Ten groups is 10× read cost.</li>
+          <li><b>Idle consumers.</b> Pods beyond the partition count cost money and process nothing.</li>
+          <li><b>On-call.</b> A broker estate needs owners, upgrades and a rota. Often the largest real cost.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">Three levers that actually move the bill</span><b>Compression</b> — <code>lz4</code> or <code>zstd</code> typically cuts storage and network 3–5× for a little CPU. <b>Retention per topic</b> — most topics do not need seven days; some need thirty. Decide each one. <b>Tiered storage</b> — long retention on object storage costs a fraction of broker disk, which changes the replay conversation entirely.</div>
+    </div>
+  </div>
+</section>
+

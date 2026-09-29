@@ -1,0 +1,56 @@
+<section class="slide" data-sec="Orientation" data-title="Stream API index">
+  <h2>Every method on Stream, in one table</h2>
+  <p class="dek">Fifty-seven methods, grouped by what they are. <b>Kind</b> says when the method runs. <b>Stateful</b> means it has to remember elements it has already seen. <b>Short-circuit</b> means it can finish without reading the whole source, which is what lets it work on an infinite stream.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Method</th><th>Kind</th><th>Behaviour</th><th>Since</th><th>Covered in</th></tr></thead>
+      <tbody>
+        <tr><td><code>of(T)</code> · <code>of(T...)</code> · <code>empty()</code> · <code>builder()</code></td><td>static source</td><td>Finite, ordered</td><td>8</td><td><a data-deck="st" data-slide="From collections, arrays and values">Creating · values</a></td></tr>
+        <tr><td><code>ofNullable(T)</code></td><td>static source</td><td>Zero or one element; empty for <code>null</code></td><td><span class="tag a">9</span></td><td><a data-deck="st" data-slide="From collections, arrays and values">Creating · values</a></td></tr>
+        <tr><td><code>concat(a, b)</code></td><td>static source</td><td>Lazy. Nesting it deeply overflows the stack</td><td>8</td><td><a data-deck="st" data-slide="From collections, arrays and values">Creating · values</a></td></tr>
+        <tr><td><code>iterate(seed, next)</code> · <code>generate(s)</code></td><td>static source</td><td>Infinite. <code>generate</code> is unordered</td><td>8</td><td><a data-deck="st" data-slide="Generated and infinite streams">Creating · infinite</a></td></tr>
+        <tr><td><code>iterate(seed, hasNext, next)</code></td><td>static source</td><td>Finite: a <code>for</code> loop as a stream</td><td><span class="tag a">9</span></td><td><a data-deck="st" data-slide="Generated and infinite streams">Creating · infinite</a></td></tr>
+        <tr><td><code>filter</code></td><td>intermediate</td><td>Stateless</td><td>8</td><td><a data-deck="st" data-slide="filter and map">filter and map</a></td></tr>
+        <tr><td><code>map</code> · <code>mapToInt</code> · <code>mapToLong</code> · <code>mapToDouble</code></td><td>intermediate</td><td>Stateless, one in → one out</td><td>8</td><td><a data-deck="st" data-slide="filter and map">filter and map</a></td></tr>
+        <tr><td><code>flatMap</code> · <code>flatMapToInt</code> · <code>flatMapToLong</code> · <code>flatMapToDouble</code></td><td>intermediate</td><td>Stateless, one in → a stream out</td><td>8</td><td><a data-deck="st" data-slide="flatMap and mapMulti">flatMap and mapMulti</a></td></tr>
+        <tr><td><code>mapMulti</code> · <code>mapMultiToInt</code> · <code>mapMultiToLong</code> · <code>mapMultiToDouble</code></td><td>intermediate</td><td>Stateless, one in → zero or more pushed out</td><td><span class="tag a">16</span></td><td><a data-deck="st" data-slide="flatMap and mapMulti">flatMap and mapMulti</a></td></tr>
+        <tr><td><code>distinct()</code></td><td>intermediate</td><td>Stateful: remembers every element seen</td><td>8</td><td><a data-deck="st" data-slide="distinct and sorted">distinct and sorted</a></td></tr>
+        <tr><td><code>sorted()</code> · <code>sorted(Comparator)</code></td><td>intermediate</td><td>Stateful barrier: buffers everything</td><td>8</td><td><a data-deck="st" data-slide="distinct and sorted">distinct and sorted</a></td></tr>
+        <tr><td><code>limit(n)</code></td><td>intermediate</td><td>Stateful, short-circuit</td><td>8</td><td><a data-deck="st" data-slide="limit, skip, takeWhile, dropWhile">Slicing</a></td></tr>
+        <tr><td><code>skip(n)</code></td><td>intermediate</td><td>Stateful</td><td>8</td><td><a data-deck="st" data-slide="limit, skip, takeWhile, dropWhile">Slicing</a></td></tr>
+        <tr><td><code>takeWhile(p)</code></td><td>intermediate</td><td>Stateful, short-circuit</td><td><span class="tag a">9</span></td><td><a data-deck="st" data-slide="limit, skip, takeWhile, dropWhile">Slicing</a></td></tr>
+        <tr><td><code>dropWhile(p)</code></td><td>intermediate</td><td>Stateful</td><td><span class="tag a">9</span></td><td><a data-deck="st" data-slide="limit, skip, takeWhile, dropWhile">Slicing</a></td></tr>
+        <tr><td><code>peek</code></td><td>intermediate</td><td>Stateless; for debugging only</td><td>8</td><td><a data-deck="st" data-slide="peek, parallel, sequential, unordered, onClose">peek and the flag ops</a></td></tr>
+        <tr><td><code>gather(Gatherer)</code></td><td>intermediate</td><td>Whatever the gatherer does: stateful, short-circuit, one-to-many</td><td><span class="tag a">24</span></td><td><a data-deck="st" data-slide="Gatherers: custom intermediate operations">Gatherers</a></td></tr>
+        <tr><td><code>forEach</code> · <code>forEachOrdered</code></td><td>terminal</td><td>Side effects only; returns nothing</td><td>8</td><td><a data-deck="st" data-slide="forEach and forEachOrdered">forEach</a></td></tr>
+        <tr><td><code>collect(Collector)</code> · <code>collect(supplier, accumulator, combiner)</code></td><td>terminal</td><td>Mutable reduction into a container</td><td>8</td><td><a data-deck="st" data-slide="collect, toList and toArray">collect</a></td></tr>
+        <tr><td><code>toList()</code></td><td>terminal</td><td>Unmodifiable list; allows nulls</td><td><span class="tag a">16</span></td><td><a data-deck="st" data-slide="collect, toList and toArray">collect</a></td></tr>
+        <tr><td><code>toArray()</code> · <code>toArray(IntFunction)</code></td><td>terminal</td><td><code>Object[]</code>, or a typed array</td><td>8</td><td><a data-deck="st" data-slide="collect, toList and toArray">collect</a></td></tr>
+        <tr><td><code>reduce</code> (identity, op) · (op) · (identity, accumulator, combiner)</td><td>terminal</td><td>Immutable reduction to one value</td><td>8</td><td><a data-deck="st" data-slide="reduce, in all three forms">reduce</a></td></tr>
+        <tr><td><code>min</code> · <code>max</code> · <code>count</code></td><td>terminal</td><td>Special-case reductions</td><td>8</td><td><a data-deck="st" data-slide="Matching, finding, counting, min and max">match and find</a></td></tr>
+        <tr><td><code>anyMatch</code> · <code>allMatch</code> · <code>noneMatch</code></td><td>terminal</td><td>Short-circuit</td><td>8</td><td><a data-deck="st" data-slide="Matching, finding, counting, min and max">match and find</a></td></tr>
+        <tr><td><code>findFirst</code> · <code>findAny</code></td><td>terminal</td><td>Short-circuit; return <code>Optional</code></td><td>8</td><td><a data-deck="st" data-slide="Matching, finding, counting, min and max">match and find</a></td></tr>
+        <tr><td><code>iterator()</code> · <code>spliterator()</code></td><td>terminal (escape hatch)</td><td>Pull elements yourself</td><td>8</td><td><a data-deck="st" data-slide="Under the hood: stages, sinks and spliterators">Under the hood</a></td></tr>
+        <tr><td><code>parallel()</code> · <code>sequential()</code> · <code>unordered()</code> · <code>onClose(r)</code></td><td>intermediate (flags)</td><td>Change how the whole pipeline runs</td><td>8</td><td><a data-deck="st" data-slide="peek, parallel, sequential, unordered, onClose">peek and the flag ops</a></td></tr>
+        <tr><td><code>isParallel()</code> · <code>close()</code></td><td>query · <code>AutoCloseable</code></td><td><code>close</code> runs the <code>onClose</code> handlers</td><td>8</td><td><a data-deck="st" data-slide="Streams the JDK hands you">Creating · JDK sources</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Only on IntStream · LongStream · DoubleStream</th><th>What it does</th><th>Since</th><th>Covered in</th></tr></thead>
+      <tbody>
+        <tr><td><code>range(a, b)</code> · <code>rangeClosed(a, b)</code></td><td>The <code>for</code> loop counter as a stream. <code>IntStream</code> and <code>LongStream</code> only</td><td>8</td><td><a data-deck="st" data-slide="IntStream, LongStream, DoubleStream">Primitive streams</a></td></tr>
+        <tr><td><code>sum()</code> · <code>average()</code> · <code>summaryStatistics()</code></td><td>Numeric reductions without boxing</td><td>8</td><td><a data-deck="st" data-slide="Summary statistics and numeric traps">Numeric traps</a></td></tr>
+        <tr><td><code>min()</code> · <code>max()</code></td><td>No comparator; return <code>OptionalInt</code> and friends</td><td>8</td><td><a data-deck="st" data-slide="IntStream, LongStream, DoubleStream">Primitive streams</a></td></tr>
+        <tr><td><code>boxed()</code> · <code>mapToObj(f)</code> · <code>asLongStream()</code> · <code>asDoubleStream()</code></td><td>Move between primitive and object streams</td><td>8</td><td><a data-deck="st" data-slide="IntStream, LongStream, DoubleStream">Primitive streams</a></td></tr>
+        <tr><td><code>collect(supplier, objIntConsumer, combiner)</code></td><td>The only <code>collect</code>; there is no <code>collect(Collector)</code>, <code>toList()</code> or <code>gather</code></td><td>8</td><td><a data-deck="st" data-slide="IntStream, LongStream, DoubleStream">Primitive streams</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Two nested types complete it</span><code>Stream.Builder&lt;T&gt;</code> (<code>add</code>, <code>accept</code>, <code>build</code>) builds a stream element by element, and <code>Stream.Builder</code> exists for each primitive stream too. <code>IntStream.IntMapMultiConsumer</code> and its long and double cousins <span class="tag a">since 16</span> are the functional interfaces that the primitive <code>mapMulti</code> takes.</div>
+</section>
+

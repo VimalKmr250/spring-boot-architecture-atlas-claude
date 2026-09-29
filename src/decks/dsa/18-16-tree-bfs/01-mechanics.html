@@ -1,0 +1,78 @@
+<section class="slide" data-sec="16 · Tree BFS" data-title="Mechanics">
+  <h2>Drain the queue one level at a time</h2>
+  <p class="dek">A plain queue traversal visits nodes in level order but loses the level boundaries. The entire pattern is one line that recovers them: <b>capture the queue's size before the inner loop</b>. That snapshot is exactly one level, because everything added during the loop belongs to the next.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">At the top of each outer iteration, the queue contains <b>precisely one complete level</b> and nothing else.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">So <code>int size = queue.size()</code> is the width of that level. Dequeuing exactly <code>size</code> nodes processes it fully, and the children enqueued during those <code>size</code> steps form the next level — restoring the invariant automatically.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Reading <code>queue.size()</code> inside the loop instead destroys this: the size grows as children are added, and the levels smear into one another.</p>
+    </div>
+    <div class="panel">
+      <h3>What the level gives you</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Once you can process a level as a unit, a whole family of questions becomes trivial variations on where you put one line:</p>
+      <ul class="checks tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li>The level's <b>list</b> — collect every value as you dequeue.</li>
+        <li>The <b>last</b> node of each level — the right-side view.</li>
+        <li>The level's <b>max</b> or <b>average</b> — fold over the level.</li>
+        <li><b>Alternating</b> direction — reverse every other level, or push to the front.</li>
+        <li>The <b>first</b> level satisfying a condition — BFS finds the shallowest, which DFS cannot promise.</li>
+      </ul>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 258" role="img" aria-label="A queue holding exactly one tree level, with the size snapshot separating it from the next level">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE QUEUE HOLDS EXACTLY ONE LEVEL AT THE TOP OF EACH ITERATION</text>
+
+        <circle cx="120" cy="52" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.3"></circle>
+        <text x="120" y="58" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">3</text>
+        <path d="M104 66 L68 92" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M136 66 L172 92" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="52" cy="108" r="20" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.6"></circle>
+        <text x="52" y="114" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">9</text>
+        <circle cx="188" cy="108" r="20" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.6"></circle>
+        <text x="188" y="114" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">20</text>
+        <path d="M172 122 L140 148" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M204 122 L236 148" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="124" cy="164" r="20" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="124" y="170" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">15</text>
+        <circle cx="252" cy="164" r="20" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="252" y="170" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">7</text>
+
+        <rect x="360" y="86" width="330" height="46" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="396" y="106" font-size="11.5" font-family="monospace" fill="currentColor">9</text>
+        <text x="446" y="106" font-size="11.5" font-family="monospace" fill="currentColor">20</text>
+        <text x="524" y="106" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">← queue right now</text>
+        <text x="374" y="126" font-size="9.5" font-family="monospace" fill="#D26A3F">size = 2 — snapshot this BEFORE the loop</text>
+
+        <path d="M360 152 L360 170" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <rect x="360" y="176" width="330" height="46" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="396" y="196" font-size="11.5" font-family="monospace" fill="currentColor">15</text>
+        <text x="450" y="196" font-size="11.5" font-family="monospace" fill="currentColor">7</text>
+        <text x="524" y="196" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">← after draining those 2</text>
+        <text x="374" y="216" font-size="9.5" font-family="monospace" fill="#3AA79B">children enqueued during the loop = the next level</text>
+
+        <text x="714" y="106" font-size="10.5" fill="currentColor" opacity="0.62">Dequeue exactly `size`</text>
+        <text x="714" y="122" font-size="10.5" fill="currentColor" opacity="0.62">nodes, never more.</text>
+        <text x="714" y="196" font-size="10.5" fill="currentColor" opacity="0.62">The invariant restores</text>
+        <text x="714" y="212" font-size="10.5" fill="currentColor" opacity="0.62">itself for free.</text>
+
+        <line x1="14" y1="234" x2="866" y2="234" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="248" font-size="10.5" fill="currentColor" opacity="0.6">Reading queue.size() inside the inner loop is the one bug that breaks every problem in this pattern at once — the levels smear together.</text>
+      </svg>
+    </div>
+    <figcaption>The size snapshot is the whole pattern. Everything else — right-side view, level maxima, zigzag — is a decision about which node in the drained level you keep.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>The answer is organised <b>by level</b>, or you need the <b>shallowest</b> node satisfying something. BFS reaches nodes in non-decreasing depth order, which is a guarantee a depth-first traversal cannot make.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>The answer depends on subtree structure — depths, path sums, shapes. Those compose naturally bottom-up, which is a depth-first job; forcing them into BFS means rebuilding the tree in the queue.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time — every node is enqueued and dequeued once. Space is <b>O(w)</b> where w is the widest level, which for a complete tree is about <b>n/2</b>. That is worse than DFS's O(h) and worth stating.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"level order traversal"</b> · <b>"return a list of lists, one per level"</b> · <b>"zigzag"</b> or <b>"alternate between left-to-right and right-to-left"</b> · <b>"the right side view"</b> · <b>"the largest value in each row"</b> · <b>"the average of each level"</b> · <b>"populate each next pointer to its right neighbour"</b>. The words <b>"level"</b>, <b>"row"</b> or <b>"depth"</b> in the output description are decisive.</div>
+</section>
+

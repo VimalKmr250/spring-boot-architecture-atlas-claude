@@ -1,0 +1,73 @@
+<section class="slide" data-sec="Middleware" data-title="What middleware means">
+  <h2>"Middleware" is five distinct tiers — name which one</h2>
+  <p class="dek">The word covers everything between the browser and the database, which is why architecture conversations stall on it. Here is the whole path of one checkout request, with the responsibility of each hop.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 330" role="img" aria-label="Request path from browser through CDN and WAF, API gateway, BFF, application modules, integration middleware and data stores, with the responsibility listed at each tier">
+        <rect x="14" y="20" width="150" height="52" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="89" y="43" text-anchor="middle" font-size="12" fill="currentColor">Browser / app</text>
+        <text x="89" y="60" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">Angular SPA</text>
+
+        <rect x="14" y="96" width="150" height="52" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="89" y="119" text-anchor="middle" font-size="12" fill="currentColor">Edge</text>
+        <text x="89" y="136" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">CDN · WAF · TLS · DDoS</text>
+
+        <rect x="14" y="172" width="150" height="52" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="89" y="195" text-anchor="middle" font-size="12" fill="currentColor">API gateway</text>
+        <text x="89" y="212" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">authn · rate limit · routing</text>
+
+        <rect x="14" y="248" width="150" height="52" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="89" y="271" text-anchor="middle" font-size="12" fill="currentColor">BFF</text>
+        <text x="89" y="288" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">aggregation · session cookie</text>
+
+        <line x1="89" y1="74" x2="89" y2="92" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <line x1="89" y1="150" x2="89" y2="168" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <line x1="89" y1="226" x2="89" y2="244" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <line x1="166" y1="274" x2="248" y2="200" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+
+        <rect x="256" y="96" width="250" height="208" rx="10" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.28"></rect>
+        <text x="381" y="120" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Application tier</text>
+        <text x="381" y="138" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">Spring Boot · the modular monolith</text>
+        <rect x="274" y="152" width="98" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="323" y="175" text-anchor="middle" font-size="11" fill="currentColor">cart</text>
+        <rect x="390" y="152" width="98" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="439" y="175" text-anchor="middle" font-size="11" fill="currentColor">order</text>
+        <rect x="274" y="202" width="98" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="323" y="225" text-anchor="middle" font-size="11" fill="currentColor">payment</text>
+        <rect x="390" y="202" width="98" height="38" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="439" y="225" text-anchor="middle" font-size="11" fill="currentColor">inventory</text>
+        <text x="381" y="268" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">business rules · transactions · orchestration</text>
+        <text x="381" y="286" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">this is the only tier that knows what an order IS</text>
+
+        <rect x="556" y="96" width="150" height="90" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="631" y="122" text-anchor="middle" font-size="12" fill="currentColor">Integration</text>
+        <text x="631" y="141" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">Kafka · outbox relay</text>
+        <text x="631" y="157" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">schema registry</text>
+        <text x="631" y="173" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">DLT + replay</text>
+
+        <rect x="556" y="210" width="150" height="94" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="631" y="236" text-anchor="middle" font-size="12" fill="currentColor">Data tier</text>
+        <text x="631" y="255" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">PostgreSQL (8 schemas)</text>
+        <text x="631" y="271" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">Redis · OpenSearch</text>
+        <text x="631" y="287" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">S3 · read replica</text>
+
+        <line x1="508" y1="160" x2="552" y2="140" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="508" y1="232" x2="552" y2="248" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="740" y="96" width="126" height="208" rx="9" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.22"></rect>
+        <text x="756" y="120" font-size="11" font-weight="600" fill="currentColor">Cuts across all</text>
+        <text x="756" y="144" font-size="10" fill="currentColor" opacity="0.7">identity (OIDC)</text>
+        <text x="756" y="164" font-size="10" fill="currentColor" opacity="0.7">config + secrets</text>
+        <text x="756" y="184" font-size="10" fill="currentColor" opacity="0.7">tracing (OTel)</text>
+        <text x="756" y="204" font-size="10" fill="currentColor" opacity="0.7">metrics + logs</text>
+        <text x="756" y="224" font-size="10" fill="currentColor" opacity="0.7">feature flags</text>
+        <text x="756" y="244" font-size="10" fill="currentColor" opacity="0.7">audit trail</text>
+        <text x="756" y="272" font-size="9.5" fill="#D26A3F">owned by Platform,</text>
+        <text x="756" y="288" font-size="9.5" fill="#D26A3F">used by everyone</text>
+      </svg>
+    </div>
+    <figcaption>The useful test for any proposed middleware: which tier does it belong to, and what does it do that the tier below cannot? A gateway that contains business logic, or a BFF that writes to the database, has stopped being middleware and become a second application.</figcaption>
+  </figure>
+</section>
+

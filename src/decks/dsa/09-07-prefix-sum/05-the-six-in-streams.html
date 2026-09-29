@@ -1,0 +1,159 @@
+<section class="slide" data-sec="07 · Prefix sum" data-title="The six, in streams">
+  <h2>Java 17 has no scan, so keep the state to one line</h2>
+  <p class="dek">Every problem here starts from the running total, and a running total is a scan: each output depends on the one before it. Java 17 streams have no scan stage, so the prefix array comes from a <code>map</code> over a one-element array. That is the only lambda in these solutions that carries state, and everything after it reads the finished array and is clean. 930 avoids the scan altogether.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">303</td><td><a href="https://leetcode.com/problems/range-sum-query-immutable/" target="_blank" rel="noopener">Range Sum Query — Immutable</a></td><td>The prefix array from a running-total <code>map</code>: one stateful line, run once in the constructor.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) build, O(1) query</td><td class="num">same</td></tr>
+        <tr><td class="num">724</td><td><a href="https://leetcode.com/problems/find-pivot-index/" target="_blank" rel="noopener">Find Pivot Index</a></td><td>The prefix scan, then <code>filter(2·p[i] + nums[i] == total)</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">560</td><td><a href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">Subarray Sum Equals K</a></td><td>The prefix scan; then each prefix value → its indices via <code>groupingBy</code>, and a binary search counts the earlier matches.</td><td><span class="tag w">stateful</span></td><td class="num">O(n log n) / O(n)</td><td class="num">O(n) / O(n)</td></tr>
+        <tr><td class="num">930</td><td><a href="https://leetcode.com/problems/binary-subarrays-with-sum/" target="_blank" rel="noopener">Binary Subarrays With Sum</a></td><td>No scan at all: find the positions of the ones, then each window of <code>goal</code> ones counts (gap before) × (gap after).</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">974</td><td><a href="https://leetcode.com/problems/subarray-sums-divisible-by-k/" target="_blank" rel="noopener">Subarray Sums Divisible by K</a></td><td>Prefix remainders into <code>groupingBy(counting())</code>, then c·(c−1)/2 pairs per remainder.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(k)</td><td class="num">same</td></tr>
+        <tr><td class="num">523</td><td><a href="https://leetcode.com/problems/continuous-subarray-sum/" target="_blank" rel="noopener">Continuous Subarray Sum</a></td><td>Prefix remainders, the first index of each via <code>toMap(…, (a, b) -&gt; a)</code>, then <code>anyMatch</code> a repeat at least two positions later.</td><td><span class="tag w">stateful</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(k)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 303 · Range Sum Query — Immutable · stateful</div>
+<pre><code class="language-java">class NumArray {
+    private final int[] p;   // p[i] = sum of the first i values
+
+    public NumArray(int[] nums) {
+        // Java 17 streams have no scan, so the running total is
+        // a stateful map, run once and in order.
+        int[] run = {0};
+        p = IntStream.concat(IntStream.of(0),
+                Arrays.stream(nums).map(v -&gt; run[0] += v))
+                .toArray();
+    }
+
+    public int sumRange(int left, int right) {
+        return p[right + 1] - p[left];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 724 · Find Pivot Index · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int pivotIndex(int[] nums) {
+        int total = Arrays.stream(nums).sum();
+        int[] run = {0};
+        int[] p = IntStream.concat(IntStream.of(0),
+                Arrays.stream(nums).map(v -&gt; run[0] += v))
+                .toArray();
+        // left = p[i], right = total - p[i] - nums[i]; equal
+        // exactly when 2·p[i] + nums[i] == total.
+        return IntStream.range(0, nums.length)
+                .filter(i -&gt; 2 * p[i] + nums[i] == total)
+                .findFirst().orElse(-1);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 560 · Subarray Sum Equals K · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int subarraySum(int[] nums, int k) {
+        int n = nums.length;
+        // 1 · the only stateful line: the running-total scan
+        int[] run = {0};
+        int[] p = IntStream.concat(IntStream.of(0),
+                Arrays.stream(nums).map(v -&gt; run[0] += v))
+                .toArray();
+        // 2 · clean from here on: prefix value -&gt; its indices,
+        //     ascending (groupingBy keeps encounter order)
+        Map&lt;Integer, List&lt;Integer&gt;&gt; at = IntStream
+                .rangeClosed(0, n).boxed()
+                .collect(Collectors.groupingBy(i -&gt; p[i]));
+        // subarrays ending at j: earlier i, p[i] == p[j] - k
+        return IntStream.rangeClosed(1, n)
+                .map(j -&gt; below(at.get(p[j] - k), j))
+                .sum();
+    }
+
+    // how many indices in the ascending list are below j
+    static int below(List&lt;Integer&gt; idx, int j) {
+        if (idx == null) return 0;
+        int pos = Collections.binarySearch(idx, j);
+        return pos &gt;= 0 ? pos : -pos - 1;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 930 · Binary Subarrays With Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int numSubarraysWithSum(int[] nums, int goal) {
+        int n = nums.length;
+        // No scan: the positions of the ones, fenced by -1, n
+        int[] one = IntStream.concat(IntStream.of(-1),
+                IntStream.concat(IntStream.range(0, n)
+                                .filter(i -&gt; nums[i] == 1),
+                        IntStream.of(n)))
+                .toArray();
+        if (goal == 0)        // all-zero runs: z(z+1)/2 each
+            return IntStream.range(1, one.length)
+                    .map(j -&gt; one[j] - one[j - 1] - 1)
+                    .map(z -&gt; z * (z + 1) / 2)
+                    .sum();
+        // Ones i .. i+goal-1: the left end sits in the gap
+        // before them, the right end in the gap after them.
+        return IntStream.rangeClosed(1, one.length - 1 - goal)
+                .map(i -&gt; (one[i] - one[i - 1])
+                        * (one[i + goal] - one[i + goal - 1]))
+                .sum();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 974 · Subarray Sums Divisible by K · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int subarraysDivByK(int[] nums, int k) {
+        // Prefix remainders; floorMod keeps them in [0, k).
+        int[] s = {0};
+        IntStream rems = Arrays.stream(nums)
+                .map(v -&gt; s[0] = Math.floorMod(s[0] + v, k));
+        Map&lt;Integer, Long&gt; byRem = IntStream
+                .concat(IntStream.of(0), rems).boxed()
+                .collect(Collectors.groupingBy(
+                        x -&gt; x, Collectors.counting()));
+        // Equal remainders at both ends make a divisible sum,
+        // and order stops mattering: c prefixes give c(c-1)/2.
+        return (int) byRem.values().stream()
+                .mapToLong(c -&gt; c * (c - 1) / 2)
+                .sum();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 523 · Continuous Subarray Sum · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean checkSubarraySum(int[] nums, int k) {
+        // Prefix remainders mod k (long: k can be 2^31 - 1)
+        long[] run = {0};
+        int[] rem = IntStream.concat(IntStream.of(0),
+                Arrays.stream(nums).map(
+                        v -&gt; (int) (run[0] = (run[0] + v) % k)))
+                .toArray();
+        // The FIRST index each remainder appears at
+        Map&lt;Integer, Integer&gt; first = IntStream
+                .range(0, rem.length).boxed()
+                .collect(Collectors.toMap(i -&gt; rem[i], i -&gt; i,
+                                          (a, b) -&gt; a));
+        // A repeat two or more positions later is a subarray of
+        // length &gt;= 2 whose sum is a multiple of k.
+        return IntStream.range(0, rem.length)
+                .anyMatch(j -&gt; first.get(rem[j]) &lt; j - 1);
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Why the scan is stateful</span><code>map(v -&gt; run[0] += v)</code> gives the right answer only because a sequential stream calls it in encounter order. Add <code>.parallel()</code> and the totals are garbage. Keep that lambda to one line with one job, and the rest of the pipeline stays pure. The one-pass map version of 560 is shorter and O(n), but it puts the entire loop body inside a single lambda, and at that point it is the loop wearing a costume.</div>
+  <div class="note tip"><span class="lbl">Counting pairs is a grouping</span>974 counts pairs of equal remainders, and for pairs the order no longer matters. c prefixes that share a remainder give c·(c−1)/2 subarrays, so <code>groupingBy(counting())</code> is the whole algorithm. 560 cannot do the same, because when k ≠ 0 the order <code>i &lt; j</code> matters. That is why it pays for a binary search per end.</div>
+</section>
+
+

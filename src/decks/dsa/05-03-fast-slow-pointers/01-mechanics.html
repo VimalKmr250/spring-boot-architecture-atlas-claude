@@ -1,0 +1,82 @@
+<section class="slide" data-sec="03 · Fast/slow pointers" data-title="Mechanics">
+  <h2>You cannot go back, so send a scout ahead</h2>
+  <p class="dek">A linked list gives you no indices, no length and no way to step backwards. Two pointers moving at <b>different speeds</b>, or the same speed with a fixed <b>gap</b>, recover all three — in one pass and O(1) space.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant — two speeds</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Move <code>slow</code> one node and <code>fast</code> two per step. Two consequences follow, and both are used constantly:</p>
+      <ul class="checks tight" style="margin-top:10px;color:var(--text-2);font-size:14px">
+        <li>When <code>fast</code> reaches the end, <code>slow</code> is at the <b>middle</b> — the length was never needed.</li>
+        <li>If there is a cycle, <code>fast</code> must eventually lap <code>slow</code>. Inside the cycle the gap closes by exactly <b>one</b> node per step, so they cannot jump past each other: a meeting is guaranteed.</li>
+      </ul>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">That "closes by exactly one" is the whole reason the algorithm terminates, and it is what interviewers ask you to justify.</p>
+    </div>
+    <div class="panel">
+      <h3>The invariant — fixed gap</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Move <code>fast</code> ahead by <code>n</code> nodes first, then advance both at the same speed. The gap is preserved, so when <code>fast</code> hits the end, <code>slow</code> sits exactly <code>n</code> from the end.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">This is how "nth node from the end" becomes one pass instead of two: you never learn the length, you just carry the offset.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Both forms are O(n) time and <b>O(1) space</b>, which is almost always the stated constraint. If a problem says "using only constant extra space" about a list, it is naming this pattern.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 250" role="img" aria-label="Floyd's cycle detection: the list tail leads into a cycle, and the algebra relating the meeting point to the cycle entrance">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">FLOYD'S TORTOISE AND HARE</text>
+
+        <!-- straight part -->
+        <circle cx="50" cy="66" r="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <text x="50" y="71" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">h</text>
+        <path d="M67 66 L93 66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="110" cy="66" r="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <path d="M127 66 L153 66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+
+        <!-- cycle entrance -->
+        <circle cx="172" cy="66" r="16" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.6"></circle>
+        <text x="172" y="71" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">S</text>
+        <text x="172" y="36" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#D26A3F">cycle start</text>
+
+        <!-- cycle -->
+        <path d="M189 66 L219 66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="238" cy="66" r="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <path d="M250 78 L268 102" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="282" cy="118" r="16" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.6"></circle>
+        <text x="282" y="123" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">M</text>
+        <text x="322" y="123" font-size="10.5" font-family="monospace" fill="#3AA79B">they meet here</text>
+        <path d="M266 130 L214 130" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+        <circle cx="198" cy="130" r="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></circle>
+        <path d="M186 118 L172 90" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></path>
+
+        <!-- labels for distances -->
+        <path d="M50 96 L156 96" stroke="#D26A3F" stroke-width="1" stroke-dasharray="3 2"></path>
+        <text x="103" y="110" text-anchor="middle" font-size="11" font-family="monospace" fill="#D26A3F">L</text>
+
+        <!-- the algebra -->
+        <line x1="440" y1="28" x2="440" y2="164" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="470" y="46" font-size="11.5" font-weight="600" fill="currentColor">Why phase 2 works</text>
+        <text x="470" y="68" font-size="11" font-family="monospace" fill="currentColor" opacity="0.8">L = head → cycle start</text>
+        <text x="470" y="84" font-size="11" font-family="monospace" fill="currentColor" opacity="0.8">C = cycle length</text>
+        <text x="470" y="100" font-size="11" font-family="monospace" fill="currentColor" opacity="0.8">k = start → meeting point</text>
+        <text x="470" y="124" font-size="11" font-family="monospace" fill="#D26A3F">slow walked  L + k</text>
+        <text x="470" y="140" font-size="11" font-family="monospace" fill="#D26A3F">fast walked  2(L + k) = L + k + nC</text>
+        <text x="470" y="160" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">⟹  L = nC − k</text>
+
+        <line x1="14" y1="182" x2="866" y2="182" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="202" font-size="11" fill="currentColor" opacity="0.72">L = nC − k says: the distance from the head to the entrance equals the distance from the meeting point onward to the entrance.</text>
+        <text x="14" y="220" font-size="11" fill="currentColor" opacity="0.72">So put one pointer back at the head, leave the other at M, and step both one at a time — they collide exactly at the entrance.</text>
+        <text x="14" y="240" font-size="11" fill="currentColor" opacity="0.72">That is the entire content of LC 142, and it is the one piece of algebra in this deck worth memorising verbatim.</text>
+      </svg>
+    </div>
+    <figcaption>Phase 1 finds <em>a</em> meeting point, which is not the cycle entrance. Phase 2 converts it into the entrance using the identity L = nC − k. Candidates who skip the algebra usually guess phase 2 and get it backwards.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Singly linked lists, and any structure where "next" is a function you can only follow forwards — including an array read as <code>i → nums[i]</code>, which turns index-chasing into exactly this cycle problem.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>You need to move backwards, or need the k-th node from the start (that is a plain loop). If the list is doubly linked, the problem is usually easier and this pattern is overkill.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(n)</b> time — phase 1 is at most L + C steps, phase 2 exactly L. <b>O(1)</b> space, which is the constraint these problems exist to enforce. A <code>HashSet</code> of visited nodes also solves 141/142 in O(n) space; say so, then give this.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"determine if the linked list has a cycle"</b> · <b>"return the node where the cycle begins"</b> · <b>"the middle node"</b> · <b>"the n-th node from the end"</b> · <b>"in one pass"</b> · <b>"using O(1) memory"</b> · <b>"the lists intersect"</b>. The pairing of <em>linked list</em> with <em>O(1) space</em> or <em>one pass</em> is effectively the problem naming this pattern for you.</div>
+</section>
+

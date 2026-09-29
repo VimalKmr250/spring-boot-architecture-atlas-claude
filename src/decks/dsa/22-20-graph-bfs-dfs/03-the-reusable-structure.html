@@ -1,0 +1,106 @@
+<section class="slide" data-sec="20 · Graph BFS / DFS" data-title="The reusable structure">
+  <h2>Two traversals, one direction array</h2>
+  <p class="dek">The <code>DIRS</code> constant and the bounds check are shared. Everything else is the choice between a stack of recursive calls and an explicit queue with level counting.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DFS — connectivity, counting, sizing (LC 200, 695, 733, 1254)</div>
+<pre><code class="language-java">private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
+
+// Count components: one DFS per unvisited start.
+int numIslands(char[][] g) {
+    int count = 0;
+    for (int r = 0; r &lt; g.length; r++)
+        for (int c = 0; c &lt; g[0].length; c++)
+            if (g[r][c] == '1') { count++; sink(g, r, c); }
+    return count;
+}
+
+/** Marks the whole component. Returns its size, which LC 695 needs. */
+private int sink(char[][] g, int r, int c) {
+    // One guard covers bounds AND "not part of this component".
+    if (r &lt; 0 || r &gt;= g.length || c &lt; 0 || c &gt;= g[0].length) return 0;
+    if (g[r][c] != '1') return 0;
+
+    g[r][c] = '0';           // mark visited — NEVER undone, unlike backtracking
+
+    int size = 1;
+    for (int[] d : DIRS) size += sink(g, r + d[0], c + d[1]);
+    return size;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">BFS — distance and elapsed time (LC 994, 1091)</div>
+<pre><code class="language-java">// Multi-source: seed EVERY start before the loop, then one pass
+// reaches each cell from its nearest source automatically.
+int spread(int[][] g) {
+    Queue&lt;int[]&gt; q = new ArrayDeque&lt;&gt;();
+    int fresh = 0;
+
+    for (int r = 0; r &lt; g.length; r++)
+        for (int c = 0; c &lt; g[0].length; c++) {
+            if (g[r][c] == 2) q.offer(new int[]{r, c});   // every source
+            else if (g[r][c] == 1) fresh++;
+        }
+
+    int minutes = 0;
+    while (!q.isEmpty() &amp;&amp; fresh &gt; 0) {
+        int size = q.size();              // SNAPSHOT — one level = one minute
+
+        for (int i = 0; i &lt; size; i++) {
+            int[] cur = q.poll();
+            for (int[] d : DIRS) {
+                int nr = cur[0] + d[0], nc = cur[1] + d[1];
+                if (nr &lt; 0 || nr &gt;= g.length || nc &lt; 0 || nc &gt;= g[0].length) continue;
+                if (g[nr][nc] != 1) continue;
+
+                g[nr][nc] = 2;            // mark on ENQUEUE, not on dequeue
+                fresh--;
+                q.offer(new int[]{nr, nc});
+            }
+        }
+        minutes++;      // guarded by fresh &gt; 0, so a drain level never counts
+    }
+    return fresh == 0 ? minutes : -1;     // unreachable fresh cells
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The border trick — for "surrounded" questions (LC 1254)</div>
+<pre><code class="language-java">// "Closed" means not touching the edge. Rather than tracking that
+// during each traversal, ELIMINATE the open ones first: flood every
+// component that touches a border, then count what remains.
+int closedIslands(int[][] g) {
+    int rows = g.length, cols = g[0].length;
+
+    // Sink everything reachable from the border.
+    for (int r = 0; r &lt; rows; r++) { sink(g, r, 0); sink(g, r, cols - 1); }
+    for (int c = 0; c &lt; cols; c++) { sink(g, 0, c); sink(g, rows - 1, c); }
+
+    // Whatever land is left cannot touch an edge.
+    int count = 0;
+    for (int r = 0; r &lt; rows; r++)
+        for (int c = 0; c &lt; cols; c++)
+            if (g[r][c] == 0) { count++; sink(g, r, c); }   // 0 is LAND here
+    return count;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>The knobs</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Traversal</dt><dd>DFS for connectivity, BFS for distance. Forced by the question, not chosen.</dd>
+          <dt>Marking</dt><dd>Mutate the grid when allowed — no extra array, and the guard doubles as the visited test. Otherwise a <code>boolean[][]</code>.</dd>
+          <dt>When to mark</dt><dd>On enqueue in BFS. Marking on dequeue lets the same cell enter the queue many times.</dd>
+          <dt>Level counting</dt><dd>The size snapshot, exactly as in a level-order tree traversal. Guard the increment so a level that changes nothing does not count.</dd>
+          <dt>Diagonals</dt><dd>Eight directions instead of four when the problem says "8-directionally", as LC 1091 does. Read for that word.</dd>
+          <dt>Recursion depth</dt><dd>A 10⁶-cell grid overflows the stack. Say so and switch to an explicit stack if the constraints are large.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Marking on dequeue</b> — cells are enqueued repeatedly before their first visit, and the queue grows far beyond the grid. <b>Using DFS for a shortest path</b> — it terminates and returns a number, just not the minimum one. <b>Incrementing the level counter unconditionally</b> — the final drain level adds a phantom step, which is exactly the off-by-one in LC 994.</div>
+    </div>
+  </div>
+</section>
+

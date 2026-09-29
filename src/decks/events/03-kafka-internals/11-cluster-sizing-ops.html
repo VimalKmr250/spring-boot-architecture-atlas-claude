@@ -1,0 +1,38 @@
+<section class="slide" data-sec="Kafka internals" data-title="Cluster sizing & ops">
+  <h2>Sizing and running the cluster</h2>
+  <p class="dek">Enough to hold a credible conversation with your platform team, or to answer "how would you size this" without hand-waving.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Worked sizing</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Volume</dt><dd>20,000 events/s × 1 KB = 20 MB/s of writes</dd>
+        <dt>Replication</dt><dd>× 3 = 60 MB/s written to disk across the cluster</dd>
+        <dt>Retention</dt><dd>7 days × 20 MB/s × 3 ≈ <b>36 TB</b> of raw storage</dd>
+        <dt>Compression</dt><dd>lz4 at ~4× → ~9 TB actually on disk</dd>
+        <dt>Brokers</dt><dd>3 minimum for RF=3; 6 for headroom and faster recovery</dd>
+        <dt>Consumers</dt><dd>read amplification: five consumer groups means 5× the read traffic of the write traffic</dd>
+      </dl>
+      <p style="margin-top:12px;font-size:13.5px;color:var(--text-2)">Kafka is usually bound by <b>network and disk throughput</b>, rarely by CPU — unless you enable heavy compression on the broker or terminate TLS without offload.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>KRaft: no more ZooKeeper</h3>
+        <p>Kafka 4.0 removed ZooKeeper entirely. Metadata now lives in an internal Raft-replicated log managed by controller nodes, which means one system to run instead of two, much faster failover and controlled recovery, and far higher partition limits.</p>
+        <p style="color:var(--text-3)">If you meet a cluster still on ZooKeeper, migration to KRaft is a prerequisite for any 4.x upgrade — and it is an operational project, not a config flag.</p>
+      </div>
+      <div class="card">
+        <h3>The operational essentials</h3>
+        <ul class="tight">
+          <li><b>Rack awareness</b> so replicas of a partition land in different availability zones.</li>
+          <li><b>Quotas</b> per client id so one badly-behaved producer cannot starve the cluster.</li>
+          <li><b>Cruise Control</b> or equivalent for partition rebalancing when brokers are added.</li>
+          <li><b>Alert on</b> under-replicated partitions, offline partitions, ISR shrink rate, disk usage, and request latency percentiles.</li>
+          <li><b>Rolling upgrades</b> one broker at a time, waiting for URP to return to zero between each.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">Managed or self-hosted</span>Running Kafka well is a full-time specialism. Unless you have a platform team that wants it, a managed service is usually the better economics — and in a bank the decision is often made for you by where the data may live.</div>
+    </div>
+  </div>
+</section>
+

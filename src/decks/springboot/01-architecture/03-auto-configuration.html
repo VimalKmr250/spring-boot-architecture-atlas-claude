@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Architecture" data-title="Auto-configuration">
+  <h2>Auto-configuration, mechanically</h2>
+  <p class="dek">Three annotations, one file of class names, and a pile of conditions. No reflection tricks, nothing hidden — you can read the whole chain yourself, and you should once.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ShopApplication.java — one annotation, three jobs</div>
+<pre><code class="language-java">@SpringBootApplication      // = the three below, combined
+public class ShopApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ShopApplication.class, args);
+    }
+}
+
+// @SpringBootApplication expands to:
+@SpringBootConfiguration    // a @Configuration, marked as THE primary one
+@EnableAutoConfiguration    // pull in auto-config classes
+@ComponentScan              // scan this package and below</code></pre>
+      <div class="codelabel" style="margin-top:14px">Inside spring-boot-autoconfigure.jar</div>
+<pre><code class="language-yaml">META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+
+org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration
+...about 150 more, one class name per line</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">A real auto-configuration class, trimmed</div>
+<pre><code class="language-java">@AutoConfiguration(before = { HibernateJpaAutoConfiguration.class })
+@ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
+@ConditionalOnMissingBean(type = "io.r2dbc.spi.ConnectionFactory")
+@EnableConfigurationProperties(DataSourceProperties.class)
+public class DataSourceAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean(DataSource.class)   // ← backs off if YOU declared one
+    @ConditionalOnProperty(name = "spring.datasource.type",
+                           havingValue = "com.zaxxer.hikari.HikariDataSource",
+                           matchIfMissing = true)
+    HikariDataSource dataSource(DataSourceProperties properties) { ... }
+}</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">The order of events</span><b>1.</b> <code>@EnableAutoConfiguration</code> reads every <code>AutoConfiguration.imports</code> on the classpath. <b>2.</b> Each class's conditions are evaluated. <b>3.</b> Surviving classes are ordered by <code>before</code>/<code>after</code>. <b>4.</b> Their <code>@Bean</code> methods run — but only after your own <code>@Configuration</code> classes are registered, which is why <code>@ConditionalOnMissingBean</code> can see your beans.</div>
+      <div class="note warn"><span class="lbl">Legacy detail worth knowing</span>Before Boot 2.7 this list lived in <code>META-INF/spring.factories</code> under an <code>EnableAutoConfiguration</code> key. Boot 2.7 introduced the <code>.imports</code> file and read both; <b>Boot 3.0 removed the <code>spring.factories</code> route entirely</b>. An old in-house starter that never migrated contributes nothing — with no error, because other <code>spring.factories</code> keys still work, so the file looks fine. If a starter mysteriously stopped applying on the 2.x→3.x upgrade, this is why.</div>
+    </div>
+  </div>
+</section>
+

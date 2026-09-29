@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Internals" data-title="Jackson advanced">
+  <h2>Polymorphism, views, and the customisations that are safe</h2>
+  <p class="dek">Two features worth knowing, one security warning, and the right way to change global behaviour without losing Boot's defaults.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Polymorphic payloads — events and payment types</div>
+<pre><code class="language-java">@JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "type")
+@JsonSubTypes({
+    @Type(value = CardPayment.class,     name = "CARD"),
+    @Type(value = BankTransfer.class,    name = "TRANSFER"),
+    @Type(value = StoreCredit.class,     name = "CREDIT")
+})
+sealed interface PaymentMethod permits CardPayment, BankTransfer, StoreCredit { }
+
+// {"type":"CARD","last4":"4242"} → CardPayment
+// `sealed` + an explicit @JsonSubTypes list is the safe pattern:
+// the set of permitted types is closed and visible.</code></pre>
+      <div class="codelabel" style="margin-top:14px">Views — one model, two audiences</div>
+<pre><code class="language-java">class Views { interface Public {} interface Internal extends Public {} }
+
+record OrderView(@JsonView(Views.Public.class)   UUID id,
+                 @JsonView(Views.Public.class)   OrderStatus status,
+                 @JsonView(Views.Internal.class) String riskScore) { }
+
+@GetMapping("/{id}") @JsonView(Views.Public.class)
+OrderView get(@PathVariable UUID id) { ... }         // riskScore omitted</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Never enable default typing</span><code>activateDefaultTyping()</code> / <code>@JsonTypeInfo(use = Id.CLASS)</code> lets the payload name any class on your classpath, which is a well-known remote-code-execution path. Always use <code>Id.NAME</code> with an explicit <code>@JsonSubTypes</code> allowlist. This one shows up in security reviews.</div>
+      <div class="codewrap">
+        <div class="codelabel">Customise globally — without replacing the ObjectMapper</div>
+<pre><code class="language-java">@Bean
+Jackson2ObjectMapperBuilderCustomizer jackson() {
+    return b -&gt; b
+        .serializationInclusion(NON_NULL)
+        .featuresToDisable(WRITE_DATES_AS_TIMESTAMPS)
+        .serializerByType(Money.class, new MoneySerializer());
+}
+// Declaring your own @Bean ObjectMapper instead means you silently lose
+// every module Boot had registered — java.time support most painfully.</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Views vs separate DTOs</span>Views avoid duplicate classes but hide the contract inside annotations, and they do not compose well once you have three audiences. Past two views, separate records per audience are clearer and let each one evolve independently. <span class="tag a">Boot 4</span> Jackson 3 changes defaults — ISO-8601 dates out of the box and unchecked exceptions.</div>
+    </div>
+  </div>
+</section>
+

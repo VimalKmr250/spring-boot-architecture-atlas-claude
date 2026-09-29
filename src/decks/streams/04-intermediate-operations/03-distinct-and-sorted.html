@@ -1,0 +1,44 @@
+<section class="slide" data-sec="Intermediate operations" data-title="distinct and sorted">
+  <h2>The two operations that have to remember</h2>
+  <p class="dek"><code>distinct</code> drops repeats using <code>equals</code> and <code>hashCode</code>. <code>sorted</code> orders by natural order or a comparator. Both are stateful, and both lean on contracts in your own classes that the compiler never checks.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Outputs on JDK 25</div>
+<pre><code class="language-java">Stream.of("b", "a", "b", "c", "a").distinct().toList();
+// [b, a, c]: the first occurrence of each, in order
+
+orders.stream()
+      .sorted(Comparator.comparing(Order::customer)
+                        .thenComparing(Order::total, Comparator.reverseOrder()))
+      .toList();                   // by customer, then biggest order first
+
+Stream.of("bb", "a", "cc", "d")
+      .sorted(Comparator.comparingInt(String::length))
+      .toList();
+// [a, d, bb, cc]: stable, so ties keep their input order
+
+// There is no distinctBy. Keep the first order per customer:
+Collection&lt;Order&gt; firstPerCustomer = orders.stream()
+        .collect(Collectors.toMap(Order::customer, o -&gt; o,
+                                  (first, later) -&gt; first, LinkedHashMap::new))
+        .values();</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Mistake</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><code>sorted()</code> on a class that is not <code>Comparable</code></td><td><code>ClassCastException</code> at run time, when the terminal operation runs: "cannot be cast to class java.lang.Comparable"</td></tr>
+          <tr><td><code>distinct()</code> on a class without <code>equals</code>/<code>hashCode</code></td><td>Nothing is removed: identity equality treats every object as distinct. Records get this right by construction</td></tr>
+          <tr><td><code>sorted(c).findFirst()</code></td><td>O(n log n) and O(n) memory for what <code>min(c)</code> does in one pass with no buffer</td></tr>
+          <tr><td><code>(a, b) -&gt; a.qty() - b.qty()</code></td><td>Overflows for large or mixed-sign values and mis-sorts silently</td></tr>
+          <tr><td>Mutating fields that <code>hashCode</code> reads, mid-stream</td><td><code>distinct</code> misses duplicates; results are undefined</td></tr>
+          <tr><td><code>sorted()</code> then parallel <code>forEach</code></td><td>The sort is correct and then ignored: <code>forEach</code> does not respect order</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Comparators are their own slide</span><code>comparing</code>, <code>thenComparing</code>, <code>reversed</code>, <code>nullsFirst</code> and the <code>reversed()</code> type-inference trap are on <a data-deck="st" data-slide="Method references and Comparator combinators">Method references and Comparator combinators</a>.</div>
+</section>
+

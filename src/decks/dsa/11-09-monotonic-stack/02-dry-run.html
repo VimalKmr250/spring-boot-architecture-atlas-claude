@@ -1,0 +1,113 @@
+<section class="slide" data-sec="09 · Monotonic stack" data-title="Dry run">
+  <h2>LC 739 traced on <code>[73,74,75,71,69,72,76,73]</code></h2>
+  <p class="dek">For each day, how many days until a warmer one? The stack holds days still waiting for warmth, and it stays strictly decreasing in temperature. Watch step 6: one arriving value settles two waiting days at once, and step 7 settles two more.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 342" role="img" aria-label="Step by step trace of the monotonic stack for daily temperatures">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TEMPERATURES</text>
+        <rect x="120" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="180" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="240" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="300" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="360" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="420" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="480" y="26" width="58" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="540" y="26" width="58" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="149" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">73</text>
+        <text x="209" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">74</text>
+        <text x="269" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">75</text>
+        <text x="329" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">71</text>
+        <text x="389" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">69</text>
+        <text x="449" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">72</text>
+        <text x="509" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">76</text>
+        <text x="569" y="44" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">73</text>
+        <text x="149" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">0</text>
+        <text x="209" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">1</text>
+        <text x="269" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">2</text>
+        <text x="329" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">3</text>
+        <text x="389" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">4</text>
+        <text x="449" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">5</text>
+        <text x="509" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">6</text>
+        <text x="569" y="64" text-anchor="middle" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">7</text>
+        <text x="630" y="44" font-size="10.5" fill="currentColor" opacity="0.6">76 is the peak — it settles</text>
+        <text x="630" y="60" font-size="10.5" fill="currentColor" opacity="0.6">two waiting days at once.</text>
+
+        <line x1="14" y1="78" x2="866" y2="78" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="98" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">i</text>
+        <text x="58" y="98" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TEMP</text>
+        <text x="124" y="98" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">POPS (AND THE ANSWER SETTLED)</text>
+        <text x="470" y="98" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">STACK AFTER — indices, temps decreasing</text>
+
+        <text x="14" y="120" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">0</text>
+        <text x="58" y="120" font-size="11" font-family="monospace" fill="currentColor">73</text>
+        <text x="124" y="120" font-size="11" fill="currentColor" opacity="0.5">stack empty — nothing to settle</text>
+        <text x="470" y="120" font-size="11" font-family="monospace" fill="currentColor">[0]</text>
+
+        <text x="14" y="142" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="58" y="142" font-size="11" font-family="monospace" fill="currentColor">74</text>
+        <text x="124" y="142" font-size="11" fill="#3AA79B">pop 0 → ans[0] = 1 − 0 = 1</text>
+        <text x="470" y="142" font-size="11" font-family="monospace" fill="currentColor">[1]</text>
+
+        <text x="14" y="164" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="58" y="164" font-size="11" font-family="monospace" fill="currentColor">75</text>
+        <text x="124" y="164" font-size="11" fill="#3AA79B">pop 1 → ans[1] = 2 − 1 = 1</text>
+        <text x="470" y="164" font-size="11" font-family="monospace" fill="currentColor">[2]</text>
+
+        <text x="14" y="186" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="58" y="186" font-size="11" font-family="monospace" fill="currentColor">71</text>
+        <text x="124" y="186" font-size="11" fill="currentColor" opacity="0.5">71 &lt; 75 — just push, nothing settles</text>
+        <text x="470" y="186" font-size="11" font-family="monospace" fill="currentColor">[2, 3]</text>
+
+        <text x="14" y="208" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">4</text>
+        <text x="58" y="208" font-size="11" font-family="monospace" fill="currentColor">69</text>
+        <text x="124" y="208" font-size="11" fill="currentColor" opacity="0.5">69 &lt; 71 — push</text>
+        <text x="470" y="208" font-size="11" font-family="monospace" fill="currentColor">[2, 3, 4]</text>
+
+        <text x="14" y="230" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">5</text>
+        <text x="58" y="230" font-size="11" font-family="monospace" fill="currentColor">72</text>
+        <text x="124" y="230" font-size="11" font-weight="600" fill="#D26A3F">pop 4 → ans[4] = 1 · pop 3 → ans[3] = 2</text>
+        <text x="470" y="230" font-size="11" font-family="monospace" fill="currentColor">[2, 5]</text>
+
+        <text x="14" y="252" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">6</text>
+        <text x="58" y="252" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">76</text>
+        <text x="124" y="252" font-size="11" font-weight="600" fill="#D26A3F">pop 5 → ans[5] = 1 · pop 2 → ans[2] = 4</text>
+        <text x="470" y="252" font-size="11" font-family="monospace" fill="currentColor">[6]</text>
+
+        <text x="14" y="274" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">7</text>
+        <text x="58" y="274" font-size="11" font-family="monospace" fill="currentColor">73</text>
+        <text x="124" y="274" font-size="11" fill="currentColor" opacity="0.5">73 &lt; 76 — push</text>
+        <text x="470" y="274" font-size="11" font-family="monospace" fill="currentColor">[6, 7]</text>
+
+        <text x="14" y="296" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">end</text>
+        <text x="124" y="296" font-size="11" fill="currentColor" opacity="0.6">6 and 7 never warmed → ans stays 0</text>
+        <text x="470" y="296" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">[6, 7] — discarded</text>
+
+        <line x1="14" y1="310" x2="866" y2="310" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="330" font-size="11" fill="currentColor" opacity="0.72">Eight pushes and six pops across the whole run — <tspan font-family="monospace" fill="#D26A3F">fourteen</tspan> stack operations for eight elements. That is the 2n bound, made concrete.</text>
+      </svg>
+    </div>
+    <figcaption>Index 2 (75°) waits four steps before 76° settles it. During that wait, indices 3, 4 and 5 are pushed and popped above it without disturbing it — the stack handles nesting for free.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">i</th><th class="num">temp</th><th>what happens</th><th>stack after (indices)</th><th>answers settled</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><td class="num">73</td><td>empty stack, push</td><td class="num">[0]</td><td>—</td></tr>
+        <tr><td class="num">1</td><td class="num">74</td><td>74 &gt; 73, pop 0</td><td class="num">[1]</td><td><code>ans[0] = 1</code></td></tr>
+        <tr><td class="num">2</td><td class="num">75</td><td>75 &gt; 74, pop 1</td><td class="num">[2]</td><td><code>ans[1] = 1</code></td></tr>
+        <tr><td class="num">3</td><td class="num">71</td><td>71 &lt; 75, push</td><td class="num">[2, 3]</td><td>—</td></tr>
+        <tr><td class="num">4</td><td class="num">69</td><td>69 &lt; 71, push</td><td class="num">[2, 3, 4]</td><td>—</td></tr>
+        <tr><td class="num">5</td><td class="num">72</td><td>pops 4 then 3, stops at 75</td><td class="num">[2, 5]</td><td><code>ans[4] = 1</code>, <code>ans[3] = 2</code></td></tr>
+        <tr><td class="num">6</td><td class="num">76</td><td>pops 5 then 2, stack empties</td><td class="num">[6]</td><td><code>ans[5] = 1</code>, <code>ans[2] = 4</code></td></tr>
+        <tr><td class="num">7</td><td class="num">73</td><td>73 &lt; 76, push</td><td class="num">[6, 7]</td><td>—</td></tr>
+        <tr><td class="num">end</td><td class="num">—</td><td>stack discarded</td><td class="num">[6, 7]</td><td><code>ans[6] = ans[7] = 0</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why the leftovers get zero for free</span>Indices 6 and 7 are still on the stack when the loop ends, meaning no warmer day ever arrived. Because Java initialises <code>new int[n]</code> to zeros and the problem defines "no warmer day" as 0, they need no handling at all. When the default is <code>−1</code> instead — as it is for next-greater-element problems — fill the array first, or drain the stack explicitly at the end.</div>
+</section>
+

@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Guarantees" data-title="Backpressure">
+  <h2>Backpressure: what happens when consumers cannot keep up</h2>
+  <p class="dek">A queue between two systems does not remove the mismatch in speed — it stores it. Where that storage fills, and what happens when it does, is a design decision you should make rather than discover.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 200" role="img" aria-label="Producer at 5000 events per second into a topic consumed at 2000 per second: lag grows at 3000 per second until retention is reached and unread data is deleted">
+        <rect x="14" y="60" width="130" height="52" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+        <text x="79" y="84" text-anchor="middle" font-size="11" fill="currentColor">producer</text>
+        <text x="79" y="100" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">5,000 /s</text>
+
+        <rect x="200" y="52" width="270" height="68" rx="9" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="335" y="76" text-anchor="middle" font-size="11" fill="currentColor">topic — the buffer</text>
+        <text x="335" y="94" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">lag grows at 3,000 /s</text>
+        <text x="335" y="110" text-anchor="middle" font-size="9.5" fill="#A22636">retention 7d = the real capacity of the buffer</text>
+        <line x1="146" y1="86" x2="196" y2="86" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+
+        <rect x="526" y="60" width="130" height="52" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.32"></rect>
+        <text x="591" y="84" text-anchor="middle" font-size="11" fill="currentColor">consumers</text>
+        <text x="591" y="100" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">2,000 /s</text>
+        <line x1="474" y1="86" x2="522" y2="86" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line>
+
+        <text x="684" y="72" font-size="10" fill="currentColor" opacity="0.75">Unlike a blocking queue, Kafka</text>
+        <text x="684" y="87" font-size="10" fill="currentColor" opacity="0.75">does NOT slow the producer down.</text>
+        <text x="684" y="106" font-size="10" fill="#A22636">When retention is hit, unread</text>
+        <text x="684" y="121" font-size="10" fill="#A22636">records are deleted. Silently.</text>
+
+        <line x1="14" y1="148" x2="866" y2="148" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="168" font-size="10.5" fill="currentColor" opacity="0.8">Kafka gives you a deep, durable buffer — which is a feature for bursts and a liability for a sustained mismatch, because the</text>
+        <text x="14" y="184" font-size="10.5" fill="currentColor" opacity="0.8">problem stays invisible for days and then becomes data loss all at once.</text>
+      </svg>
+    </div>
+    <figcaption>The buffer is measured in <em>time</em>, not messages: seven days of retention at a 3,000/s deficit is your entire margin. Alerting on lag <b>trend</b> rather than absolute value is what turns this from a cliff into a warning.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Scale the consumer</h4><p>Add instances up to the partition count, then increase partitions. The first is instant; the second is disruptive, which is the argument for over-provisioning partitions early.</p></div>
+    <div class="card"><h4>Make handling cheaper</h4><p>Batch listener with bulk database writes instead of one row per message; drop an N+1 inside the handler. Usually a 5–10× win and no infrastructure change.</p></div>
+    <div class="card"><h4>Shed or prioritise</h4><p>Split into a high-priority and a bulk topic, or sample low-value events. Better to consciously drop telemetry than to have retention silently drop orders.</p></div>
+  </div>
+</section>
+

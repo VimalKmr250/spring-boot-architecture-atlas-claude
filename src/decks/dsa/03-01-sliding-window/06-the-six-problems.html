@@ -1,0 +1,110 @@
+<section class="slide" data-sec="01 · Sliding window" data-title="The six problems">
+  <h2>Six windows, six different knobs</h2>
+  <p class="dek">Work them in the listed order: 3 establishes the skeleton, 209 flips it to the shortest form, 424 and 904 change only the invalidity test, 567 fixes the size, and 76 combines everything. Each row names the one knob that changes.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Variant</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">3</td><td><a href="https://leetcode.com/problems/longest-substring-without-repeating-characters/" target="_blank" rel="noopener">Longest Substring Without Repeating Characters</a></td><td><span class="tag w">Medium</span></td><td>The baseline. Invalid ⇔ the char just admitted appears twice.</td><td>A · longest</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">209</td><td><a href="https://leetcode.com/problems/minimum-size-subarray-sum/" target="_blank" rel="noopener">Minimum Size Subarray Sum</a></td><td><span class="tag w">Medium</span></td><td>Shortest, not longest — so shrink while <em>valid</em> and record inside the loop.</td><td>B · shortest</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">424</td><td><a href="https://leetcode.com/problems/longest-repeating-character-replacement/" target="_blank" rel="noopener">Longest Repeating Character Replacement</a></td><td><span class="tag w">Medium</span></td><td>Validity is <code>len − maxFreq ≤ k</code>: the chars you would have to replace.</td><td>A · longest</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">904</td><td><a href="https://leetcode.com/problems/fruit-into-baskets/" target="_blank" rel="noopener">Fruit Into Baskets</a></td><td><span class="tag w">Medium</span></td><td>Literally the skeleton unchanged: longest window with at most 2 distinct.</td><td>A · longest</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">567</td><td><a href="https://leetcode.com/problems/permutation-in-string/" target="_blank" rel="noopener">Permutation in String</a></td><td><span class="tag w">Medium</span></td><td>Fixed width <code>|s1|</code>; a permutation is just an equal count vector.</td><td>C · fixed</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">76</td><td><a href="https://leetcode.com/problems/minimum-window-substring/" target="_blank" rel="noopener">Minimum Window Substring</a></td><td><span class="tag b">Hard</span></td><td>Shortest window covering a multiset. The <code>missing</code> counter avoids comparing maps.</td><td>B · shortest</td><td class="num">O(n + m) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 3 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Try every pair <code>(l, r)</code> and test the substring for duplicates. O(n³), or O(n²) if you carry a set as <code>r</code> grows.</dd>
+          <dt>The observation</dt><dd>If <code>[l, r]</code> contains a duplicate, then so does <code>[l, r']</code> for every <code>r' &gt; r</code>. So once <code>l</code> has been pushed past a duplicate, it never has any reason to go back.</dd>
+          <dt>The optimisation</dt><dd>Keep <code>l</code> monotone and maintain a count array instead of rebuilding a set. Each index is touched twice.</dd>
+          <dt>Edge cases</dt><dd>Empty string returns 0; a single repeated character returns 1; the count array must cover the full ASCII range the problem allows.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 3 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int lengthOfLongestSubstring(String s) {
+        int[] count = new int[128];       // KNOB 1 · ASCII counts beat a HashMap here
+        int l = 0, best = 0;
+
+        for (int r = 0; r &lt; s.length(); r++) {
+            char in = s.charAt(r);
+            count[in]++;                  // KNOB 2 · admit
+
+            // KNOB 3 · the ONLY char that can now exceed 1 is the one
+            // we just admitted, so this single test is the full invariant.
+            while (count[in] &gt; 1) {
+                count[s.charAt(l++)]--;   // KNOB 4 · evict, mirroring KNOB 2
+            }
+
+            best = Math.max(best, r - l + 1);   // KNOB 5 · record
+        }
+        return best;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 76 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Brute force</dt><dd>Every substring, each checked against <code>t</code>'s frequency map. O(n²·m) and hopeless at n = 10⁵.</dd>
+          <dt>First idea</dt><dd>A shortest-form window that compares the window's map to <code>t</code>'s map. Correct, but the comparison is O(52) per step and easy to get wrong.</dd>
+          <dt>The observation</dt><dd>You never need the whole comparison — only <em>how many characters are still missing</em>, counted with multiplicity. That collapses to a single <code>int</code>.</dd>
+          <dt>The trick</dt><dd>Let <code>need[c]</code> go <b>negative</b> for surplus characters. Then <code>need[c] &gt; 0</code> before admitting means "this one actually helped", and <code>need[c] == 0</code> before evicting means "losing this one actually hurts". Both tests are one line.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 76 · O(n + m) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public String minWindow(String s, String t) {
+        if (s.length() &lt; t.length()) return "";
+
+        int[] need = new int[128];
+        for (char c : t.toCharArray()) need[c]++;
+
+        int missing = t.length();   // chars still uncovered, WITH multiplicity
+        int bestL = 0, bestLen = Integer.MAX_VALUE, l = 0;
+
+        for (int r = 0; r &lt; s.length(); r++) {
+            // admit: only a char we still needed reduces `missing`.
+            // Surplus chars push need[c] negative, which is intentional.
+            if (need[s.charAt(r)]-- &gt; 0) missing--;
+
+            while (missing == 0) {            // valid → shrink and record
+                if (r - l + 1 &lt; bestLen) { bestLen = r - l + 1; bestL = l; }
+
+                // evict: giving back a char whose need was exactly 0
+                // is the one that breaks coverage.
+                if (need[s.charAt(l++)]++ == 0) missing++;
+            }
+        }
+        return bestLen == Integer.MAX_VALUE
+                ? "" : s.substring(bestL, bestL + bestLen);
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>209 · Minimum Size Subarray Sum <span class="tag a">variant B</span></h4><p><b>Path:</b> brute force is every <code>(l, r)</code> with prefix sums, O(n²). The observation is that all values are <em>positive</em>, so the window sum rises strictly with width — validity is monotone, so a window works.</p><p><b>Delta:</b> state is a single <code>int sum</code>; invalid test becomes <code>while (sum &gt;= target)</code>, and the record moves inside that loop. Return 0, not <code>MAX_VALUE</code>, when nothing qualifies.</p><p><b>Watch for:</b> the follow-up asks for O(n log n). That variant builds a running-sum array and binary searches it for each <code>r</code> — worth naming even if you do not write it.</p></div>
+
+    <div class="card"><h4>424 · Longest Repeating Character Replacement <span class="tag a">variant A</span></h4><p><b>Path:</b> brute force fixes a target letter and windows 26 times, O(26n) — already fast enough, and worth mentioning aloud. The single-pass version is the interesting one.</p><p><b>Delta:</b> only knob 3 changes, to <code>while (len - maxFreq &gt; k)</code> — the count of characters you would have to replace. Keep <code>maxFreq</code> as a running maximum and <b>do not</b> recompute it when shrinking: a stale-high <code>maxFreq</code> can only suppress a window that could not have beaten the recorded best anyway.</p><p><b>Watch for:</b> that non-recomputation is the part interviewers probe. Be ready to justify it.</p></div>
+
+    <div class="card"><h4>904 · Fruit Into Baskets <span class="tag a">variant A</span></h4><p><b>Path:</b> the story about baskets is a disguise. Two baskets, each holding one fruit type, means "longest subarray with at most 2 distinct values" — read past the narrative to the constraint.</p><p><b>Delta:</b> none. This is the skeleton from the previous slide with <code>win.size() &gt; 2</code> exactly as written. Generalise the 2 to a parameter and the same code answers "at most K distinct" for any K.</p><p><b>Watch for:</b> the <code>win.remove(out)</code> when a count hits zero — without it <code>size()</code> over-reports and the answer is too small.</p></div>
+
+    <div class="card"><h4>567 · Permutation in String <span class="tag a">variant C</span></h4><p><b>Path:</b> brute force sorts every window of width <code>|s1|</code>, O(n·k log k). The observation: a permutation is defined entirely by its character counts, and adjacent windows differ in only two positions — so the count vector updates in O(1).</p><p><b>Delta:</b> fixed size, so the shrink is an <code>if</code>. Rather than comparing 26 counters per step, keep a <code>matches</code> integer of how many letters have the right count, and adjust it by ±1 as each admit or evict crosses the target.</p><p><b>Watch for:</b> the <code>matches</code> counter is the part worth practising. Recomputing all 26 counts each step is O(26n) and still passes, but the incremental update is what the problem is testing.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>3</b> and <b>76</b>. Between them they contain all five knobs, both directions of the shrink loop, and the negative-count trick that the covering problems depend on. The other four are then twenty minutes each.</div>
+</section>
+

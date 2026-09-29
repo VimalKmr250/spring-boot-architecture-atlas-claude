@@ -1,0 +1,109 @@
+<section class="slide" data-sec="04 · Binary search on sorted data" data-title="The reusable structure">
+  <h2>Write <code>lowerBound</code> once; derive the rest</h2>
+  <p class="dek">One function, eight lines, no post-loop fixups. Everything else in this family is either a call to it with a different target, or the same loop with a different way of deciding which half to keep.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The one template worth memorising</div>
+<pre><code class="language-java">/**
+ * The first index in [0, n] at which the predicate becomes true.
+ * Requires monotonicity:  F F F T T T  — it must flip exactly once.
+ *
+ * Invariant, maintained by every iteration:
+ *     everything &lt;  l  is FALSE
+ *     everything &gt;= r  is TRUE
+ * so when l == r, that index IS the boundary.
+ *
+ * Returns n when no index satisfies the predicate — which is
+ * exactly the insert position, not an error case.
+ */
+int lowerBound(int[] a, int target) {
+    int l = 0, r = a.length;          // r = n, NOT n - 1
+
+    while (l &lt; r) {                   // strict &lt;, so it ends with l == r
+        int mid = l + (r - l) / 2;    // NOT (l + r) / 2 — that overflows near Integer.MAX_VALUE
+
+        if (a[mid] &gt;= target) r = mid;     // mid may be the boundary: keep it
+        else                  l = mid + 1; // mid is definitely not: drop it
+    }
+    return l;
+}
+
+// Everything else falls out of that one function:
+int firstOccurrence(int[] a, int t) { int i = lowerBound(a, t);
+                                      return (i &lt; a.length &amp;&amp; a[i] == t) ? i : -1; }
+int lastOccurrence (int[] a, int t) { return lowerBound(a, t + 1) - 1; }
+int countOf        (int[] a, int t) { return lowerBound(a, t + 1) - lowerBound(a, t); }
+int insertPosition (int[] a, int t) { return lowerBound(a, t); }          // LC 35, verbatim
+boolean contains   (int[] a, int t) { int i = lowerBound(a, t);
+                                      return i &lt; a.length &amp;&amp; a[i] == t; } // LC 704</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Variant · rotated array, target search (LC 33)</div>
+<pre><code class="language-java">// A rotated sorted array is not monotone, so no single predicate
+// works. But at ANY midpoint, at least one half is still sorted —
+// and in a sorted half you can decide containment in O(1).
+int search(int[] a, int target) {
+    int l = 0, r = a.length - 1;      // closed range here: we want an exact hit
+
+    while (l &lt;= r) {
+        int mid = l + (r - l) / 2;
+        if (a[mid] == target) return mid;
+
+        if (a[l] &lt;= a[mid]) {                     // LEFT half is sorted
+            if (a[l] &lt;= target &amp;&amp; target &lt; a[mid]) r = mid - 1;   // it must be in there
+            else                                   l = mid + 1;
+        } else {                                  // RIGHT half is sorted
+            if (a[mid] &lt; target &amp;&amp; target &lt;= a[r]) l = mid + 1;
+            else                                   r = mid - 1;
+        }
+    }
+    return -1;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Variant · compare against a neighbour, not a target (LC 153, 162)</div>
+<pre><code class="language-java">// When there is no target, compare a[mid] with something that
+// tells you which side the answer lies on.
+
+// LC 153 — minimum of a rotated array. Compare with a[r], never a[l]:
+// on an unrotated array a[mid] &gt; a[l] is true yet the min is at 0.
+int findMin(int[] a) {
+    int l = 0, r = a.length - 1;
+    while (l &lt; r) {
+        int mid = l + (r - l) / 2;
+        if (a[mid] &gt; a[r]) l = mid + 1;   // min is strictly right of mid
+        else               r = mid;       // mid could BE the min
+    }
+    return a[l];
+}
+
+// LC 162 — any peak. Walk uphill; the edges count as -infinity,
+// so an uphill step can never run off the end.
+int findPeakElement(int[] a) {
+    int l = 0, r = a.length - 1;
+    while (l &lt; r) {
+        int mid = l + (r - l) / 2;
+        if (a[mid] &lt; a[mid + 1]) l = mid + 1;   // ascending: a peak lies right
+        else                     r = mid;       // descending: mid could be it
+    }
+    return l;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Range</dt><dd><code>[0, n)</code> half-open for boundary questions; <code>[0, n−1]</code> closed only when you need an exact hit and will return from inside the loop, as in LC 33.</dd>
+        <dt>Predicate</dt><dd>The only genuinely problem-specific line. Say it in words first, then check it reads F…F T…T left to right.</dd>
+        <dt>Comparator</dt><dd>Against a target (34, 35, 704), against the right end (153), or against a neighbour (162). Choosing the wrong comparison partner is the classic LC 153 failure.</dd>
+        <dt>Return</dt><dd><code>l</code> for a boundary, <code>a[l]</code> for a value, <code>l − 1</code> for the last element below the boundary. Never adjust after the loop for any other reason.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b><code>mid = (l + r) / 2</code></b> — overflows once <code>l + r</code> exceeds <code>Integer.MAX_VALUE</code>. This is the famous bug that sat in the JDK's own <code>Arrays.binarySearch</code> for nine years; always write <code>l + (r - l) / 2</code>. <b><code>r = mid - 1</code> in the half-open template</b> — discards the very index you were looking for, and the result is silently off by one. <b>Mixing the two range conventions</b> — <code>while (l &lt; r)</code> with <code>r = n - 1</code> never examines the last element; <code>while (l &lt;= r)</code> with <code>r = mid</code> loops forever. Pick one convention per function and never blend them.</div>
+  </div>
+</section>
+

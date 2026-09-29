@@ -1,0 +1,39 @@
+<section class="slide" data-sec="Frontend" data-title="One contract, two ends">
+  <h2>Generate the client; never hand-write a DTO twice</h2>
+  <p class="dek">Hand-maintained TypeScript interfaces drift from the Java records within one sprint, and the drift is discovered by a customer. Make the OpenAPI document the single source and generate both sides from it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Backend: contract published by the build</div>
+<pre><code class="language-yaml"># springdoc renders it from the controllers at build time,
+# then it is committed and diffed in the PR
+- task: generateOpenApiDocs        # gradle
+  outputFileName: openapi.yaml
+
+# CI gate: fail the build on a breaking change
+- run: oasdiff breaking main/openapi.yaml openapi.yaml --fail-on ERR</code></pre>
+      <div class="codelabel" style="margin-top:14px">Frontend: client regenerated on every build</div>
+<pre><code class="language-yaml">- run: npx @openapitools/openapi-generator-cli generate \
+        -i ../api/openapi.yaml -g typescript-angular \
+        -o src/app/api --additional-properties=useSingleRequestParameter=true
+# src/app/api is .gitignore'd and rebuilt — it cannot drift</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card accent">
+        <h3>What this buys you</h3>
+        <ul class="tight">
+          <li>Renaming a field in Java breaks the <b>frontend compile</b>, in CI, before merge.</li>
+          <li>The <code>oasdiff</code> gate turns "is this a breaking change?" from a judgement call into a build result.</li>
+          <li>New endpoints appear in the frontend with types and no ticket.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Design-first vs code-first</h3>
+        <p><b>Code-first</b> (annotations → spec) is faster and what most Spring teams do; the risk is a spec that documents whatever the code happened to do.</p>
+        <p><b>Design-first</b> (spec → stubs) is right when an external party or another team consumes the API and the contract must be agreed before either side builds. Use it for partner APIs, code-first internally.</p>
+      </div>
+      <div class="note warn"><span class="lbl">Contract tests for the async side</span>OpenAPI covers HTTP. Kafka events need the same treatment: register Avro/JSON schemas, set compatibility to <code>BACKWARD</code>, and let the registry reject an incompatible producer at deploy time.</div>
+    </div>
+  </div>
+</section>
+

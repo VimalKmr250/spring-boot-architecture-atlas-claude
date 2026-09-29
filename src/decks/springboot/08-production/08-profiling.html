@@ -1,0 +1,37 @@
+<section class="slide" data-sec="Production" data-title="Profiling">
+  <h2>"The endpoint is slow" — the ordered method</h2>
+  <p class="dek">Six steps, cheapest first. Most incidents are solved by step 2 or 3; starting at step 1 rather than guessing is what separates a 20-minute diagnosis from a two-day one.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Step</th><th>Tool</th><th>What it rules in or out</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Slow for everyone, or at p99 only?</td><td>The RED dashboard</td><td>A fat tail means contention, GC or one bad tenant — not the code path itself</td></tr>
+        <tr><td>2</td><td>Where does the time go across services?</td><td>A trace of one slow request</td><td>Points at the hop. Usually a downstream call or the database</td></tr>
+        <tr><td>3</td><td>How many queries, and how long?</td><td>Trace spans, <code>datasource-proxy</code>, <code>pg_stat_statements</code></td><td>N+1, a missing index, or far too many rows returned</td></tr>
+        <tr><td>4</td><td>Is it waiting on a pool?</td><td>Hikari metrics: <code>pending</code>, <code>usage</code>, <code>acquire</code></td><td>Connection starvation — the time is queueing, not working</td></tr>
+        <tr><td>5</td><td>What are the threads doing right now?</td><td><code>/actuator/threaddump</code>, three snapshots 10 s apart</td><td>A lock, a blocking call, or a fully occupied thread pool</td></tr>
+        <tr><td>6</td><td>Where is CPU actually spent?</td><td>async-profiler / JFR flame graph</td><td>The genuinely CPU-bound case — the rarest outcome in enterprise services</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Java Flight Recorder — safe to run in production</div>
+<pre><code class="language-yaml"># Start a recording on a running pod, ~1% overhead
+jcmd &lt;pid&gt; JFR.start name=slow duration=120s filename=/dumps/slow.jfr settings=profile
+jcmd &lt;pid&gt; JFR.dump  name=slow filename=/dumps/slow.jfr
+# Open in JDK Mission Control: hot methods, allocation, locks, JDBC, GC.
+
+# Or always-on, so the evidence already exists when the incident starts:
+-XX:StartFlightRecording=disk=true,maxsize=200M,maxage=6h,dumponexit=true</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">The three-thread-dump trick</span>Take three dumps ten seconds apart. Threads stuck on the <b>same stack frame</b> in all three are your problem — a lock, a socket read with no timeout, or a pool wait. Costs nothing, needs no extra tooling, and solves a surprising share of production hangs.</div>
+      <div class="note warn"><span class="lbl">Measure before and after, the same way</span>"It feels faster" is not a result. Capture p50/p95/p99 and throughput from the same dashboard under comparable load. Optimisations that help p50 and hurt p99 are common — caching often does exactly that.</div>
+      <div class="note good"><span class="lbl">Where the time usually is</span>In rough order: N+1 queries · a missing index · an unbounded result set · a downstream call with no timeout · connection-pool starvation · serialising a huge response. CPU-bound application code is near the bottom of that list.</div>
+    </div>
+  </div>
+</section>
+

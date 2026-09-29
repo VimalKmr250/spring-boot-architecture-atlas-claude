@@ -1,0 +1,110 @@
+<section class="slide" data-sec="27 · 1D DP basics" data-title="The reusable structure">
+  <h2>Three recurrence shapes cover all six problems</h2>
+  <p class="dek">Fixed lookback, unbounded choice over a target, and a scan over all earlier states. Identify which one a problem is, and the code is ten lines.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Shape A · fixed lookback (LC 70, 198, 213)</div>
+<pre><code class="language-java">// STATE: dp[i] = the best answer considering the first i items.
+// Each cell looks back a CONSTANT number of positions, so the
+// array collapses to rolling variables.
+int rob(int[] nums) {
+    int prev2 = 0;   // dp[i-2]
+    int prev1 = 0;   // dp[i-1]
+
+    for (int v : nums) {
+        // Take v (forfeiting the previous house) or skip it.
+        int cur = Math.max(prev1, prev2 + v);
+        prev2 = prev1;
+        prev1 = cur;
+    }
+    return prev1;
+}
+
+// LC 213 — the houses form a CIRCLE, so the first and last are
+// adjacent. You can never take both, so run the linear solver
+// twice on two overlapping ranges and take the better.
+int robCircular(int[] nums) {
+    if (nums.length == 1) return nums[0];
+    return Math.max(robRange(nums, 0, nums.length - 2),    // drop the last
+                    robRange(nums, 1, nums.length - 1));   // drop the first
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Shape B · unbounded choice over a target (LC 322, 279)</div>
+<pre><code class="language-java">// STATE: dp[t] = the best way to make exactly amount t.
+// Each cell tries EVERY option, so the cost is O(target * options).
+int coinChange(int[] coins, int amount) {
+    int[] dp = new int[amount + 1];
+
+    // amount+1 is an "impossible" sentinel that is safely larger
+    // than any real answer, and never overflows when incremented.
+    Arrays.fill(dp, amount + 1);
+    dp[0] = 0;                               // zero coins make zero
+
+    for (int t = 1; t &lt;= amount; t++) {
+        for (int c : coins) {
+            if (c &gt; t) continue;              // this coin does not fit
+            dp[t] = Math.min(dp[t], dp[t - c] + 1);
+        }
+    }
+    return dp[amount] &gt; amount ? -1 : dp[amount];
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Shape C · scan all earlier states (LC 300)</div>
+<pre><code class="language-java">// STATE: dp[i] = the longest increasing subsequence ENDING AT i.
+// Not "within the first i" — you must know the last element to
+// decide whether the sequence can be extended.
+int lengthOfLIS(int[] nums) {
+    int[] dp = new int[nums.length];
+    Arrays.fill(dp, 1);                       // each element alone counts as 1
+
+    int best = 1;
+    for (int i = 1; i &lt; nums.length; i++) {
+        for (int j = 0; j &lt; i; j++) {
+            if (nums[j] &lt; nums[i]) {
+                dp[i] = Math.max(dp[i], dp[j] + 1);
+            }
+        }
+        // "ending at i" is NOT monotone, so the answer is the
+        // maximum over the whole array, not dp[n-1].
+        best = Math.max(best, dp[i]);
+    }
+    return best;
+}
+
+// The O(n log n) version: `tails[k]` is the SMALLEST possible tail
+// of an increasing subsequence of length k+1. Binary search for
+// the insert position and overwrite it.
+//   tails is NOT the actual subsequence — only its length is valid.
+int lisFast(int[] nums) {
+    List&lt;Integer&gt; tails = new ArrayList&lt;&gt;();
+    for (int v : nums) {
+        int pos = Collections.binarySearch(tails, v);
+        if (pos &lt; 0) pos = -(pos + 1);        // the insertion point
+        if (pos == tails.size()) tails.add(v);
+        else                     tails.set(pos, v);
+    }
+    return tails.size();
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Identifying the shape</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Adjacency constraint</dt><dd>Shape A. The constraint distance <em>is</em> the lookback distance.</dd>
+          <dt>"Make exactly this amount"</dt><dd>Shape B. The state is indexed by the target, not by position.</dd>
+          <dt>Subsequence</dt><dd>Shape C, with the "ending here" definition — and the answer is the maximum, not the last cell.</dd>
+          <dt>Circular input</dt><dd>Run the linear solver twice on two ranges that each exclude one endpoint.</dd>
+          <dt>Sentinel value</dt><dd>For minimisation use a value just above any real answer, such as <code>amount + 1</code>. <code>Integer.MAX_VALUE</code> overflows the moment you add one.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Returning <code>dp[n−1]</code> for an "ending here" state</b> — LC 300's answer is the maximum over the array, and using the last cell reports only the subsequence ending at the final element. <b><code>Integer.MAX_VALUE</code> as the infinity sentinel</b> — <code>MAX_VALUE + 1</code> wraps to negative and looks like a brilliant answer. <b>Optimising space before the array version works</b> — rolling variables must be updated in the right order, and the bug is invisible until you compare against the array version you never wrote.</div>
+    </div>
+  </div>
+</section>
+

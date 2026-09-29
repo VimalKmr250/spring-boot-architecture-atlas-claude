@@ -1,0 +1,129 @@
+<section class="slide" data-sec="Complexity analysis" data-title="Finding space complexity">
+  <h2>Space is the peak, not the total</h2>
+  <p class="dek">Time adds up everything that ever runs. Space asks a narrower question: at the worst single moment, how much <b>extra</b> memory is alive? Memory that is released and reused does not accumulate — which is why naive Fibonacci makes O(2ⁿ) calls but never needs more than O(n) of stack.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>What goes in the count</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Counts</dt><dd>Every structure you allocate that grows with the input: arrays, maps, sets, heaps, queues, DP tables.</dd>
+        <dt>Counts</dt><dd>The recursion stack — its <b>maximum depth</b> times a constant-size frame. It is the term most often forgotten.</dd>
+        <dt>Counts</dt><dd>Copies you make: <code>substring</code>, <code>toCharArray</code>, <code>new ArrayList&lt;&gt;(path)</code>, a sorted copy of the input, an object sort's temporary buffer.</dd>
+        <dt>Excluded</dt><dd>The input, unless you copy it. Mutating it in place costs no space — but say that you are doing it.</dd>
+        <dt>Excluded</dt><dd>The output, by this deck's convention. Say "excluding the output" out loud, because some interviewers include it.</dd>
+        <dt>Constant</dt><dd>Anything whose size does not depend on the input — <code>int[26]</code>, <code>int[128]</code>, ten local variables — is O(1), however large it looks.</dd>
+      </dl>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Where it goes</th><th>Space</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Recursion on a tree</td><td class="num">O(h)</td><td>One frame per node on the current path: log n balanced, n skewed.</td></tr>
+          <tr><td>Recursion along an array or list</td><td class="num">O(n)</td><td>One frame per element, all alive at the deepest point.</td></tr>
+          <tr><td>BFS queue on a tree</td><td class="num">O(w)</td><td>About one level at a time; the widest level of a complete tree is about n/2.</td></tr>
+          <tr><td>BFS or DFS on a grid</td><td class="num">O(R·C)</td><td>The visited grid, and a frontier or stack that can hold much of it.</td></tr>
+          <tr><td>Map or set of values seen</td><td class="num">O(distinct)</td><td>At most n, and at most the alphabet — which is why <code>int[26]</code> is O(1).</td></tr>
+          <tr><td>Heap capped at k</td><td class="num">O(k)</td><td>Poll whenever it grows past k.</td></tr>
+          <tr><td>DP table</td><td class="num">product of the dimensions</td><td>One cell per state: O(n), O(m·n), O(n·capacity).</td></tr>
+          <tr><td>DP with rolling rows</td><td class="num">one dimension fewer</td><td>Possible when row i reads only row i − 1.</td></tr>
+          <tr><td>Backtracking</td><td class="num">O(depth)</td><td>The path plus the stack; the answers themselves are output.</td></tr>
+          <tr><td>Two pointers, in-place tricks</td><td class="num">O(1)</td><td>A fixed set of variables, whatever n is.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 232" role="img" aria-label="A seven-node binary tree and the call stack at the moment each node is entered during a depth-first search. The stack never holds more than three frames, the height of the tree.">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">DFS ON 7 NODES · THE CALL STACK AS EACH NODE IS ENTERED</text>
+
+        <!-- tree -->
+        <path d="M200 64 L140 90 M200 64 L260 90 M140 118 L110 144 M140 118 L170 144 M260 118 L230 144 M260 118 L290 144" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="200" cy="50" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="140" cy="104" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="260" cy="104" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="110" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="170" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="230" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <circle cx="290" cy="158" r="14" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-opacity="0.6"></circle>
+        <text x="200" y="54" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">A</text>
+        <text x="140" y="108" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">B</text>
+        <text x="260" y="108" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">C</text>
+        <text x="110" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">D</text>
+        <text x="170" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">E</text>
+        <text x="230" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">F</text>
+        <text x="290" y="162" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">G</text>
+        <text x="14" y="54" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 1</text>
+        <text x="14" y="108" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 2</text>
+        <text x="14" y="162" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">depth 3</text>
+
+        <!-- stack snapshots -->
+        <path d="M344 96 L844 96" stroke="#D26A3F" stroke-opacity="0.6" stroke-dasharray="4 3"></path>
+        <text x="350" y="88" font-size="10.5" font-family="monospace" fill="#D26A3F">peak: 3 frames — the height of the tree</text>
+        <line x1="344" y1="172" x2="844" y2="172" stroke="currentColor" stroke-opacity="0.25"></line>
+
+        <rect x="350" y="148" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="378" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+
+        <rect x="422" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="422" y="124" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="450" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="450" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+
+        <rect x="494" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="494" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="494" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="522" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="522" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+        <text x="522" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">D</text>
+
+        <rect x="566" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="566" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="566" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="594" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="594" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">B</text>
+        <text x="594" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">E</text>
+
+        <rect x="638" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="638" y="124" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="666" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="666" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+
+        <rect x="710" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="710" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="710" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="738" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="738" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+        <text x="738" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">F</text>
+
+        <rect x="782" y="148" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="782" y="124" width="56" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.5"></rect>
+        <rect x="782" y="100" width="56" height="22" rx="4" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-opacity="0.75"></rect>
+        <text x="810" y="163" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">A</text>
+        <text x="810" y="139" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">C</text>
+        <text x="810" y="115" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">G</text>
+
+        <text x="378" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter A</text>
+        <text x="450" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter B</text>
+        <text x="522" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter D</text>
+        <text x="594" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter E</text>
+        <text x="666" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter C</text>
+        <text x="738" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter F</text>
+        <text x="810" y="188" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.55">enter G</text>
+
+        <line x1="14" y1="202" x2="866" y2="202" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="222" font-size="11" fill="currentColor" opacity="0.8">7 calls in total → <tspan font-weight="600" fill="#D26A3F">O(n) time</tspan></text>
+        <text x="300" y="222" font-size="11" fill="currentColor" opacity="0.8">at most 3 frames alive at once → <tspan font-weight="600" fill="#D26A3F">O(h) space</tspan></text>
+        <text x="600" y="222" font-size="11" fill="currentColor" opacity="0.65">a skewed tree stacks all 7 → O(n) space</text>
+      </svg>
+    </div>
+    <figcaption>Copper is the call running now; teal frames are waiting for it to return. When D returns, its frame is freed and E reuses the slot — so seven calls never need more than three frames at once. That is the difference between counting calls (time) and measuring depth (space).</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="note warn"><span class="lbl">Java's stack is smaller than your Big-O</span>A recursive solution can be O(n) in space and still crash. The default thread stack — typically 512 KB to 1 MB, set with <code>-Xss</code> — holds on the order of 10⁴ frames for a small method, so recursing down a 10⁵-node linked list or skewed tree throws <code>StackOverflowError</code>. When depth can reach n, rewrite with an explicit <code>ArrayDeque</code>: the same Big-O, but the stack now lives on the heap.</div>
+    <div class="note tip"><span class="lbl">Space is usually spent to buy time</span>A <code>HashSet</code> turns an O(n²) pair scan into O(n) (06). A memo table turns O(2ⁿ) into a polynomial (27–30). When a problem demands O(1) extra space, it is refusing that trade — reach for Floyd's cycle detection (03), in-place marking, or a rolling array instead.</div>
+  </div>
+</section>
+

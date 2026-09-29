@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Architecture" data-title="The @Conditional family">
+  <h2>The conditions that decide what exists</h2>
+  <p class="dek">These are the whole of Boot's "opinion". Nine annotations; you will write three of them yourself the first time you build an internal starter.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Annotation</th><th>Fires when</th><th>Typical use</th></tr></thead>
+      <tbody>
+        <tr><td><code>@ConditionalOnClass</code></td><td>A class is on the classpath</td><td>Configure Hibernate only if Hibernate was added</td></tr>
+        <tr><td><code>@ConditionalOnMissingClass</code></td><td>A class is absent</td><td>Fall back when an optional library is not present</td></tr>
+        <tr><td><code>@ConditionalOnBean</code></td><td>A bean of that type already exists</td><td>Add a <code>JpaTransactionManager</code> only if a <code>DataSource</code> exists</td></tr>
+        <tr><td><code>@ConditionalOnMissingBean</code></td><td>No such bean is defined</td><td><b>The back-off rule.</b> On nearly every auto-configured <code>@Bean</code></td></tr>
+        <tr><td><code>@ConditionalOnProperty</code></td><td>A property has a value (or is absent, with <code>matchIfMissing</code>)</td><td>Feature toggles in your own starter</td></tr>
+        <tr><td><code>@ConditionalOnWebApplication</code></td><td>It is a servlet or reactive web app</td><td>Skip MVC config in a batch job</td></tr>
+        <tr><td><code>@ConditionalOnResource</code></td><td>A file exists on the classpath</td><td>Load config only when a mapping file is shipped</td></tr>
+        <tr><td><code>@ConditionalOnExpression</code></td><td>A SpEL expression is true</td><td>Compound conditions — use sparingly, it is unreadable</td></tr>
+        <tr><td><code>@Profile</code></td><td>An active profile matches</td><td>Environment-shaped beans (worker vs web)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Find out why a bean does or does not exist</div>
+<pre><code class="language-yaml"># run with --debug, or set:
+debug: true
+# prints the ConditionEvaluationReport:
+#
+#   Positive matches:
+#   -----------------
+#   DataSourceAutoConfiguration matched:
+#      - @ConditionalOnClass found required classes 'javax.sql.DataSource' (OnClassCondition)
+#
+#   Negative matches:
+#   -----------------
+#   KafkaAutoConfiguration:
+#      Did not match:
+#      - @ConditionalOnClass did not find required class
+#        'org.springframework.kafka.core.KafkaTemplate' (OnClassCondition)</code></pre>
+    </div>
+    <div class="note good"><span class="lbl">Read this report before guessing</span>"Why is my <code>DataSource</code> the wrong one?" and "why did my custom <code>ObjectMapper</code> not take effect?" are both answered in full by that output, in about thirty seconds. It is the single most under-used diagnostic in Spring Boot.
+    <p style="margin-top:10px">Actuator's <code>/actuator/conditions</code> endpoint gives the same report as JSON on a running application — useful when the problem only reproduces in an environment you cannot restart with <code>--debug</code>.</p></div>
+  </div>
+</section>
+

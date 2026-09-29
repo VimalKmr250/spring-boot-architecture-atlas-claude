@@ -1,0 +1,90 @@
+<section class="slide" data-sec="08 · Difference array" data-title="Mechanics">
+  <h2>Record the edges of a range, not its contents</h2>
+  <p class="dek">Adding <code>v</code> to every element of <code>[l, r]</code> costs O(r − l). Do that a hundred thousand times and you have an O(n·q) solution that times out. A difference array records each update as <b>two numbers</b> — a rise at <code>l</code> and a fall at <code>r+1</code> — and reconstructs the whole array once at the end with a single prefix sum.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The invariant</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px"><code>D[i]</code> holds the <em>change</em> between position <code>i−1</code> and position <code>i</code>. Running a prefix sum over <code>D</code> therefore rebuilds the original array exactly.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">So a range update becomes: <code>D[l] += v</code> and <code>D[r+1] -= v</code>. The first says "from here on, everything is <code>v</code> higher"; the second cancels it once the range ends.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">Every update is <b>O(1)</b> regardless of range width. One O(n) sweep at the end turns all of them into the final array.</p>
+    </div>
+    <div class="panel">
+      <h3>Why <code>r + 1</code>, and why size <code>n + 1</code></h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">The range is inclusive of <code>r</code>, so the cancellation must land on the <em>first index after</em> it. Writing <code>D[r] -= v</code> silently drops the last element of every range.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">That means <code>r + 1</code> can equal <code>n</code>, so <code>D</code> needs length <code>n + 1</code>. The extra slot is a deliberate overflow bin: it is written but never read, which removes the bounds check entirely.</p>
+      <p style="color:var(--text-2);font-size:14px;margin-top:10px">This is the exact inverse of a prefix sum. One turns an array into its running totals; the other turns running totals back into an array.</p>
+    </div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 274" role="img" aria-label="A range update recorded as two edge marks in a difference array, then rebuilt by a prefix sum">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ONE UPDATE: ADD 5 TO THE RANGE [2, 4]</text>
+
+        <text x="14" y="48" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">naive</text>
+        <rect x="76" y="32" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="126" y="32" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="176" y="32" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="226" y="32" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="276" y="32" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="326" y="32" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <text x="200" y="50" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">+5</text>
+        <text x="250" y="50" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">+5</text>
+        <text x="300" y="50" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor">+5</text>
+        <text x="400" y="50" font-size="10.5" fill="currentColor" opacity="0.6">touches every element — O(width) per update</text>
+
+        <text x="14" y="104" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">D</text>
+        <rect x="76" y="88" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="126" y="88" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="176" y="88" width="48" height="26" rx="4" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.6"></rect>
+        <rect x="226" y="88" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="276" y="88" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="326" y="88" width="48" height="26" rx="4" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.6"></rect>
+        <text x="200" y="106" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">+5</text>
+        <text x="350" y="106" text-anchor="middle" font-size="11.5" font-family="monospace" font-weight="600" fill="currentColor">−5</text>
+        <text x="200" y="128" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">D[l]</text>
+        <text x="350" y="128" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#3AA79B">D[r+1]</text>
+        <text x="400" y="106" font-size="10.5" fill="currentColor" opacity="0.6">two writes — O(1) per update, any width</text>
+
+        <text x="76" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">0</text>
+        <text x="126" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">1</text>
+        <text x="176" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">2</text>
+        <text x="226" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">3</text>
+        <text x="276" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">4</text>
+        <text x="326" y="146" font-size="9.5" font-family="monospace" fill="currentColor" opacity="0.35">5</text>
+
+        <line x1="14" y1="162" x2="866" y2="162" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="182" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">REBUILD: ONE PREFIX SUM OVER D</text>
+
+        <text x="14" y="216" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.5">result</text>
+        <rect x="76" y="200" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="126" y="200" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <rect x="176" y="200" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="226" y="200" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="276" y="200" width="48" height="26" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="326" y="200" width="48" height="26" rx="4" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <text x="100" y="218" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+        <text x="150" y="218" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+        <text x="200" y="218" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">5</text>
+        <text x="250" y="218" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">5</text>
+        <text x="300" y="218" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">5</text>
+        <text x="350" y="218" text-anchor="middle" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">0</text>
+        <text x="400" y="218" font-size="10.5" fill="currentColor" opacity="0.6">the running total carries the +5 across the range, and the −5 ends it</text>
+
+        <text x="14" y="252" font-size="11" fill="currentColor" opacity="0.72">q updates then one rebuild: <tspan font-family="monospace" fill="#D26A3F">O(q + n)</tspan> instead of <tspan font-family="monospace">O(q · n)</tspan>. With q = n = 10⁵ that is 2×10⁵ operations rather than 10¹⁰.</text>
+        <text x="14" y="270" font-size="10.5" fill="currentColor" opacity="0.55">A difference array is the exact inverse of a prefix sum: one turns values into running totals, the other turns running totals back into values.</text>
+      </svg>
+    </div>
+    <figcaption>The rise at <code>l</code> and the fall at <code>r+1</code> are the only two cells an update ever touches. Everything between them is produced by the running total during the single rebuild pass.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Applies when</h4><p>Many <b>range updates</b> land before any read. Also for interval occupancy — "is any point covered more than C times?" — where each interval contributes +1 at its start and −1 just past its end.</p></div>
+    <div class="card"><h4>Does not apply when</h4><p>Reads and writes interleave, since every read needs a fresh O(n) rebuild. That case wants a Fenwick or segment tree with lazy propagation. Also when the coordinate range is enormous and sparse — then sort the events instead of allocating an array.</p></div>
+    <div class="card"><h4>Complexity</h4><p><b>O(1)</b> per update, <b>O(n)</b> for the single rebuild, so <b>O(q + n)</b> overall. Space is <b>O(n)</b>. Use <code>long</code> when many updates can stack on one index.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Recognition cues — the literal words in the statement</span><b>"add v to all elements between i and j"</b> · <b>"apply all the updates and return the final array"</b> · <b>"bookings[i] = [first, last, seats]"</b> · <b>"passengers get on at from and off at to"</b> · <b>"does the capacity ever exceed"</b> · <b>"shift the letters in the range"</b>. The decisive shape is a <b>list of intervals with a value</b>, combined with the fact that nothing is read until every update has been applied.</div>
+</section>
+

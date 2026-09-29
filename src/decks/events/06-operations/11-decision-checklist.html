@@ -1,0 +1,27 @@
+<section class="slide" data-sec="Operations" data-title="Decision checklist">
+  <h2>The decisions, in the order to make them</h2>
+  <p class="dek">Everything in this tab, as a sequence. Each answer constrains the next, and the expensive ones are all near the top.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Decision</th><th>Default answer</th><th>Cost to reverse</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Does this step need to be synchronous?</td><td>Yes if the user's action should fail when it fails; otherwise an event</td><td class="num">weeks</td></tr>
+        <tr><td>2</td><td>Event or command?</td><td>Event — a past-tense fact with no named consumer</td><td class="num">weeks</td></tr>
+        <tr><td>3</td><td>Thin, fat or delta?</td><td>Fat, with only the fields the event genuinely means</td><td class="num">weeks — it is a contract</td></tr>
+        <tr><td>4</td><td>What is the key?</td><td>The entity whose events must stay ordered</td><td class="num">weeks — repartitioning is disruptive</td></tr>
+        <tr><td>5</td><td>Choreography or orchestration?</td><td>Choreograph within a context, orchestrate across them and past four steps</td><td class="num">weeks</td></tr>
+        <tr><td>6</td><td>How does the event get published?</td><td>Outbox. Always. Polling relay first, CDC when volume justifies it</td><td class="num">days</td></tr>
+        <tr><td>7</td><td>Partition count?</td><td>Peak throughput ÷ per-consumer rate, × 3 headroom. Round up generously</td><td class="num">weeks</td></tr>
+        <tr><td>8</td><td>Format and compatibility?</td><td>Avro + registry, BACKWARD, register from CI</td><td class="num">days</td></tr>
+        <tr><td>9</td><td>Retention?</td><td>7 days for operational topics; compaction for reference data; long retention if rebuild is required</td><td class="num">hours</td></tr>
+        <tr><td>10</td><td>Retry strategy?</td><td>Bounded retries then a DLT. Non-blocking retry topics if ordering permits</td><td class="num">hours</td></tr>
+        <tr><td>11</td><td>How is the consumer idempotent?</td><td>Business key, or a dedupe table on the event id. <b>Answer this before writing the handler</b></td><td class="num">hours</td></tr>
+        <tr><td>12</td><td>What is the staleness SLO?</td><td>State a number per flow, measure it, alert on it</td><td class="num">hours</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note good"><span class="lbl">If you answer only three</span>Make them <b>6</b> (outbox — otherwise you lose events silently), <b>11</b> (idempotency — otherwise duplicates corrupt data) and <b>10</b> (bounded retries plus a DLT — otherwise one bad record stops a partition). Those three are the difference between a system that degrades gracefully and one that fails invisibly.</div>
+</section>
+

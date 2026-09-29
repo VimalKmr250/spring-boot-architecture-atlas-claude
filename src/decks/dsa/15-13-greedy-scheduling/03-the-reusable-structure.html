@@ -1,0 +1,114 @@
+<section class="slide" data-sec="13 · Greedy scheduling" data-title="The reusable structure">
+  <h2>Three skeletons, and the proof that goes with each</h2>
+  <p class="dek">Furthest reach for jumps and coverage, sort-then-place for reconstruction, and bound-then-construct for scheduling under a constraint. Each is short — write the justification in a comment so you remember why it is correct.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton A · furthest reach (LC 45, 55, 763)</div>
+<pre><code class="language-java">/**
+ * Scan a BAND of reachable positions, remembering the furthest
+ * point anything in the band can reach. Commit to a jump only
+ * when the band is exhausted.
+ *
+ * Optimality: this is BFS over layers. Band k is exactly the set
+ * reachable in k jumps, so the first band containing the target
+ * gives the minimum.
+ */
+int minJumps(int[] a) {
+    int jumps = 0, bandEnd = 0, farthest = 0;
+
+    // n - 1, NOT n: arriving at the last index means you are done,
+    // so you never jump FROM it.
+    for (int i = 0; i &lt; a.length - 1; i++) {
+        farthest = Math.max(farthest, i + a[i]);
+
+        if (i == bandEnd) {          // band exhausted — must jump now
+            jumps++;
+            bandEnd = farthest;
+        }
+    }
+    return jumps;
+}
+
+// Reachability only (LC 55) — no counter, just the frontier.
+boolean canReach(int[] a) {
+    int farthest = 0;
+    for (int i = 0; i &lt; a.length; i++) {
+        if (i &gt; farthest) return false;      // a gap we cannot cross
+        farthest = Math.max(farthest, i + a[i]);
+    }
+    return true;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Skeleton B · sort, then place (LC 406)</div>
+<pre><code class="language-java">/**
+ * Find an order in which each item's position becomes FORCED once
+ * its predecessors are fixed. Then a single insertion pass works.
+ *
+ * LC 406: people are [height, k] where k counts taller-or-equal
+ * people in front. Process TALLEST first — shorter people inserted
+ * later are invisible to them, so an already-placed person's k
+ * value can never be disturbed. That invariance is the proof.
+ */
+int[][] reconstructQueue(int[][] people) {
+    Arrays.sort(people, (a, b) -&gt;
+            a[0] != b[0] ? b[0] - a[0]     // taller first
+                         : a[1] - b[1]);   // same height: smaller k first
+
+    List&lt;int[]&gt; out = new ArrayList&lt;&gt;();
+    for (int[] p : people) {
+        // Everyone already placed is >= this height, so putting p
+        // at index p[1] puts exactly p[1] of them in front.
+        out.add(p[1], p);
+    }
+    return out.toArray(new int[0][]);
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton C · bound, then construct (LC 621)</div>
+<pre><code class="language-java">/**
+ * Prove a lower bound from the most constrained element, then show
+ * it is achievable. The answer is the bound.
+ *
+ * LC 621: the most frequent task forces a skeleton of
+ *     (maxFreq - 1) full blocks of width (n + 1), plus a tail
+ *     holding every task that ties for maxFreq.
+ * Nothing can beat that, and any leftover tasks slot into the gaps
+ * without lengthening it — so the schedule length is
+ *     max(that bound, tasks.length).
+ */
+int leastInterval(char[] tasks, int n) {
+    int[] count = new int[26];
+    int maxFreq = 0;
+    for (char t : tasks) maxFreq = Math.max(maxFreq, ++count[t - 'A']);
+
+    int tied = 0;                       // how many tasks hit maxFreq
+    for (int c : count) if (c == maxFreq) tied++;
+
+    int bound = (maxFreq - 1) * (n + 1) + tied;
+
+    // If there are more tasks than slots, the gaps are already full
+    // and no idling is needed at all.
+    return Math.max(bound, tasks.length);
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Which skeleton</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>"minimum jumps", "can you reach"</dt><dd>A. Track a frontier; increment only at the band edge.</dd>
+          <dt>"as many parts as possible"</dt><dd>A again — the part ends at the furthest last-occurrence seen so far.</dd>
+          <dt>"reconstruct", "rebuild the order"</dt><dd>B. Find the order in which each placement is forced, usually most-constrained first.</dd>
+          <dt>"minimum time with a cooldown"</dt><dd>C. Bound from the most frequent element, then show it is achievable.</dd>
+          <dt>"is there a valid starting point"</dt><dd>C in disguise: prove the total is feasible, then show the failure points identify the answer.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Looping to <code>n − 1</code> in LC 45</b> — arriving at the last index ends the journey, so jumping from it counts a phantom step. <b>Assuming greedy works without the exchange argument</b> — LC 55 is greedy, but "pick the largest jump each time" is <em>not</em> correct for it; the frontier is. <b>Comparator overflow in LC 406</b> — <code>b[0] - a[0]</code> is safe for heights under 10⁴, but build the habit of <code>Integer.compare</code> anyway.</div>
+    </div>
+  </div>
+</section>
+

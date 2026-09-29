@@ -1,0 +1,85 @@
+<section class="slide" data-sec="06 · Hashing / frequency maps" data-title="The reusable structure">
+  <h2>Four idioms, and the Java methods worth knowing</h2>
+  <p class="dek">The code is short, so the leverage is in fluency: <code>merge</code>, <code>computeIfAbsent</code> and <code>getOrDefault</code> remove the null-checking that makes hash solutions look clumsy under time pressure.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The four idioms</div>
+<pre><code class="language-java">// 1 · MEMBERSHIP — "have I seen it?"
+//     Set.add returns false when the element was already there,
+//     so the check and the insert are a single operation.
+boolean containsDuplicate(int[] a) {
+    Set&lt;Integer&gt; seen = new HashSet&lt;&gt;();
+    for (int v : a) if (!seen.add(v)) return true;
+    return false;
+}
+
+// 2 · COUNTING — merge is the whole idiom
+Map&lt;Integer, Integer&gt; freq = new HashMap&lt;&gt;();
+for (int v : a) freq.merge(v, 1, Integer::sum);       // no getOrDefault dance
+freq.merge(v, -1, Integer::sum);                      // and to decrement
+if (freq.get(v) == 0) freq.remove(v);                 // keep size() honest
+
+//     For a known small alphabet, an array beats a map outright —
+//     no boxing, no hashing, and it is what a window state should use.
+int[] count = new int[26];
+count[c - 'a']++;
+
+// 3 · GROUPING — computeIfAbsent creates the bucket on first use
+Map&lt;String, List&lt;String&gt;&gt; groups = new HashMap&lt;&gt;();
+groups.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(value);
+
+// 4 · COMPLEMENT — store as you go, ask for the partner you need
+Map&lt;Integer, Integer&gt; seen = new HashMap&lt;&gt;();
+for (int i = 0; i &lt; a.length; i++) {
+    Integer j = seen.get(target - a[i]);
+    if (j != null) return new int[]{ j, i };
+    seen.put(a[i], i);        // AFTER the lookup — see the note below
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Bucket sort by frequency — top-K in O(n), no heap (LC 347)</div>
+<pre><code class="language-java">// A heap gives O(n log k). But a frequency can never exceed n,
+// so index an array BY the frequency and read it from the top:
+// O(n), and simpler than the heap version once you have seen it.
+int[] topKFrequent(int[] nums, int k) {
+    Map&lt;Integer, Integer&gt; freq = new HashMap&lt;&gt;();
+    for (int v : nums) freq.merge(v, 1, Integer::sum);
+
+    // bucket[f] = every value occurring exactly f times
+    List&lt;Integer&gt;[] bucket = new List[nums.length + 1];
+    for (Map.Entry&lt;Integer, Integer&gt; e : freq.entrySet()) {
+        int f = e.getValue();
+        if (bucket[f] == null) bucket[f] = new ArrayList&lt;&gt;();
+        bucket[f].add(e.getKey());
+    }
+
+    int[] out = new int[k];
+    int idx = 0;
+    for (int f = nums.length; f &gt;= 1 &amp;&amp; idx &lt; k; f--) {
+        if (bucket[f] == null) continue;
+        for (int v : bucket[f]) {
+            out[idx++] = v;
+            if (idx == k) break;
+        }
+    }
+    return out;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Picking the container</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt><code>int[26]</code></dt><dd>Lowercase letters. Fastest, and no boxing at all. Reach for it before a map whenever the alphabet is fixed.</dd>
+          <dt><code>int[128]</code></dt><dd>ASCII. Covers mixed case and punctuation without thought.</dd>
+          <dt><code>HashMap</code></dt><dd>Arbitrary or unbounded keys. The default when values are <code>int</code>s up to 10⁹.</dd>
+          <dt><code>HashSet</code></dt><dd>Membership only. Say <code>!set.add(v)</code> rather than <code>contains</code> then <code>add</code>.</dd>
+          <dt><code>TreeMap</code></dt><dd>Only when you need order or range queries — <code>floorKey</code>, <code>ceilingKey</code>, <code>subMap</code>. O(log n), so do not reach for it by default.</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Inserting before looking up in LC 1</b> — on <code>[3,3]</code> with target 6, the element finds <em>itself</em> and you return <code>[0,0]</code>. Always probe first, then insert. <b>Leaving zero counts in the map</b> — <code>size()</code> then over-reports distinct keys, which silently breaks every "at most K distinct" window. <b>Using <code>==</code> on boxed <code>Integer</code></b> — it compares references, and Java only caches −128 to 127, so the comparison works on small tests and fails at 1000. Use <code>.equals</code>, or unbox to <code>int</code> first.</div>
+    </div>
+  </div>
+</section>
+

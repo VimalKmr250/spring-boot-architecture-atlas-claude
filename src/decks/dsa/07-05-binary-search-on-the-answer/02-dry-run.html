@@ -1,0 +1,105 @@
+<section class="slide" data-sec="05 · Binary search on the answer" data-title="Dry run">
+  <h2>LC 875 traced on <code>piles = [3,6,7,11]</code>, <code>h = 8</code></h2>
+  <p class="dek">Koko eats at <code>k</code> bananas per hour; each pile takes <code>ceil(pile / k)</code> hours because she never moves on mid-pile. Find the smallest <code>k</code> finishing within 8 hours. The answer range is <code>[1, 11]</code> — one banana per hour at worst, and the largest pile at best.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 320" role="img" aria-label="Binary search over eating speeds from 1 to 11, showing the hours needed at each tested speed">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE ANSWER SPACE — SPEEDS 1 TO 11, AND THE HOURS EACH NEEDS</text>
+
+        <!-- speed axis -->
+        <rect x="46" y="30" width="62" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-opacity="0.45"></rect>
+        <rect x="110" y="30" width="62" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-opacity="0.45"></rect>
+        <rect x="174" y="30" width="62" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-opacity="0.45"></rect>
+        <rect x="238" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.8"></rect>
+        <rect x="302" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="366" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="430" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="494" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="558" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="622" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+        <rect x="686" y="30" width="62" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.45"></rect>
+
+        <text x="77" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">1</text>
+        <text x="141" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">2</text>
+        <text x="205" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">3</text>
+        <text x="269" y="49" text-anchor="middle" font-size="12" font-family="monospace" font-weight="600" fill="currentColor">4</text>
+        <text x="333" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">5</text>
+        <text x="397" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">6</text>
+        <text x="461" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">7</text>
+        <text x="525" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">8</text>
+        <text x="589" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">9</text>
+        <text x="653" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">10</text>
+        <text x="717" y="49" text-anchor="middle" font-size="12" font-family="monospace" fill="currentColor">11</text>
+
+        <text x="14" y="76" font-size="10" font-family="monospace" fill="currentColor" opacity="0.5">hours</text>
+        <text x="77" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#D26A3F">27</text>
+        <text x="141" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#D26A3F">14</text>
+        <text x="205" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#D26A3F">10</text>
+        <text x="269" y="76" text-anchor="middle" font-size="11" font-family="monospace" font-weight="600" fill="#3AA79B">8</text>
+        <text x="333" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">8</text>
+        <text x="397" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">6</text>
+        <text x="461" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">6</text>
+        <text x="525" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">5</text>
+        <text x="589" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">5</text>
+        <text x="653" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">5</text>
+        <text x="717" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="#3AA79B">4</text>
+
+        <path d="M269 104 L269 84" stroke="#D26A3F" stroke-width="1.8" marker-end="url(#arwA)"></path>
+        <text x="269" y="120" text-anchor="middle" font-size="11.5" font-weight="600" fill="#D26A3F">the boundary: first speed with hours ≤ 8</text>
+        <text x="500" y="106" font-size="10.5" fill="currentColor" opacity="0.6">Hours fall as speed rises — never the reverse.</text>
+        <text x="500" y="120" font-size="10.5" fill="currentColor" opacity="0.6">That monotonicity is what licenses the search.</text>
+
+        <line x1="14" y1="136" x2="866" y2="136" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ITER</text>
+        <text x="76" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">[lo, hi)</text>
+        <text x="176" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">mid</text>
+        <text x="240" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">HOURS AT SPEED mid</text>
+        <text x="520" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">≤ 8 ?</text>
+        <text x="620" y="156" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">MOVE</text>
+
+        <text x="14" y="178" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="76" y="178" font-size="11" font-family="monospace" fill="currentColor">[1, 12)</text>
+        <text x="176" y="178" font-size="11" font-family="monospace" fill="currentColor">6</text>
+        <text x="240" y="178" font-size="11" font-family="monospace" fill="currentColor">1+1+2+2 = 6</text>
+        <text x="520" y="178" font-size="11" font-family="monospace" fill="#3AA79B">yes</text>
+        <text x="620" y="178" font-size="11" font-family="monospace" fill="#3AA79B">hi = 6   (keep mid)</text>
+
+        <text x="14" y="200" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="76" y="200" font-size="11" font-family="monospace" fill="currentColor">[1, 6)</text>
+        <text x="176" y="200" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="240" y="200" font-size="11" font-family="monospace" fill="currentColor">1+2+3+4 = 10</text>
+        <text x="520" y="200" font-size="11" font-family="monospace" fill="#D26A3F">no</text>
+        <text x="620" y="200" font-size="11" font-family="monospace" fill="#D26A3F">lo = 4   (drop mid)</text>
+
+        <text x="14" y="222" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="76" y="222" font-size="11" font-family="monospace" fill="currentColor">[4, 6)</text>
+        <text x="176" y="222" font-size="11" font-family="monospace" fill="currentColor">5</text>
+        <text x="240" y="222" font-size="11" font-family="monospace" fill="currentColor">1+2+2+3 = 8</text>
+        <text x="520" y="222" font-size="11" font-family="monospace" fill="#3AA79B">yes</text>
+        <text x="620" y="222" font-size="11" font-family="monospace" fill="#3AA79B">hi = 5   (keep mid)</text>
+
+        <text x="14" y="244" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">4</text>
+        <text x="76" y="244" font-size="11" font-family="monospace" fill="currentColor">[4, 5)</text>
+        <text x="176" y="244" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="240" y="244" font-size="11" font-family="monospace" fill="currentColor">1+2+2+3 = 8</text>
+        <text x="520" y="244" font-size="11" font-family="monospace" fill="#3AA79B">yes</text>
+        <text x="620" y="244" font-size="11" font-family="monospace" fill="#3AA79B">hi = 4   (keep mid)</text>
+
+        <text x="14" y="266" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">—</text>
+        <text x="76" y="266" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">[4, 4)</text>
+        <text x="240" y="266" font-size="11" fill="currentColor" opacity="0.6">lo == hi, range empty</text>
+        <text x="620" y="266" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">return 4</text>
+
+        <line x1="14" y1="282" x2="866" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="300" font-size="10.5" fill="currentColor" opacity="0.62">Four feasibility checks, each one linear pass over four piles. Trying every speed from 1 to 11 would have been eleven passes — and for piles up to 10⁹, a billion.</text>
+        <text x="14" y="316" font-size="10.5" fill="currentColor" opacity="0.62">Speeds 5 and 4 both take exactly 8 hours. The template keeps shrinking past the first success, which is what makes it return the smallest rather than a lucky one.</text>
+      </svg>
+    </div>
+    <figcaption>Iterations 3 and 4 both find a feasible speed and both keep shrinking. The asymmetry is deliberate: a feasible <code>mid</code> may itself be the answer, so it stays in range.</figcaption>
+  </figure>
+
+  <div class="note"><span class="lbl">Setting the bounds correctly</span><code>lo = 1</code>, because a speed of zero never finishes. <code>hi = max(piles)</code>, because eating faster than the biggest pile cannot beat one hour per pile — and with <code>h ≥ piles.length</code> guaranteed by the statement, that speed always works. Picking <code>hi = sum(piles)</code> also terminates correctly and costs only a handful of extra iterations; picking <code>hi</code> too <em>small</em> is the error that silently returns a wrong answer.</div>
+</section>
+

@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Production" data-title="Startup time">
+  <h2>Startup: what each technique actually buys</h2>
+  <p class="dek">Startup matters for rolling deploys, autoscaling responsiveness and how quickly you can roll back — not usually for cost. Measure before choosing, because the expensive options buy the least in most enterprise services.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Technique</th><th>Typical effect</th><th>Cost</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline large Boot app</td><td class="num">4–8 s</td><td>—</td><td>Where most services sit</td></tr>
+        <tr><td>Trim the classpath</td><td class="num">−0.5–2 s</td><td>An afternoon of dependency review</td><td><b>Do this first.</b> Free, and it shrinks the CVE surface too</td></tr>
+        <tr><td><code>spring.main.lazy-initialization</code></td><td class="num">−30–50%</td><td>Startup failures move to first request</td><td>Dev only. Never in production — you lose fail-fast</td></tr>
+        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>None; on by default</td><td>Free win on upgrade</td></tr>
+        <tr><td>AppCDS / AOT cache</td><td class="num">−20–40%</td><td>A training run in the build</td><td>Excellent value; no code change</td></tr>
+        <tr><td>Checkpoint/restore (CRaC)</td><td class="num">to ~50 ms</td><td>Beans must handle checkpoint/restore; connections reopen</td><td>Niche but powerful where supported</td></tr>
+        <tr><td>GraalVM native image</td><td class="num">to ~50 ms, low RSS</td><td>Long builds, reflection config, harder debugging, some libraries unsupported</td><td>Only for scale-to-zero or per-request billing</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Find out where the time goes before optimising anything</div>
+<pre><code class="language-java">public static void main(String[] args) {
+    var app = new SpringApplication(ShopApplication.class);
+    app.setApplicationStartup(new BufferingApplicationStartup(4096));
+    app.run(args);
+}
+// then GET /actuator/startup — every step, with durations, worst first.
+// Usually one auto-configuration, one slow @PostConstruct, or a classpath scan.</code></pre>
+    </div>
+    <div class="note good"><span class="lbl">Honest framing for an interview</span>"For a long-running service, 5 seconds of startup costs nothing at steady state. It matters for rolling deploys and for how fast we can roll back. I would trim the classpath, enable CDS, measure, and consider native only if we needed scale-to-zero." That shows judgement; "we'd go native for performance" shows the opposite, since native is usually <em>slower</em> at peak throughput than a warmed-up JIT.</div>
+  </div>
+</section>
+

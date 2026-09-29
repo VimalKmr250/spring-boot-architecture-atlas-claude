@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Internals" data-title="Derived queries">
+  <h2>Spring Data derived queries: the keyword reference</h2>
+  <p class="dek">The method-name parser is genuinely useful up to about three conditions. Past that it produces names nobody can read, and a <code>@Query</code> is both shorter and clearer.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Keyword</th><th>Generated predicate</th></tr></thead>
+        <tbody>
+          <tr><td><code>findBy</code> / <code>readBy</code> / <code>getBy</code></td><td>identical — pick one and be consistent</td></tr>
+          <tr><td><code>And</code> / <code>Or</code></td><td><code>a = ? and b = ?</code></td></tr>
+          <tr><td><code>Between</code></td><td><code>x between ? and ?</code></td></tr>
+          <tr><td><code>LessThan</code> / <code>GreaterThanEqual</code></td><td><code>x &lt; ?</code> / <code>x &gt;= ?</code></td></tr>
+          <tr><td><code>After</code> / <code>Before</code></td><td>date comparison</td></tr>
+          <tr><td><code>IsNull</code> / <code>IsNotNull</code></td><td><code>x is null</code></td></tr>
+          <tr><td><code>Like</code> / <code>Containing</code></td><td><code>like ?</code> / <code>like %?%</code></td></tr>
+          <tr><td><code>StartingWith</code> / <code>EndingWith</code></td><td><code>like ?%</code> / <code>like %?</code></td></tr>
+          <tr><td><code>IgnoreCase</code></td><td><code>upper(x) = upper(?)</code></td></tr>
+          <tr><td><code>In</code> / <code>NotIn</code></td><td><code>x in (?)</code></td></tr>
+          <tr><td><code>True</code> / <code>False</code></td><td><code>x = true</code></td></tr>
+          <tr><td><code>OrderBy…Desc</code></td><td><code>order by x desc</code></td></tr>
+          <tr><td><code>First10</code> / <code>Top5</code> / <code>Distinct</code></td><td><code>limit</code> / <code>distinct</code></td></tr>
+          <tr><td><code>countBy</code> / <code>existsBy</code> / <code>deleteBy</code></td><td>count / exists / delete</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Readable, and the point where it stops being readable</div>
+<pre><code class="language-java">// Fine
+Optional&lt;OrderJpaEntity&gt; findByIdempotencyKey(String key);
+List&lt;OrderJpaEntity&gt; findTop10ByStatusOrderByPlacedAtDesc(OrderStatus s);
+boolean existsByCustomerIdAndStatus(UUID customerId, OrderStatus status);
+long countByPlacedAtAfter(Instant since);
+
+// Not fine — write a @Query
+List&lt;OrderJpaEntity&gt;
+  findByCustomerIdAndStatusInAndPlacedAtBetweenAndTotalMinorGreaterThanOrderByPlacedAtDesc(
+      UUID customerId, Collection&lt;OrderStatus&gt; statuses,
+      Instant from, Instant to, long min);</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl"><code>deleteBy…</code> is a loop, not a DELETE</span>Spring Data <b>loads every matching entity</b> and deletes them one by one, so lifecycle callbacks and cascades fire. That is sometimes what you want; on 200,000 rows it is an outage. For a bulk delete use <code>@Modifying @Query("delete from …")</code> and accept that callbacks will not run.</div>
+      <div class="note warn"><span class="lbl">Ambiguous property names</span><code>findByCustomerAddressCity</code> could mean <code>customer.address.city</code> or a property called <code>customerAddress</code>. Disambiguate with underscores — <code>findByCustomer_Address_City</code> — rather than hoping the resolver guesses right, because it fails at startup with a message that does not name the real problem.</div>
+    </div>
+  </div>
+</section>
+

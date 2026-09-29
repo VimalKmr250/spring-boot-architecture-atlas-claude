@@ -1,0 +1,112 @@
+<section class="slide" data-sec="14 · Linked list manipulation" data-title="The reusable structure">
+  <h2>A dummy, a tail, and three saved pointers</h2>
+  <p class="dek">Reverse and merge are the two primitives; everything else composes them. Write the reverse from muscle memory — its four lines never change order, and half this family is built on it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Primitive A · reverse (LC 25, 92)</div>
+<pre><code class="language-java">// Four lines, always in this order. Step 1 must come first or
+// step 2 severs your only route to the rest of the list.
+ListNode reverse(ListNode head) {
+    ListNode prev = null, cur = head;
+
+    while (cur != null) {
+        ListNode next = cur.next;   // 1 · save what is ahead
+        cur.next = prev;            // 2 · flip this link
+        prev = cur;                 // 3 · advance prev
+        cur = next;                 // 4 · advance cur
+    }
+    return prev;                    // the new head
+}
+
+// Reversing a SEGMENT: seed prev with the node that should follow
+// the segment, and the tail reconnection happens for free.
+ListNode reverseSegment(ListNode start, ListNode stopAfter) {
+    ListNode prev = stopAfter, cur = start;
+    while (cur != stopAfter) {
+        ListNode next = cur.next;
+        cur.next = prev;
+        prev = cur;
+        cur = next;
+    }
+    return prev;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Primitive B · merge two sorted lists (LC 21, 23)</div>
+<pre><code class="language-java">// Dummy + tail. The dummy removes "which list starts the result?"
+// and the tail removes "where do I append?".
+ListNode merge(ListNode a, ListNode b) {
+    ListNode dummy = new ListNode(0);
+    ListNode tail = dummy;
+
+    while (a != null &amp;&amp; b != null) {
+        if (a.val &lt;= b.val) { tail.next = a; a = a.next; }
+        else                { tail.next = b; b = b.next; }
+        tail = tail.next;
+    }
+
+    // At most one list remains; attach it whole rather than looping.
+    tail.next = (a != null) ? a : b;
+
+    return dummy.next;
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">The composition — reverse in k-groups (LC 25)</div>
+<pre><code class="language-java">/**
+ * Per group you need THREE references:
+ *   groupPrev  the node before the group (starts as the dummy)
+ *   kth        the group's last node, which becomes its first
+ *   nextGroup  the node after the group, saved before rewiring
+ */
+ListNode reverseKGroup(ListNode head, int k) {
+    ListNode dummy = new ListNode(0, head);
+    ListNode groupPrev = dummy;
+
+    while (true) {
+        ListNode kth = walk(groupPrev, k);
+        if (kth == null) break;              // fewer than k left — leave it
+
+        ListNode nextGroup = kth.next;       // SAVE before rewiring
+        ListNode oldHead = groupPrev.next;   // becomes the group's new TAIL
+
+        // Seeding prev with nextGroup reconnects the tail for free.
+        ListNode prev = nextGroup, cur = oldHead;
+        while (cur != nextGroup) {
+            ListNode next = cur.next;
+            cur.next = prev;
+            prev = cur;
+            cur = next;
+        }
+
+        groupPrev.next = kth;                // front reconnection
+        groupPrev = oldHead;                 // old head now precedes the next group
+    }
+    return dummy.next;
+}
+
+/** The k-th node after `from`, or null if the list runs out. */
+private ListNode walk(ListNode from, int k) {
+    while (from != null &amp;&amp; k &gt; 0) { from = from.next; k--; }
+    return from;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Dummy or not</dt><dd>Use one whenever the head can change. The only problems here that do not need one are those that never touch the first node.</dd>
+        <dt>What to save</dt><dd>Before any rewiring, name every pointer you will still need afterwards. Writing those declarations first prevents almost every bug in this pattern.</dd>
+        <dt>Seed of the reversal</dt><dd><code>null</code> for a whole list; the following node for a segment, which performs one reconnection for free.</dd>
+        <dt>Iterative or recursive</dt><dd>Iterative. Lists here reach 5×10⁴ nodes and recursion risks a stack overflow — mention that trade-off rather than assuming.</dd>
+        <dt>Values or nodes</dt><dd>If the statement says the values may not be modified, you must move nodes. Read for that sentence before choosing the easy path.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Rewiring before saving</b> — <code>cur.next = prev</code> written first loses the remainder of the list, and the output is a truncated list rather than a crash. <b>Returning <code>head</code> instead of <code>dummy.next</code></b> — after any head change, <code>head</code> points into the middle of the result. <b>Leaving a cycle</b> — forgetting to terminate the final node produces an infinite loop in the judge's traversal, not in yours, which makes it hard to spot locally.</div>
+  </div>
+</section>
+

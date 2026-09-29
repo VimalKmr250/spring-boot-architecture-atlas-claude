@@ -1,0 +1,57 @@
+<section class="slide" data-sec="JPA" data-title="Keys">
+  <h2>Identifiers: the choice that affects insert throughput</h2>
+  <p class="dek">Four generation strategies with materially different behaviour under batch inserts, plus the two ways to model a composite key.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Strategy</th><th>How it works</th><th>Batch inserts</th><th>Use when</th></tr></thead>
+      <tbody>
+        <tr><td><code>IDENTITY</code></td><td>Database auto-increment; id known only after the INSERT</td><td class="num">❌ disabled</td><td>Legacy schemas you cannot change. Hibernate cannot batch, because it must round-trip per row</td></tr>
+        <tr><td><code>SEQUENCE</code></td><td>Database sequence, pre-fetched in blocks</td><td class="num">✅ excellent</td><td><b>The default choice on PostgreSQL/Oracle.</b> Set <code>allocationSize</code> to match the sequence's <code>INCREMENT BY</code></td></tr>
+        <tr><td><code>UUID</code></td><td>Generated in the JVM before insert</td><td class="num">✅ excellent</td><td>Distributed id generation, ids needed before persisting, no cross-service collisions</td></tr>
+        <tr><td><code>AUTO</code></td><td>Provider picks — usually sequence on Hibernate 6</td><td class="num">~</td><td>Avoid: what you get depends on the dialect, so behaviour changes with the database</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Sequence with a matching allocation size</div>
+<pre><code class="language-java">@Id
+@GeneratedValue(strategy = SEQUENCE, generator = "order_seq")
+@SequenceGenerator(name = "order_seq", sequenceName = "order_mgmt.order_id_seq",
+                   allocationSize = 50)     // must equal the DB's INCREMENT BY
+private Long id;
+
+// DB: CREATE SEQUENCE order_mgmt.order_id_seq INCREMENT BY 50;
+// Hibernate now fetches one value and hands out 50 ids without another round trip.
+// Mismatch here = duplicate key errors that appear only under concurrency.</code></pre>
+      <div class="codelabel" style="margin-top:14px">Composite keys — prefer @EmbeddedId</div>
+<pre><code class="language-java">@Embeddable
+record OrderLineId(UUID orderId, int lineNo) implements Serializable { }
+
+@Entity
+class OrderLineEntity {
+    @EmbeddedId private OrderLineId id;        // one field, typed, reusable
+
+    @MapsId("orderId")                         // the FK column IS part of the key
+    @ManyToOne(fetch = LAZY)
+    private OrderJpaEntity order;
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>UUID: the version matters</h3>
+        <p>Random UUIDv4 primary keys fragment a B-tree index, because every insert lands in a random leaf page. On a large, insert-heavy table that costs real write throughput and index bloat.</p>
+        <p>Time-ordered UUIDs (v7) insert near-sequentially and largely remove the problem while keeping client-side generation.</p>
+<pre style="margin-top:8px"><code class="language-java">// RFC 9562 version 7 — Hibernate ORM 7.0+ only
+@Id @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+private UUID id;</code></pre>
+        <p style="margin-top:8px"><b>Do not reach for <code>style = TIME</code> expecting v7.</b> Hibernate's <code>TIME</code> style is a custom <em>version&nbsp;1</em> layout — timestamp plus the host IP, not the Unix-epoch prefix v7 specifies. It is still index-friendly, but it is not the thing your DBA or your Postgres <code>uuidv7()</code> function means, and mixing the two in one column defeats the ordering you wanted. <code>Style.VERSION_7</code> arrived in Hibernate ORM 7.0 — on 6.6 and earlier the enum has only <code>AUTO</code>, <code>RANDOM</code> and <code>TIME</code>, so generate v7 in the application and assign it yourself.</p>
+      </div>
+      <div class="note warn"><span class="lbl"><code>@IdClass</code> vs <code>@EmbeddedId</code></span><code>@IdClass</code> repeats every key field on the entity <em>and</em> in a separate class, so the two drift. <code>@EmbeddedId</code> keeps one definition and gives you a type you can pass around. Use <code>@IdClass</code> only when mapping a legacy schema whose queries you cannot change.</div>
+      <div class="note tip"><span class="lbl">Natural vs surrogate</span>Use a surrogate key even when a natural one exists. Order numbers get reformatted, customer references get reissued, and "this will never change" is a statement about the current business process, not about the data.</div>
+    </div>
+  </div>
+</section>
+

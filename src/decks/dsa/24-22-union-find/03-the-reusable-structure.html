@@ -1,0 +1,119 @@
+<section class="slide" data-sec="22 · Union find" data-title="The reusable structure">
+  <h2>Twenty lines you should be able to type from memory</h2>
+  <p class="dek">Write the class once, correctly, and every problem in this family becomes four or five lines of driver code. Both optimisations are one line each and neither is optional.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">The class — path compression and union by size</div>
+<pre><code class="language-java">class DSU {
+    private final int[] parent;
+    private final int[] size;
+    private int components;      // live count, so no second pass is needed
+
+    DSU(int n) {
+        parent = new int[n];
+        size   = new int[n];
+        components = n;
+        for (int i = 0; i &lt; n; i++) { parent[i] = i; size[i] = 1; }
+    }
+
+    /** Root of x's component, flattening the path on the way. */
+    int find(int x) {
+        while (parent[x] != x) {
+            parent[x] = parent[parent[x]];   // point at the grandparent
+            x = parent[x];
+        }
+        return x;
+    }
+
+    /** true if two distinct components were merged; false if already joined. */
+    boolean union(int a, int b) {
+        int ra = find(a), rb = find(b);
+        if (ra == rb) return false;          // this edge would close a cycle
+
+        // Attach the SMALLER tree under the larger, keeping depth low.
+        if (size[ra] &lt; size[rb]) { int t = ra; ra = rb; rb = t; }
+        parent[rb] = ra;
+        size[ra] += size[rb];
+        components--;
+        return true;
+    }
+
+    boolean connected(int a, int b) { return find(a) == find(b); }
+    int componentCount()            { return components; }
+    int componentSize(int x)        { return size[find(x)]; }
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The driver is always four or five lines</div>
+<pre><code class="language-java">// LC 547 — count components from an adjacency MATRIX
+DSU dsu = new DSU(n);
+for (int i = 0; i &lt; n; i++)
+    for (int j = i + 1; j &lt; n; j++)
+        if (isConnected[i][j] == 1) dsu.union(i, j);
+return dsu.componentCount();
+
+// LC 684 — the last edge that closes a cycle
+for (int[] e : edges)
+    if (!dsu.union(e[0] - 1, e[1] - 1)) return e;   // 1-indexed input
+
+// LC 1319 — cables to connect everything
+// You need n-1 edges minimum; spares are the redundant ones.
+if (connections.length &lt; n - 1) return -1;
+for (int[] c : connections) dsu.union(c[0], c[1]);
+return dsu.componentCount() - 1;    // moves = components - 1
+
+// LC 990 — equalities first, then check the inequalities
+for (String e : equations)
+    if (e.charAt(1) == '=') dsu.union(e.charAt(0) - 'a', e.charAt(3) - 'a');
+for (String e : equations)
+    if (e.charAt(1) == '!' &amp;&amp; dsu.connected(e.charAt(0)-'a', e.charAt(3)-'a'))
+        return false;
+return true;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Variant · grouping, then sorting within groups (LC 1202)</div>
+<pre><code class="language-java">// Swappable index pairs form components. Within a component ANY
+// permutation is reachable, so each component's characters can be
+// sorted freely among its own positions.
+String smallestStringWithSwaps(String s, List&lt;List&lt;Integer&gt;&gt; pairs) {
+    DSU dsu = new DSU(s.length());
+    for (List&lt;Integer&gt; p : pairs) dsu.union(p.get(0), p.get(1));
+
+    // Bucket the indices by root.
+    Map&lt;Integer, List&lt;Integer&gt;&gt; groups = new HashMap&lt;&gt;();
+    for (int i = 0; i &lt; s.length(); i++)
+        groups.computeIfAbsent(dsu.find(i), k -&gt; new ArrayList&lt;&gt;()).add(i);
+
+    char[] out = s.toCharArray();
+
+    for (List&lt;Integer&gt; idx : groups.values()) {
+        // idx is ascending already, since i increased as we inserted.
+        char[] chars = new char[idx.size()];
+        for (int i = 0; i &lt; idx.size(); i++) chars[i] = s.charAt(idx.get(i));
+        Arrays.sort(chars);
+
+        // Smallest characters into the smallest positions.
+        for (int i = 0; i &lt; idx.size(); i++) out[idx.get(i)] = chars[i];
+    }
+    return new String(out);
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The knobs</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Index mapping</dt><dd>Nodes must be <code>0..n−1</code>. Subtract 1 for 1-indexed input, or map characters with <code>c - 'a'</code>, or strings through a <code>HashMap</code>.</dd>
+        <dt>What to carry</dt><dd>A size array for balancing, a live component count, and sometimes a per-component aggregate such as a maximum. Update all of them inside <code>union</code>.</dd>
+        <dt>Edge order</dt><dd>Process in the given order when the problem asks for the <em>last</em> qualifying edge; sort by weight when building a minimum spanning tree.</dd>
+        <dt>Two DSUs</dt><dd>Some problems need separate connectivity views — LC 1579 runs one for each traveller and shares the type-3 edges between them.</dd>
+        <dt>Rank or size</dt><dd>Either balances correctly. Size is more useful, because it also answers "how big is this component?".</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Comparing the nodes instead of their roots</b> — <code>if (a == b)</code> rather than <code>if (find(a) == find(b))</code> misses every cycle that is not a self-loop. <b>Forgetting to initialise <code>parent[i] = i</code></b> — Java zero-fills the array, so every node claims 0 as its root and the whole graph starts connected. <b>Omitting both optimisations</b> — the code is still correct, but a path-shaped union sequence makes each find O(n) and the solution times out on the large tests.</div>
+  </div>
+</section>
+

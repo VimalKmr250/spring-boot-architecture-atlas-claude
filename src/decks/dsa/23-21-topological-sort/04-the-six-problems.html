@@ -1,0 +1,139 @@
+<section class="slide" data-sec="21 · Topological sort" data-title="The six problems">
+  <h2>Six orderings, one algorithm</h2>
+  <p class="dek">207 and 210 are the template with different return types. 802 reverses the graph. 2115 keys it on strings. 1462 asks about reachability, and 1203 nests two sorts inside each other.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The twist</th><th>Form</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">207</td><td><a href="https://leetcode.com/problems/course-schedule/" target="_blank" rel="noopener">Course Schedule</a></td><td><span class="tag w">Medium</span></td><td>Feasibility only — compare the emitted count with <code>n</code>.</td><td>Kahn</td><td class="num">O(V+E) / O(V+E)</td></tr>
+        <tr><td class="num">210</td><td><a href="https://leetcode.com/problems/course-schedule-ii/" target="_blank" rel="noopener">Course Schedule II</a></td><td><span class="tag w">Medium</span></td><td>The same run, returning the order instead of a boolean.</td><td>Kahn</td><td class="num">O(V+E) / O(V+E)</td></tr>
+        <tr><td class="num">802</td><td><a href="https://leetcode.com/problems/find-eventual-safe-states/" target="_blank" rel="noopener">Find Eventual Safe States</a></td><td><span class="tag w">Medium</span></td><td>Reverse the edges and peel by outdegree.</td><td>Kahn, reversed</td><td class="num">O(V+E) / O(V+E)</td></tr>
+        <tr><td class="num">2115</td><td><a href="https://leetcode.com/problems/find-all-possible-recipes-from-given-supplies/" target="_blank" rel="noopener">Find All Possible Recipes from Given Supplies</a></td><td><span class="tag w">Medium</span></td><td>String nodes; supplies are the zero-indegree seeds.</td><td>Kahn on strings</td><td class="num">O(V+E) / O(V+E)</td></tr>
+        <tr><td class="num">1462</td><td><a href="https://leetcode.com/problems/course-schedule-iv/" target="_blank" rel="noopener">Course Schedule IV</a></td><td><span class="tag w">Medium</span></td><td>Reachability queries — propagate ancestor sets, or Floyd–Warshall.</td><td>Kahn + closure</td><td class="num">O(V·E) / O(V²)</td></tr>
+        <tr><td class="num">1203</td><td><a href="https://leetcode.com/problems/sort-items-by-groups-respecting-dependencies/" target="_blank" rel="noopener">Sort Items by Groups Respecting Dependencies</a></td><td><span class="tag b">Hard</span></td><td>Two nested sorts — one over groups, one within each group.</td><td>Kahn × 2</td><td class="num">O(V+E) / O(V+E)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 210 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The restatement</dt><dd>Courses are nodes, prerequisites are directed edges, and a valid schedule is a topological order. Saying that out loud is most of the solution.</dd>
+          <dt>Reading the input</dt><dd><code>[a, b]</code> means "take <code>b</code> before <code>a</code>", so the edge is <code>b → a</code> and <code>indegree[a]</code> increments. Getting this backwards is the failure mode for this whole family.</dd>
+          <dt>Why indegree and not removal</dt><dd>A course with three prerequisites must wait for all three. A counter that decrements handles that naturally; removing edges from a set would need extra bookkeeping.</dd>
+          <dt>Seeding</dt><dd>Every course with no prerequisites starts available. There may be several, and there may be disconnected groups — so seed them <em>all</em> before draining.</dd>
+          <dt>Cycle detection</dt><dd>Free. If fewer than <code>n</code> courses were emitted, the remainder are mutually blocking, and the problem asks for an empty array in that case.</dd>
+          <dt>Edge cases</dt><dd>No prerequisites at all means every course is immediately available and any order works. A self-loop <code>[a, a]</code> is a cycle of length one and is handled with no special case.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 210 · O(V + E) time, O(V + E) space</div>
+<pre><code class="language-java">class Solution {
+    public int[] findOrder(int numCourses, int[][] prerequisites) {
+        // 1 · BUILD. [a, b] = "take b before a", so the edge is b -> a.
+        List&lt;List&lt;Integer&gt;&gt; adj = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; numCourses; i++) adj.add(new ArrayList&lt;&gt;());
+
+        int[] indeg = new int[numCourses];
+        for (int[] p : prerequisites) {
+            int after = p[0], before = p[1];
+            adj.get(before).add(after);     // finishing `before` unlocks `after`
+            indeg[after]++;                 // `after` has one more blocker
+        }
+
+        // 2 · SEED every initially-unblocked course, not just one.
+        Queue&lt;Integer&gt; q = new ArrayDeque&lt;&gt;();
+        for (int i = 0; i &lt; numCourses; i++) if (indeg[i] == 0) q.offer(i);
+
+        // 3 · DRAIN
+        int[] order = new int[numCourses];
+        int idx = 0;
+
+        while (!q.isEmpty()) {
+            int cur = q.poll();
+            order[idx++] = cur;
+
+            for (int next : adj.get(cur)) {
+                // Freed exactly when its last prerequisite is done.
+                if (--indeg[next] == 0) q.offer(next);
+            }
+        }
+
+        // 4 · CHECK. Unemitted courses are mutually blocking: a cycle.
+        return idx == numCourses ? order : new int[0];
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 2115 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The restatement</dt><dd>A recipe is a node; each ingredient it needs is a prerequisite edge. Supplies are nodes that start satisfied. "Which recipes can I make?" is "which nodes does the topological sort reach?".</dd>
+          <dt>The naive approach</dt><dd>Loop repeatedly over all recipes, making any whose ingredients are all available, until a full pass changes nothing. Correct, but O(n²) in the number of recipes.</dd>
+          <dt>The change from LC 210</dt><dd>Nodes are <b>strings</b>, and not every ingredient is a recipe — some are raw supplies with no dependencies of their own.</dd>
+          <dt>Handling that</dt><dd>Give each recipe an indegree equal to its ingredient count, minus the ones already in supplies. Or more simply: seed the queue with every supply, and let an ingredient that is not a recipe simply never appear as a node.</dd>
+          <dt>The structure</dt><dd><code>Map&lt;String, List&lt;String&gt;&gt;</code> from ingredient to the recipes it feeds, plus <code>Map&lt;String, Integer&gt;</code> for indegrees. Everything else is the template.</dd>
+          <dt>Why cycles matter</dt><dd>Two recipes can require each other. Neither ever reaches indegree zero, so neither is emitted — which is the correct answer with no extra code.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 2115 · O(V + E) time, O(V + E) space</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;String&gt; findAllRecipes(String[] recipes, List&lt;List&lt;String&gt;&gt; ingredients,
+                                       String[] supplies) {
+        // ingredient -> recipes that need it
+        Map&lt;String, List&lt;String&gt;&gt; adj = new HashMap&lt;&gt;();
+        Map&lt;String, Integer&gt; indeg = new HashMap&lt;&gt;();
+
+        for (int i = 0; i &lt; recipes.length; i++) {
+            String recipe = recipes[i];
+            indeg.put(recipe, ingredients.get(i).size());
+
+            for (String ing : ingredients.get(i)) {
+                adj.computeIfAbsent(ing, k -&gt; new ArrayList&lt;&gt;()).add(recipe);
+            }
+        }
+
+        // SEED with the supplies — they are the zero-indegree nodes.
+        Queue&lt;String&gt; q = new ArrayDeque&lt;&gt;(Arrays.asList(supplies));
+
+        List&lt;String&gt; made = new ArrayList&lt;&gt;();
+
+        while (!q.isEmpty()) {
+            String have = q.poll();
+
+            // An ingredient nobody needs simply has no entry here.
+            for (String recipe : adj.getOrDefault(have, List.of())) {
+                if (indeg.merge(recipe, -1, Integer::sum) == 0) {
+                    made.add(recipe);      // every ingredient satisfied
+                    q.offer(recipe);       // and it can feed other recipes
+                }
+            }
+        }
+        // Mutually-dependent recipes never reach zero and are excluded,
+        // which is exactly the required behaviour.
+        return made;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>207 · Course Schedule <span class="tag a">Kahn</span></h4><p><b>Path:</b> "can you finish all courses" is "is this graph acyclic". The order itself is never needed.</p><p><b>Delta:</b> the template with <code>return count == numCourses;</code> and no output array. The DFS three-colour version is equally valid and slightly shorter if you prefer recursion.</p><p><b>Watch for:</b> solve 210 instead and return <code>order.length &gt; 0</code> — one implementation covers both problems, and 210 is the one that exercises the edge direction.</p></div>
+
+    <div class="card"><h4>802 · Find Eventual Safe States <span class="tag a">reversed</span></h4><p><b>Path:</b> a node is safe when every path from it ends at a terminal — equivalently, it can reach no cycle. Kahn's peels nodes with no <em>outgoing</em> edges rather than no incoming ones.</p><p><b>Delta:</b> build the reversed graph and use outdegree where indegree normally goes. Seed with the terminals, and everything the peeling reaches is safe.</p><p><b>Watch for:</b> the answer must be in ascending order. Collecting by scanning the <code>safe[]</code> array gives that for free; collecting in processing order does not.</p></div>
+
+    <div class="card"><h4>1462 · Course Schedule IV <span class="tag a">closure</span></h4><p><b>Path:</b> answering each query with its own traversal is O(Q·(V+E)) and too slow. The queries need the <b>transitive closure</b>, not a single order.</p><p><b>Delta:</b> run Kahn's while propagating a <code>boolean[n]</code> or <code>BitSet</code> of ancestors — when node <code>u</code> is processed, every dependent inherits <code>u</code>'s ancestor set plus <code>u</code> itself. With <code>n ≤ 100</code>, Floyd–Warshall over a reachability matrix is also acceptable and easier to write.</p><p><b>Watch for:</b> propagation must happen in topological order, or a node's ancestor set is incomplete when it is read.</p></div>
+
+    <div class="card"><h4>1203 · Sort Items by Groups <span class="tag a">Kahn × 2</span></h4><p><b>Path:</b> two levels of ordering — groups must be ordered relative to each other, and items within a group must be ordered too.</p><p><b>Delta:</b> assign every ungrouped item its own unique group first, so the group graph is well defined. Then topologically sort the groups, sort the items inside each group, and concatenate.</p><p><b>Watch for:</b> that first step is what makes the problem tractable — without it, items with <code>group == -1</code> are all lumped together and their mutual ordering is lost. A cycle in <em>either</em> sort means the answer is empty.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>210</b> and <b>802</b>. 210 fixes the edge direction and the count-based cycle check, which 207, 2115 and 1203 all reuse unchanged. 802 forces you to notice that reversing the graph turns "what depends on me" into "what do I depend on" — and that reversal is the move that makes several otherwise awkward graph problems fall out immediately.</div>
+</section>
+

@@ -1,0 +1,28 @@
+<section class="slide" data-sec="Version history" data-title="What changed, version by version">
+  <h2>What each Java release added to streams</h2>
+  <p class="dek">Streams arrived in Java 8 and have grown in small steps since, with one big one: Gatherers in 24. When a codebase is pinned to an older version, this table says which idioms it cannot use. The last three rows were checked against the JDKs' own class files and API lists.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Java</th><th>Released</th><th>Added</th></tr></thead>
+      <tbody>
+        <tr><td class="num">8</td><td class="num">2014 · LTS</td><td><code>java.util.stream</code>: <code>Stream</code>, the three primitive streams, <code>Collector</code>, <code>Collectors</code> (37 methods), <code>StreamSupport</code>. <code>Optional</code>, <code>java.util.function</code>, <code>Collection.stream()</code>, and stream sources across the JDK: <code>Files.lines</code>, <code>BufferedReader.lines</code>, <code>chars()</code>, <code>Random.ints</code>, <code>Pattern.splitAsStream</code></td></tr>
+        <tr><td class="num">9</td><td class="num">2017</td><td><code>takeWhile</code>, <code>dropWhile</code>, three-argument <code>iterate</code>, <code>ofNullable</code>. <code>Collectors.filtering</code> and <code>flatMapping</code>. <code>Optional.stream</code>, <code>or</code>, <code>ifPresentOrElse</code>. <code>Matcher.results</code>, <code>Scanner.tokens</code>, <code>LocalDate.datesUntil</code>. <code>count()</code> may now skip traversal on sized streams</td></tr>
+        <tr><td class="num">10</td><td class="num">2018</td><td><code>toUnmodifiableList</code>, <code>toUnmodifiableSet</code>, <code>toUnmodifiableMap</code>. <code>Optional.orElseThrow()</code>. <code>flatMap</code> honours short-circuiting (JDK-8075939)</td></tr>
+        <tr><td class="num">11</td><td class="num">2018 · LTS</td><td><code>Predicate.not</code>, <code>String.lines</code>, <code>Optional.isEmpty</code></td></tr>
+        <tr><td class="num">12</td><td class="num">2019</td><td><code>Collectors.teeing</code></td></tr>
+        <tr><td class="num">16</td><td class="num">2021</td><td><code>Stream.toList()</code>; <code>mapMulti</code> and its primitive forms</td></tr>
+        <tr><td class="num">17</td><td class="num">2021 · LTS</td><td><code>RandomGenerator</code>: <code>ints</code>, <code>longs</code> and <code>doubles</code> from any random generator</td></tr>
+        <tr><td class="num">21</td><td class="num">2023 · LTS</td><td><code>SequencedCollection.reversed()</code>, so <code>list.reversed().stream()</code> streams backwards; record patterns make lambdas over records shorter</td></tr>
+        <tr><td class="num">22 · 23</td><td class="num">2024</td><td>Stream Gatherers in preview (JEP 461, JEP 473)</td></tr>
+        <tr><td class="num">24</td><td class="num">2025</td><td>Gatherers final (JEP 485): <code>Stream.gather</code>, <code>Gatherer</code>, <code>Gatherers</code></td></tr>
+        <tr><td class="num">25</td><td class="num">2025 · LTS</td><td>No change: the stream, <code>Collectors</code>, <code>Gatherer</code> and <code>Optional</code> APIs are identical to 24</td></tr>
+        <tr><td class="num">26</td><td class="num">2026</td><td>No stream change. <code>Comparator</code> gains <code>min(a, b)</code> and <code>max(a, b)</code></td></tr>
+        <tr><td class="num">27</td><td class="num">2026</td><td>Nothing new in <code>java.util.stream</code> in its New API list</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The version question in interviews</span>"What's new in streams since Java 8?" The strong answer names four things and a date: <code>takeWhile</code>/<code>dropWhile</code> in 9, <code>teeing</code> in 12, <code>toList()</code> and <code>mapMulti</code> in 16, and Gatherers, final in 24, which make custom intermediate operations possible for the first time. Then add that <code>toList()</code> returns an unmodifiable list: that is the follow-up.</div>
+</section>
+

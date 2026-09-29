@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Internals" data-title="SpEL">
+  <h2>SpEL: where it appears, and where it should not</h2>
+  <p class="dek">The same expression language powers cache keys, security rules, event conditions and property defaults. It is convenient, unit-testable nowhere, and fails at runtime — so keep expressions short.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The five places you will meet it</div>
+<pre><code class="language-java">// 1. Cache keys — composite keys and conditions
+@Cacheable(cacheNames = "orders", key = "#customerId + ':' + #status",
+           condition = "#status != null", unless = "#result.isEmpty()")
+List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
+
+// 2. Security rules  (.value() — a value type never equals a String)
+@PreAuthorize("hasRole('OPS') or #cmd.customerId.value() == authentication.name")
+@PreAuthorize("@orderAccess.canView(#id, authentication)")   // call a bean — preferred
+
+// 3. Event conditions
+@EventListener(condition = "#event.total.amount &gt; 1000")
+
+// 4. Property values with defaults and SpEL
+@Value("${shop.retries:3}")
+@Value("#{systemProperties['user.timezone'] ?: 'UTC'}")
+@Value("#{'${shop.regions}'.split(',')}")
+
+// 5. Conditional bean registration
+@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active}'.contains('test')")</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Syntax worth remembering</h3>
+        <dl class="kv">
+          <dt><code>#name</code></dt><dd>a method argument (needs <code>-parameters</code> at compile time)</dd>
+          <dt><code>#result</code></dt><dd>the return value, in <code>unless</code></dd>
+          <dt><code>#root.method</code></dt><dd>the method name, for generic keys</dd>
+          <dt><code>@beanName</code></dt><dd>reference a bean and call it</dd>
+          <dt><code>?.</code></dt><dd>safe navigation — returns null instead of throwing</dd>
+          <dt><code>?:</code></dt><dd>Elvis, for defaults</dd>
+          <dt><code>?[..]</code> <code>![..]</code></dt><dd>collection filter and projection</dd>
+          <dt><code>${..}</code> vs <code>#{..}</code></dt><dd>property placeholder vs SpEL expression — different things</dd>
+        </dl>
+      </div>
+      <div class="note bad"><span class="lbl">Never evaluate user input as SpEL</span>Passing a request parameter into <code>parser.parseExpression(input)</code> is remote code execution — SpEL can reach <code>T(java.lang.Runtime)</code>. It appears in real CVEs. If you need user-supplied filtering, parse it yourself into a closed set of allowed operations.</div>
+      <div class="note tip"><span class="lbl">The refactoring rule</span>Once an expression contains both <code>and</code> and <code>or</code>, or exceeds about 60 characters, move it into a bean method and call that (<code>@orderAccess.canView(...)</code>). You get a compiler, a debugger and a unit test — none of which SpEL gives you.</div>
+    </div>
+  </div>
+</section>
+

@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Internals" data-title="AOP limits">
+  <h2>Why your aspect silently didn't run</h2>
+  <p class="dek">Every one of these applies equally to Spring's own annotations. Learn them once here and you have debugged four different "annotation does nothing" bugs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Situation</th><th>What happens</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Self-invocation — <code>this.method()</code></td><td>Advice never runs. <b>No error, no warning, in every Spring version</b> — the reference manual's own phrasing is that the annotation "may be silently ignored"</td><td>Move the method to another bean, or inject <code>self</code> via <code>@Lazy</code>, or use the template API directly. AspectJ weaving is the only mode that advises it; an IDE inspection catches it in review</td></tr>
+        <tr><td><code>private</code> or <code>final</code> method</td><td>CGLIB cannot override it — advice skipped</td><td>Make it <code>public</code> (or at least non-final) on the proxied bean</td></tr>
+        <tr><td><code>final</code> class</td><td>CGLIB cannot subclass — bean creation fails, or proxying is skipped</td><td>Remove <code>final</code>, or implement an interface so a JDK proxy can be used</td></tr>
+        <tr><td>Object created with <code>new</code></td><td>Not a bean, so no proxy exists at all</td><td>Let Spring create it</td></tr>
+        <tr><td>Called from a different thread</td><td>Advice runs, but <code>SecurityContext</code> / transaction / MDC are thread-bound and empty</td><td><code>DelegatingSecurityContextExecutor</code>, or pass context explicitly</td></tr>
+        <tr><td>Two aspects, wrong order</td><td>e.g. audit sees the pre-transaction state, or a retry re-runs inside a doomed transaction</td><td><code>@Order</code> on each aspect — and think about which must be outermost</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note bad"><span class="lbl">The ordering bug worth internalising</span>Retry <b>outside</b> transaction: each attempt gets a fresh transaction — correct. Retry <b>inside</b> transaction: the first failure already marked it rollback-only, so every retry runs in a transaction that can never commit, and you get <code>UnexpectedRollbackException</code> after wasting three attempts.
+    <p style="margin-top:8px">Put <code>@Retryable</code> on the <em>caller</em> of the transactional method, not on the transactional method itself.</p></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Proving a proxy exists, in two lines</div>
+<pre><code class="language-java">System.out.println(AopUtils.isAopProxy(orderService));        // true?
+System.out.println(AopUtils.isCglibProxy(orderService));      // which kind?
+System.out.println(AopProxyUtils.ultimateTargetClass(orderService));</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Kotlin and Lombok users</span>Kotlin classes are <code>final</code> by default — the <code>kotlin-spring</code> compiler plugin opens the annotated ones for you. Lombok's <code>@Value</code> makes a class <code>final</code>, which quietly breaks proxying on any bean using it.</div>
+    </div>
+  </div>
+</section>
+

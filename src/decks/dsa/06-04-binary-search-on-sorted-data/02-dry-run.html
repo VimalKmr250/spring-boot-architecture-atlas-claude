@@ -1,0 +1,124 @@
+<section class="slide" data-sec="04 · Binary search on sorted data" data-title="Dry run">
+  <h2>LC 34 traced on <code>[5,7,7,8,8,10]</code>, target 8</h2>
+  <p class="dek">Find the first and last index of 8. Both come from the <em>same</em> function: the first position is <code>lowerBound(8)</code>, and the last is <code>lowerBound(9) − 1</code>. Two calls, one template, no second implementation to get wrong.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 330" role="img" aria-label="Two binary search traces finding the lower bound of 8 and of 9 in a sorted array">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE ARRAY</text>
+        <rect x="120" y="26" width="58" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="180" y="26" width="58" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="240" y="26" width="58" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <rect x="300" y="26" width="58" height="30" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <rect x="360" y="26" width="58" height="30" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <rect x="420" y="26" width="58" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.25"></rect>
+        <text x="149" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">5</text>
+        <text x="209" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">7</text>
+        <text x="269" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">7</text>
+        <text x="329" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" font-weight="600" fill="currentColor">8</text>
+        <text x="389" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" font-weight="600" fill="currentColor">8</text>
+        <text x="449" y="46" text-anchor="middle" font-size="12.5" font-family="monospace" fill="currentColor">10</text>
+        <text x="149" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">0</text>
+        <text x="209" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">1</text>
+        <text x="269" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">2</text>
+        <text x="329" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">3</text>
+        <text x="389" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">4</text>
+        <text x="449" y="70" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor" opacity="0.4">5</text>
+        <text x="510" y="40" font-size="11" fill="currentColor" opacity="0.62">Answer: [3, 4]</text>
+        <text x="510" y="58" font-size="11" fill="currentColor" opacity="0.62">from lowerBound(8) = 3 and lowerBound(9) − 1 = 4</text>
+
+        <line x1="14" y1="86" x2="866" y2="86" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <!-- call 1 -->
+        <text x="14" y="106" font-size="11.5" font-weight="600" fill="#D26A3F">CALL 1 · lowerBound(8) — predicate is "a[i] &gt;= 8"</text>
+        <text x="14" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ITER</text>
+        <text x="80" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">[l, r)</text>
+        <text x="180" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">mid</text>
+        <text x="250" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">a[mid]</text>
+        <text x="330" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">a[mid] &gt;= 8 ?</text>
+        <text x="470" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">MOVE</text>
+        <text x="640" y="126" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">RANGE SIZE</text>
+
+        <text x="14" y="146" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="80" y="146" font-size="11" font-family="monospace" fill="currentColor">[0, 6)</text>
+        <text x="180" y="146" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="250" y="146" font-size="11" font-family="monospace" fill="currentColor">8</text>
+        <text x="330" y="146" font-size="11" font-family="monospace" fill="#3AA79B">TRUE</text>
+        <text x="470" y="146" font-size="11" font-family="monospace" fill="#3AA79B">r = mid = 3  (keep mid)</text>
+        <text x="646" y="146" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">6 → 3</text>
+
+        <text x="14" y="166" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="80" y="166" font-size="11" font-family="monospace" fill="currentColor">[0, 3)</text>
+        <text x="180" y="166" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="250" y="166" font-size="11" font-family="monospace" fill="currentColor">7</text>
+        <text x="330" y="166" font-size="11" font-family="monospace" fill="#D26A3F">false</text>
+        <text x="470" y="166" font-size="11" font-family="monospace" fill="#D26A3F">l = mid + 1 = 2  (drop mid)</text>
+        <text x="646" y="166" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3 → 1</text>
+
+        <text x="14" y="186" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="80" y="186" font-size="11" font-family="monospace" fill="currentColor">[2, 3)</text>
+        <text x="180" y="186" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="250" y="186" font-size="11" font-family="monospace" fill="currentColor">7</text>
+        <text x="330" y="186" font-size="11" font-family="monospace" fill="#D26A3F">false</text>
+        <text x="470" y="186" font-size="11" font-family="monospace" fill="#D26A3F">l = mid + 1 = 3  (drop mid)</text>
+        <text x="646" y="186" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1 → 0</text>
+
+        <text x="14" y="206" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">—</text>
+        <text x="80" y="206" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">[3, 3)</text>
+        <text x="180" y="206" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">—</text>
+        <text x="330" y="206" font-size="11" fill="currentColor" opacity="0.6">l == r, range empty</text>
+        <text x="470" y="206" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">return l = 3</text>
+        <text x="646" y="206" font-size="11" fill="currentColor" opacity="0.6">3 iterations for n=6</text>
+
+        <line x1="14" y1="222" x2="866" y2="222" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <!-- call 2 -->
+        <text x="14" y="242" font-size="11.5" font-weight="600" fill="#D26A3F">CALL 2 · lowerBound(9) — the same function, target + 1</text>
+
+        <text x="14" y="262" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="80" y="262" font-size="11" font-family="monospace" fill="currentColor">[0, 6)</text>
+        <text x="180" y="262" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="250" y="262" font-size="11" font-family="monospace" fill="currentColor">8</text>
+        <text x="330" y="262" font-size="11" font-family="monospace" fill="#D26A3F">false</text>
+        <text x="470" y="262" font-size="11" font-family="monospace" fill="#D26A3F">l = 4</text>
+        <text x="646" y="262" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">6 → 2</text>
+
+        <text x="14" y="282" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="80" y="282" font-size="11" font-family="monospace" fill="currentColor">[4, 6)</text>
+        <text x="180" y="282" font-size="11" font-family="monospace" fill="currentColor">5</text>
+        <text x="250" y="282" font-size="11" font-family="monospace" fill="currentColor">10</text>
+        <text x="330" y="282" font-size="11" font-family="monospace" fill="#3AA79B">TRUE</text>
+        <text x="470" y="282" font-size="11" font-family="monospace" fill="#3AA79B">r = 5</text>
+        <text x="646" y="282" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2 → 1</text>
+
+        <text x="14" y="302" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="80" y="302" font-size="11" font-family="monospace" fill="currentColor">[4, 5)</text>
+        <text x="180" y="302" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="250" y="302" font-size="11" font-family="monospace" fill="currentColor">8</text>
+        <text x="330" y="302" font-size="11" font-family="monospace" fill="#D26A3F">false</text>
+        <text x="470" y="302" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">l = 5 → return 5, so last = 4</text>
+        <text x="646" y="302" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1 → 0</text>
+
+        <text x="14" y="322" font-size="10.5" fill="currentColor" opacity="0.62">Neither call ever tests for equality. Both just locate a boundary — which is why one function answers two different questions.</text>
+      </svg>
+    </div>
+    <figcaption>Iteration 1 of call 1 lands exactly on an 8 — and the loop does not stop. It cannot: there may be an earlier 8. Keeping <code>mid</code> in range with <code>r = mid</code> is what finds the <em>first</em> one rather than an arbitrary one.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Call</th><th class="num">l</th><th class="num">r</th><th class="num">mid</th><th class="num">a[mid]</th><th>predicate</th><th>action</th><th>result</th></tr></thead>
+      <tbody>
+        <tr><td>lowerBound(8)</td><td class="num">0</td><td class="num">6</td><td class="num">3</td><td class="num">8</td><td>8 ≥ 8 → true</td><td><code>r = 3</code>, mid kept</td><td class="num">—</td></tr>
+        <tr><td>lowerBound(8)</td><td class="num">0</td><td class="num">3</td><td class="num">1</td><td class="num">7</td><td>7 ≥ 8 → false</td><td><code>l = 2</code>, mid dropped</td><td class="num">—</td></tr>
+        <tr><td>lowerBound(8)</td><td class="num">2</td><td class="num">3</td><td class="num">2</td><td class="num">7</td><td>7 ≥ 8 → false</td><td><code>l = 3</code>, mid dropped</td><td class="num">first = 3</td></tr>
+        <tr><td>lowerBound(9)</td><td class="num">0</td><td class="num">6</td><td class="num">3</td><td class="num">8</td><td>8 ≥ 9 → false</td><td><code>l = 4</code></td><td class="num">—</td></tr>
+        <tr><td>lowerBound(9)</td><td class="num">4</td><td class="num">6</td><td class="num">5</td><td class="num">10</td><td>10 ≥ 9 → true</td><td><code>r = 5</code></td><td class="num">—</td></tr>
+        <tr><td>lowerBound(9)</td><td class="num">4</td><td class="num">5</td><td class="num">4</td><td class="num">8</td><td>8 ≥ 9 → false</td><td><code>l = 5</code></td><td class="num">last = 5 − 1 = 4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why <code>lowerBound(target + 1) − 1</code> gives the last occurrence</span><code>lowerBound(9)</code> returns the first index holding something ≥ 9, which is the first index <em>past</em> the run of 8s. Step back one and you are on the last 8. This works even when the target is absent: then both calls return the same index, the range is empty, and you return <code>[−1, −1]</code> after a single equality check. No separate "upper bound" function is ever needed.</div>
+</section>
+

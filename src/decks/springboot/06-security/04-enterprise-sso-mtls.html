@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Security" data-title="Enterprise SSO & mTLS">
+  <h2>Enterprise SSO, token relay and service-to-service trust</h2>
+  <p class="dek">Where the corporate identity estate meets your service. Usually one central IdP — Entra ID, Ping, Okta, Keycloak — fronting an older directory, and two hard questions: how identity reaches you, and how it propagates onward.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SAML 2 — still the default in large enterprises for browser SSO</div>
+<pre><code class="language-yaml">spring.security.saml2.relyingparty.registration.corp:
+  assertingparty.metadata-uri: https://sso.retailco.com/idp/metadata
+  signing.credentials:
+    - private-key-location: classpath:sp.key
+      certificate-location: classpath:sp.crt
+# starter: spring-boot-starter-security + spring-security-saml2-service-provider</code></pre>
+<pre style="margin-top:10px"><code class="language-java">http.saml2Login(withDefaults())
+    .saml2Logout(withDefaults());</code></pre>
+      <div class="codelabel" style="margin-top:14px">OIDC login, plus relaying the token onward</div>
+<pre><code class="language-java">http.oauth2Login(withDefaults());        // browser-facing app / BFF
+
+// Propagate the caller's identity to a downstream service, rather than
+// calling it as a generic service account:
+@Bean OAuth2AuthorizedClientManager clientManager(...) { ... }
+
+@Bean RestClient wmsClient(OAuth2AuthorizedClientManager manager) {
+    var interceptor = new OAuth2ClientHttpRequestInterceptor(manager);
+    return RestClient.builder()
+            .baseUrl("https://wms.internal")
+            .requestInterceptor(interceptor)
+            .build();
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Identity propagation: two models</h3>
+        <dl class="kv">
+          <dt>Token relay</dt><dd>Pass the user's token (or exchange it) downstream. Downstream can enforce user-level rules and the audit trail names a person. More coupling to the IdP.</dd>
+          <dt>Service account</dt><dd>Call with client credentials and pass the user id as a claim or header. Simpler and faster; downstream must trust you, so it needs mTLS or a service mesh to know it really is you.</dd>
+        </dl>
+        <p style="margin-top:4px">Regulated work usually wants token relay for anything customer-affecting and service accounts for infrastructure calls.</p>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">mTLS between services</div>
+<pre><code class="language-yaml">server.ssl:
+  client-auth: need                 # reject callers without a valid client cert
+  trust-store: classpath:truststore.p12
+  trust-store-password: ${TRUSTSTORE_PW}
+# Then map the cert subject to an Authentication:
+# http.x509(x -> x.subjectPrincipalRegex("CN=(.*?)(?:,|$)"))</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Let the platform do it</span>A service mesh issues and rotates workload certificates automatically and gives you mTLS with no application code and no certificate expiry incidents at 3am on a bank holiday. Hand-managed truststores in a Spring config are a maintenance burden that outlives whoever set them up.</div>
+    </div>
+  </div>
+</section>
+

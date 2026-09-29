@@ -1,0 +1,119 @@
+<section class="slide" data-sec="23 · Shortest path" data-title="The reusable structure">
+  <h2>One heap loop, and three ways to change what "shorter" means</h2>
+  <p class="dek">The skeleton is fixed. What varies is the comparator, how costs combine, and whether the state needs an extra dimension for a constraint.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">Dijkstra — the template</div>
+<pre><code class="language-java">/**
+ * Shortest distances from `src`. Requires NON-NEGATIVE weights:
+ * the correctness argument is that a popped node can never be
+ * improved by anything still in the queue.
+ *
+ * Lazy deletion: Java's PriorityQueue cannot decrease a key, so we
+ * push a new entry and skip the stale one when it surfaces.
+ */
+int[] dijkstra(int n, List&lt;int[]&gt;[] adj, int src) {
+    int[] dist = new int[n];
+    Arrays.fill(dist, Integer.MAX_VALUE);
+    dist[src] = 0;
+
+    // (node, distance), ordered by distance
+    PriorityQueue&lt;int[]&gt; pq =
+            new PriorityQueue&lt;&gt;((a, b) -&gt; Integer.compare(a[1], b[1]));
+    pq.offer(new int[]{src, 0});
+
+    while (!pq.isEmpty()) {
+        int[] cur = pq.poll();
+        int node = cur[0], d = cur[1];
+
+        // STALE: a better route to this node was already recorded.
+        if (d &gt; dist[node]) continue;
+
+        for (int[] e : adj[node]) {
+            int next = e[0], w = e[1];
+            int cand = d + w;
+
+            if (cand &lt; dist[next]) {
+                dist[next] = cand;
+                pq.offer(new int[]{next, cand});   // push, never update
+            }
+        }
+    }
+    return dist;
+}</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Changing what "shorter" means</div>
+<pre><code class="language-java">// MAXIMISE a PRODUCT — probabilities (LC 1514).
+// Max-heap, and costs MULTIPLY instead of adding.
+PriorityQueue&lt;Object[]&gt; pq = new PriorityQueue&lt;&gt;(
+        (a, b) -&gt; Double.compare((double) b[1], (double) a[1]));
+double cand = prob * edgeProb;
+if (cand &gt; best[next]) { best[next] = cand; pq.offer(...); }
+
+// MINIMISE a MAXIMUM — minimax paths (LC 1631, 778).
+// The path cost is the WORST single step, not the sum.
+int cand = Math.max(effortSoFar, Math.abs(h[next] - h[cur]));
+if (cand &lt; dist[next]) { dist[next] = cand; pq.offer(...); }
+
+// COUNT the shortest paths (LC 1976).
+// Carry a ways[] alongside dist[]:
+if (cand &lt; dist[next]) {
+    dist[next] = cand;
+    ways[next] = ways[cur];                    // a strictly better route
+    pq.offer(...);
+} else if (cand == dist[next]) {
+    ways[next] = (ways[next] + ways[cur]) % MOD;   // another equally short one
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Bellman-Ford — when a constraint bounds the hops (LC 787)</div>
+<pre><code class="language-java">/**
+ * "At most k stops" breaks Dijkstra's invariant: a MORE expensive
+ * route that uses fewer stops may still win later, so a single
+ * distance per node is not enough information.
+ *
+ * Bellman-Ford relaxes every edge k+1 times. After round r, dist[]
+ * holds the cheapest cost reachable using AT MOST r edges — so the
+ * hop limit falls out of the round count for free.
+ */
+int findCheapestPrice(int n, int[][] flights, int src, int dst, int k) {
+    int[] dist = new int[n];
+    Arrays.fill(dist, Integer.MAX_VALUE);
+    dist[src] = 0;
+
+    for (int round = 0; round &lt;= k; round++) {
+        // Relax from a SNAPSHOT: without it, a route found earlier in
+        // this same round could be extended again, using more than
+        // `round + 1` edges and breaking the hop bound.
+        int[] prev = dist.clone();
+
+        for (int[] f : flights) {
+            int from = f[0], to = f[1], price = f[2];
+            if (prev[from] == Integer.MAX_VALUE) continue;
+
+            dist[to] = Math.min(dist[to], prev[from] + price);
+        }
+    }
+    return dist[dst] == Integer.MAX_VALUE ? -1 : dist[dst];
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Choosing the algorithm</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Unweighted</dt><dd>Plain BFS. A priority queue is wasted effort when every edge costs 1.</dd>
+        <dt>Non-negative weights</dt><dd>Dijkstra. O(E log E), and the default choice.</dd>
+        <dt>A hop or step limit</dt><dd>Bellman-Ford with the round count as the limit, or Dijkstra over <code>(node, stepsUsed)</code> states.</dd>
+        <dt>All pairs, small V</dt><dd>Floyd–Warshall. Three nested loops, O(V³), and trivial to write correctly when <code>V ≤ 100</code>.</dd>
+        <dt>Minimax rather than sum</dt><dd>Dijkstra with <code>max</code> in place of <code>+</code>. Union-find with sorted edges also solves these, and is worth naming.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Overflow when relaxing</b> — <code>dist[u] + w</code> overflows when <code>dist[u]</code> is <code>Integer.MAX_VALUE</code>; skip unreachable nodes first, or use a large finite sentinel. <b>Omitting the stale skip</b> — still correct, but finalised nodes are re-expanded and the solution times out on dense graphs. <b>Relaxing in place in Bellman-Ford</b> — without the <code>clone()</code>, one round can chain several edges and the hop limit is silently violated, which is the classic LC 787 wrong answer.</div>
+  </div>
+</section>
+

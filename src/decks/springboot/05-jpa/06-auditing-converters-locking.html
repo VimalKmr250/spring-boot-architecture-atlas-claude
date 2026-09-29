@@ -1,0 +1,55 @@
+<section class="slide" data-sec="JPA" data-title="Auditing, converters, locking">
+  <h2>Auditing, converters, soft delete, locking</h2>
+  <p class="dek">The four cross-cutting concerns every enterprise entity eventually grows, each with a proper JPA mechanism and a common hand-rolled version that is worse.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Auditing — four annotations and one bean</div>
+<pre><code class="language-java">@Configuration
+@EnableJpaAuditing(auditorAwareRef = "auditorAware")
+class AuditConfig {
+    @Bean AuditorAware&lt;String&gt; auditorAware() {
+        return () -&gt; Optional.ofNullable(SecurityContextHolder.getContext())
+                .map(SecurityContext::getAuthentication)
+                .filter(Authentication::isAuthenticated)
+                .map(Authentication::getName);
+    }
+}
+
+@Entity
+@EntityListeners(AuditingEntityListener.class)     // ← easy to forget; nothing happens without it
+class OrderJpaEntity extends Auditable { ... }</code></pre>
+      <div class="codelabel" style="margin-top:14px">Converters — for types JPA does not know</div>
+<pre><code class="language-java">@Converter(autoApply = true)                       // applies to every Money field
+class MoneyConverter implements AttributeConverter&lt;Money, Long&gt; {
+    public Long convertToDatabaseColumn(Money m) { return m == null ? null : m.minorUnits(); }
+    public Money convertToEntityAttribute(Long v)  { return v == null ? null : Money.ofMinor(v); }
+}
+
+@Convert(converter = EncryptedStringConverter.class)   // per-field, e.g. PII at rest
+private String taxIdentifier;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Soft delete and locking</div>
+<pre><code class="language-java">@Entity
+@SoftDelete(columnName = "deleted")        // Hibernate 6.4+: adds the predicate everywhere
+class PromotionEntity { ... }
+
+// Optimistic (default choice): no locks held, retry on conflict
+@Version private long version;
+
+// Pessimistic: only for genuinely contended single rows
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("select i from InventoryItemEntity i where i.sku = :sku")
+Optional&lt;InventoryItemEntity&gt; findForUpdate(@Param("sku") String sku);
+
+@DynamicUpdate      // UPDATE only the changed columns, not all of them
+@OptimisticLocking(type = OptimisticLockType.DIRTY)   // version-less, niche</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Soft delete has a tail</span>Unique constraints stop working the way you expect — a "deleted" row still occupies the unique value, so re-creating the same SKU fails. Use a partial index (<code>CREATE UNIQUE INDEX ... WHERE deleted = false</code>). And any native query or reporting join you write must repeat the predicate yourself; the Hibernate filter does not reach them.</div>
+      <div class="note tip"><span class="lbl">Converter vs <code>@Embeddable</code></span>Use <code>AttributeConverter</code> when the value type maps to <b>one</b> column (<code>Money</code> → <code>bigint</code>). Use <code>@Embeddable</code> when it maps to <b>several</b> (<code>Address</code> → four columns). Trying to force a multi-column type through a converter ends in a serialised blob nobody can query.</div>
+    </div>
+  </div>
+</section>
+

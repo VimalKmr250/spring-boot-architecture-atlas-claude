@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Core annotations" data-title="Web MVC annotations">
+  <h2>Web MVC: mapping, binding, responding</h2>
+  <p class="dek">The full set you use on a real controller, plus the two response-shaping annotations that most teams only discover after their error format has already gone inconsistent.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">OrderController.java — every common annotation in one place</div>
+<pre><code class="language-java">@RestController
+@RequestMapping("/api/orders")                    // class-level prefix
+@Validated                                        // enables @Min/@NotBlank on params
+class OrderController {
+
+    @GetMapping("/{id}")
+    OrderView get(@PathVariable UUID id) { ... }
+
+    @GetMapping
+    Page&lt;OrderSummary&gt; list(
+            @RequestParam(defaultValue = "PLACED") OrderStatus status,
+            @RequestParam(required = false) @Size(max = 64) String customerRef,
+            @RequestHeader(value = "X-Channel", defaultValue = "web") String channel,
+            @CookieValue(required = false) String sessionHint,
+            @PageableDefault(size = 20, sort = "placedAt", direction = DESC) Pageable page) { ... }
+
+    @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    @ResponseStatus(CREATED)                      // 201 instead of the default 200
+    OrderView place(@Valid @RequestBody PlaceOrderRequest body,
+                    @RequestHeader("Idempotency-Key") @NotBlank String key,
+                    @AuthenticationPrincipal Jwt jwt) { ... }
+
+    @PatchMapping("/{id}/address")
+    ResponseEntity&lt;Void&gt; reroute(@PathVariable UUID id, @RequestBody AddressPatch patch) {
+        orders.reroute(OrderId.of(id), patch);
+        return ResponseEntity.noContent().build();   // full control when you need it
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(NO_CONTENT)
+    void cancel(@PathVariable UUID id) { ... }
+}</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>@RestControllerAdvice</code></h4><p>Class-level <code>@ExceptionHandler</code> methods shared across controllers. Scope it with <code>@RestControllerAdvice(basePackages = "...")</code> when different modules need different error shapes — otherwise one advice quietly owns the whole application.</p></div>
+    <div class="card"><h4><code>@ResponseStatus</code> two ways</h4><p>On a handler method it sets the success status. On an exception class it maps that exception to a status without any advice — convenient for simple cases, but it produces Boot's default error body, not your <code>ProblemDetail</code>.</p></div>
+    <div class="card"><h4><code>@CrossOrigin</code></h4><p>Works, but scattering it across controllers means CORS rules live in fifteen files. Configure it once in <code>WebMvcConfigurer.addCorsMappings</code> — or at the gateway, which is where it belongs in an enterprise topology.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Return type: DTO or <code>ResponseEntity</code>?</span>Return the DTO directly when the status is always the same — it is cleaner and reads better. Reach for <code>ResponseEntity</code> only when the status, headers or presence of a body genuinely vary at runtime (<code>Location</code> on create, <code>ETag</code>, conditional 304). Mixing both in one controller is fine and normal.</div>
+</section>
+

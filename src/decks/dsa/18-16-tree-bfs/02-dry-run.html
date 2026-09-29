@@ -1,0 +1,79 @@
+<section class="slide" data-sec="16 · Tree BFS" data-title="Dry run">
+  <h2>LC 102 traced on <code>3 / 9, 20 / null, null, 15, 7</code></h2>
+  <p class="dek">Level order on the standard example. Three iterations of the outer loop produce three levels. Watch the queue contents at the top of each iteration — it always holds exactly one complete level, which is what makes the size snapshot correct.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 314" role="img" aria-label="Level order traversal trace showing the queue before and after each level is drained">
+        <circle cx="130" cy="46" r="20" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.6"></circle>
+        <text x="130" y="52" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">3</text>
+        <path d="M114 60 L78 86" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M146 60 L182 86" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="62" cy="102" r="20" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.7"></circle>
+        <text x="62" y="108" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">9</text>
+        <circle cx="198" cy="102" r="20" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-opacity="0.7"></circle>
+        <text x="198" y="108" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">20</text>
+        <path d="M182 116 L150 142" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <path d="M214 116 L246 142" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.2"></path>
+        <circle cx="134" cy="158" r="20" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-opacity="0.4"></circle>
+        <text x="134" y="164" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">15</text>
+        <circle cx="262" cy="158" r="20" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-opacity="0.4"></circle>
+        <text x="262" y="164" text-anchor="middle" font-size="11.5" font-family="monospace" fill="currentColor">7</text>
+        <text x="62" y="136" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.45">no children</text>
+
+        <text x="330" y="46" font-size="11" fill="currentColor" opacity="0.7">Output: <tspan font-family="monospace" fill="#D26A3F">[[3], [9,20], [15,7]]</tspan></text>
+        <text x="330" y="70" font-size="10.5" fill="currentColor" opacity="0.6">Node 9 contributes nothing to level 2 —</text>
+        <text x="330" y="86" font-size="10.5" fill="currentColor" opacity="0.6">its null children are filtered on enqueue,</text>
+        <text x="330" y="102" font-size="10.5" fill="currentColor" opacity="0.6">which keeps the queue free of null entries.</text>
+
+        <line x1="14" y1="188" x2="866" y2="188" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="14" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ITER</text>
+        <text x="76" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">QUEUE AT TOP</text>
+        <text x="230" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">size</text>
+        <text x="300" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">DRAINED</text>
+        <text x="440" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ENQUEUED WHILE DRAINING</text>
+        <text x="690" y="208" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">LEVEL EMITTED</text>
+
+        <text x="14" y="232" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">1</text>
+        <text x="76" y="232" font-size="11" font-family="monospace" fill="currentColor">[3]</text>
+        <text x="236" y="232" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">1</text>
+        <text x="300" y="232" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="440" y="232" font-size="11" font-family="monospace" fill="#3AA79B">9, 20</text>
+        <text x="690" y="232" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">[3]</text>
+
+        <text x="14" y="256" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">2</text>
+        <text x="76" y="256" font-size="11" font-family="monospace" fill="currentColor">[9, 20]</text>
+        <text x="236" y="256" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">2</text>
+        <text x="300" y="256" font-size="11" font-family="monospace" fill="currentColor">9, then 20</text>
+        <text x="440" y="256" font-size="11" font-family="monospace" fill="#3AA79B">(9 adds none), 15, 7</text>
+        <text x="690" y="256" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">[9, 20]</text>
+
+        <text x="14" y="280" font-size="11" font-family="monospace" fill="currentColor" opacity="0.6">3</text>
+        <text x="76" y="280" font-size="11" font-family="monospace" fill="currentColor">[15, 7]</text>
+        <text x="236" y="280" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">2</text>
+        <text x="300" y="280" font-size="11" font-family="monospace" fill="currentColor">15, then 7</text>
+        <text x="440" y="280" font-size="11" font-family="monospace" fill="currentColor" opacity="0.5">nothing — both are leaves</text>
+        <text x="690" y="280" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">[15, 7]</text>
+
+        <text x="14" y="306" font-size="10.5" fill="currentColor" opacity="0.62">Iteration 2 is the one that matters: the snapshot is 2, so exactly nodes 9 and 20 are drained — even though 15 and 7 join the queue midway.</text>
+      </svg>
+    </div>
+    <figcaption>If the loop tested <code>queue.size()</code> live instead of the snapshot, iteration 2 would keep going and swallow 15 and 7, emitting <code>[9,20,15,7]</code> as a single level.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">iteration</th><th>queue at top</th><th class="num">snapshot</th><th>drained in order</th><th>children added</th><th>level output</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td class="num">[3]</td><td class="num">1</td><td>3</td><td class="num">9, 20</td><td class="num">[3]</td></tr>
+        <tr><td class="num">2</td><td class="num">[9, 20]</td><td class="num">2</td><td>9, 20</td><td class="num">15, 7</td><td class="num">[9, 20]</td></tr>
+        <tr><td class="num">3</td><td class="num">[15, 7]</td><td class="num">2</td><td>15, 7</td><td class="num">none</td><td class="num">[15, 7]</td></tr>
+        <tr><td class="num">—</td><td class="num">[]</td><td class="num">—</td><td>loop ends</td><td class="num">—</td><td class="num">done</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Filter nulls on enqueue, not on dequeue</span>Check <code>if (node.left != null)</code> before adding. The alternative — enqueuing nulls and skipping them on dequeue — makes the size snapshot meaningless, because a level's recorded width then includes phantom entries. The one exception is when you deliberately use null as a level separator, which is an alternative formulation of this pattern but does not mix with the size snapshot.</div>
+</section>
+

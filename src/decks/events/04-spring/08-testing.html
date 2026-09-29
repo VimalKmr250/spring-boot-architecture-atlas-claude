@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Spring" data-title="Testing">
+  <h2>Testing event-driven code at four levels</h2>
+  <p class="dek">You cannot unit-test a topology, and end-to-end tests of one are slow and flaky. Match the level to what you are actually trying to prove.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Level</th><th>Tool</th><th>Proves</th><th>Speed</th></tr></thead>
+      <tbody>
+        <tr><td>Handler logic</td><td>Plain JUnit — call the method directly</td><td>The business rule, including idempotency on a repeat call</td><td class="num">&lt; 1 ms</td></tr>
+        <tr><td>Serialization</td><td><code>@JsonTest</code> / Avro round-trip</td><td>The payload serialises, deserialises and matches the schema</td><td class="num">ms</td></tr>
+        <tr><td>Integration</td><td>Testcontainers Kafka + <code>@SpringBootTest</code></td><td>Real producer, broker, consumer group, offsets, error handler, DLT</td><td class="num">~5 s</td></tr>
+        <tr><td>Contract</td><td>Schema registry compatibility check in CI</td><td>You have not broken a consumer you cannot name</td><td class="num">s — a gate</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Integration test with Testcontainers and Awaitility</div>
+<pre><code class="language-java">@SpringBootTest
+@Import(KafkaContainerConfig.class)
+class OrderEventFlowIT {
+
+    @Test
+    void placingAnOrderReservesStock() {
+        var orderId = orders.place(aValidOrder());
+
+        await().atMost(Duration.ofSeconds(10))         // async: poll, never Thread.sleep
+               .untilAsserted(() -&gt;
+                   assertThat(reservations.findByOrderId(orderId)).isPresent());
+    }
+
+    @Test
+    void aDuplicateEventIsIgnored() {
+        kafka.send(TOPIC, orderId, event);
+        kafka.send(TOPIC, orderId, event);            // same event twice
+
+        await().during(Duration.ofSeconds(2))          // and STAYS at one
+               .atMost(Duration.ofSeconds(10))
+               .untilAsserted(() -&gt;
+                   assertThat(reservations.countByOrderId(orderId)).isEqualTo(1));
+    }
+
+    @Test
+    void aPoisonRecordLandsInTheDlt() {
+        kafka.send(TOPIC, orderId, "{ not json");
+        await().atMost(Duration.ofSeconds(10))
+               .untilAsserted(() -&gt; assertThat(dltRecords()).hasSize(1));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Testcontainers over <code>@EmbeddedKafka</code></span>Embedded Kafka is faster to start but is not the broker you run — it diverges on version, on configuration, and on transactional behaviour. With container reuse, Testcontainers costs a few seconds once per build and tests the real thing.</div>
+      <div class="note bad"><span class="lbl"><code>Thread.sleep</code> in an async test</span>Too short and it is flaky; too long and the suite crawls. Awaitility polls until the condition holds and fails fast with a useful message. The <code>during()</code> form above is the one people miss — it is how you assert that something <em>stays</em> true, which is the whole point of a duplicate test.</div>
+      <div class="note warn"><span class="lbl">Test the three properties, not the happy path</span>Every consumer deserves three tests: it works, <b>a duplicate changes nothing</b>, and <b>a poison record reaches the DLT without stalling</b>. Those two extra tests are what make the consumer safe to operate.</div>
+    </div>
+  </div>
+</section>
+

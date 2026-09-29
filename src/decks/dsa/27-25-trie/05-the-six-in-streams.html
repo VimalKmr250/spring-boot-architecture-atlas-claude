@@ -1,0 +1,215 @@
+<section class="slide" data-sec="25 · Trie" data-title="The six, in streams">
+  <h2>A trie walk is a fold; a wildcard is an anyMatch</h2>
+  <p class="dek">Walking a word down a trie is a left fold over its letters, and Java 17 has no <code>foldLeft</code>. On a sequential stream the three-argument <code>reduce</code> behaves as one, provided its combiner never runs, so 208 and 211 make that combiner throw. A <code>.</code> in 211 becomes an <code>anyMatch</code> over all 26 children. Within their limits, three of the six need no trie at all: a hash set of roots for 648, a scan of at most 50 keys for 677, and a scan of the sorted products for 1268. 212 is the exception. Its speed comes from pruning the trie as words are found, and a stream can only drive that search.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">208</td><td><a href="https://leetcode.com/problems/implement-trie-prefix-tree/" target="_blank" rel="noopener">Implement Trie (Prefix Tree)</a></td><td>Every operation folds the word's letters down the trie with a three-argument <code>reduce</code>. Insert creates the missing nodes on the way.</td><td><span class="tag w">stateful</span></td><td class="num">O(L) per op</td><td class="num">same</td></tr>
+        <tr><td class="num">211</td><td><a href="https://leetcode.com/problems/design-add-and-search-words-data-structure/" target="_blank" rel="noopener">Design Add and Search Words Data Structure</a></td><td>Insert is 208's fold. In the search, a <code>.</code> streams all 26 children into a recursive <code>anyMatch</code>.</td><td><span class="tag w">stateful</span></td><td class="num">O(26^dots · L)</td><td class="num">same</td></tr>
+        <tr><td class="num">648</td><td><a href="https://leetcode.com/problems/replace-words/" target="_blank" rel="noopener">Replace Words</a></td><td>A hash set of roots replaces the trie. Each word becomes its shortest prefix in the set, trying no more letters than the longest root has.</td><td><span class="tag g">clean</span></td><td class="num">O(S·R), R ≤ 100</td><td class="num">O(total chars)</td></tr>
+        <tr><td class="num">677</td><td><a href="https://leetcode.com/problems/map-sum-pairs/" target="_blank" rel="noopener">Map Sum Pairs</a></td><td>Keep a plain map. <code>sum</code> filters the keys with <code>startsWith</code> and adds up their values.</td><td><span class="tag g">clean</span></td><td class="num">O(n·L) per sum</td><td class="num">O(L) insert</td></tr>
+        <tr><td class="num">1268</td><td><a href="https://leetcode.com/problems/search-suggestions-system/" target="_blank" rel="noopener">Search Suggestions System</a></td><td>Sort once. For each prefix typed, <code>filter(startsWith).limit(3)</code> over the sorted list.</td><td><span class="tag g">clean</span></td><td class="num">O(L · total chars)</td><td class="num">O(total chars)</td></tr>
+        <tr><td class="num">212</td><td><a href="https://leetcode.com/problems/word-search-ii/" target="_blank" rel="noopener">Word Search II</a></td><td>Build the trie with 208's fold, then run a DFS from every cell that marks cells and prunes found words. <code>forEach</code> only drives it.</td><td><span class="tag b">forced</span></td><td class="num">O(mn·4^L)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 208 · Implement Trie (Prefix Tree) · stateful</div>
+<pre><code class="language-java">class Trie {
+    private static class Node {
+        final Node[] next = new Node[26];
+        boolean word;
+
+        Node child(int c, boolean create) {
+            if (next[c - 'a'] == null &amp;&amp; create)
+                next[c - 'a'] = new Node();
+            return next[c - 'a'];
+        }
+    }
+
+    private final Node root = new Node();
+
+    public void insert(String word) {
+        walk(word, true).word = true;
+    }
+
+    public boolean search(String word) {
+        Node n = walk(word, false);
+        return n != null &amp;&amp; n.word;
+    }
+
+    public boolean startsWith(String prefix) {
+        return walk(prefix, false) != null;
+    }
+
+    // Java 17 has no foldLeft. On a sequential stream the
+    // three-argument reduce is one; its combiner never runs.
+    private Node walk(String w, boolean create) {
+        return w.chars().boxed().reduce(root,
+                (n, c) -&gt; n == null ? null : n.child(c, create),
+                (a, b) -&gt; { throw new AssertionError(); });
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 211 · Design Add and Search Words Data Structure · stateful</div>
+<pre><code class="language-java">class WordDictionary {
+    private static class Node {
+        final Node[] next = new Node[26];
+        boolean word;
+    }
+
+    private final Node root = new Node();
+
+    public void addWord(String word) {
+        // The sequential fold down the trie from 208's insert.
+        Node end = word.chars().boxed().reduce(root, (n, c) -&gt; {
+            int i = c - 'a';
+            if (n.next[i] == null) n.next[i] = new Node();
+            return n.next[i];
+        }, (a, b) -&gt; { throw new AssertionError(); });
+        end.word = true;
+    }
+
+    public boolean search(String word) {
+        return match(root, word, 0);
+    }
+
+    // A '.' tries every child: anyMatch over them, recursively.
+    // The search reads the trie and never changes it.
+    private static boolean match(Node n, String w, int i) {
+        if (n == null) return false;
+        if (i == w.length()) return n.word;
+        char c = w.charAt(i);
+        Stream&lt;Node&gt; options = c == '.'
+                ? Arrays.stream(n.next)
+                : Stream.of(n.next[c - 'a']);
+        return options.anyMatch(ch -&gt; match(ch, w, i + 1));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 648 · Replace Words · clean</div>
+<pre><code class="language-java">class Solution {
+    public String replaceWords(List&lt;String&gt; dictionary,
+                               String sentence) {
+        Set&lt;String&gt; roots = new HashSet&lt;&gt;(dictionary);
+        int longest = dictionary.stream()
+                .mapToInt(String::length).max().orElse(0);
+        // A hash set of roots stands in for the trie: try each
+        // prefix up to the longest root, shortest first.
+        return Arrays.stream(sentence.split(" "))
+                .map(w -&gt; IntStream.rangeClosed(1, w.length())
+                        .limit(longest)
+                        .mapToObj(k -&gt; w.substring(0, k))
+                        .filter(roots::contains)
+                        .findFirst().orElse(w))
+                .collect(Collectors.joining(" "));
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 677 · Map Sum Pairs · clean</div>
+<pre><code class="language-java">class MapSum {
+    private final Map&lt;String, Integer&gt; vals = new HashMap&lt;&gt;();
+
+    public void insert(String key, int val) {
+        vals.put(key, val);    // a repeated key overwrites
+    }
+
+    // At most 50 calls and keys of at most 50 letters: a scan
+    // of every key per sum is plenty, and needs no trie.
+    public int sum(String prefix) {
+        return vals.entrySet().stream()
+                .filter(e -&gt; e.getKey().startsWith(prefix))
+                .mapToInt(Map.Entry::getValue)
+                .sum();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1268 · Search Suggestions System · clean</div>
+<pre><code class="language-java">class Solution {
+    public List&lt;List&lt;String&gt;&gt; suggestedProducts(
+            String[] products, String searchWord) {
+        List&lt;String&gt; sorted = Arrays.stream(products).sorted()
+                .toList();
+        // For each prefix typed so far, the first three sorted
+        // products that start with it.
+        return IntStream.rangeClosed(1, searchWord.length())
+                .mapToObj(k -&gt; searchWord.substring(0, k))
+                .map(p -&gt; sorted.stream()
+                        .filter(s -&gt; s.startsWith(p))
+                        .limit(3)
+                        .toList())
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 212 · Word Search II · forced</div>
+<pre><code class="language-java">class Solution {
+    private static class Node {
+        final Node[] next = new Node[26];
+        String word;       // set on the node ending a word
+    }
+
+    private static final int[][] STEPS =
+            { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
+
+    public List&lt;String&gt; findWords(char[][] board,
+                                  String[] words) {
+        Node root = new Node();
+        BinaryOperator&lt;Node&gt; never = (a, b) -&gt; {
+            throw new AssertionError();
+        };
+        Arrays.stream(words).forEach(w -&gt; w.chars().boxed()
+                .reduce(root, Solution::child, never).word = w);
+        int m = board.length, n = board[0].length;
+        List&lt;String&gt; found = new ArrayList&lt;&gt;();
+        // The search marks cells and prunes found words from
+        // the trie. That mutation is what keeps it fast.
+        IntStream.range(0, m * n).forEach(x -&gt;
+                dfs(board, x / n, x % n, root, found));
+        return found;
+    }
+
+    private static Node child(Node n, int c) {
+        int i = c - 'a';
+        if (n.next[i] == null) n.next[i] = new Node();
+        return n.next[i];
+    }
+
+    private static void dfs(char[][] b, int r, int c,
+                            Node parent, List&lt;String&gt; found) {
+        if (r &lt; 0 || c &lt; 0 || r &gt;= b.length || c &gt;= b[0].length
+                || b[r][c] == '#') return;
+        char ch = b[r][c];
+        Node node = parent.next[ch - 'a'];
+        if (node == null) return;
+        if (node.word != null) {          // report it once
+            found.add(node.word);
+            node.word = null;
+        }
+        b[r][c] = '#';                    // visited
+        Arrays.stream(STEPS).forEach(d -&gt;
+                dfs(b, r + d[0], c + d[1], node, found));
+        b[r][c] = ch;
+        // Nothing left to find below this node: prune it.
+        if (Arrays.stream(node.next).allMatch(Objects::isNull))
+            parent.next[ch - 'a'] = null;
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">A fold that says it is sequential</span>The accumulator in <code>reduce(root, step, combiner)</code> is not associative: folding "ap" and "ple" separately from the root gives the wrong node. That is only correct on a sequential stream, where the combiner is never called. A combiner that throws <code>AssertionError</code> writes that fact into the code, and it fails loudly if someone later adds <code>.parallel()</code>. That one line is what the stateful label means.</div>
+  <div class="note warn"><span class="lbl">When the trie is the algorithm</span>648, 677 and 1268 can drop the trie because their limits are small. 212 cannot. The trie lets one DFS serve up to 30,000 words that share prefixes, and deleting a word's branch once it is found stops the search from walking those paths again. Both are mutation during the search, so the streams here only drive the DFS, and the loop is the better code.</div>
+</section>
+
+

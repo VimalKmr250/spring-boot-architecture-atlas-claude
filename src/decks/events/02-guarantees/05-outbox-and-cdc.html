@@ -1,0 +1,77 @@
+<section class="slide" data-sec="Guarantees" data-title="Outbox and CDC">
+  <h2>Relaying the outbox: polling or CDC</h2>
+  <p class="dek">Two implementations of the same pattern with very different operational profiles. Most teams should start with polling and move to CDC when volume or latency justifies a Kafka Connect cluster.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Polling relay — simple, no extra infrastructure</div>
+<pre><code class="language-sql">CREATE TABLE outbox (
+  id            bigserial PRIMARY KEY,
+  aggregate_type text NOT NULL,          -- 'order'
+  aggregate_id   text NOT NULL,          -- '88421'  → becomes the Kafka key
+  event_type     text NOT NULL,          -- 'OrderPlaced'
+  payload        jsonb NOT NULL,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  sent_at        timestamptz             -- null = not yet published
+);
+CREATE INDEX ON outbox (created_at) WHERE sent_at IS NULL;   -- partial: stays tiny</code></pre>
+<pre style="margin-top:12px"><code class="language-java">@Scheduled(fixedDelay = 200)
+@Transactional
+void relay() {
+    // LIMIT comes BEFORE the locking clause — Postgres rejects the
+    // other order. FOR UPDATE SKIP LOCKED makes this safe on N pods.
+    var batch = jdbc.sql("""
+        SELECT * FROM outbox WHERE sent_at IS NULL
+        ORDER BY id
+        LIMIT 200
+        FOR UPDATE SKIP LOCKED
+        """).query(OutboxRow.class).list();
+
+    for (var row : batch) {
+        kafka.send(topicFor(row), row.aggregateId(), row.payload());
+    }
+    kafka.flush();                              // confirm before marking
+    jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY(?)")
+        .param(batch.stream().map(OutboxRow::id).toArray(Long[]::new))
+        .update();                              // ANY(?) needs an ARRAY, not a List
+}</code></pre>
+      <div class="note warn" style="margin-top:10px"><span class="lbl">Yes, this holds a transaction across a network call</span>Everywhere else in this atlas the rule is "never call an external system inside <code>@Transactional</code>". The relay is the deliberate exception: the rows are locked with <code>SKIP LOCKED</code> so no other pod blocks on them, the batch is bounded, and the send has a <code>delivery.timeout.ms</code> that caps how long the transaction can live. Keep the batch small, keep the timeout short, and size the relay's pool separately from the request pool — then one slow broker delays events instead of exhausting the connections checkout needs.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Debezium CDC — reads the write-ahead log, no polling</div>
+<pre><code class="language-json">{
+  "name": "order-outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "slot.name": "order_outbox",
+    "table.include.list": "order_mgmt.outbox",
+    "transforms": "outbox",
+    "transforms.outbox.type":
+      "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.route.by.field": "aggregate_type",
+    "transforms.outbox.table.field.event.key": "aggregate_id",
+    "transforms.outbox.table.field.event.payload": "payload"
+  }
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Polling</th><th>CDC</th></tr></thead>
+          <tbody>
+            <tr><td>Latency</td><td class="num">200 ms–1 s</td><td class="num">~10 ms</td></tr>
+            <tr><td>DB load</td><td>A query per interval</td><td>None — reads the WAL</td></tr>
+            <tr><td>Ordering</td><td>By id, per batch</td><td>Log order, exact</td></tr>
+            <tr><td>Infrastructure</td><td>None</td><td>Kafka Connect + replication slot</td></tr>
+            <tr><td>Failure mode</td><td>Backlog grows; visible</td><td>A stalled slot fills the WAL and <b>can stop the database</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">The CDC failure everyone learns once</span>A replication slot that stops being consumed prevents PostgreSQL from recycling WAL segments. The disk fills, and the primary stops accepting writes. <b>Alert on replication slot lag</b> from the first day you create one, and have a documented decision about when to drop the slot to save the database.</div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Either way, watch the age of the oldest unsent row</span>One metric — <code>max(now() - created_at) where sent_at is null</code> — tells you the whole health of your event pipeline. It is the best early warning in an event-driven system, and it costs one query.</div>
+</section>
+

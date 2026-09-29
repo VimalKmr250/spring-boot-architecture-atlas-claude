@@ -1,0 +1,87 @@
+<section class="slide" data-sec="Coding drills" data-title="Strings: words">
+  <h2>Strings: word frequency, grouping and reordering</h2>
+  <p class="dek">The input is <code>String text = "to be or not to be that is the question"</code>, split with <code>String[] words = text.split("\\s+")</code>. The word-frequency drill, sorted by count, is the stream question most often set as live coding.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Drills 37–42</div>
+<pre><code class="language-java">// 37 · Word frequency, most common first, ties alphabetical
+Map&lt;String, Long&gt; counts = Arrays.stream(words)
+        .collect(groupingBy(Function.identity(), counting()));
+counts.entrySet().stream()
+      .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed()
+                       .thenComparing(Map.Entry.comparingByKey()))
+      .map(e -&gt; e.getKey() + "=" + e.getValue())
+      .toList();
+// [be=2, to=2, is=1, not=1, or=1, question=1, that=1, the=1]
+
+// 38 · The longest word
+Arrays.stream(words).max(Comparator.comparingInt(String::length));   // Optional[question]
+
+// 39 · Words grouped by length
+Arrays.stream(words).collect(groupingBy(String::length, TreeMap::new, toList()));
+// {2=[to, be, or, to, be, is], 3=[not, the], 4=[that], 8=[question]}
+
+// 40 · The words that repeat
+counts.entrySet().stream()
+      .filter(e -&gt; e.getValue() &gt; 1)
+      .map(Map.Entry::getKey)
+      .sorted().toList();                               // [be, to]
+
+// 41 · Distinct words, in order
+Arrays.stream(words).distinct().toList();
+// [to, be, or, not, that, is, the, question]
+
+// 42 · How many words start with "t"
+Arrays.stream(words).filter(w -&gt; w.startsWith("t")).count();          // 4</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Drills 43–47</div>
+<pre><code class="language-java">// 43 · Reverse each word, keep the word order
+Arrays.stream(words)
+      .map(w -&gt; new StringBuilder(w).reverse().toString())
+      .collect(joining(" "));
+// ot eb ro ton ot eb taht si eht noitseuq
+
+// 44 · Reverse the word order
+IntStream.range(0, words.length)
+         .mapToObj(i -&gt; words[words.length - 1 - i])
+         .collect(joining(" "));
+// question the is that be to not or be to
+String.join(" ", List.of(words).reversed());         // the same, Java 21
+
+// 45 · Capitalise every word
+Arrays.stream(words)
+      .map(w -&gt; Character.toUpperCase(w.charAt(0)) + w.substring(1))
+      .collect(joining(" "));
+// To Be Or Not To Be That Is The Question
+
+// 46 · Group anagrams
+List.of("listen", "silent", "enlist", "google", "gogole", "cat", "act").stream()
+    .collect(groupingBy(
+        w -&gt; w.chars().sorted()
+              .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+              .toString(),
+        LinkedHashMap::new, toList()))
+    .values();
+// [[listen, silent, enlist], [google, gogole], [cat, act]]
+
+// 47 · Join with a delimiter, prefix and suffix
+Arrays.stream(words).distinct().limit(4).collect(joining(", ", "[", "]"));
+// [to, be, or, not]</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>The follow-up they ask</th><th>What to say</th></tr></thead>
+      <tbody>
+        <tr><td class="num">37</td><td>Why the explicit <code>&lt;String, Long&gt;</code>?</td><td><code>comparingByValue().reversed()</code> has no target type to infer from, the same trap as <code>comparing(lambda).reversed()</code>.</td></tr>
+        <tr><td class="num">37</td><td>Now for a 10 GB log file?</td><td><code>Files.lines</code> in try-with-resources, <code>flatMap</code> to words, and the same collector: memory grows with the number of <em>distinct</em> words, not the file size.</td></tr>
+        <tr><td class="num">45</td><td>What if the text has two spaces in a row?</td><td><code>split(" ")</code> produces an empty word, and <code>charAt(0)</code> throws <code>StringIndexOutOfBoundsException</code>. Splitting on <code>"\\s+"</code> avoids it; so does <code>filter(w -&gt; !w.isEmpty())</code>.</td></tr>
+        <tr><td class="num">46</td><td>What is the key?</td><td>The letters in sorted order: every anagram of a word has the same one. The key costs O(L log L) per word.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+

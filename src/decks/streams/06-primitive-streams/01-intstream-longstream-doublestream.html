@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Primitive streams" data-title="IntStream, LongStream, DoubleStream">
+  <h2>Primitive streams exist to avoid boxing</h2>
+  <p class="dek">A <code>Stream&lt;Integer&gt;</code> holds an object per element. <code>IntStream</code>, <code>LongStream</code> and <code>DoubleStream</code> hold primitives, and add the numeric operations a <code>Stream&lt;T&gt;</code> cannot: sum, average, statistics, ranges. What they lack matters just as much: no <code>toList()</code>, no <code>collect(Collector)</code>, no <code>sorted(Comparator)</code> and no <code>gather</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Crossing between object and primitive streams</div>
+<pre><code class="language-java">int units = orders.stream()
+        .flatMap(o -&gt; o.lines().stream())
+        .mapToInt(Line::qty)                             // Stream&lt;Line&gt; → IntStream
+        .sum();
+
+OptionalDouble avgTotal = orders.stream().mapToDouble(Order::total).average();
+
+int[] squares = IntStream.rangeClosed(1, 5).map(i -&gt; i * i).toArray();
+// [1, 4, 9, 16, 25]
+
+List&lt;Integer&gt; asList = IntStream.of(3, 1, 2).boxed().toList();   // box to collect
+
+// IntStream.sorted() is ascending only; box to sort another way
+List&lt;Integer&gt; desc = IntStream.of(3, 1, 2).boxed()
+        .sorted(Comparator.reverseOrder())
+        .toList();                                                   // [3, 2, 1]</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>From → to</th><th>Method</th></tr></thead>
+        <tbody>
+          <tr><td><code>Stream&lt;T&gt;</code> → <code>IntStream</code></td><td><code>mapToInt</code> · <code>flatMapToInt</code> · <code>mapMultiToInt</code></td></tr>
+          <tr><td><code>IntStream</code> → <code>Stream&lt;Integer&gt;</code></td><td><code>boxed()</code></td></tr>
+          <tr><td><code>IntStream</code> → <code>Stream&lt;U&gt;</code></td><td><code>mapToObj(i -&gt; …)</code></td></tr>
+          <tr><td><code>IntStream</code> → <code>LongStream</code> · <code>DoubleStream</code></td><td><code>asLongStream()</code> · <code>asDoubleStream()</code>, or <code>mapToLong</code> · <code>mapToDouble</code></td></tr>
+          <tr><td><code>String</code> → <code>IntStream</code></td><td><code>chars()</code> · <code>codePoints()</code></td></tr>
+          <tr><td><code>int[]</code> → <code>IntStream</code></td><td><code>Arrays.stream(a)</code> · <code>IntStream.of(…)</code></td></tr>
+          <tr><td>Collect without boxing</td><td><code>collect(supplier, ObjIntConsumer, combiner)</code>, the only <code>collect</code> they have</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl"><code>chars()</code> gives you numbers</span><code>"abc".chars().forEach(System.out::println)</code> prints <code>97</code>, <code>98</code>, <code>99</code>. The stream is an <code>IntStream</code> of UTF-16 code units. Turn them back with <code>mapToObj(c -&gt; (char) c)</code> or <code>Character.toString(c)</code>, and use <code>codePoints()</code> when the text can contain emoji or other characters outside the Basic Multilingual Plane.</div>
+    <div class="note tip"><span class="lbl">When boxing actually matters</span>A <code>Stream&lt;Integer&gt;</code> allocates an <code>Integer</code> per element outside the small cache of −128 to 127, and every arithmetic step unboxes it again. In a request handler over fifty items this is noise. In a numeric loop over millions it dominates, which is the case the primitive streams are for.</div>
+  </div>
+</section>
+

@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Production" data-title="Memory leaks">
+  <h2>Finding a leak from a heap dump</h2>
+  <p class="dek">A leak in Java is an object still reachable but no longer needed. The heap dump tells you which one; the reference chain tells you why.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Capture, then analyse offline</div>
+<pre><code class="language-yaml"># Live histogram first — often enough on its own
+jcmd &lt;pid&gt; GC.class_histogram | head -30
+
+# Full dump (pauses the JVM; take it from a pod already out of rotation)
+jcmd &lt;pid&gt; GC.heap_dump /dumps/heap.hprof
+# or let it happen automatically:
+-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/dumps
+
+# Eclipse MAT: Leak Suspects -&gt; dominator tree -&gt;
+# "path to GC roots, excluding weak/soft references" — that path IS the bug.</code></pre>
+      <div class="note warn" style="margin-top:12px"><span class="lbl">A heap dump is customer data</span>It contains every string in memory: names, addresses, tokens, possibly card data. Treat it as production data — restricted storage, access logged, deleted afterwards. Copying one to a laptop is a data-handling incident in most banks.</div>
+    </div>
+    <div class="card">
+      <h3>The leaks that actually happen in Spring apps</h3>
+      <dl class="kv" style="margin-top:8px">
+        <dt>Unbounded cache</dt><dd>A <code>ConcurrentHashMap</code> used as a cache with no eviction. Use Caffeine with a <code>maximumSize</code> — always.</dd>
+        <dt>ThreadLocal on a pooled thread</dt><dd>Set and never removed. The thread lives forever, so the value does too. Always <code>remove()</code> in a <code>finally</code>.</dd>
+        <dt>Listeners never unregistered</dt><dd>Anything registering itself at startup that outlives its owner.</dd>
+        <dt>Session-scoped state</dt><dd>Large objects in an HTTP session with a long timeout, times concurrent users.</dd>
+        <dt>Accumulating collections</dt><dd>A <code>List</code> field on a singleton that only ever grows — an audit buffer, a "recent items" list.</dd>
+        <dt>Not a leak</dt><dd>A rising heap that drops after a full GC is just G1 being lazy. Only growth <em>after</em> a full GC counts.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The graph that identifies a leak with no tooling at all</span>Plot <code>jvm_memory_used_bytes{area="heap"}</code> over a week with deploys marked. A healthy service shows a sawtooth with a flat baseline. A leak shows a sawtooth whose <b>troughs rise steadily</b> until the pod restarts — and a restart cadence matching your deploy frequency is how leaks stay hidden for years.</div>
+</section>
+

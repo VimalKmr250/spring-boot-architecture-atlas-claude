@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Orientation" data-title="Reading complexity off the constraints">
+  <h2>The constraints tell you the intended complexity</h2>
+  <p class="dek">Judges run on the order of 10<sup>8</sup> simple operations per second. Every problem's constraint section is therefore a direct hint at the algorithm the setter had in mind — read it before you design, not after your first submission times out.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th class="num">n up to</th><th>Intended complexity</th><th>What that usually means</th></tr></thead>
+        <tbody>
+          <tr><td class="num">10–12</td><td class="num">O(n!) · O(2ⁿ·n)</td><td>Permutation backtracking, bitmask DP</td></tr>
+          <tr><td class="num">20–25</td><td class="num">O(2ⁿ)</td><td>Subset enumeration, meet in the middle</td></tr>
+          <tr><td class="num">100–500</td><td class="num">O(n³)</td><td>Floyd–Warshall, interval DP, matrix chain</td></tr>
+          <tr><td class="num">2 000–5 000</td><td class="num">O(n²)</td><td>Grid DP, string DP, pairwise scans</td></tr>
+          <tr><td class="num">10⁵</td><td class="num">O(n log n)</td><td>Sorting, heaps, binary search, balanced trees</td></tr>
+          <tr><td class="num">10⁶–10⁷</td><td class="num">O(n)</td><td>Windows, two pointers, prefix sums, counting</td></tr>
+          <tr><td class="num">10⁹ and above</td><td class="num">O(log n) · O(1)</td><td>Binary search on the answer, maths, bit tricks</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Worked example</h3>
+        <p style="color:var(--text-2);font-size:14px;margin-top:8px">The constraints read <code>1 &lt;= piles.length &lt;= 10⁴</code> and <code>1 &lt;= piles[i] &lt;= 10⁹</code>.</p>
+        <p style="color:var(--text-2);font-size:14px;margin-top:8px">The array is small but the <em>values</em> are enormous. A small n paired with a huge value range means the search is over the value range, not the array: the search space is the values, and each feasibility check costs one O(n) pass. Total O(n log maxV) ≈ 10⁴ × 30 = 3×10⁵ operations, comfortably inside budget. That problem is LC 875.</p>
+      </div>
+      <div class="note good"><span class="lbl">Two more tells worth memorising</span><b>"Return the answer modulo 10⁹+7"</b> means the count is astronomically large, so it is a counting DP and never an enumeration. <b>"You may return the answer in any order"</b> means the grader sorts for you, so do not spend time ordering the output.</div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say this in the interview</span>"The constraints put n at 10⁵, so I need O(n log n) or better — which rules out the pairwise approach I'd otherwise reach for." In one sentence you have demonstrated that you design against a budget rather than guessing. It reliably scores, and it costs five seconds.</div>
+</section>
+
+

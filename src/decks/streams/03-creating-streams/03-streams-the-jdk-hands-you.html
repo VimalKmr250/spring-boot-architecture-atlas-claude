@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Creating streams" data-title="Streams the JDK hands you">
+  <h2>JDK methods that already return a stream</h2>
+  <p class="dek">Since Java 8, and especially since 9, a lot of the JDK returns streams directly. The ones backed by a file or another resource hold it open until the stream is closed. That is the one rule people miss, because a terminal operation does <b>not</b> close the stream.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Method</th><th>Streams over</th><th>Must close?</th><th>Since</th></tr></thead>
+      <tbody>
+        <tr><td><code>Files.lines(path)</code></td><td>Lines of a file, read lazily</td><td><b>Yes</b></td><td>8</td></tr>
+        <tr><td><code>Files.list(dir)</code> · <code>Files.walk(dir)</code> · <code>Files.find(…)</code></td><td>Directory entries, one level or recursive</td><td><b>Yes</b></td><td>8</td></tr>
+        <tr><td><code>bufferedReader.lines()</code></td><td>Lines from any reader</td><td>Close the reader</td><td>8</td></tr>
+        <tr><td><code>zipFile.stream()</code> · <code>jarFile.stream()</code></td><td>Archive entries</td><td>Close the file</td><td>8</td></tr>
+        <tr><td><code>string.lines()</code></td><td>Lines of a string, any line terminator</td><td>No</td><td><span class="tag a">11</span></td></tr>
+        <tr><td><code>charSequence.chars()</code> · <code>codePoints()</code></td><td>Characters as an <code>IntStream</code></td><td>No</td><td>8</td></tr>
+        <tr><td><code>pattern.splitAsStream(s)</code></td><td>The pieces between matches</td><td>No</td><td>8</td></tr>
+        <tr><td><code>pattern.matcher(s).results()</code></td><td>Every match, as a <code>MatchResult</code></td><td>No</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>scanner.tokens()</code> · <code>scanner.findAll(regex)</code></td><td>Tokens, or matches</td><td>Close the scanner over a file</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>localDate.datesUntil(end)</code></td><td>Every date up to <code>end</code>, exclusive</td><td>No</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>optional.stream()</code></td><td>Zero or one element</td><td>No</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>bitSet.stream()</code></td><td>Indexes of the set bits</td><td>No</td><td>8</td></tr>
+        <tr><td><code>ProcessHandle.allProcesses()</code> · <code>serviceLoader.stream()</code></td><td>Running processes; service providers</td><td>No</td><td><span class="tag a">9</span></td></tr>
+        <tr><td><code>StreamSupport.stream(spliterator, parallel)</code></td><td>Anything <code>Iterable</code>, or your own data structure</td><td>Depends on the source</td><td>8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A file, an Iterable, and three string sources</div>
+<pre><code class="language-java">// Files.lines holds an open file handle until close()
+try (Stream&lt;String&gt; lines = Files.lines(Path.of("orders.csv"))) {
+    long paid = lines.skip(1)                        // the header row
+                     .filter(l -&gt; l.endsWith(",PAID"))
+                     .count();
+}
+
+// An Iterable with no stream() method of its own
+Stream&lt;Order&gt; legacy = StreamSupport.stream(legacyDao.findAll().spliterator(), false);
+
+"a1b22c333".chars().filter(Character::isDigit).count();         // 6
+Pattern.compile("\\d+").matcher("a1b22c333").results()
+       .map(MatchResult::group).toList();                       // [1, 22, 333]
+Pattern.compile(",").splitAsStream("a,b,,c").toList();          // [a, b, , c]</code></pre>
+    </div>
+    <div class="note bad"><span class="lbl">The leak no test catches</span><code>Files.lines(path).filter(…).count()</code> without try-with-resources leaves the file open. <code>Stream</code> is <code>AutoCloseable</code>, but nothing closes it for you: not the terminal operation, and not garbage collection in any timely way. In a long-running service each call leaks a file descriptor until the process fails with "Too many open files". Streams over collections, arrays and generators hold no resource and need no closing. The difference is invisible at the call site, which is the whole problem. Close handlers registered with <code>onClose</code> are how <code>Files.lines</code> releases its handle.</div>
+  </div>
+</section>
+

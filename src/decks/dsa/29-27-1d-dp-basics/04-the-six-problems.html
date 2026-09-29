@@ -1,0 +1,128 @@
+<section class="slide" data-sec="27 · 1D DP basics" data-title="The six problems">
+  <h2>Six recurrences, three shapes</h2>
+  <p class="dek">70, 198 and 213 have fixed lookback. 322 and 279 are unbounded choice over a target. 300 is the one that needs the "ending here" state — and it is the one people get wrong.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>Level</th><th>The state</th><th>Shape</th><th>Complexity</th></tr></thead>
+      <tbody>
+        <tr><td class="num">70</td><td><a href="https://leetcode.com/problems/climbing-stairs/" target="_blank" rel="noopener">Climbing Stairs</a></td><td><span class="tag g">Easy</span></td><td>Ways to reach step <code>i</code> — it is Fibonacci.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">198</td><td><a href="https://leetcode.com/problems/house-robber/" target="_blank" rel="noopener">House Robber</a></td><td><span class="tag w">Medium</span></td><td>Best over the first <code>i</code> houses.</td><td>A</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">213</td><td><a href="https://leetcode.com/problems/house-robber-ii/" target="_blank" rel="noopener">House Robber II</a></td><td><span class="tag w">Medium</span></td><td>Circular, so run 198 twice on overlapping ranges.</td><td>A ×2</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">322</td><td><a href="https://leetcode.com/problems/coin-change/" target="_blank" rel="noopener">Coin Change</a></td><td><span class="tag w">Medium</span></td><td>Fewest coins making exactly <code>t</code>.</td><td>B</td><td class="num">O(amount·coins) / O(amount)</td></tr>
+        <tr><td class="num">279</td><td><a href="https://leetcode.com/problems/perfect-squares/" target="_blank" rel="noopener">Perfect Squares</a></td><td><span class="tag w">Medium</span></td><td>Coin change where the coins are the perfect squares.</td><td>B</td><td class="num">O(n√n) / O(n)</td></tr>
+        <tr><td class="num">300</td><td><a href="https://leetcode.com/problems/longest-increasing-subsequence/" target="_blank" rel="noopener">Longest Increasing Subsequence</a></td><td><span class="tag w">Medium</span></td><td>Longest sequence <em>ending at</em> <code>i</code>.</td><td>C</td><td class="num">O(n²) or O(n log n)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 1 · LC 198 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Why greedy fails</dt><dd>"Take every other house" gives 2 + 9 + 1 = 12 here by luck, but on <code>[2,1,1,2]</code> it takes 2 + 1 = 3 while the optimum is 2 + 2 = 4. The choice at each house depends on the whole future, so it must be compared rather than guessed.</dd>
+          <dt>The state</dt><dd><code>dp[i]</code> = the most you can rob <b>considering the first i houses</b>. Not "having robbed house i" — the prefix form is what makes the recurrence two-way.</dd>
+          <dt>The transition</dt><dd>Two options only. <b>Skip</b> house <code>i</code>, so the answer is <code>dp[i−1]</code>. <b>Take</b> it, which forbids house <code>i−1</code>, so the answer is <code>dp[i−2] + nums[i]</code>. Take the larger.</dd>
+          <dt>Base cases</dt><dd><code>dp[0] = nums[0]</code>, and <code>dp[1] = max(nums[0], nums[1])</code>. Handling those before the loop avoids negative indices.</dd>
+          <dt>The answer</dt><dd><code>dp[n−1]</code>, because the prefix state is non-decreasing — skipping is always available, so later cells can never be worse.</dd>
+          <dt>Space</dt><dd>Only two previous cells are read, so two variables suffice. Write the array version first, verify, then collapse it.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 198 · O(n) time, O(1) space</div>
+<pre><code class="language-java">class Solution {
+    public int rob(int[] nums) {
+        // dp[i-2] and dp[i-1], rolled into two variables.
+        // Starting both at 0 makes the first iteration correct:
+        // cur = max(0, 0 + nums[0]) = nums[0].
+        int prev2 = 0, prev1 = 0;
+
+        for (int v : nums) {
+            // SKIP house i: the answer is unchanged  -> prev1
+            // TAKE house i: house i-1 is then forbidden, so build
+            //               on the answer from two back -> prev2 + v
+            int cur = Math.max(prev1, prev2 + v);
+
+            prev2 = prev1;
+            prev1 = cur;
+        }
+        return prev1;
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="panel">
+        <h3>Anchor 2 · LC 300 — the path to the solution</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>The state that does not work</dt><dd>"The longest increasing subsequence within the first <code>i</code> elements." You cannot extend it, because you do not know what it ends with — and without that, the transition is unwritable.</dd>
+          <dt>The state that does</dt><dd><code>dp[i]</code> = the longest increasing subsequence <b>ending exactly at index i</b>. Now extension is decidable: any earlier <code>j</code> with a smaller value can be extended by <code>i</code>.</dd>
+          <dt>The transition</dt><dd><code>dp[i] = 1 + max(dp[j])</code> over all <code>j &lt; i</code> with <code>nums[j] &lt; nums[i]</code>, defaulting to 1 when none qualifies. That inner scan is what makes it O(n²).</dd>
+          <dt>The answer</dt><dd><code>max(dp)</code>, <b>not</b> <code>dp[n−1]</code>. The "ending here" state is not monotone — the longest subsequence may end anywhere.</dd>
+          <dt>The O(n log n) version</dt><dd>Keep <code>tails</code>, where <code>tails[k]</code> is the smallest possible tail of a length-<code>(k+1)</code> subsequence. Binary search each value's position and overwrite. The list's <em>length</em> is the answer.</dd>
+          <dt>The caveat worth stating</dt><dd><code>tails</code> is not itself a valid subsequence — only its length is meaningful. Claiming otherwise is a common mistake, and interviewers check for it.</dd>
+        </dl>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">LC 300 · O(n²) time, O(n) space — with the O(n log n) form below</div>
+<pre><code class="language-java">class Solution {
+    public int lengthOfLIS(int[] nums) {
+        // dp[i] = longest increasing subsequence ENDING AT i.
+        // The "ending at" part is essential: without it you cannot
+        // decide whether a later element extends the sequence.
+        int[] dp = new int[nums.length];
+        Arrays.fill(dp, 1);              // every element alone has length 1
+
+        int best = 1;
+
+        for (int i = 1; i &lt; nums.length; i++) {
+            for (int j = 0; j &lt; i; j++) {
+                if (nums[j] &lt; nums[i]) {
+                    dp[i] = Math.max(dp[i], dp[j] + 1);
+                }
+            }
+            // "ending at i" is NOT monotone, so track the running max.
+            best = Math.max(best, dp[i]);
+        }
+        return best;                     // NOT dp[n-1]
+    }
+
+    // O(n log n): tails[k] is the SMALLEST tail among increasing
+    // subsequences of length k+1. Not a real subsequence — but its
+    // length is exactly the answer.
+    public int lengthOfLISFast(int[] nums) {
+        int[] tails = new int[nums.length];
+        int size = 0;
+
+        for (int v : nums) {
+            int lo = 0, hi = size;
+            while (lo &lt; hi) {                    // first index with tails[i] >= v
+                int mid = lo + (hi - lo) / 2;
+                if (tails[mid] &lt; v) lo = mid + 1;
+                else                hi = mid;
+            }
+            tails[lo] = v;
+            if (lo == size) size++;              // v extended the longest run
+        }
+        return size;
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>70 · Climbing Stairs <span class="tag a">shape A</span></h4><p><b>Path:</b> to reach step <code>i</code> you arrived from <code>i−1</code> or <code>i−2</code>, so the ways add: <code>dp[i] = dp[i−1] + dp[i−2]</code>. It is Fibonacci with different base cases.</p><p><b>Delta:</b> the simplest recurrence in the deck, and the right place to practise the four questions before anything harder.</p><p><b>Watch for:</b> <code>dp[0] = 1</code> — there is exactly one way to be at the bottom, namely doing nothing. Setting it to 0 makes every subsequent value wrong.</p></div>
+
+    <div class="card"><h4>213 · House Robber II <span class="tag a">shape A ×2</span></h4><p><b>Path:</b> the circle means house 0 and house <code>n−1</code> are adjacent, so they can never both be taken.</p><p><b>Delta:</b> that single fact splits the problem cleanly. Run the linear solver on <code>[0, n−2]</code> and on <code>[1, n−1]</code>, and take the larger. Every valid selection is covered by one of the two ranges.</p><p><b>Watch for:</b> a single house must be special-cased — both ranges would be empty and return 0, losing the only available answer.</p></div>
+
+    <div class="card"><h4>322 · Coin Change <span class="tag a">shape B</span></h4><p><b>Path:</b> greedy — take the largest coin that fits — is wrong. With coins <code>[1,3,4]</code> and amount 6, greedy gives 4+1+1 = 3 coins while the optimum is 3+3 = 2. Saying that out loud is what justifies the DP.</p><p><b>Delta:</b> <code>dp[t] = min over coins c of dp[t−c] + 1</code>, with <code>dp[0] = 0</code>. Every coin is tried at every amount.</p><p><b>Watch for:</b> use <code>amount + 1</code> as the unreachable sentinel, not <code>Integer.MAX_VALUE</code> — adding 1 to <code>MAX_VALUE</code> wraps negative and wins the <code>min</code>.</p></div>
+
+    <div class="card"><h4>279 · Perfect Squares <span class="tag a">shape B</span></h4><p><b>Path:</b> this is coin change where the coin denominations are <code>1, 4, 9, 16, …</code>. Recognising that is the whole problem.</p><p><b>Delta:</b> the same recurrence with the inner loop running <code>j*j &lt;= t</code>. There are about <code>√n</code> squares below <code>n</code>, so the total is O(n√n).</p><p><b>Watch for:</b> a BFS over amounts — each level being one more square — is an equally good solution and often finds the answer faster in practice, since the result is at most 4 by Lagrange's theorem.</p></div>
+  </div>
+
+  <div class="note good"><span class="lbl">If you only drill two</span>Do <b>198</b> and <b>300</b>. 198 gives you the take-or-skip transition and the space collapse, which cover 70, 213 and much of what follows. 300 is the one that forces the state-definition discipline: the prefix form simply cannot express the recurrence, and discovering why is what teaches you to interrogate your state before writing any code.</div>
+</section>
+

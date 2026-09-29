@@ -1,0 +1,181 @@
+<section class="slide" data-sec="14 · Linked list manipulation" data-title="The six, in streams">
+  <h2>A stream cannot rewire a list, but it can compute the new order</h2>
+  <p class="dek">Pointer surgery changes the very structure being walked, and that is interference: a stream must not modify its own source. What a stream can do is walk the nodes and decide where each one goes, whether by an index map, a merge or a sort. It collects that order, and only then does a final pass rewire every node, once each. All six are clean and keep the loop's time bound, 23 aside. All six pay O(n) extra space for the list of nodes.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">21</td><td><a href="https://leetcode.com/problems/merge-two-sorted-lists/" target="_blank" rel="noopener">Merge Two Sorted Lists</a></td><td>A record of the two heads emits the smaller node at each step; then relink the emitted order.</td><td><span class="tag g">clean</span></td><td class="num">O(n+m) / O(n+m)</td><td class="num">O(n+m) / O(1)</td></tr>
+        <tr><td class="num">24</td><td><a href="https://leetcode.com/problems/swap-nodes-in-pairs/" target="_blank" rel="noopener">Swap Nodes in Pairs</a></td><td>Position <code>i</code> takes the node at <code>i ^ 1</code>, its pair partner, when there is one.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">92</td><td><a href="https://leetcode.com/problems/reverse-linked-list-ii/" target="_blank" rel="noopener">Reverse Linked List II</a></td><td>Positions inside <code>[left, right]</code> read from their mirror; the rest stay put.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">23</td><td><a href="https://leetcode.com/problems/merge-k-sorted-lists/" target="_blank" rel="noopener">Merge k Sorted Lists</a></td><td><code>flatMap</code> every list's nodes, <code>sorted</code> by value, then relink.</td><td><span class="tag g">clean</span></td><td class="num">O(N log N) / O(N)</td><td class="num">O(N log k) / O(k)</td></tr>
+        <tr><td class="num">25</td><td><a href="https://leetcode.com/problems/reverse-nodes-in-k-group/" target="_blank" rel="noopener">Reverse Nodes in k-Group</a></td><td>Inside each complete group of k, position <code>i</code> reads from its mirror; the short tail stays put.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+        <tr><td class="num">138</td><td><a href="https://leetcode.com/problems/copy-list-with-random-pointer/" target="_blank" rel="noopener">Copy List with Random Pointer</a></td><td><code>toMap</code> each node to a fresh copy, then one pass sets every copy's <code>next</code> and <code>random</code> through the map.</td><td><span class="tag g">clean</span></td><td class="num">O(n) / O(n)</td><td class="num">O(n) / O(1)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 21 · Merge Two Sorted Lists · clean</div>
+<pre><code class="language-java">class Solution {
+    // the two unmerged heads; each step takes the smaller
+    record Heads(ListNode a, ListNode b) {
+        boolean fromA() {
+            return b == null || a != null &amp;&amp; a.val &lt;= b.val;
+        }
+        boolean more() { return a != null || b != null; }
+        ListNode taken() { return fromA() ? a : b; }
+        Heads next() {
+            return fromA() ? new Heads(a.next, b)
+                           : new Heads(a, b.next);
+        }
+    }
+
+    public ListNode mergeTwoLists(ListNode list1,
+                                  ListNode list2) {
+        // Collect the merged order first; rewire only after.
+        List&lt;ListNode&gt; order = Stream
+                .iterate(new Heads(list1, list2), Heads::more,
+                         Heads::next)
+                .map(Heads::taken)
+                .toList();
+        return relink(order);
+    }
+
+    // ---- the same relink in 21, 24, 92, 23 and 25 ----
+    // Each index writes one different node: parallel-safe.
+    static ListNode relink(List&lt;ListNode&gt; order) {
+        int n = order.size();
+        IntStream.range(0, n).forEach(i -&gt; order.get(i).next =
+                i + 1 &lt; n ? order.get(i + 1) : null);
+        return n == 0 ? null : order.get(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 24 · Swap Nodes in Pairs · clean</div>
+<pre><code class="language-java">class Solution {
+    public ListNode swapPairs(ListNode head) {
+        List&lt;ListNode&gt; nodes = Stream.iterate(head,
+                Objects::nonNull, x -&gt; x.next).toList();
+        int n = nodes.size();
+        // Position i takes its pair partner i ^ 1 when there is
+        // one: 0&lt;-&gt;1, 2&lt;-&gt;3, ... An odd last node stays put.
+        return relink(IntStream.range(0, n)
+                .map(i -&gt; (i ^ 1) &lt; n ? i ^ 1 : i)
+                .mapToObj(nodes::get)
+                .toList());
+    }
+
+    // ---- the same relink in 21, 24, 92, 23 and 25 ----
+    // Each index writes one different node: parallel-safe.
+    static ListNode relink(List&lt;ListNode&gt; order) {
+        int n = order.size();
+        IntStream.range(0, n).forEach(i -&gt; order.get(i).next =
+                i + 1 &lt; n ? order.get(i + 1) : null);
+        return n == 0 ? null : order.get(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 92 · Reverse Linked List II · clean</div>
+<pre><code class="language-java">class Solution {
+    public ListNode reverseBetween(ListNode head, int left,
+                                   int right) {
+        List&lt;ListNode&gt; nodes = Stream.iterate(head,
+                Objects::nonNull, x -&gt; x.next).toList();
+        int lo = left - 1, hi = right - 1;   // 0-indexed
+        // Inside [lo, hi], position i reads from its mirror.
+        return relink(IntStream.range(0, nodes.size())
+                .mapToObj(i -&gt; nodes.get(
+                        i &gt;= lo &amp;&amp; i &lt;= hi ? lo + hi - i : i))
+                .toList());
+    }
+
+    // ---- the same relink in 21, 24, 92, 23 and 25 ----
+    // Each index writes one different node: parallel-safe.
+    static ListNode relink(List&lt;ListNode&gt; order) {
+        int n = order.size();
+        IntStream.range(0, n).forEach(i -&gt; order.get(i).next =
+                i + 1 &lt; n ? order.get(i + 1) : null);
+        return n == 0 ? null : order.get(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 23 · Merge k Sorted Lists · clean</div>
+<pre><code class="language-java">class Solution {
+    public ListNode mergeKLists(ListNode[] lists) {
+        // Every node of every list, sorted by value. sorted()
+        // is a barrier: the walk ends before relink rewires.
+        return relink(Arrays.stream(lists)
+                .flatMap(h -&gt; Stream.iterate(h,
+                        Objects::nonNull, x -&gt; x.next))
+                .sorted(Comparator.comparingInt(x -&gt; x.val))
+                .toList());
+    }
+
+    // ---- the same relink in 21, 24, 92, 23 and 25 ----
+    // Each index writes one different node: parallel-safe.
+    static ListNode relink(List&lt;ListNode&gt; order) {
+        int n = order.size();
+        IntStream.range(0, n).forEach(i -&gt; order.get(i).next =
+                i + 1 &lt; n ? order.get(i + 1) : null);
+        return n == 0 ? null : order.get(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 25 · Reverse Nodes in k-Group · clean</div>
+<pre><code class="language-java">class Solution {
+    public ListNode reverseKGroup(ListNode head, int k) {
+        List&lt;ListNode&gt; nodes = Stream.iterate(head,
+                Objects::nonNull, x -&gt; x.next).toList();
+        int n = nodes.size(), full = n / k * k;
+        // Inside each complete group, position i reads from its
+        // mirror in that group. The short tail stays put.
+        return relink(IntStream.range(0, n)
+                .mapToObj(i -&gt; nodes.get(i &lt; full
+                        ? i / k * k + (k - 1 - i % k) : i))
+                .toList());
+    }
+
+    // ---- the same relink in 21, 24, 92, 23 and 25 ----
+    // Each index writes one different node: parallel-safe.
+    static ListNode relink(List&lt;ListNode&gt; order) {
+        int n = order.size();
+        IntStream.range(0, n).forEach(i -&gt; order.get(i).next =
+                i + 1 &lt; n ? order.get(i + 1) : null);
+        return n == 0 ? null : order.get(0);
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 138 · Copy List with Random Pointer · clean</div>
+<pre><code class="language-java">class Solution {
+    public Node copyRandomList(Node head) {
+        // old node -&gt; a fresh copy. Node has no equals(), so
+        // the map is keyed by identity, which is what we want.
+        Map&lt;Node, Node&gt; copy = Stream.iterate(head,
+                        Objects::nonNull, x -&gt; x.next)
+                .collect(Collectors.toMap(
+                        x -&gt; x, x -&gt; new Node(x.val)));
+        // Wire the copies through the map; get(null) is null.
+        copy.forEach((old, c) -&gt; {
+            c.next = copy.get(old.next);
+            c.random = copy.get(old.random);
+        });
+        return copy.get(head);
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">Compute the order, then relink once</span>Collecting the nodes into a list before rewiring is what makes this safe: the walk is over before any <code>next</code> pointer changes. The relink itself is a <code>forEach</code> in which each index writes to a different node, so even that step would be correct in parallel. The tests also check that the nodes themselves move, since swapping values would break the rules of 24 and 25.</div>
+  <div class="note warn"><span class="lbl">What it costs</span>The loop versions run in O(1) extra space, while every version here holds all n nodes in a list. When the follow-up says "constant extra space", the stream answer no longer qualifies. Reverse the pointers in place with a loop, and say that this is why.</div>
+</section>
+
+

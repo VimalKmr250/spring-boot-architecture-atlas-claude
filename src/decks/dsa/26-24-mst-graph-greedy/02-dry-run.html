@@ -1,0 +1,97 @@
+<section class="slide" data-sec="24 · MST / graph greedy" data-title="Dry run">
+  <h2>LC 1584 traced on four points</h2>
+  <p class="dek">Points are <code>(0,0), (2,2), (3,10), (5,2)</code> with Manhattan distance. Kruskal sorts all six candidate edges and takes the first three that merge distinct components — one fewer than the number of points.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 880 322" role="img" aria-label="Kruskal processing sorted edges, accepting three and rejecting the rest as cycles">
+        <text x="14" y="16" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">THE POINTS AND THE CHOSEN EDGES</text>
+
+        <circle cx="70" cy="140" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="70" y="145" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">0</text>
+        <text x="70" y="168" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.45">(0,0)</text>
+        <circle cx="170" cy="100" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="170" y="105" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">1</text>
+        <text x="170" y="128" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.45">(2,2)</text>
+        <circle cx="240" cy="44" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="240" y="49" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">2</text>
+        <text x="240" y="30" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.45">(3,10)</text>
+        <circle cx="290" cy="140" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-opacity="0.7"></circle>
+        <text x="290" y="145" text-anchor="middle" font-size="10" font-family="monospace" fill="currentColor">3</text>
+        <text x="290" y="168" text-anchor="middle" font-size="9" font-family="monospace" fill="currentColor" opacity="0.45">(5,2)</text>
+
+        <path d="M84 134 L156 106" stroke="#3AA79B" stroke-width="2.2"></path>
+        <text x="112" y="112" font-size="10" font-family="monospace" font-weight="600" fill="#3AA79B">4</text>
+        <path d="M184 100 L276 134" stroke="#3AA79B" stroke-width="2.2"></path>
+        <text x="236" y="112" font-size="10" font-family="monospace" font-weight="600" fill="#3AA79B">3</text>
+        <path d="M176 87 L234 58" stroke="#3AA79B" stroke-width="2.2"></path>
+        <text x="196" y="66" font-size="10" font-family="monospace" font-weight="600" fill="#3AA79B">9</text>
+
+        <text x="360" y="60" font-size="11" fill="currentColor" opacity="0.72">Three edges for four points — exactly n − 1.</text>
+        <text x="360" y="82" font-size="11.5" font-weight="600" fill="#D26A3F">Total: 3 + 4 + 9 = 20</text>
+        <text x="360" y="110" font-size="11" fill="currentColor" opacity="0.62">Point 2 is far from everything, so its cheapest</text>
+        <text x="360" y="128" font-size="11" fill="currentColor" opacity="0.62">link still costs 9 — the tree must include it.</text>
+
+        <line x1="14" y1="190" x2="866" y2="190" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="14" y="210" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ALL SIX EDGES, SORTED BY MANHATTAN DISTANCE</text>
+
+        <text x="14" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">EDGE</text>
+        <text x="96" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">WEIGHT</text>
+        <text x="180" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">ROOTS</text>
+        <text x="290" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">UNION</text>
+        <text x="420" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">TAKEN?</text>
+        <text x="540" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">EDGES SO FAR</text>
+        <text x="700" y="232" font-size="10.5" font-family="monospace" fill="currentColor" opacity="0.55">RUNNING TOTAL</text>
+
+        <text x="14" y="254" font-size="11" font-family="monospace" fill="currentColor">1–3</text>
+        <text x="102" y="254" font-size="11" font-family="monospace" fill="currentColor">3</text>
+        <text x="180" y="254" font-size="11" font-family="monospace" fill="currentColor">1 vs 3</text>
+        <text x="290" y="254" font-size="11" fill="#3AA79B">merged</text>
+        <text x="420" y="254" font-size="11" font-weight="600" fill="#3AA79B">yes</text>
+        <text x="546" y="254" font-size="11" font-family="monospace" fill="currentColor">1</text>
+        <text x="706" y="254" font-size="11" font-family="monospace" fill="currentColor">3</text>
+
+        <text x="14" y="274" font-size="11" font-family="monospace" fill="currentColor">0–1</text>
+        <text x="102" y="274" font-size="11" font-family="monospace" fill="currentColor">4</text>
+        <text x="180" y="274" font-size="11" font-family="monospace" fill="currentColor">0 vs 1</text>
+        <text x="290" y="274" font-size="11" fill="#3AA79B">merged</text>
+        <text x="420" y="274" font-size="11" font-weight="600" fill="#3AA79B">yes</text>
+        <text x="546" y="274" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="706" y="274" font-size="11" font-family="monospace" fill="currentColor">7</text>
+
+        <text x="14" y="294" font-size="11" font-family="monospace" fill="currentColor">0–3</text>
+        <text x="102" y="294" font-size="11" font-family="monospace" fill="currentColor">7</text>
+        <text x="180" y="294" font-size="11" font-family="monospace" fill="currentColor">same</text>
+        <text x="290" y="294" font-size="11" fill="#D26A3F">already joined</text>
+        <text x="420" y="294" font-size="11" fill="#D26A3F">no — cycle</text>
+        <text x="546" y="294" font-size="11" font-family="monospace" fill="currentColor">2</text>
+        <text x="706" y="294" font-size="11" font-family="monospace" fill="currentColor">7</text>
+
+        <text x="14" y="314" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">1–2</text>
+        <text x="102" y="314" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">9</text>
+        <text x="180" y="314" font-size="11" font-family="monospace" fill="currentColor">1 vs 2</text>
+        <text x="290" y="314" font-size="11" fill="#3AA79B">merged</text>
+        <text x="420" y="314" font-size="11" font-weight="600" fill="#3AA79B">yes — 3rd edge, stop</text>
+        <text x="546" y="314" font-size="11" font-family="monospace" font-weight="600" fill="currentColor">3</text>
+        <text x="706" y="314" font-size="11" font-family="monospace" font-weight="600" fill="#D26A3F">20</text>
+      </svg>
+    </div>
+    <figcaption>Edge 0–3 is rejected because 0 and 3 are already connected through 1. That is union-find returning false — the same cycle test used for redundant edges, reused here as the MST acceptance rule.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>edge</th><th class="num">weight</th><th>already connected?</th><th>action</th><th class="num">edges taken</th><th class="num">total</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1–3</td><td class="num">3</td><td>no</td><td>take</td><td class="num">1</td><td class="num">3</td></tr>
+        <tr><td class="num">0–1</td><td class="num">4</td><td>no</td><td>take</td><td class="num">2</td><td class="num">7</td></tr>
+        <tr><td class="num">0–3</td><td class="num">7</td><td><b>yes</b> — via 1</td><td>skip</td><td class="num">2</td><td class="num">7</td></tr>
+        <tr><td class="num">1–2</td><td class="num">9</td><td>no</td><td>take — now n−1 edges</td><td class="num">3</td><td class="num"><b>20</b></td></tr>
+        <tr><td class="num">2–3</td><td class="num">10</td><td colspan="4">never examined — the loop exits at n−1 edges</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Why stopping at <code>n − 1</code> edges is safe</span>A spanning tree on <code>n</code> nodes has exactly <code>n − 1</code> edges, so once that many have been accepted every node is connected and any further edge would close a cycle. Breaking there saves scanning the tail of the sorted list — with <code>n = 1000</code> points that is roughly 500,000 edges, of which only 999 are ever taken.</div>
+</section>
+

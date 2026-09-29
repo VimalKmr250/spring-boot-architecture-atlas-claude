@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Wrap-up" data-title="First 90 days">
+  <h2>If you are starting on Monday</h2>
+  <p class="dek">Order of work for a greenfield enterprise service, or for bringing an existing one under control. Roughly a quarter, and each step makes the next one cheaper.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="tag a">Weeks 1–2</span> Make the boundaries real</h3>
+      <ul class="checks tight">
+        <li>Name the bounded contexts with the business, not in a code review.</li>
+        <li>Create the module packages with <code>api / spi / internal</code>.</li>
+        <li>Add ArchUnit rules and <code>modules.verify()</code> to CI on day one — retrofitting them is what costs.</li>
+        <li>Schema per module, one database role per module, grants enforced.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Weeks 3–6</span> Make it observable and testable</h3>
+      <ul class="checks tight">
+        <li>Trace id end to end, including across Kafka; structured JSON logs.</li>
+        <li>Testcontainers from the first integration test; no H2.</li>
+        <li>One vertical slice fully built — controller to database to event — as the pattern everyone copies.</li>
+        <li>Error model (<code>ProblemDetail</code>) and the OpenAPI contract gate.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Weeks 7–10</span> Make it resilient</h3>
+      <ul class="checks tight">
+        <li>Timeouts on every outbound client; then retries, breakers, bulkheads in that order.</li>
+        <li>Outbox for every event that must not be lost; idempotent consumers with a DLT.</li>
+        <li>Idempotency keys on every mutating public endpoint.</li>
+        <li>SLOs defined for the top three journeys; burn-rate alerts wired.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="tag a">Weeks 11–13</span> Make it operable</h3>
+      <ul class="checks tight">
+        <li>Expand/contract migration discipline and a rehearsed rollback.</li>
+        <li>Feature flags with expiry; deploy decoupled from release.</li>
+        <li>Four dashboards, not fourteen; a runbook per alert.</li>
+        <li>ADRs for every level 1–4 decision made so far, written while the context is fresh.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Going deeper</span>Eric Evans, <i>Domain-Driven Design</i> (contexts and aggregates) · Vaughn Vernon, <i>Implementing DDD</i> (the practical companion) · Sam Newman, <i>Monolith to Microservices</i> (the extraction playbook) · Gregor Hohpe, <i>Enterprise Integration Patterns</i> (still the reference for messaging) · Ford, Richards et al., <i>Fundamentals of Software Architecture</i> and <i>Software Architecture: The Hard Parts</i> (trade-off analysis) · Nygard, <i>Release It!</i> (the resilience patterns, with the outage stories that produced them).</div>
+</section>

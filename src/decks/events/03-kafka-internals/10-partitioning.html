@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Kafka internals" data-title="Partitioning">
+  <h2>Partition count and the hot-partition problem</h2>
+  <p class="dek">Partitions are your unit of parallelism, ordering and storage distribution. Two numbers to get right up front, because both are awkward to change later.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Choosing the count</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">Start from throughput, then take the maximum of the two bounds:</p>
+      <dl class="kv" style="margin-top:12px">
+        <dt>Target</dt><dd>peak 20,000 events/s on <code>orders.placed</code></dd>
+        <dt>Consumer</dt><dd>one instance handles ~2,000/s → <b>10 partitions</b> minimum</dd>
+        <dt>Headroom</dt><dd>3× for growth and for replaying a backlog fast → <b>24–32</b></dd>
+        <dt>Upper bound</dt><dd>partitions cost memory, file handles and leader-election time on the brokers. A few thousand per broker is fine; tens of thousands is not</dd>
+      </dl>
+      <p style="margin-top:12px;font-size:13.5px;color:var(--text-2)"><b>Round to something you will not need to change.</b> Adding partitions re-maps <code>hash(key) % n</code>, so a key's history and future land in different partitions and per-key ordering breaks across the change.</p>
+      <p style="margin-top:8px;font-size:13.5px;color:var(--text-3)">The clean way to repartition is a new topic at the new count, dual-publish, migrate consumers, retire the old one — the same expand/contract shape as a schema change.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">Hot partitions</span>Key on <code>customerId</code> and your largest corporate account lands entirely on one partition. That consumer runs at 100% while five sit idle, and lag on that one partition is the lag your customers feel. Kafka will not rebalance around it, because the key contract forbids moving the data.
+      <p style="margin-top:8px">Detect it by graphing <b>lag per partition</b>, not lag per topic — the topic average hides a single hot partition completely.</p></div>
+      <div class="card">
+        <h3>Fixes for a hot key</h3>
+        <ul class="tight">
+          <li><b>Key more finely</b> — <code>orderId</code> instead of <code>customerId</code>, if per-customer ordering is not actually required.</li>
+          <li><b>Composite key with a salt</b> — <code>customerId:bucket</code>, where the bucket is derived from the order id. Spreads load, preserves nothing about customer ordering, so check that is acceptable.</li>
+          <li><b>Separate topic</b> for the handful of enormous accounts, with its own consumer group and its own scaling.</li>
+          <li><b>Custom partitioner</b> for genuinely skewed distributions — powerful, and an obligation to maintain forever.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+

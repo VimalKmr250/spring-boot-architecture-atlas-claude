@@ -1,0 +1,109 @@
+<section class="slide" data-sec="03 · Fast/slow pointers" data-title="The reusable structure">
+  <h2>Four skeletons, and a dummy node that prevents half the bugs</h2>
+  <p class="dek">Two speeds for cycles and midpoints, a fixed gap for offsets from the end, and a head-swap trick for aligning two lists. The <code>dummy</code> node in skeleton B is not a style choice — it is what makes deleting the head require no special case.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton A · two speeds — cycle and midpoint (LC 141, 142, 876)</div>
+<pre><code class="language-java">// The guard `fast != null &amp;&amp; fast.next != null` covers BOTH
+// the odd and even length cases. Getting it wrong is the
+// number one NullPointerException in this whole family.
+ListNode middle(ListNode head) {
+    ListNode slow = head, fast = head;
+
+    while (fast != null &amp;&amp; fast.next != null) {
+        slow = slow.next;
+        fast = fast.next.next;
+    }
+    return slow;        // even length: the SECOND of the two middles
+}
+
+boolean hasCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+
+    while (fast != null &amp;&amp; fast.next != null) {
+        slow = slow.next;
+        fast = fast.next.next;
+        if (slow == fast) return true;   // compare AFTER moving
+    }
+    return false;                        // fast fell off: no cycle
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Skeleton B · fixed gap from the end (LC 19)</div>
+<pre><code class="language-java">// `dummy` sits one before the head, so deleting the head
+// needs no special case: slow simply stops on the dummy.
+ListNode removeNthFromEnd(ListNode head, int n) {
+    ListNode dummy = new ListNode(0, head);
+    ListNode fast = dummy, slow = dummy;
+
+    for (int i = 0; i &lt; n; i++) fast = fast.next;   // open the gap
+
+    while (fast.next != null) {                     // preserve it to the end
+        fast = fast.next;
+        slow = slow.next;
+    }
+
+    slow.next = slow.next.next;   // slow is the node BEFORE the target
+    return dummy.next;            // not `head` — it may have been deleted
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Skeleton C · aligning two lists by swapping heads (LC 160)</div>
+<pre><code class="language-java">// Each pointer walks its own list, then the other. Both therefore
+// travel exactly lenA + lenB before meeting, which cancels the
+// length difference without ever measuring either length.
+//
+//   a: A A A A | B B B          both cover the same total,
+//   b: B B B   | A A A A        so they arrive together.
+//
+// If the lists never intersect, both become null at the same
+// moment and the loop ends with a == b == null. The null case
+// is handled by the SAME code, which is why this beats the
+// "measure both lengths and skip the difference" version.
+ListNode getIntersectionNode(ListNode headA, ListNode headB) {
+    ListNode a = headA, b = headB;
+
+    while (a != b) {
+        a = (a == null) ? headB : a.next;
+        b = (b == null) ? headA : b.next;
+    }
+    return a;
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Skeleton D · reverse in place — the other half of LC 234</div>
+<pre><code class="language-java">// Three pointers, and the order of the four lines never changes.
+// Write them in this order every time and it cannot go wrong.
+ListNode reverse(ListNode head) {
+    ListNode prev = null, cur = head;
+
+    while (cur != null) {
+        ListNode next = cur.next;   // 1 · save what is ahead
+        cur.next = prev;            // 2 · flip this link
+        prev = cur;                 // 3 · advance prev
+        cur = next;                 // 4 · advance cur
+    }
+    return prev;                    // the new head
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Which skeleton, and why</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>"has a cycle"</dt><dd>A, returning a boolean. Compare after moving, never before, or both pointers start equal and you return true immediately.</dd>
+        <dt>"where the cycle begins"</dt><dd>A for phase 1, then the reset walk for phase 2. Never return the meeting point.</dd>
+        <dt>"the middle"</dt><dd>A. Decide up front whether you want the first or second middle on an even length — starting <code>fast</code> at <code>head.next</code> gives the first.</dd>
+        <dt>"nth from the end"</dt><dd>B, with a dummy. Also the right shape for "remove the head under a condition".</dd>
+        <dt>Two lists</dt><dd>C. It handles the no-intersection case with no extra branch.</dd>
+      </dl>
+    </div>
+    <div class="note bad"><span class="lbl">The three bugs that actually happen</span><b>Guard written as <code>fast.next != null &amp;&amp; fast != null</code></b> — the order matters; testing <code>fast.next</code> first throws on a null <code>fast</code>. <b>Comparing before moving</b> — <code>slow</code> and <code>fast</code> both begin at the head, so a pre-move comparison reports a cycle on every list. <b>Returning <code>head</code> after a deletion</b> — if the head itself was removed, <code>head</code> now points at a detached node; always return <code>dummy.next</code>.</div>
+  </div>
+</section>
+

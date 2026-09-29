@@ -1,0 +1,33 @@
+<section class="slide" data-sec="Foundations" data-title="Events, commands, queries">
+  <h2>Three kinds of message, and why confusing them hurts</h2>
+  <p class="dek">"We publish events" is often untrue — many teams publish commands over a topic and inherit the worst of both models. The distinction is not pedantry; it decides coupling, ownership and error handling.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Event</th><th>Command</th><th>Query</th></tr></thead>
+      <tbody>
+        <tr><td>Says</td><td>"This happened"</td><td>"Do this"</td><td>"Tell me this"</td></tr>
+        <tr><td>Tense</td><td>Past — <code>OrderPlaced</code></td><td>Imperative — <code>ShipOrder</code></td><td>Interrogative — <code>GetOrder</code></td></tr>
+        <tr><td>Consumers</td><td>Zero to many, unknown to the producer</td><td><b>Exactly one</b>, known</td><td>One, known</td></tr>
+        <tr><td>Can it be rejected?</td><td>No — it already happened</td><td>Yes — the handler may refuse</td><td>n/a</td></tr>
+        <tr><td>Coupling</td><td>Lowest — producer knows nothing</td><td>Sender knows the handler exists and what it does</td><td>Highest</td></tr>
+        <tr><td>Failure means</td><td>A consumer is behind; retry or DLT</td><td>The requested action did not happen — someone must care</td><td>No answer</td></tr>
+        <tr><td>Carry it on</td><td>A topic, fan-out</td><td>A queue or a direct call, point to point</td><td>A direct call</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="note bad"><span class="lbl">The smell: a command dressed as an event</span><code>SendConfirmationEmail</code> on a topic is a command. It has exactly one legitimate consumer, the producer knows what will happen, and if it fails someone must be told. Publishing it as an "event" means nobody owns the failure and the producer has coupling it cannot see.
+    <p style="margin-top:8px">Publish <code>OrderPlaced</code> instead and let the notification service decide that an email is the right reaction. Now a second reaction can be added without the producer changing.</p></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h3>Commands over a broker are still legitimate</h3>
+        <p>Sending a command to a durable queue gives you retry, backpressure and decoupling <em>in time</em> without decoupling in knowledge. That is a normal and useful pattern — a work queue.</p>
+        <p>Just be honest that it is a command: one consumer group, a clear owner, and an error path that reaches a human.</p>
+      </div>
+      <div class="note tip"><span class="lbl">The test</span>Ask: <b>"if nobody consumed this, would anything be wrong?"</b> Yes → it is a command, and it needs an owner and an SLA. No → it is an event, and you are free to fan out.</div>
+    </div>
+  </div>
+</section>
+
