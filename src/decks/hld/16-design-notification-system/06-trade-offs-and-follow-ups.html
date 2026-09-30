@@ -1,0 +1,52 @@
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: trade-offs and follow-ups">
+  <h2>At-least-once delivery, bounded duplicates, and a thundering herd you caused yourself</h2>
+  <p class="dek">Wrap up with the guarantees you actually offer, which are at-least-once delivery with deduplication and never exactly-once across third-party providers. Then cover how the system behaves at the edges: a campaign that brings the whole user base back at once, stale device tokens, and compliance.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: sending a campaign push to 8 million users in one minute makes app opens spike, and the API and database fall over under the traffic the notification created. Sending at a throttled 20 thousand a second, staggered by time zone, spreads app opens over hours within capacity. Right: duplicate prevention layers. Producer retries are deduped by the idempotency key at the API. Replayed queue messages are deduped by the notification and channel key in the router. Provider retries use the provider's idempotency id. The remaining risk window is a provider that sent the message but timed out before replying; check its status before resending.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">The herd your own campaign creates</text>
+        <line x1="30" y1="220" x2="410" y2="220" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="30" y1="220" x2="30" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="30" y1="120" x2="410" y2="120" stroke="#D26A3F" stroke-dasharray="5 4" stroke-opacity="0.8"></line>
+        <text x="408" y="114" text-anchor="end" font-size="9" fill="#D26A3F">backend capacity</text>
+        <polyline points="30,210 70,208 80,50 100,60 120,150 150,200 200,208 410,209" fill="none" stroke="#D26A3F" stroke-width="2"></polyline>
+        <text x="110" y="46" font-size="9.5" fill="#D26A3F">8 M pushes in 1 min</text>
+        <polyline points="30,210 70,190 120,172 170,160 220,162 270,166 320,170 370,176 410,182" fill="none" stroke="#3AA79B" stroke-width="2"></polyline>
+        <text x="250" y="152" font-size="9.5" fill="#3AA79B">throttled + staggered by time zone</text>
+        <text x="410" y="238" text-anchor="end" font-size="9" fill="currentColor" opacity="0.7">app opens over time →</text>
+        <text x="215" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">notification volume is also a load test of your whole backend</text>
+
+        <line x1="450" y1="12" x2="450" y2="274" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Where duplicates are stopped</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="470" y="34" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="52" font-weight="600">producer retried the API call</text><text x="482" y="68" opacity="0.85">→ Idempotency-Key at the API returns the same notification id</text>
+          <rect x="470" y="84" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="102" font-weight="600">queue redelivered after a worker crash</text><text x="482" y="118" opacity="0.85">→ router records (notification, user, channel) as sent; skip if present</text>
+          <rect x="470" y="134" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="152" font-weight="600">channel worker retried the provider</text><text x="482" y="168" opacity="0.85">→ same provider-side id; the provider dedupes where supported</text>
+          <rect x="470" y="184" width="410" height="42" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <text x="482" y="202" font-weight="600" fill="#D26A3F">residual: provider sent it but timed out</text><text x="482" y="218" opacity="0.85">→ query status before resending; accept a rare duplicate push</text>
+        </g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">effectively-once for SMS and OTP; at-least-once, cheaply, for push</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Stale device tokens</td><td>APNs/FCM report invalid tokens: delete them. Prune devices unseen for 60 days.</td></tr>
+          <tr><td>Compliance</td><td>One-click unsubscribe (email), opt-in consent for SMS (TCPA), consent records, and region-specific data storage.</td></tr>
+          <tr><td>In-app inbox</td><td>Store per-user notifications (the log indexed by user) with read state; deliver live over WebSocket if connected.</td></tr>
+          <tr><td>Multi-region</td><td>Regional pipelines; route by user home region; providers by destination country.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"A durable intake API with idempotency, priority-separated topics, router workers that apply preferences, caps and quiet hours at send time, and channel-specific workers with per-provider limiters, breakers and fail-over. Every state change goes into a notification log, so any message can be traced end to end."</div>
+  </div>
+</section>

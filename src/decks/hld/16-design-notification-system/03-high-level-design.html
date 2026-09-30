@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: high-level design">
+  <h2>A pipeline of queues: accept, decide, render, deliver, track</h2>
+  <p class="dek">Each stage has one job and a queue in front of it, so it can scale, retry and fail on its own. The key design move is keeping queues separate by <b>priority</b> at the front and by <b>channel</b> at the back. A campaign flooding email can't delay an OTP, and a slow SMS provider can't stall push notifications.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Producers such as the order service, auth service and campaign scheduler call the notification API, which validates, checks idempotency and writes to one of three Kafka topics by priority: critical, normal and bulk. Router workers consume critical first, look up preferences, devices and caps, render templates and choose channels, then write to per-channel queues for push, email, SMS and in-app. Channel workers call providers: APNs and FCM, an email provider, two SMS providers for fail-over, and the in-app inbox. Providers call back with delivery status, which a tracking service writes to the notification log and analytics.">
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="40" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="59">order svc</text>
+          <rect x="10" y="90" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="109">auth svc</text>
+          <rect x="10" y="140" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="159">campaigns</text>
+        </g>
+        <rect x="130" y="70" width="110" height="80" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="185" y="96" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Notification</text>
+        <text x="185" y="110" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">API</text>
+        <text x="185" y="128" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">validate · idempotency</text>
+        <text x="185" y="140" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">→ 202</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="106" y1="55" x2="127" y2="85" marker-end="url(#arwA)"></line><line x1="106" y1="105" x2="127" y2="108" marker-end="url(#arwA)"></line><line x1="106" y1="155" x2="127" y2="132" marker-end="url(#arwA)"></line></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="270" y="46" width="110" height="24" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="325" y="62">critical</text>
+          <rect x="270" y="98" width="110" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="325" y="114">normal</text>
+          <rect x="270" y="150" width="110" height="24" rx="4" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-dasharray="4 3"></rect><text x="325" y="166">bulk (throttled)</text>
+        </g>
+        <text x="325" y="36" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">Kafka by priority</text>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="240" y1="90" x2="267" y2="60" marker-end="url(#arwB)"></line><line x1="240" y1="110" x2="267" y2="110" marker-end="url(#arwB)"></line><line x1="240" y1="130" x2="267" y2="160" marker-end="url(#arwB)"></line></g>
+
+        <rect x="410" y="80" width="140" height="80" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="480" y="100" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Router workers</text>
+        <g font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle"><text x="480" y="116">prefs · caps · quiet hours</text><text x="480" y="128">dedupe · render template</text><text x="480" y="140">pick channels + devices</text><text x="480" y="152">critical drained first</text></g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="380" y1="58" x2="407" y2="94" marker-end="url(#arwB)"></line><line x1="380" y1="110" x2="407" y2="116" marker-end="url(#arwB)"></line><line x1="380" y1="162" x2="407" y2="140" marker-end="url(#arwB)"></line></g>
+        <path d="M430 20 a50 6 0 0 1 100 0 v24 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M430 20 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="480" y="40" text-anchor="middle" font-size="9" fill="currentColor">prefs · devices</text>
+        <line x1="480" y1="80" x2="480" y2="52" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="580" y="40" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="56">push q</text>
+          <rect x="580" y="84" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="100">email q</text>
+          <rect x="580" y="128" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="144">SMS q</text>
+          <rect x="580" y="172" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="188">in-app q</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3"><line x1="550" y1="100" x2="577" y2="54" marker-end="url(#arwB)"></line><line x1="550" y1="112" x2="577" y2="96" marker-end="url(#arwB)"></line><line x1="550" y1="126" x2="577" y2="140" marker-end="url(#arwB)"></line><line x1="550" y1="140" x2="577" y2="182" marker-end="url(#arwB)"></line></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="36" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="56">push workers</text>
+          <rect x="690" y="80" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="100">email workers</text>
+          <rect x="690" y="124" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="144">SMS workers</text>
+          <rect x="690" y="168" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="188">inbox writer</text>
+          <rect x="806" y="36" width="84" height="32" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="56">APNs · FCM</text>
+          <rect x="806" y="80" width="84" height="32" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="100">SES · SendGrid</text>
+          <rect x="806" y="118" width="84" height="20" rx="4" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="848" y="132" font-size="8.5">SMS provider A</text>
+          <rect x="806" y="142" width="84" height="20" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="156" font-size="8.5">SMS provider B</text>
+          <rect x="806" y="168" width="84" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="848" y="188">inbox store</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.2"><line x1="660" y1="52" x2="687" y2="52" marker-end="url(#arwA)"></line><line x1="660" y1="96" x2="687" y2="96" marker-end="url(#arwA)"></line><line x1="660" y1="140" x2="687" y2="140" marker-end="url(#arwA)"></line><line x1="660" y1="184" x2="687" y2="184" marker-end="url(#arwA)"></line>
+          <line x1="786" y1="52" x2="803" y2="52" marker-end="url(#arwA)"></line><line x1="786" y1="96" x2="803" y2="96" marker-end="url(#arwA)"></line><line x1="786" y1="136" x2="803" y2="128" marker-end="url(#arwA)"></line><line x1="786" y1="146" x2="803" y2="152" stroke-dasharray="3 3" marker-end="url(#arwA)"></line><line x1="786" y1="184" x2="803" y2="184" marker-end="url(#arwA)"></line></g>
+
+        <rect x="580" y="250" width="160" height="40" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="660" y="268" text-anchor="middle" font-size="10" fill="currentColor">tracking service</text>
+        <text x="660" y="282" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">delivered · opened · bounced</text>
+        <path d="M848 200 V270 H743" fill="none" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        <text x="856" y="236" font-size="8.5" fill="currentColor" opacity="0.8">webhooks</text>
+        <path d="M330 262 a60 7 0 0 1 120 0 v28 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M330 262 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="390" y="286" text-anchor="middle" font-size="9.5" fill="currentColor">notification log</text>
+        <line x1="580" y1="270" x2="453" y2="274" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="200" y="274" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">every stage appends status here,</text>
+        <text x="200" y="288" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">so "where is n-5f2?" has an answer</text>
+      </svg>
+    </div>
+    <figcaption>Priority separation at the front means critical messages have their own topic, consumers and capacity. Channel separation at the back gives each channel its own workers sized for its provider's rate limits. Retries happen inside each channel stage, with backoff and a dead-letter queue, never by re-running the whole pipeline.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Router workers decide</h4><p>For each (notification, user): Is it a duplicate? Is the user opted in for this category and channel? Is it quiet hours in their timezone? Are they over their cap? Which devices are live? Then render the template in the user's locale and emit one message per channel.</p></div>
+    <div class="card"><h4>Channel workers deliver</h4><p>Batch where providers allow it (FCM multicast, email batch APIs). Respect each provider's rate limits with a token bucket per provider. Retry transient errors, drop permanent ones (invalid token, hard bounce), and record the provider's message id for tracking.</p></div>
+    <div class="card"><h4>Tracking closes the loop</h4><p>Providers call back with delivered, bounced or complaint. The SDK and email pixels report opens. Hard bounces and invalid tokens feed back into the device and contact tables, which protects sender reputation and cuts cost.</p></div>
+  </div>
+</section>

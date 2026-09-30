@@ -1,0 +1,50 @@
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: API and data model">
+  <h2>Producers send intents; the platform decides channel, content and timing</h2>
+  <p class="dek">A producer says "tell user 42 their order shipped" with a template and parameters. It doesn't choose between push and email, and it doesn't render text. That keeps preferences, localisation, caps and provider details in one place, and lets you change them without touching fifty services.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/notifications
+Idempotency-Key: order-881-shipped            # same key → same notification
+{ "recipients": { "user_ids": ["u-42"] },     # or { "segment": "lapsed-30d" }
+  "template": "order_shipped", "category": "transactional",
+  "priority": "normal",                       # critical | normal | bulk
+  "params": { "order_id": "881", "eta": "Thu" },
+  "send_at": null }                           # or a timestamp
+→ 202 { "notification_id": "n-5f2…" }
+
+GET  /v1/notifications/n-5f2…     → per-channel status timeline
+POST /v1/devices    { "token": "…", "platform": "ios" }
+PUT  /v1/users/u-42/preferences   { "marketing": { "push": false } }</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Data model: templates keyed by template, channel and locale with subject and body; user preferences keyed by user with category, channel, enabled flag, quiet hours and time zone; devices keyed by user with token, platform and last seen; notification log keyed by notification id and channel with user, status history and provider message id, stored in a wide-column store with a TTL; idempotency keys with a TTL in Redis.">
+          <rect x="10" y="10" width="195" height="92" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">templates</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="46">(template, channel, locale)</text><text x="20" y="62">subject · body (Mustache)</text><text x="20" y="78">version</text><text x="20" y="94" opacity="0.7">cached in every worker</text></g>
+          <rect x="215" y="10" width="195" height="92" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="225" y="28" font-size="11" font-weight="600" fill="currentColor">user_preferences</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="225" y="46">PK user_id</text><text x="225" y="62">category · channel · on/off</text><text x="225" y="78">quiet_hours · timezone</text><text x="225" y="94" opacity="0.7">read on every send</text></g>
+          <rect x="10" y="114" width="195" height="80" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="132" font-size="11" font-weight="600" fill="currentColor">devices</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="150">PK user_id · token</text><text x="20" y="166">platform · app_version</text><text x="20" y="182">last_seen (prune stale)</text></g>
+          <rect x="215" y="114" width="195" height="80" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="225" y="132" font-size="11" font-weight="600" fill="currentColor">idempotency (Redis)</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="225" y="150">idem:order-881-shipped</text><text x="225" y="166">→ n-5f2…  TTL 24 h</text><text x="225" y="182">dedupe:(u-42,tmpl) 10 min</text></g>
+          <rect x="10" y="206" width="400" height="92" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="224" font-size="11" font-weight="600" fill="currentColor">notification_log (wide-column, TTL 90 d)</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="242">PK (notification_id) · CK channel</text><text x="20" y="258">user_id · template · provider_msg_id</text><text x="20" y="274">status: queued → sent → delivered → opened</text><text x="20" y="290" opacity="0.7">+ index by user for the in-app inbox</text></g>
+          <text x="210" y="318" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">prefs and devices are small, relational · log is huge, append-heavy</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>202, not 200</h4><p>Sending is asynchronous. The API validates the request, checks idempotency, persists it (or enqueues it durably) and returns a notification id immediately. Producers must never block on an SMS provider's latency.</p></div>
+    <div class="card"><h4>Segments are expanded later</h4><p>"Send to segment lapsed-30d" (8 M users) is stored as one job. A campaign worker expands it in pages, at a controlled rate, instead of the API call enqueueing 8 M messages synchronously.</p></div>
+    <div class="card"><h4>Two different stores</h4><p>Preferences, devices and templates are small, read constantly and change rarely, so keep them in a relational DB behind a cache. The log is write-heavy, time-ordered and huge, so use a wide-column store with a TTL, and aggregate to analytics for open and click rates.</p></div>
+  </div>
+</section>

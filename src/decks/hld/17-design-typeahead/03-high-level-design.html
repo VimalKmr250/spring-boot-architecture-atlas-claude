@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: high-level design">
+  <h2>A fast in-memory serving path fed by a slow, careful build path</h2>
+  <p class="dek">Split the system in two. <b>Serving</b> is stateless apart from a read-only trie in memory: every request is a few pointer hops, heavily cached at the edge. <b>Building</b> is a data pipeline that turns search logs into ranked, filtered snapshots every hour or so and ships them to the servers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Serving path: the client debounces keystrokes and caches results; the CDN caches popular short prefixes for a few minutes; a load balancer routes by prefix to suggest servers, each holding a trie shard in memory with replicas, and answers in a few milliseconds. Build path: search logs stream through Kafka into an aggregation job that keeps decayed counts per query; a trie builder applies the blocklist, ranks and builds versioned snapshots per shard into object storage; suggest servers load new snapshots with a blue-green swap. A small trending overlay from a streaming job adds fast-rising queries between builds.">
+        <text x="20" y="22" font-size="11.5" font-weight="600" fill="#D26A3F">Serving (every keystroke)</text>
+        <rect x="20" y="36" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="56" text-anchor="middle" font-size="10" fill="currentColor">client</text><text x="65" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">debounce · cache</text>
+        <rect x="140" y="36" width="100" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="190" y="56" text-anchor="middle" font-size="10" fill="currentColor">CDN</text><text x="190" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">"a"…"zz": 5 min TTL</text>
+        <rect x="270" y="36" width="90" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="315" y="56" text-anchor="middle" font-size="10" fill="currentColor">LB</text><text x="315" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">route by prefix</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="110" y1="59" x2="137" y2="59" marker-end="url(#arwA)"></line><line x1="240" y1="59" x2="267" y2="59" marker-end="url(#arwA)"></line></g>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="400" y="24" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="43">suggest: a–f</text>
+          <rect x="400" y="62" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="81">suggest: g–p</text>
+          <rect x="400" y="100" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="119">suggest: q–z</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="360" y1="52" x2="397" y2="40" marker-end="url(#arwA)"></line><line x1="360" y1="62" x2="397" y2="77" marker-end="url(#arwA)"></line><line x1="360" y1="72" x2="397" y2="113" marker-end="url(#arwA)"></line></g>
+        <text x="600" y="50" font-size="9.5" fill="currentColor" opacity="0.85">trie shard in RAM, × 3 replicas</text>
+        <text x="600" y="66" font-size="9.5" fill="currentColor" opacity="0.85">lookup ≈ 1 ms; no disk, no DB</text>
+        <text x="600" y="82" font-size="9.5" fill="currentColor" opacity="0.85">+ trending overlay merged in</text>
+
+        <line x1="10" y1="152" x2="890" y2="152" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="20" y="176" font-size="11.5" font-weight="600" fill="#3AA79B">Build (hourly / daily)</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="196" width="110" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="75" y="216">search logs</text><text x="75" y="230" font-size="8.5" opacity="0.75">query, lang, click</text>
+          <rect x="160" y="204" width="100" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="210" y="223">Kafka</text>
+          <rect x="290" y="190" width="130" height="58" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="355" y="210">aggregate</text><text x="355" y="224" font-size="8.5">decayed counts</text><text x="355" y="236" font-size="8.5">per query</text>
+          <rect x="450" y="190" width="140" height="58" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="520" y="210">trie builder</text><text x="520" y="224" font-size="8.5">filter blocklist · rank</text><text x="520" y="236" font-size="8.5">top-8 per node · shard</text>
+        </g>
+        <path d="M620 198 a55 6 0 0 1 110 0 v36 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M620 198 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="675" y="220" text-anchor="middle" font-size="9.5" fill="currentColor">snapshots</text><text x="675" y="234" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">v2026-09-30T10</text>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="130" y1="219" x2="157" y2="219" marker-end="url(#arwB)"></line><line x1="260" y1="219" x2="287" y2="219" marker-end="url(#arwB)"></line><line x1="420" y1="219" x2="447" y2="219" marker-end="url(#arwB)"></line><line x1="590" y1="219" x2="617" y2="219" marker-end="url(#arwB)"></line></g>
+        <path d="M730 212 C 800 212, 820 130, 525 118" fill="none" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="790" y="170" font-size="9.5" fill="#3AA79B">load + blue/green swap</text>
+        <rect x="290" y="268" width="300" height="34" rx="5" fill="none" stroke="#3AA79B" stroke-dasharray="4 3"></rect>
+        <text x="440" y="289" text-anchor="middle" font-size="9.5" fill="currentColor">trending overlay: streaming top-k per short prefix (minutes)</text>
+        <line x1="210" y1="234" x2="300" y2="276" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+      </svg>
+    </div>
+    <figcaption>The serving path has no writes and no database. If the build pipeline breaks, servers keep serving the last good snapshot, a few hours stale, which nobody notices. If a suggest shard dies, its replicas take over. And if the whole service fails, the search box still accepts typing.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Caching does most of the work</h4><p>One- and two-character prefixes are few (about 1,000) and account for a large share of requests. The CDN and browser cache them for minutes. The server sees mostly longer, rarer prefixes, and each of those is still a microsecond trie walk.</p></div>
+    <div class="card"><h4>Sharding the trie</h4><p>Shard by prefix range so each lookup hits exactly one shard. The ranges are cut by measured traffic, not the alphabet ("s" and "c" are huge, "x" is tiny). Replicate each shard three or more times for throughput and availability.</p></div>
+    <div class="card"><h4>Safe deploys of data</h4><p>Load the new snapshot alongside the old one, run canary queries (sizes, blocklist hits, top results for known prefixes), then swap an atomic pointer. Keep the previous version for an instant rollback, since a bad snapshot is a data outage.</p></div>
+  </div>
+</section>

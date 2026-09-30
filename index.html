@@ -16562,6 +16562,669 @@ POST   /v1/posts/{id}/like              # idempotent per user</code></pre>
   </div>
   <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Hot keys and resharding" href="#hld/37">HLD · Hot keys and resharding</a><a data-deck="hld" data-slide="Cache failure modes" href="#hld/49">HLD · Cache failure modes</a></p>
 </section>
+<!-- decks/hld/16-design-notification-system/01-requirements.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: requirements">
+  <h2>Design a notification system: many producers, four channels, and users who must not be spammed</h2>
+  <p class="dek">Every product team wants to notify users: order shipped, a login from a new device, "you have 3 new followers", a marketing campaign. A central notification platform gives them one API and handles channels (push, SMS, email, in-app), user preferences, templates, rate limits, retries and delivery tracking. The difficulties are wildly mixed urgency and volume, unreliable third-party providers, and not annoying people.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 1 billion notifications a day is about 12 thousand a second on average, with campaigns spiking to 100 thousand a second. By channel: push about 70 percent, email 20 percent, in-app 8 percent and SMS 2 percent, which is 20 million SMS a day and the most expensive channel. Latency classes: one-time passwords and security alerts within 5 seconds at p99; transactional within a minute; marketing within hours. The notification log is 1 billion rows at about 500 bytes, 500 gigabytes a day, kept 90 days.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="49">1 B notifications / day</text><text x="140" y="65" font-size="9.5" opacity="0.75">≈ 12 k/s avg</text>
+          <rect x="30" y="96" width="220" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="115">campaign spikes</text><text x="140" y="131" font-weight="600">≈ 100 k/s</text>
+          <rect x="30" y="162" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="181">log: 500 GB/day</text><text x="140" y="197" font-size="9.5" opacity="0.75">90-day retention</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="140" y1="74" x2="140" y2="93" marker-end="url(#arw)"></line></g>
+        <text x="450" y="26" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">By channel</text>
+        <g>
+          <rect x="310" y="40" width="252" height="26" fill="#3AA79B" fill-opacity="0.5"></rect>
+          <rect x="310" y="72" width="72" height="26" fill="#8A94A3" fill-opacity="0.6"></rect>
+          <rect x="310" y="104" width="29" height="26" fill="#8A94A3" fill-opacity="0.45"></rect>
+          <rect x="310" y="136" width="7" height="26" fill="#D26A3F" fill-opacity="0.8"></rect>
+        </g>
+        <g font-size="10" fill="currentColor"><text x="570" y="58">push 70%</text><text x="390" y="90">email 20%</text><text x="346" y="122">in-app 8%</text><text x="324" y="154" fill="#D26A3F">SMS 2% = 20 M/day, $$$</text></g>
+        <text x="760" y="26" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Latency classes</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="660" y="38" width="200" height="40" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="760" y="55" font-weight="600">critical: OTP, security</text><text x="760" y="70">p99 &lt; 5 s</text>
+          <rect x="660" y="88" width="200" height="40" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="760" y="105" font-weight="600">transactional: order shipped</text><text x="760" y="120">&lt; 1 min</text>
+          <rect x="660" y="138" width="200" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="760" y="155" font-weight="600">bulk: marketing, digests</text><text x="760" y="170">hours; throttled</text>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard part: a campaign must never delay an OTP, and flaky providers must not lose either</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>One API for all producers: send to a user, a list, or a segment, now or scheduled.</li>
+      <li>Channels: iOS/Android push, email, SMS, in-app inbox.</li>
+      <li>Templates with localisation; user preferences per category and channel.</li>
+      <li>Delivery status: sent, delivered, opened, failed.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Never lose a notification; never double-send an SMS or OTP.</li>
+      <li>Priority isolation between critical and bulk traffic.</li>
+      <li>Survive a provider outage (fail over to a secondary).</li>
+      <li>Per-user caps and quiet hours enforced centrally.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Who owns the content? Producers pick a template; the platform renders it.</li>
+      <li>Can users unsubscribe per category? Yes, and that's a legal requirement for marketing.</li>
+      <li>Out of scope: campaign authoring UI and A/B testing.</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/16-design-notification-system/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: API and data model">
+  <h2>Producers send intents; the platform decides channel, content and timing</h2>
+  <p class="dek">A producer says "tell user 42 their order shipped" with a template and parameters. It doesn't choose between push and email, and it doesn't render text. That keeps preferences, localisation, caps and provider details in one place, and lets you change them without touching fifty services.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/notifications
+Idempotency-Key: order-881-shipped            # same key → same notification
+{ "recipients": { "user_ids": ["u-42"] },     # or { "segment": "lapsed-30d" }
+  "template": "order_shipped", "category": "transactional",
+  "priority": "normal",                       # critical | normal | bulk
+  "params": { "order_id": "881", "eta": "Thu" },
+  "send_at": null }                           # or a timestamp
+→ 202 { "notification_id": "n-5f2…" }
+
+GET  /v1/notifications/n-5f2…     → per-channel status timeline
+POST /v1/devices    { "token": "…", "platform": "ios" }
+PUT  /v1/users/u-42/preferences   { "marketing": { "push": false } }</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Data model: templates keyed by template, channel and locale with subject and body; user preferences keyed by user with category, channel, enabled flag, quiet hours and time zone; devices keyed by user with token, platform and last seen; notification log keyed by notification id and channel with user, status history and provider message id, stored in a wide-column store with a TTL; idempotency keys with a TTL in Redis.">
+          <rect x="10" y="10" width="195" height="92" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">templates</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="46">(template, channel, locale)</text><text x="20" y="62">subject · body (Mustache)</text><text x="20" y="78">version</text><text x="20" y="94" opacity="0.7">cached in every worker</text></g>
+          <rect x="215" y="10" width="195" height="92" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="225" y="28" font-size="11" font-weight="600" fill="currentColor">user_preferences</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="225" y="46">PK user_id</text><text x="225" y="62">category · channel · on/off</text><text x="225" y="78">quiet_hours · timezone</text><text x="225" y="94" opacity="0.7">read on every send</text></g>
+          <rect x="10" y="114" width="195" height="80" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="132" font-size="11" font-weight="600" fill="currentColor">devices</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="150">PK user_id · token</text><text x="20" y="166">platform · app_version</text><text x="20" y="182">last_seen (prune stale)</text></g>
+          <rect x="215" y="114" width="195" height="80" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="225" y="132" font-size="11" font-weight="600" fill="currentColor">idempotency (Redis)</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="225" y="150">idem:order-881-shipped</text><text x="225" y="166">→ n-5f2…  TTL 24 h</text><text x="225" y="182">dedupe:(u-42,tmpl) 10 min</text></g>
+          <rect x="10" y="206" width="400" height="92" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="224" font-size="11" font-weight="600" fill="currentColor">notification_log (wide-column, TTL 90 d)</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="242">PK (notification_id) · CK channel</text><text x="20" y="258">user_id · template · provider_msg_id</text><text x="20" y="274">status: queued → sent → delivered → opened</text><text x="20" y="290" opacity="0.7">+ index by user for the in-app inbox</text></g>
+          <text x="210" y="318" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">prefs and devices are small, relational · log is huge, append-heavy</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>202, not 200</h4><p>Sending is asynchronous. The API validates the request, checks idempotency, persists it (or enqueues it durably) and returns a notification id immediately. Producers must never block on an SMS provider's latency.</p></div>
+    <div class="card"><h4>Segments are expanded later</h4><p>"Send to segment lapsed-30d" (8 M users) is stored as one job. A campaign worker expands it in pages, at a controlled rate, instead of the API call enqueueing 8 M messages synchronously.</p></div>
+    <div class="card"><h4>Two different stores</h4><p>Preferences, devices and templates are small, read constantly and change rarely, so keep them in a relational DB behind a cache. The log is write-heavy, time-ordered and huge, so use a wide-column store with a TTL, and aggregate to analytics for open and click rates.</p></div>
+  </div>
+</section>
+<!-- decks/hld/16-design-notification-system/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: high-level design">
+  <h2>A pipeline of queues: accept, decide, render, deliver, track</h2>
+  <p class="dek">Each stage has one job and a queue in front of it, so it can scale, retry and fail on its own. The key design move is keeping queues separate by <b>priority</b> at the front and by <b>channel</b> at the back. A campaign flooding email can't delay an OTP, and a slow SMS provider can't stall push notifications.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Producers such as the order service, auth service and campaign scheduler call the notification API, which validates, checks idempotency and writes to one of three Kafka topics by priority: critical, normal and bulk. Router workers consume critical first, look up preferences, devices and caps, render templates and choose channels, then write to per-channel queues for push, email, SMS and in-app. Channel workers call providers: APNs and FCM, an email provider, two SMS providers for fail-over, and the in-app inbox. Providers call back with delivery status, which a tracking service writes to the notification log and analytics.">
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="40" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="59">order svc</text>
+          <rect x="10" y="90" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="109">auth svc</text>
+          <rect x="10" y="140" width="96" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="58" y="159">campaigns</text>
+        </g>
+        <rect x="130" y="70" width="110" height="80" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="185" y="96" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Notification</text>
+        <text x="185" y="110" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">API</text>
+        <text x="185" y="128" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">validate · idempotency</text>
+        <text x="185" y="140" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">→ 202</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="106" y1="55" x2="127" y2="85" marker-end="url(#arwA)"></line><line x1="106" y1="105" x2="127" y2="108" marker-end="url(#arwA)"></line><line x1="106" y1="155" x2="127" y2="132" marker-end="url(#arwA)"></line></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="270" y="46" width="110" height="24" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="325" y="62">critical</text>
+          <rect x="270" y="98" width="110" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="325" y="114">normal</text>
+          <rect x="270" y="150" width="110" height="24" rx="4" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-dasharray="4 3"></rect><text x="325" y="166">bulk (throttled)</text>
+        </g>
+        <text x="325" y="36" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">Kafka by priority</text>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="240" y1="90" x2="267" y2="60" marker-end="url(#arwB)"></line><line x1="240" y1="110" x2="267" y2="110" marker-end="url(#arwB)"></line><line x1="240" y1="130" x2="267" y2="160" marker-end="url(#arwB)"></line></g>
+
+        <rect x="410" y="80" width="140" height="80" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="480" y="100" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Router workers</text>
+        <g font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle"><text x="480" y="116">prefs · caps · quiet hours</text><text x="480" y="128">dedupe · render template</text><text x="480" y="140">pick channels + devices</text><text x="480" y="152">critical drained first</text></g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="380" y1="58" x2="407" y2="94" marker-end="url(#arwB)"></line><line x1="380" y1="110" x2="407" y2="116" marker-end="url(#arwB)"></line><line x1="380" y1="162" x2="407" y2="140" marker-end="url(#arwB)"></line></g>
+        <path d="M430 20 a50 6 0 0 1 100 0 v24 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M430 20 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="480" y="40" text-anchor="middle" font-size="9" fill="currentColor">prefs · devices</text>
+        <line x1="480" y1="80" x2="480" y2="52" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="580" y="40" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="56">push q</text>
+          <rect x="580" y="84" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="100">email q</text>
+          <rect x="580" y="128" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="144">SMS q</text>
+          <rect x="580" y="172" width="80" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="188">in-app q</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3"><line x1="550" y1="100" x2="577" y2="54" marker-end="url(#arwB)"></line><line x1="550" y1="112" x2="577" y2="96" marker-end="url(#arwB)"></line><line x1="550" y1="126" x2="577" y2="140" marker-end="url(#arwB)"></line><line x1="550" y1="140" x2="577" y2="182" marker-end="url(#arwB)"></line></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="36" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="56">push workers</text>
+          <rect x="690" y="80" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="100">email workers</text>
+          <rect x="690" y="124" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="144">SMS workers</text>
+          <rect x="690" y="168" width="96" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="738" y="188">inbox writer</text>
+          <rect x="806" y="36" width="84" height="32" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="56">APNs · FCM</text>
+          <rect x="806" y="80" width="84" height="32" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="100">SES · SendGrid</text>
+          <rect x="806" y="118" width="84" height="20" rx="4" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="848" y="132" font-size="8.5">SMS provider A</text>
+          <rect x="806" y="142" width="84" height="20" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="848" y="156" font-size="8.5">SMS provider B</text>
+          <rect x="806" y="168" width="84" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="848" y="188">inbox store</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.2"><line x1="660" y1="52" x2="687" y2="52" marker-end="url(#arwA)"></line><line x1="660" y1="96" x2="687" y2="96" marker-end="url(#arwA)"></line><line x1="660" y1="140" x2="687" y2="140" marker-end="url(#arwA)"></line><line x1="660" y1="184" x2="687" y2="184" marker-end="url(#arwA)"></line>
+          <line x1="786" y1="52" x2="803" y2="52" marker-end="url(#arwA)"></line><line x1="786" y1="96" x2="803" y2="96" marker-end="url(#arwA)"></line><line x1="786" y1="136" x2="803" y2="128" marker-end="url(#arwA)"></line><line x1="786" y1="146" x2="803" y2="152" stroke-dasharray="3 3" marker-end="url(#arwA)"></line><line x1="786" y1="184" x2="803" y2="184" marker-end="url(#arwA)"></line></g>
+
+        <rect x="580" y="250" width="160" height="40" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="660" y="268" text-anchor="middle" font-size="10" fill="currentColor">tracking service</text>
+        <text x="660" y="282" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">delivered · opened · bounced</text>
+        <path d="M848 200 V270 H743" fill="none" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        <text x="856" y="236" font-size="8.5" fill="currentColor" opacity="0.8">webhooks</text>
+        <path d="M330 262 a60 7 0 0 1 120 0 v28 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M330 262 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="390" y="286" text-anchor="middle" font-size="9.5" fill="currentColor">notification log</text>
+        <line x1="580" y1="270" x2="453" y2="274" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="200" y="274" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">every stage appends status here,</text>
+        <text x="200" y="288" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">so "where is n-5f2?" has an answer</text>
+      </svg>
+    </div>
+    <figcaption>Priority separation at the front means critical messages have their own topic, consumers and capacity. Channel separation at the back gives each channel its own workers sized for its provider's rate limits. Retries happen inside each channel stage, with backoff and a dead-letter queue, never by re-running the whole pipeline.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Router workers decide</h4><p>For each (notification, user): Is it a duplicate? Is the user opted in for this category and channel? Is it quiet hours in their timezone? Are they over their cap? Which devices are live? Then render the template in the user's locale and emit one message per channel.</p></div>
+    <div class="card"><h4>Channel workers deliver</h4><p>Batch where providers allow it (FCM multicast, email batch APIs). Respect each provider's rate limits with a token bucket per provider. Retry transient errors, drop permanent ones (invalid token, hard bounce), and record the provider's message id for tracking.</p></div>
+    <div class="card"><h4>Tracking closes the loop</h4><p>Providers call back with delivered, bounced or complaint. The SDK and email pixels report opens. Hard bounces and invalid tokens feed back into the device and contact tables, which protects sender reputation and cuts cost.</p></div>
+  </div>
+</section>
+<!-- decks/hld/16-design-notification-system/04-priority-and-providers.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: priority and providers">
+  <h2>Deep dive 1: isolate by priority, and route around failing providers</h2>
+  <p class="dek">Two things threaten delivery. <b>Load you create yourself</b>, when an 8-million-user campaign lands on the same workers as OTPs. And <b>third parties you don't control</b>, when an SMS provider degrades, rate-limits you or goes down. Separate lanes handle the first. Per-provider limiters, circuit breakers and a secondary provider handle the second.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Left: the SMS stage. Messages pass a per-provider token-bucket limiter, then a circuit breaker on provider A; when A's error rate exceeds 5 percent the breaker opens and traffic routes to provider B. Transient errors retry with backoff; after five attempts messages go to a dead-letter queue for inspection. Right: a chart during a campaign. The bulk queue depth rises to 8 million and drains over two hours at a throttled rate, while the p99 latency of critical OTP messages stays flat at about 2 seconds, because critical traffic has its own topic and consumers.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">SMS channel: limit, break, fail over</text>
+        <rect x="10" y="110" width="80" height="40" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="50" y="134" text-anchor="middle" font-size="9.5" fill="currentColor">SMS queue</text>
+        <rect x="110" y="104" width="90" height="52" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="155" y="124" text-anchor="middle" font-size="9.5" fill="currentColor">limiter</text>
+        <text x="155" y="138" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">≤ provider's</text>
+        <text x="155" y="149" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">contracted rate</text>
+        <rect x="220" y="104" width="80" height="52" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="260" y="124" text-anchor="middle" font-size="9.5" fill="currentColor">breaker</text>
+        <text x="260" y="140" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">err &gt; 5%</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="90" y1="130" x2="107" y2="130" marker-end="url(#arwA)"></line><line x1="200" y1="130" x2="217" y2="130" marker-end="url(#arwA)"></line></g>
+        <rect x="330" y="60" width="96" height="36" rx="5" fill="none" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3"></rect>
+        <text x="378" y="76" text-anchor="middle" font-size="9.5" fill="currentColor">provider A</text>
+        <text x="378" y="89" text-anchor="middle" font-size="8.5" fill="#D26A3F">degraded ✕</text>
+        <rect x="330" y="164" width="96" height="36" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="378" y="180" text-anchor="middle" font-size="9.5" fill="currentColor">provider B</text>
+        <text x="378" y="193" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">takes over</text>
+        <line x1="300" y1="118" x2="327" y2="84" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></line>
+        <line x1="300" y1="142" x2="327" y2="176" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line>
+        <rect x="110" y="214" width="190" height="36" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="205" y="230" text-anchor="middle" font-size="9" fill="currentColor">retry: backoff + jitter, same msg id</text>
+        <text x="205" y="243" text-anchor="middle" font-size="9" fill="currentColor">5 attempts → DLQ + alert</text>
+        <line x1="260" y1="156" x2="240" y2="211" stroke="#8A94A3" stroke-width="1.1" stroke-dasharray="3 3" marker-end="url(#arw)"></line>
+        <text x="215" y="280" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">permanent errors (invalid number) never retry</text>
+
+        <line x1="450" y1="12" x2="450" y2="292" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">During an 8 M-user campaign</text>
+        <line x1="490" y1="250" x2="880" y2="250" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="490" y1="250" x2="490" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <polygon points="520,250 560,70 820,250" fill="#3AA79B" fill-opacity="0.2"></polygon>
+        <polyline points="520,250 560,70 820,250" fill="none" stroke="#3AA79B" stroke-width="1.8"></polyline>
+        <text x="600" y="92" font-size="9.5" fill="#3AA79B">bulk queue depth: 8 M, drained over ~2 h</text>
+        <polyline points="490,212 540,210 600,213 660,211 720,212 780,210 880,211" fill="none" stroke="#D26A3F" stroke-width="2.2"></polyline>
+        <text x="880" y="202" text-anchor="end" font-size="9.5" fill="#D26A3F">critical (OTP) p99 ≈ 2 s, unaffected</text>
+        <text x="880" y="268" text-anchor="end" font-size="9" fill="currentColor" opacity="0.7">time →</text>
+        <text x="675" y="288" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">separate topics, consumer groups and provider quotas per priority</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Throttle bulk on purpose</h4><p>Send campaigns at a fixed rate (say 20k/s). This protects provider quotas and sender reputation, and it protects your own backend: 8 M pushes in one minute means 2 M people opening the app in the same minute. Spread sends by time zone and "send at local 10 am".</p></div>
+    <div class="card"><h4>Provider abstraction</h4><p>Hide providers behind one interface per channel, with health scores, cost and region routing. Fail over automatically on errors or latency. For SMS, route by destination country to the cheapest healthy provider; the costs differ by 10× across providers.</p></div>
+    <div class="card"><h4>Retries that don't duplicate</h4><p>Send each attempt with the same idempotency or message id where the provider supports it. A timeout isn't a failure. Query the provider's status before resending an OTP, or users receive two codes and the older one no longer works.</p></div>
+  </div>
+</section>
+<!-- decks/hld/16-design-notification-system/05-deciding-what-to-send.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: deciding what to send">
+  <h2>Deep dive 2: the router is a policy engine that mostly says "not now"</h2>
+  <p class="dek">The best notification system sends <em>fewer</em> notifications. Each candidate passes a sequence of checks, and most of the product value is in them: duplicates dropped, preferences honoured, quiet hours respected, bursts collapsed into digests, and every channel chosen for this user right now. Critical messages skip the checks that could delay them.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Flowchart for one candidate notification. First, a duplicate check: if the same user and template were sent within the dedupe window, drop it. Second, preferences: if the user opted out of this category on this channel, suppress it and log that. Third, quiet hours: if it is night in the user's time zone and the message is not critical, schedule it for 8 am local. Fourth, frequency cap: if the user has already had three marketing messages today, drop it or fold it into a digest. Fifth, aggregation: collapse bursts such as five likes into one message. Finally render in the user's locale and choose channels: push to active devices, otherwise email, and SMS only for critical messages.">
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="60" width="80" height="44" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="50" y="80">candidate</text><text x="50" y="94" font-size="8.5" opacity="0.75">user × template</text>
+        </g>
+        <g fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5">
+          <polygon points="160,52 210,82 160,112 110,82"></polygon>
+          <polygon points="290,52 340,82 290,112 240,82"></polygon>
+          <polygon points="420,52 470,82 420,112 370,82"></polygon>
+          <polygon points="550,52 600,82 550,112 500,82"></polygon>
+        </g>
+        <polygon points="680,52 730,82 680,112 630,82" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></polygon>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <text x="160" y="79">dupe?</text><text x="160" y="91" font-size="8" opacity="0.7">10-min key</text>
+          <text x="290" y="79">opted</text><text x="290" y="91">in?</text>
+          <text x="420" y="79">quiet</text><text x="420" y="91">hours?</text>
+          <text x="550" y="79">over</text><text x="550" y="91">cap?</text>
+          <text x="680" y="79">burst?</text><text x="680" y="91" font-size="8" opacity="0.7">aggregate</text>
+        </g>
+        <rect x="760" y="56" width="130" height="52" rx="6" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="825" y="76" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">render + choose</text>
+        <text x="825" y="92" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">locale · channels</text>
+        <g stroke="#D26A3F" stroke-width="1.3">
+          <line x1="90" y1="82" x2="107" y2="82" marker-end="url(#arwA)"></line><line x1="210" y1="82" x2="237" y2="82" marker-end="url(#arwA)"></line>
+          <line x1="340" y1="82" x2="367" y2="82" marker-end="url(#arwA)"></line><line x1="470" y1="82" x2="497" y2="82" marker-end="url(#arwA)"></line>
+          <line x1="600" y1="82" x2="627" y2="82" marker-end="url(#arwA)"></line><line x1="730" y1="82" x2="757" y2="82" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="8.5" fill="#D26A3F" text-anchor="middle"><text x="224" y="74">no</text><text x="354" y="74">yes</text><text x="484" y="74">no</text><text x="614" y="74">no</text></g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="160" y1="112" x2="160" y2="147" marker-end="url(#arw)"></line><line x1="290" y1="112" x2="290" y2="147" marker-end="url(#arw)"></line>
+          <line x1="420" y1="112" x2="420" y2="147" marker-end="url(#arw)"></line><line x1="550" y1="112" x2="550" y2="147" marker-end="url(#arw)"></line><line x1="680" y1="112" x2="680" y2="147" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle"><text x="170" y="132">yes</text><text x="300" y="132">no</text><text x="432" y="132">yes</text><text x="562" y="132">yes</text><text x="692" y="132">yes</text></g>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="110" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="160" y="167">drop</text><text x="160" y="180" font-size="8" opacity="0.75">log "duplicate"</text>
+          <rect x="240" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="290" y="167">suppress</text><text x="290" y="180" font-size="8" opacity="0.75">log "opted out"</text>
+          <rect x="370" y="150" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="420" y="167">defer to 8 am</text><text x="420" y="180" font-size="8" opacity="0.75">user's timezone</text>
+          <rect x="500" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="550" y="167">drop or digest</text><text x="550" y="180" font-size="8" opacity="0.75">bulk only</text>
+          <rect x="630" y="150" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="680" y="167">"Ana and 4 others</text><text x="680" y="180">liked your post"</text>
+        </g>
+        <path d="M680 190 C 680 214, 760 214, 800 112" fill="none" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></path>
+        <rect x="100" y="222" width="510" height="54" rx="6" fill="#D26A3F" fill-opacity="0.07" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="355" y="242" text-anchor="middle" font-size="10" fill="currentColor" font-weight="600">critical (OTP, security alert, fraud): skip quiet hours and caps</text>
+        <text x="355" y="260" text-anchor="middle" font-size="9.5" fill="currentColor">dedupe and opt-out still apply (security alerts may be non-optional)</text>
+        <g font-size="9" fill="currentColor">
+          <text x="640" y="236">channel choice:</text>
+          <text x="640" y="250">• push → devices seen &lt; 30 d</text>
+          <text x="640" y="264">• none → email fallback</text>
+          <text x="640" y="278">• SMS only if critical or opted in</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Check late, not early</h4><p>Preferences and quiet hours are evaluated at <em>send</em> time, not when the notification was requested. A deferred or scheduled message rechecks them, so a user who unsubscribed at 9 pm doesn't get the 8 am campaign.</p></div>
+    <div class="card"><h4>Caps are counters</h4><p>Per user, per category, per day: a Redis <code>INCR</code> with a TTL until midnight in the user's timezone. Check and increment atomically. Caps are the single best defence against a buggy producer spamming users in a loop.</p></div>
+    <div class="card"><h4>Aggregation windows</h4><p>For bursty events (likes, comments), hold the first event for a short window, say 2 minutes, keyed by (user, post, type), and collapse everything that arrives in it into one message. That's fewer notifications, better copy, and lower cost.</p></div>
+  </div>
+</section>
+<!-- decks/hld/16-design-notification-system/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: trade-offs and follow-ups">
+  <h2>At-least-once delivery, bounded duplicates, and a thundering herd you caused yourself</h2>
+  <p class="dek">Wrap up with the guarantees you actually offer, which are at-least-once delivery with deduplication and never exactly-once across third-party providers. Then cover how the system behaves at the edges: a campaign that brings the whole user base back at once, stale device tokens, and compliance.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: sending a campaign push to 8 million users in one minute makes app opens spike, and the API and database fall over under the traffic the notification created. Sending at a throttled 20 thousand a second, staggered by time zone, spreads app opens over hours within capacity. Right: duplicate prevention layers. Producer retries are deduped by the idempotency key at the API. Replayed queue messages are deduped by the notification and channel key in the router. Provider retries use the provider's idempotency id. The remaining risk window is a provider that sent the message but timed out before replying; check its status before resending.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">The herd your own campaign creates</text>
+        <line x1="30" y1="220" x2="410" y2="220" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="30" y1="220" x2="30" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="30" y1="120" x2="410" y2="120" stroke="#D26A3F" stroke-dasharray="5 4" stroke-opacity="0.8"></line>
+        <text x="408" y="114" text-anchor="end" font-size="9" fill="#D26A3F">backend capacity</text>
+        <polyline points="30,210 70,208 80,50 100,60 120,150 150,200 200,208 410,209" fill="none" stroke="#D26A3F" stroke-width="2"></polyline>
+        <text x="110" y="46" font-size="9.5" fill="#D26A3F">8 M pushes in 1 min</text>
+        <polyline points="30,210 70,190 120,172 170,160 220,162 270,166 320,170 370,176 410,182" fill="none" stroke="#3AA79B" stroke-width="2"></polyline>
+        <text x="250" y="152" font-size="9.5" fill="#3AA79B">throttled + staggered by time zone</text>
+        <text x="410" y="238" text-anchor="end" font-size="9" fill="currentColor" opacity="0.7">app opens over time →</text>
+        <text x="215" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">notification volume is also a load test of your whole backend</text>
+
+        <line x1="450" y1="12" x2="450" y2="274" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Where duplicates are stopped</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="470" y="34" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="52" font-weight="600">producer retried the API call</text><text x="482" y="68" opacity="0.85">→ Idempotency-Key at the API returns the same notification id</text>
+          <rect x="470" y="84" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="102" font-weight="600">queue redelivered after a worker crash</text><text x="482" y="118" opacity="0.85">→ router records (notification, user, channel) as sent; skip if present</text>
+          <rect x="470" y="134" width="410" height="42" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="482" y="152" font-weight="600">channel worker retried the provider</text><text x="482" y="168" opacity="0.85">→ same provider-side id; the provider dedupes where supported</text>
+          <rect x="470" y="184" width="410" height="42" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <text x="482" y="202" font-weight="600" fill="#D26A3F">residual: provider sent it but timed out</text><text x="482" y="218" opacity="0.85">→ query status before resending; accept a rare duplicate push</text>
+        </g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">effectively-once for SMS and OTP; at-least-once, cheaply, for push</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Stale device tokens</td><td>APNs/FCM report invalid tokens: delete them. Prune devices unseen for 60 days.</td></tr>
+          <tr><td>Compliance</td><td>One-click unsubscribe (email), opt-in consent for SMS (TCPA), consent records, and region-specific data storage.</td></tr>
+          <tr><td>In-app inbox</td><td>Store per-user notifications (the log indexed by user) with read state; deliver live over WebSocket if connected.</td></tr>
+          <tr><td>Multi-region</td><td>Regional pipelines; route by user home region; providers by destination country.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"A durable intake API with idempotency, priority-separated topics, router workers that apply preferences, caps and quiet hours at send time, and channel-specific workers with per-provider limiters, breakers and fail-over. Every state change goes into a notification log, so any message can be traced end to end."</div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/01-requirements.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: requirements">
+  <h2>Design search autocomplete: a million prefix lookups a second, each answered in milliseconds</h2>
+  <p class="dek">As the user types "how to b", show the eight most popular completions. It has to feel instant, so suggestions must arrive before the next keystroke, and it's called on nearly every keystroke. That makes this a read-latency problem, solved by precomputing answers offline and serving them from memory.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 500 million daily users times 10 searches times about 6 suggestion requests per search, after debouncing, is 30 billion requests a day, about 350 thousand a second, one million at peak. Latency: the whole round trip must fit in about 100 milliseconds, so the server has about 10 to 20 milliseconds. Data: about 100 million distinct queries worth keeping; a trie with the top 8 completions cached at each node fits in tens of gigabytes, so shard it across memory servers.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">500 M DAU × 10 searches</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">× ~6 keystroke calls</text><text x="140" y="125" font-size="9.5" opacity="0.75">(after debouncing)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">30 B/day ≈ 350 k/s</text><text x="140" y="190" font-weight="600">≈ 1 M req/s at peak</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">feel instant: &lt; 100 ms total</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">minus network + render</text><text x="450" y="125" font-size="9.5" opacity="0.75">(mobile RTT 40–80 ms)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="173">server budget</text><text x="450" y="190" font-weight="600">≈ 10–20 ms p99</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">~100 M distinct queries kept</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">trie + top-8 per node</text><text x="760" y="125" font-size="9.5" opacity="0.75">(depth capped ~30 chars)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="173">tens of GB in memory</text><text x="760" y="190" font-weight="600">shard + replicate</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">no database on the read path: precompute answers per prefix and serve them from RAM</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Given a prefix, return the top 8 completions by popularity.</li>
+      <li>Reflect trending queries within about an hour.</li>
+      <li>Filter offensive or legally blocked suggestions.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Server p99 &lt; 20 ms; highly available. If it fails, the search box still works, just without suggestions.</li>
+      <li>Eventual consistency is fine: suggestions may be hours old.</li>
+      <li>Heavily read-dominated: suggestions are rebuilt offline.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Personalised or global? Global first, with a personal blend as a follow-up.</li>
+      <li>Prefix only, or typo-tolerant? Prefix only; fuzzy is a follow-up.</li>
+      <li>One language to start (lowercased, normalised).</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: API and data model">
+  <h2>One tiny GET, and a trie that stores its answers at every node</h2>
+  <p class="dek">The API is a single cacheable GET. The interesting data structure is a <b>trie</b> (prefix tree) in which every node also stores the <b>top-k completions below it</b>. A lookup becomes "walk down one node per character, then return the list stored there". There is no subtree search at query time.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">GET /v1/suggest?q=car&amp;lang=en&amp;limit=8
+Cache-Control: public, max-age=300           # short prefixes are very cacheable
+→ 200 { "prefix": "car",
+        "suggestions": [ "car insurance", "cars for sale", "cartoon",
+                         "car rental", "cardi b", … ],
+        "version": "trie-2026-09-30T10" }</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">client behaviour (half the design)</div>
+<pre><code class="language-javascript">// debounce 50–100 ms; cancel stale requests; cache per prefix
+// "car" then "cart" → if "car" results are complete (&lt; 8 hits), filter locally
+// never block typing on the network</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Trie fragment. The root has child c; c has child a; ca has children r and t. Each node stores the top completions under it with scores: node car stores car insurance 950, cars for sale 870, cartoon 640; node cat stores cat videos 700 and caterpillar 300; node ca stores the best of both subtrees: car insurance, cars for sale, cat videos. Looking up car walks three nodes and returns the stored list.">
+          <g font-size="11" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+            <circle cx="210" cy="24" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="210" y="28">·</text>
+            <circle cx="210" cy="74" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="210" y="78">c</text>
+            <circle cx="210" cy="124" r="14" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F"></circle><text x="210" y="128">a</text>
+            <circle cx="110" cy="190" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-width="1.6"></circle><text x="110" y="194">r</text>
+            <circle cx="310" cy="190" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="310" y="194">t</text>
+          </g>
+          <g stroke="#8A94A3" stroke-width="1.3"><line x1="210" y1="38" x2="210" y2="60"></line><line x1="210" y1="88" x2="210" y2="110"></line><line x1="200" y1="135" x2="120" y2="178"></line><line x1="220" y1="135" x2="300" y2="178"></line></g>
+          <rect x="236" y="100" width="176" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="242" y="114">top("ca"):</text><text x="242" y="128">car insurance 950</text><text x="242" y="142">cars for sale 870 · cat…</text></g>
+          <rect x="10" y="214" width="190" height="62" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="16" y="230">top("car"):</text><text x="16" y="244">car insurance   950</text><text x="16" y="258">cars for sale   870</text><text x="16" y="272">cartoon         640 …</text></g>
+          <rect x="220" y="214" width="190" height="48" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="226" y="230">top("cat"):</text><text x="226" y="244">cat videos      700</text><text x="226" y="258">caterpillar     300</text></g>
+          <text x="210" y="300" text-anchor="middle" font-size="9.5" fill="currentColor">lookup("car") = 3 hops + read the list: O(len(prefix))</text>
+          <text x="210" y="316" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">memory traded for speed: each query is copied into its ancestors' lists</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Where the counts come from</h4><p>A <code>query_counts</code> table (query → decayed score), built from search logs by a batch or streaming job. Scores decay exponentially (half-life of about a week), so yesterday's spike fades and evergreen queries stay.</p></div>
+    <div class="card"><h4>The trie is a build artefact</h4><p>It isn't a database. It's an immutable snapshot built offline, versioned, stored in object storage and loaded into memory by the serving nodes. Updates arrive as new snapshots, never as in-place writes on the hot path.</p></div>
+    <div class="card"><h4>Or a KV of prefixes</h4><p>A flat alternative: precompute <code>prefix → top-8 list</code> for every prefix up to 20 characters and serve it from a KV store or a CDN. It's simpler to shard and cache, and bigger on disk. It's often the pragmatic interview answer after explaining the trie.</p></div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: high-level design">
+  <h2>A fast in-memory serving path fed by a slow, careful build path</h2>
+  <p class="dek">Split the system in two. <b>Serving</b> is stateless apart from a read-only trie in memory: every request is a few pointer hops, heavily cached at the edge. <b>Building</b> is a data pipeline that turns search logs into ranked, filtered snapshots every hour or so and ships them to the servers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Serving path: the client debounces keystrokes and caches results; the CDN caches popular short prefixes for a few minutes; a load balancer routes by prefix to suggest servers, each holding a trie shard in memory with replicas, and answers in a few milliseconds. Build path: search logs stream through Kafka into an aggregation job that keeps decayed counts per query; a trie builder applies the blocklist, ranks and builds versioned snapshots per shard into object storage; suggest servers load new snapshots with a blue-green swap. A small trending overlay from a streaming job adds fast-rising queries between builds.">
+        <text x="20" y="22" font-size="11.5" font-weight="600" fill="#D26A3F">Serving (every keystroke)</text>
+        <rect x="20" y="36" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="56" text-anchor="middle" font-size="10" fill="currentColor">client</text><text x="65" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">debounce · cache</text>
+        <rect x="140" y="36" width="100" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="190" y="56" text-anchor="middle" font-size="10" fill="currentColor">CDN</text><text x="190" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">"a"…"zz": 5 min TTL</text>
+        <rect x="270" y="36" width="90" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="315" y="56" text-anchor="middle" font-size="10" fill="currentColor">LB</text><text x="315" y="70" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">route by prefix</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="110" y1="59" x2="137" y2="59" marker-end="url(#arwA)"></line><line x1="240" y1="59" x2="267" y2="59" marker-end="url(#arwA)"></line></g>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="400" y="24" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="43">suggest: a–f</text>
+          <rect x="400" y="62" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="81">suggest: g–p</text>
+          <rect x="400" y="100" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="460" y="119">suggest: q–z</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="360" y1="52" x2="397" y2="40" marker-end="url(#arwA)"></line><line x1="360" y1="62" x2="397" y2="77" marker-end="url(#arwA)"></line><line x1="360" y1="72" x2="397" y2="113" marker-end="url(#arwA)"></line></g>
+        <text x="600" y="50" font-size="9.5" fill="currentColor" opacity="0.85">trie shard in RAM, × 3 replicas</text>
+        <text x="600" y="66" font-size="9.5" fill="currentColor" opacity="0.85">lookup ≈ 1 ms; no disk, no DB</text>
+        <text x="600" y="82" font-size="9.5" fill="currentColor" opacity="0.85">+ trending overlay merged in</text>
+
+        <line x1="10" y1="152" x2="890" y2="152" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="20" y="176" font-size="11.5" font-weight="600" fill="#3AA79B">Build (hourly / daily)</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="196" width="110" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="75" y="216">search logs</text><text x="75" y="230" font-size="8.5" opacity="0.75">query, lang, click</text>
+          <rect x="160" y="204" width="100" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="210" y="223">Kafka</text>
+          <rect x="290" y="190" width="130" height="58" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="355" y="210">aggregate</text><text x="355" y="224" font-size="8.5">decayed counts</text><text x="355" y="236" font-size="8.5">per query</text>
+          <rect x="450" y="190" width="140" height="58" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="520" y="210">trie builder</text><text x="520" y="224" font-size="8.5">filter blocklist · rank</text><text x="520" y="236" font-size="8.5">top-8 per node · shard</text>
+        </g>
+        <path d="M620 198 a55 6 0 0 1 110 0 v36 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M620 198 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="675" y="220" text-anchor="middle" font-size="9.5" fill="currentColor">snapshots</text><text x="675" y="234" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">v2026-09-30T10</text>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="130" y1="219" x2="157" y2="219" marker-end="url(#arwB)"></line><line x1="260" y1="219" x2="287" y2="219" marker-end="url(#arwB)"></line><line x1="420" y1="219" x2="447" y2="219" marker-end="url(#arwB)"></line><line x1="590" y1="219" x2="617" y2="219" marker-end="url(#arwB)"></line></g>
+        <path d="M730 212 C 800 212, 820 130, 525 118" fill="none" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="790" y="170" font-size="9.5" fill="#3AA79B">load + blue/green swap</text>
+        <rect x="290" y="268" width="300" height="34" rx="5" fill="none" stroke="#3AA79B" stroke-dasharray="4 3"></rect>
+        <text x="440" y="289" text-anchor="middle" font-size="9.5" fill="currentColor">trending overlay: streaming top-k per short prefix (minutes)</text>
+        <line x1="210" y1="234" x2="300" y2="276" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+      </svg>
+    </div>
+    <figcaption>The serving path has no writes and no database. If the build pipeline breaks, servers keep serving the last good snapshot, a few hours stale, which nobody notices. If a suggest shard dies, its replicas take over. And if the whole service fails, the search box still accepts typing.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Caching does most of the work</h4><p>One- and two-character prefixes are few (about 1,000) and account for a large share of requests. The CDN and browser cache them for minutes. The server sees mostly longer, rarer prefixes, and each of those is still a microsecond trie walk.</p></div>
+    <div class="card"><h4>Sharding the trie</h4><p>Shard by prefix range so each lookup hits exactly one shard. The ranges are cut by measured traffic, not the alphabet ("s" and "c" are huge, "x" is tiny). Replicate each shard three or more times for throughput and availability.</p></div>
+    <div class="card"><h4>Safe deploys of data</h4><p>Load the new snapshot alongside the old one, run canary queries (sizes, blocklist hits, top results for known prefixes), then swap an atomic pointer. Keep the previous version for an instant rollback, since a bad snapshot is a data outage.</p></div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/04-the-top-k-trie.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: the top-k trie">
+  <h2>Deep dive 1: build the top-k lists bottom-up, and keep the trie small</h2>
+  <p class="dek">The trie is built offline, so you can afford to do the work there. Insert every kept query with its score, then compute each node's top-k by merging its children's lists from the leaves up. At query time nothing is searched, only read. The remaining problem is memory, which you control with thresholds, depth limits and path compression.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: bottom-up build. Leaf nodes hold their own queries: cartoon 640, cart 120, car insurance 950, cars for sale 870. Their parent car merges the children's lists and keeps the best eight: car insurance, cars for sale, cartoon, cart. That list is merged again at ca with the cat subtree, and so on up to the root. Each node stores ids of its top eight queries, not copies of strings. Right: memory. Keeping only queries seen at least 10 times in 90 days, capping depth at 30 characters and collapsing single-child chains into one edge (c, a, r, t, o, o, n becomes car then toon) shrinks the trie from hundreds of gigabytes to tens.">
+        <text x="230" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Top-k computed bottom-up at build time</text>
+        <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="10" y="200" width="100" height="36" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="16" y="215">cartoon 640</text><text x="16" y="229">cart    120</text>
+          <rect x="120" y="200" width="110" height="36" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="126" y="215">car insur. 950</text><text x="126" y="229">(leaf)</text>
+          <rect x="240" y="200" width="110" height="36" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="246" y="215">cars f.s.  870</text><text x="246" y="229">(leaf)</text>
+          <rect x="360" y="200" width="100" height="36" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="366" y="215">cat videos 700</text><text x="366" y="229">caterp.    300</text>
+          <rect x="90" y="120" width="190" height="50" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.4"></rect><text x="96" y="136" font-weight="600">top("car")</text><text x="96" y="150">insurance 950, cars 870,</text><text x="96" y="163">cartoon 640, cart 120</text>
+          <rect x="180" y="40" width="200" height="50" rx="4" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F" stroke-width="1.5"></rect><text x="186" y="56" font-weight="600">top("ca")</text><text x="186" y="70">insurance 950, cars 870,</text><text x="186" y="83">cat videos 700, cartoon…</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="60" y1="200" x2="150" y2="173" marker-end="url(#arwA)"></line><line x1="175" y1="200" x2="180" y2="173" marker-end="url(#arwA)"></line><line x1="295" y1="200" x2="230" y2="173" marker-end="url(#arwA)"></line><line x1="200" y1="120" x2="250" y2="93" marker-end="url(#arwA)"></line><line x1="410" y1="200" x2="330" y2="93" marker-end="url(#arwA)"></line></g>
+        <text x="230" y="260" text-anchor="middle" font-size="9.5" fill="currentColor">merge children's lists, keep the best 8: a k-way merge per node</text>
+        <text x="230" y="276" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">nodes store query ids (4 B each), not strings</text>
+
+        <line x1="470" y1="12" x2="470" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="680" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Keeping it in memory</text>
+        <g font-size="10" fill="currentColor">
+          <text x="490" y="50">naive: every query ever typed</text>
+          <rect x="490" y="56" width="380" height="18" fill="#D26A3F" fill-opacity="0.6"></rect><text x="860" y="70" text-anchor="end" fill="currentColor" font-size="9">~500 GB</text>
+          <text x="490" y="96">keep queries seen ≥ 10× in 90 days</text>
+          <rect x="490" y="102" width="130" height="18" fill="#D26A3F" fill-opacity="0.45"></rect><text x="626" y="116" font-size="9">~120 GB</text>
+          <text x="490" y="142">+ depth cap 30 chars, ids not strings</text>
+          <rect x="490" y="148" width="70" height="18" fill="#3AA79B" fill-opacity="0.5"></rect><text x="566" y="162" font-size="9">~60 GB</text>
+          <text x="490" y="188">+ path compression (radix trie)</text>
+          <rect x="490" y="194" width="40" height="18" fill="#3AA79B" fill-opacity="0.7"></rect><text x="536" y="208" font-size="9">~30–40 GB → 4 shards</text>
+        </g>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="490" y="244">c→a→r→t→o→o→n</text><text x="628" y="244" font-family="IBM Plex Sans, sans-serif">becomes</text><text x="690" y="244">"car"→"toon"</text>
+        </g>
+        <text x="680" y="270" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">single-child chains collapse into one edge</text>
+      </svg>
+    </div>
+    <figcaption>The sizes are illustrative orders of magnitude. The point is the lever each step pulls: the long tail of one-off queries dominates memory and never appears in a top 8 anyway, so drop it before building.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Query cost</h4><p><code>O(len(prefix))</code> pointer hops to reach the node, then return a precomputed list, no matter how many queries sit below it. That flat cost is the property that lets a million requests a second fit on a modest fleet.</p></div>
+    <div class="card"><h4>Scoring</h4><p>Score = decayed frequency plus a small freshness boost, capped so a single viral day can't dominate for weeks. Normalise queries at build time (lowercase, trim, Unicode NFKC) so "Car " and "car" count as one.</p></div>
+    <div class="card"><h4>Why not just a database</h4><p><code>WHERE query LIKE 'car%' ORDER BY count DESC LIMIT 8</code> works with a prefix index at low volume, but at 1 M/s each call is a range scan and a sort. A search engine's completion suggester is fine at moderate scale. At this scale, precompute.</p></div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/05-freshness-and-sharding.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: freshness and sharding">
+  <h2>Deep dive 2: fresh enough for breaking news, balanced enough for "s"</h2>
+  <p class="dek">A daily rebuild is too slow when something happens in the news: people type it within minutes. Rebuilding the whole trie every minute is too expensive. The answer is layers: a stable base, a periodic delta, and a small real-time trending layer, merged when the query is served. Separately, prefix traffic is very uneven, so shard boundaries follow measured load, not the alphabet.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: three layers merged at query time. The base snapshot is rebuilt daily from 90 days of decayed counts and is stable. The hourly delta applies counts from the last few hours. The trending overlay is computed every minute by a streaming job using a count-min sketch and heavy-hitter tracking per short prefix, and holds only fast-rising queries. A query for a prefix merges the three lists, dedupes, re-scores and returns the top 8. Right: traffic by first letter is very uneven, with s, c, a and m heavy and x, q and z light; shard boundaries are cut so each shard carries about the same load, for example a to b, c, d to h, i to m, n to r, s, t to z.">
+        <text x="220" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Three layers, merged per request</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="20" y="40" width="250" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="30" y="58" font-weight="600">base snapshot · daily</text><text x="30" y="74" opacity="0.8" font-size="9">90 days, decayed · stable · largest</text>
+          <rect x="20" y="96" width="250" height="44" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="30" y="114" font-weight="600">hourly delta</text><text x="30" y="130" opacity="0.8" font-size="9">last hours' counts, added to base scores</text>
+          <rect x="20" y="152" width="250" height="44" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="30" y="170" font-weight="600">trending overlay · every minute</text><text x="30" y="186" opacity="0.8" font-size="9">count-min sketch + heavy hitters, short prefixes</text>
+        </g>
+        <rect x="310" y="96" width="120" height="44" rx="6" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="370" y="114" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">merge</text>
+        <text x="370" y="130" text-anchor="middle" font-size="8.5" fill="currentColor">dedupe · re-score</text>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="270" y1="62" x2="307" y2="108" marker-end="url(#arw)"></line><line x1="270" y1="118" x2="307" y2="118" marker-end="url(#arw)"></line></g>
+        <line x1="270" y1="174" x2="307" y2="130" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="370" y="170" text-anchor="middle" font-size="9.5" fill="currentColor">→ top 8</text>
+        <text x="220" y="224" text-anchor="middle" font-size="9.5" fill="currentColor">a new query can surface in about a minute via the overlay,</text>
+        <text x="220" y="238" text-anchor="middle" font-size="9.5" fill="currentColor">while the big structures change only hourly or daily</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">trending passes the same blocklist and safety filters</text>
+
+        <line x1="450" y1="12" x2="450" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Shard by measured load, not by letter</text>
+        <line x1="470" y1="200" x2="885" y2="200" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g fill="#8A94A3" fill-opacity="0.55">
+          <rect x="474" y="130" width="12" height="70"></rect><rect x="489" y="170" width="12" height="30"></rect><rect x="504" y="110" width="12" height="90"></rect><rect x="519" y="160" width="12" height="40"></rect>
+          <rect x="534" y="180" width="12" height="20"></rect><rect x="549" y="170" width="12" height="30"></rect><rect x="564" y="168" width="12" height="32"></rect><rect x="579" y="172" width="12" height="28"></rect>
+          <rect x="594" y="175" width="12" height="25"></rect><rect x="609" y="185" width="12" height="15"></rect><rect x="624" y="180" width="12" height="20"></rect><rect x="639" y="160" width="12" height="40"></rect>
+          <rect x="654" y="130" width="12" height="70"></rect><rect x="669" y="172" width="12" height="28"></rect><rect x="684" y="186" width="12" height="14"></rect><rect x="699" y="140" width="12" height="60"></rect>
+          <rect x="714" y="194" width="12" height="6"></rect><rect x="729" y="160" width="12" height="40"></rect>
+        </g>
+        <rect x="744" y="80" width="12" height="120" fill="#D26A3F" fill-opacity="0.7"></rect>
+        <g fill="#8A94A3" fill-opacity="0.55">
+          <rect x="759" y="150" width="12" height="50"></rect><rect x="774" y="176" width="12" height="24"></rect><rect x="789" y="170" width="12" height="30"></rect><rect x="804" y="176" width="12" height="24"></rect>
+          <rect x="819" y="196" width="12" height="4"></rect><rect x="834" y="186" width="12" height="14"></rect><rect x="849" y="196" width="12" height="4"></rect>
+        </g>
+        <g font-size="8" fill="currentColor" text-anchor="middle" opacity="0.7"><text x="480" y="212">a</text><text x="510" y="212">c</text><text x="660" y="212">m</text><text x="705" y="212">p</text><text x="750" y="212" fill="#D26A3F" opacity="1">s</text><text x="855" y="212">z</text></g>
+        <g stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="3 3"><line x1="502" y1="60" x2="502" y2="220"></line><line x1="517" y1="60" x2="517" y2="220"></line><line x1="592" y1="60" x2="592" y2="220"></line><line x1="667" y1="60" x2="667" y2="220"></line><line x1="742" y1="60" x2="742" y2="220"></line><line x1="757" y1="60" x2="757" y2="220"></line></g>
+        <g font-size="8.5" fill="#D26A3F" text-anchor="middle"><text x="486" y="56">a–b</text><text x="510" y="56">c</text><text x="555" y="56">d–h</text><text x="630" y="56">i–m</text><text x="705" y="56">n–r</text><text x="750" y="56">s</text><text x="820" y="56">t–z</text></g>
+        <text x="675" y="240" text-anchor="middle" font-size="9.5" fill="currentColor">uneven ranges, even load; "s" alone may need</text>
+        <text x="675" y="254" text-anchor="middle" font-size="9.5" fill="currentColor">its own shard (or split by two letters: "sa"–"sm", …)</text>
+        <text x="675" y="276" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">recompute boundaries at each build from last week's traffic</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Trending, cheaply</h4><p>A streaming job counts query frequency per minute with a count-min sketch (small, approximate) and tracks heavy hitters per short prefix. It emits queries whose rate is far above their baseline. The overlay is tiny: a few thousand entries, replicated to every server.</p></div>
+    <div class="card"><h4>Safety at every layer</h4><p>Autocomplete can put words in users' mouths, so it's a trust and legal surface. The blocklist and classifier run in the builder <em>and</em> on the overlay, and a manual kill list is applied at serve time for emergencies, taking effect in seconds.</p></div>
+    <div class="card"><h4>Personalisation as a blend</h4><p>Keep a small per-user list of recent searches (on the device or in a KV store) and blend it with the global results: "your recent" first, then global. That needs no per-user trie, just a merge of two short lists.</p></div>
+  </div>
+</section>
+<!-- decks/hld/17-design-typeahead/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: trade-offs and follow-ups">
+  <h2>Most of the latency budget is spent outside your servers</h2>
+  <p class="dek">A 1 ms trie lookup doesn't help if the phone waits 80 ms for the network and the UI renders late. Close by walking the end-to-end budget. Then show where each layer of caching removes a round trip entirely, and what you'd add next.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Latency budget for one keystroke on mobile: debounce wait 50 ms, network round trip 40 to 80 ms, CDN hit 0 ms extra or server lookup 1 to 5 ms, then render 10 ms, for about 100 to 150 ms. Below, the request is served from the closest cache available: the browser or app cache for prefixes already seen in this session takes 0 ms and removes the call; local filtering of a longer prefix from a complete shorter-prefix result also removes the call; the CDN answers short popular prefixes; only the rest reaches the suggest servers.">
+        <text x="450" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One keystroke, end to end (mobile)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="40" y="36" width="160" height="40" fill="#8A94A3" fill-opacity="0.35"></rect><text x="120" y="54">debounce</text><text x="120" y="68" font-size="9">~50 ms</text>
+          <rect x="200" y="36" width="240" height="40" fill="#D26A3F" fill-opacity="0.35"></rect><text x="320" y="54">network round trip</text><text x="320" y="68" font-size="9">40–80 ms</text>
+          <rect x="440" y="36" width="40" height="40" fill="#3AA79B" fill-opacity="0.5"></rect><text x="460" y="54">srv</text><text x="460" y="68" font-size="9">1–5</text>
+          <rect x="480" y="36" width="60" height="40" fill="#8A94A3" fill-opacity="0.35"></rect><text x="510" y="54">render</text><text x="510" y="68" font-size="9">~10</text>
+        </g>
+        <text x="560" y="60" font-size="10.5" fill="#D26A3F" font-weight="600">≈ 100–150 ms: the network dominates</text>
+
+        <text x="450" y="112" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">So avoid the round trip whenever possible</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="40" y="128" width="190" height="60" rx="6" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="135" y="150" font-weight="600">in-app cache</text><text x="135" y="166" font-size="9">prefixes seen this session</text><text x="135" y="180" font-size="9">0 ms · no call</text>
+          <rect x="250" y="128" width="190" height="60" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="345" y="150" font-weight="600">local filter</text><text x="345" y="166" font-size="9">"car" → "cart": filter the list</text><text x="345" y="180" font-size="9">if it was complete · no call</text>
+          <rect x="460" y="128" width="190" height="60" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="555" y="150" font-weight="600">CDN edge</text><text x="555" y="166" font-size="9">short popular prefixes</text><text x="555" y="180" font-size="9">~10–30 ms · near the user</text>
+          <rect x="670" y="128" width="190" height="60" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="765" y="150" font-weight="600">suggest servers</text><text x="765" y="166" font-size="9">long / rare prefixes</text><text x="765" y="180" font-size="9">full round trip</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="230" y1="158" x2="247" y2="158" marker-end="url(#arw)"></line><line x1="440" y1="158" x2="457" y2="158" marker-end="url(#arw)"></line><line x1="650" y1="158" x2="667" y2="158" marker-end="url(#arw)"></line></g>
+        <text x="450" y="214" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">each layer only forwards its misses; the server fleet is sized for what's left</text>
+        <text x="450" y="238" text-anchor="middle" font-size="9.5" fill="#D26A3F">and a failure anywhere degrades to "no suggestions", never "can't search"</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Typo tolerance</td><td>Fuzzy matching within edit distance 1 via n-gram indexes or a search engine's completion suggester; costlier, so use it only if the prefix finds nothing.</td></tr>
+          <tr><td>Multiple languages</td><td>A trie per language or locale, chosen by the request's locale; normalisation rules per script.</td></tr>
+          <tr><td>Personal results</td><td>Blend a per-user recent list; never leak one user's queries into global suggestions below a k-anonymity threshold.</td></tr>
+          <tr><td>Business rules</td><td>Boost fields and pinned results applied at merge time, not baked into the trie.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"All the heavy work is offline: decayed counts, filtering, a top-k-per-node trie, and shards cut by load. The serving path is an in-memory lookup behind CDN and client caches, with a trending overlay for freshness. Rebuild failures only make suggestions a little stale, and serving failures only hide suggestions."</div>
+  </div>
+</section>
 </main>
 
 
