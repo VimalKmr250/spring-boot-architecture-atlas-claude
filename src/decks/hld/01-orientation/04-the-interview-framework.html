@@ -1,0 +1,70 @@
+<section class="slide" data-sec="Orientation" data-title="The interview framework">
+  <h2>Eight steps in 45 minutes, and you drive</h2>
+  <p class="dek">A system-design round is scored on how you get to an answer, not on reaching one particular diagram. The eight steps make your reasoning visible and keep you from spending 30 minutes on the database schema. Every worked design in this deck follows them in order.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Timeline of a 45-minute round: clarify requirements 0 to 5 minutes, estimate 5 to 8, API 8 to 12, data model 12 to 15, high-level design 15 to 25, two deep dives 25 to 38, bottlenecks and failure 38 to 43, wrap-up 43 to 45. The high-level design and deep dives take about half the time.">
+        <rect x="20" y="72" width="95.6" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="115.6" y="72" width="57.3" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="172.9" y="72" width="76.4" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="249.3" y="72" width="57.4" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="306.7" y="72" width="191.1" height="34" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="497.8" y="72" width="248.4" height="34" fill="#D26A3F" fill-opacity="0.26" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="746.2" y="72" width="95.6" height="34" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <rect x="841.8" y="72" width="38.2" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+
+        <g font-size="13" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="67.8" y="94">1</text><text x="144.3" y="94">2</text><text x="211.1" y="94">3</text><text x="278" y="94">4</text>
+          <text x="402.3" y="94">5</text><text x="622" y="94">6</text><text x="794" y="94">7</text><text x="860.9" y="94">8</text>
+        </g>
+
+        <g font-size="11.5" fill="currentColor" text-anchor="middle">
+          <text x="67.8" y="42">Clarify requirements</text>
+          <text x="211.1" y="42">Define the API</text>
+          <text x="402.3" y="42">High-level design</text>
+          <text x="794" y="42">Bottlenecks &amp; failure</text>
+          <text x="144.3" y="130">Estimate</text>
+          <text x="278" y="130">Data model</text>
+          <text x="622" y="130">Deep dives ×2</text>
+          <text x="880" y="130" text-anchor="end">Wrap-up</text>
+        </g>
+        <g font-size="10" fill="currentColor" opacity="0.6" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="67.8" y="58">0–5 min</text>
+          <text x="211.1" y="58">8–12</text>
+          <text x="402.3" y="58">15–25</text>
+          <text x="794" y="58">38–43</text>
+          <text x="144.3" y="145">5–8</text>
+          <text x="278" y="145">12–15</text>
+          <text x="622" y="145">25–38</text>
+          <text x="880" y="145" text-anchor="end">43–45</text>
+        </g>
+
+        <path d="M306.7 164 v8 H746.2 v-8" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="526" y="190" text-anchor="middle" font-size="11" fill="#D26A3F">about half the round: the design and the two places you go deep</text>
+      </svg>
+    </div>
+    <figcaption>The time boxes are guides, not rules. If the interviewer pulls you into a deep dive at minute 12, follow them. Just make sure requirements, a rough scale and a whole end-to-end picture exist before you go deep on any one box.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Step</th><th>What you do</th><th>Say out loud, e.g.</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Clarify</td><td>Functional scope (3–5 core features), non-functional targets (scale, latency, availability, consistency), what is out of scope</td><td>"I'll focus on create and redirect. Analytics can be eventually consistent. Is that fair?"</td></tr>
+        <tr><td>2 · Estimate</td><td>DAU → QPS, peak, read:write ratio, storage over 5 years, bandwidth, cache size</td><td>"100 M writes a day is about 1,200 a second, so one Postgres primary can take it."</td></tr>
+        <tr><td>3 · API</td><td>The 3–5 endpoints or messages that serve the core features, including idempotency and paging</td><td>"<code>POST /v1/urls</code> takes an idempotency key, so a retried create can't make two links."</td></tr>
+        <tr><td>4 · Data model</td><td>Entities, key fields, access patterns, then SQL or NoSQL and the partition key</td><td>"Every read is by short code, so this is a key-value access pattern."</td></tr>
+        <tr><td>5 · High-level design</td><td>Clients → edge → services → stores → async consumers. Walk one request end to end.</td><td>"A redirect never touches the write path. Here's the read path…"</td></tr>
+        <tr><td>6 · Deep dives</td><td>The two hardest parts: usually the core algorithm and the scaling bottleneck</td><td>"The interesting problems are generating unique keys and keeping redirects under 10 ms."</td></tr>
+        <tr><td>7 · Bottlenecks</td><td>Hot spots, single points of failure, what breaks at 10×, the failure modes of each dependency</td><td>"If Redis dies, redirects fall back to the read replicas, which are sized to carry the full read load."</td></tr>
+        <tr><td>8 · Wrap-up</td><td>Summarise the trade-offs you made and what you would do next</td><td>"I chose availability over consistency for reads. Next I'd add multi-region."</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">What is actually scored</span>Four things: <b>navigating the problem</b> (did you find the hard part?), <b>the design</b> (does it work end to end?), <b>trade-offs</b> (did you name the alternatives and why you rejected them?), and <b>communication</b> (could the interviewer follow you?). Senior candidates are also expected to raise failure modes and operability without being asked.</div>
+    <div class="note warn"><span class="lbl">The classic ways to lose</span>Designing before clarifying. Drawing boxes with no data flow. Naming technologies without reasons ("Kafka, because it scales"). Going deep too early. Waiting for the interviewer to drive. And never mentioning what happens when something fails.</div>
+  </div>
+</section>

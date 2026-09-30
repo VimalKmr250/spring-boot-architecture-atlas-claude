@@ -288,12 +288,12 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 .xrefs a:hover{color:var(--accent);border-color:var(--accent)}
 
 .t-abbr{display:none}
-/* Six tabs need about 1,170px at full width, so the header sheds detail in steps as the
+/* Seven tabs need about 1,290px at full width, so the header sheds detail in steps as the
    window narrows. Below the last step the tab strip scrolls sideways rather than overflowing. */
-@media (max-width:1220px){
+@media (max-width:1300px){
   .brand span{display:none}
 }
-@media (max-width:1080px){
+@media (max-width:1160px){
   .t-full{display:none}
   .t-abbr{display:inline}
   .tabs button{padding:6px 10px}
@@ -306,7 +306,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   .counter{display:none}
   .brand b{font-size:13px}
 }
-@media (max-width:640px){
+@media (max-width:670px){
   .brand{display:none}
   .tabs{margin-left:0}
 }

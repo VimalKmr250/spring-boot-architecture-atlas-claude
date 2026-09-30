@@ -36,6 +36,7 @@
     <button role="tab" id="tab-deck" aria-selected="true" onclick="setView('deck')"><span class="t-full">Reference deck</span><span class="t-abbr">Deck</span></button>
     <button role="tab" id="tab-sb" aria-selected="false" onclick="setView('sb')"><span class="t-full">Spring Boot</span><span class="t-abbr">Boot</span></button>
     <button role="tab" id="tab-ed" aria-selected="false" onclick="setView('ed')"><span class="t-full">Event-driven</span><span class="t-abbr">Events</span></button>
+    <button role="tab" id="tab-hld" aria-selected="false" onclick="setView('hld')"><span class="t-full">System design</span><span class="t-abbr">HLD</span></button>
     <button role="tab" id="tab-iv" aria-selected="false" onclick="setView('iv')"><span class="t-full">Interview prep</span><span class="t-abbr">Interview</span></button>
     <button role="tab" id="tab-dsa" aria-selected="false" onclick="setView('dsa')"><span class="t-full">DSA patterns</span><span class="t-abbr">DSA</span></button>
     <button role="tab" id="tab-st" aria-selected="false" onclick="setView('st')"><span class="t-full">Java streams</span><span class="t-abbr">Streams</span></button>
@@ -60,6 +61,12 @@
 <main class="stage" id="stage-ed" data-deck="ed" data-slug="events" hidden>
 
 <!-- @include decks/events/**/*.html -->
+</main>
+
+
+<main class="stage" id="stage-hld" data-deck="hld" data-slug="hld" hidden>
+
+<!-- @include decks/hld/**/*.html -->
 </main>
 
 

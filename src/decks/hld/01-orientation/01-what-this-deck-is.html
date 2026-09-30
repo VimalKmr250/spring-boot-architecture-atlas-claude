@@ -1,0 +1,77 @@
+<section class="slide" data-sec="Orientation" data-title="What this deck is">
+  <h2>Design the system before you design the classes</h2>
+  <p class="lede">High-level design (HLD) is where you decide what the components are, how data moves between them, where it is stored, and what happens when a piece fails or the load grows tenfold. This deck teaches that in three stages: the fundamentals and building blocks, the architectural and cloud patterns built from them, and then twelve interview designs worked step by step. It loosely follows the <a href="https://roadmap.sh/system-design" target="_blank" rel="noopener">roadmap.sh system design path</a>, and almost every idea comes with a diagram.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">11</span><p>topic sections: fundamentals, estimation, the building blocks, reliability, operations, and the patterns built from them.</p></div>
+    <div class="card lift"><span class="bignum">12</span><p>worked designs, from the URL shortener to a distributed key-value store. Each takes six slides and follows the same method.</p></div>
+    <div class="card lift"><span class="bignum">8</span><p>steps in the interview framework. Every sample design is walked through them in order, so the method becomes habit.</p></div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Diagram legend: rounded boxes are clients, square boxes services, copper boxes the component in focus, dashed boxes external systems, cylinders datastores, segmented bars queues or logs; grey arrows are plain calls, copper arrows synchronous calls on the critical path, dashed teal arrows asynchronous messages">
+        <rect x="20" y="28" width="120" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="80" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">Client</text>
+        <text x="80" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">user, app, actor</text>
+
+        <rect x="170" y="28" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="230" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">Service</text>
+        <text x="230" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">stateless compute</text>
+
+        <rect x="320" y="28" width="120" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="380" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">In focus</text>
+        <text x="380" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">the part under discussion</text>
+
+        <rect x="470" y="28" width="120" height="46" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="4 3"></rect>
+        <text x="530" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">External</text>
+        <text x="530" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">not ours to change</text>
+
+        <path d="M630 34 a50 6 0 0 1 100 0 v34 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M630 34 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="680" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">Datastore</text>
+        <text x="680" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">database, cache, blob</text>
+
+        <rect x="760" y="36" width="120" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <line x1="784" y1="36" x2="784" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="808" y1="36" x2="808" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="832" y1="36" x2="832" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="856" y1="36" x2="856" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <text x="820" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">queue, topic, log</text>
+
+        <line x1="30" y1="150" x2="200" y2="150" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="115" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">call or data flow</text>
+
+        <line x1="320" y1="150" x2="520" y2="150" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="420" y="140" text-anchor="middle" font-size="10.5" fill="#D26A3F">sync</text>
+        <text x="420" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">synchronous, on the user's critical path</text>
+
+        <line x1="640" y1="150" x2="850" y2="150" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="745" y="140" text-anchor="middle" font-size="10.5" fill="#3AA79B">async</text>
+        <text x="745" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">asynchronous, off the request thread</text>
+      </svg>
+    </div>
+    <figcaption>This notation is used on every diagram in the deck. When a diagram shows a copper path, that is the chain the user is waiting on, so latency and availability add up along it. A dashed teal path can lag or fail without the user noticing straight away.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="panel">
+      <h3>How to use it</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Arrow keys</b> or the buttons move through slides, and <b>C</b> opens the contents. Each worked design is its own section there.</li>
+        <li><b>Self-study:</b> read one section per sitting, then redraw its diagrams from memory. If you can't redraw a diagram, you can't use it in an interview.</li>
+        <li><b>Teaching:</b> use sections 02–11 as lectures. Use the designs as exercises: show the requirements slide, let the group sketch a design for 15 minutes, then reveal the rest.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>What it assumes</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>You have built and deployed a web service with a database behind it. No distributed-systems background is needed.</li>
+        <li>Nothing is tied to one vendor, but real technology is named (PostgreSQL, Redis, Kafka, Cassandra, S3, a CDN), because interviewers want to hear concrete choices.</li>
+        <li>All numbers are rough, and each states its assumptions. In an interview, the reasoning behind a number counts for more than its precision.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The one habit worth building</span>Name the trade-off every time you choose something. "I'll use a cache" earns nothing. "I'll use a cache-aside Redis in front of the database. Profiles can be up to 60 seconds stale, and in return the database sees about 5% of reads" is the sentence that gets scored.</div>
+</section>

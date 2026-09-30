@@ -1,0 +1,111 @@
+<section class="slide" data-sec="Orientation" data-title="HLD vs LLD">
+  <h2>HLD draws the boxes and arrows; LLD fills in the boxes</h2>
+  <p class="dek">It is the same system at three zoom levels. High-level design stops at the service boundary: which services exist, how they talk to each other, and where the data lives. Low-level design opens one service up and decides its classes, interfaces and schema.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Three zoom levels. System level: clients, load balancer, order and payment services, database and queue. Service level: inside the order service, API, domain modules, repository and outbound adapter. Code level: classes OrderController, OrderService, Order and OrderRepository.">
+        <!-- panel frames -->
+        <rect x="8" y="30" width="286" height="250" rx="10" fill="none" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="308" y="30" width="286" height="250" rx="10" fill="none" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+        <rect x="608" y="30" width="286" height="250" rx="10" fill="none" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="151" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#D26A3F">1 · System: HLD</text>
+        <text x="451" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">2 · Service: where HLD meets LLD</text>
+        <text x="751" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor" opacity="0.8">3 · Code: LLD</text>
+
+        <!-- panel 1: system -->
+        <rect x="24" y="52" width="72" height="30" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="60" y="71" text-anchor="middle" font-size="11" fill="currentColor">Web</text>
+        <rect x="24" y="92" width="72" height="30" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="60" y="111" text-anchor="middle" font-size="11" fill="currentColor">Mobile</text>
+        <rect x="116" y="70" width="60" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="146" y="91" text-anchor="middle" font-size="11" fill="currentColor">LB</text>
+        <line x1="96" y1="67" x2="114" y2="80" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="96" y1="107" x2="114" y2="94" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="196" y="52" width="84" height="32" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="238" y="72" text-anchor="middle" font-size="11" fill="currentColor">Order svc</text>
+        <rect x="196" y="100" width="84" height="32" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="238" y="120" text-anchor="middle" font-size="11" fill="currentColor">Payment svc</text>
+        <line x1="176" y1="82" x2="194" y2="70" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="238" y1="84" x2="238" y2="98" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <path d="M60 170 a36 6 0 0 1 72 0 v34 a36 6 0 0 1 -72 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M60 170 a36 6 0 0 0 72 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="96" y="194" text-anchor="middle" font-size="11" fill="currentColor">Orders DB</text>
+        <rect x="170" y="176" width="110" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="225" y="193" text-anchor="middle" font-size="11" fill="currentColor">order-events</text>
+        <line x1="214" y1="84" x2="120" y2="164" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="258" y1="132" x2="240" y2="172" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="151" y="236" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">which services, which stores,</text>
+        <text x="151" y="252" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">sync or async, how it scales</text>
+
+        <!-- zoom 1 -> 2 -->
+        <line x1="280" y1="52" x2="308" y2="30" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="3 3"></line>
+        <line x1="280" y1="84" x2="308" y2="280" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="3 3"></line>
+
+        <!-- panel 2: service -->
+        <rect x="330" y="48" width="242" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="451" y="67" text-anchor="middle" font-size="11" fill="currentColor">REST / gRPC API · auth · validation</text>
+        <rect x="330" y="90" width="114" height="54" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="387" y="113" text-anchor="middle" font-size="11" fill="currentColor">order history</text>
+        <text x="387" y="129" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">module</text>
+        <rect x="458" y="90" width="114" height="54" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="515" y="113" text-anchor="middle" font-size="11" fill="currentColor">checkout</text>
+        <text x="515" y="129" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">module</text>
+        <rect x="330" y="160" width="114" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="387" y="179" text-anchor="middle" font-size="11" fill="currentColor">payment client</text>
+        <rect x="458" y="160" width="114" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="515" y="179" text-anchor="middle" font-size="11" fill="currentColor">repository</text>
+        <line x1="515" y1="78" x2="515" y2="88" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="387" y1="78" x2="387" y2="88" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="515" y1="144" x2="515" y2="158" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="470" y1="144" x2="430" y2="158" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="451" y="226" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">API contract, module boundaries,</text>
+        <text x="451" y="242" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">owned tables, outbound dependencies</text>
+
+        <!-- zoom 2 -> 3 -->
+        <line x1="572" y1="90" x2="608" y2="30" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></line>
+        <line x1="572" y1="144" x2="608" y2="280" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></line>
+
+        <!-- panel 3: classes -->
+        <rect x="626" y="46" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="626" y1="64" x2="746" y2="64" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="686" y="59" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">OrderController</text>
+        <text x="632" y="82" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+place(req)</text>
+        <rect x="760" y="46" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="760" y1="64" x2="880" y2="64" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="820" y="59" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">OrderService</text>
+        <text x="766" y="82" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+place(cmd): Order</text>
+        <rect x="626" y="126" width="120" height="66" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="626" y1="144" x2="746" y2="144" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="686" y="139" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Order</text>
+        <text x="632" y="160" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">-lines, -status</text>
+        <text x="632" y="178" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+cancel()</text>
+        <rect x="760" y="126" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="760" y1="144" x2="880" y2="144" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="820" y="139" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">«interface» Repo</text>
+        <text x="766" y="162" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+save(Order)</text>
+        <line x1="746" y1="71" x2="758" y2="71" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="790" y1="96" x2="730" y2="124" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="820" y1="96" x2="820" y2="124" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="751" y="226" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">classes, interfaces, patterns,</text>
+        <text x="751" y="242" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">schema DDL, algorithms</text>
+      </svg>
+    </div>
+    <figcaption>A system-design round lives mostly in panel 1 and dips into panel 2 during the deep dives. An object-oriented design or machine-coding round lives in panel 3. Answer at the level you were asked: drawing classes in an HLD round is a common way to run out of time.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>High-level design</th><th>Low-level design</th></tr></thead>
+      <tbody>
+        <tr><td>Question it answers</td><td>What are the parts, and how do they cooperate at scale?</td><td>How is one part built so it is correct and easy to change?</td></tr>
+        <tr><td>Decisions</td><td>Services and their boundaries, datastores, sync vs async, caching, partitioning, replication, consistency level, failure handling</td><td>Classes and interfaces, design patterns (Strategy, Factory…), concurrency inside a process, exact schema, algorithms</td></tr>
+        <tr><td>Artefacts</td><td>Architecture diagram, data-flow and sequence diagrams, capacity estimate, API contract, ADRs</td><td>Class and sequence diagrams, DDL, interface signatures, pseudo-code</td></tr>
+        <tr><td>Optimises for</td><td>Scalability, availability, latency, cost, team autonomy</td><td>Readability, testability, extensibility, correctness</td></tr>
+        <tr><td>Interview round</td><td>"System design", 45–60 min, whiteboard</td><td>"OOD" or "machine coding", 60–90 min, often compiles</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Where they meet</span>The API contract and the data model belong to both. HLD decides that an order service owns the orders and exposes <code>POST /orders</code>. LLD decides the <code>Order</code> aggregate, its invariants, and the columns in the table. In an HLD round, sketch both at the level of resources and fields, not classes and methods.</div>
+</section>

@@ -310,12 +310,12 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 .xrefs a:hover{color:var(--accent);border-color:var(--accent)}
 
 .t-abbr{display:none}
-/* Six tabs need about 1,170px at full width, so the header sheds detail in steps as the
+/* Seven tabs need about 1,290px at full width, so the header sheds detail in steps as the
    window narrows. Below the last step the tab strip scrolls sideways rather than overflowing. */
-@media (max-width:1220px){
+@media (max-width:1300px){
   .brand span{display:none}
 }
-@media (max-width:1080px){
+@media (max-width:1160px){
   .t-full{display:none}
   .t-abbr{display:inline}
   .tabs button{padding:6px 10px}
@@ -328,7 +328,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
   .counter{display:none}
   .brand b{font-size:13px}
 }
-@media (max-width:640px){
+@media (max-width:670px){
   .brand{display:none}
   .tabs{margin-left:0}
 }
@@ -363,6 +363,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
     <button role="tab" id="tab-deck" aria-selected="true" onclick="setView('deck')"><span class="t-full">Reference deck</span><span class="t-abbr">Deck</span></button>
     <button role="tab" id="tab-sb" aria-selected="false" onclick="setView('sb')"><span class="t-full">Spring Boot</span><span class="t-abbr">Boot</span></button>
     <button role="tab" id="tab-ed" aria-selected="false" onclick="setView('ed')"><span class="t-full">Event-driven</span><span class="t-abbr">Events</span></button>
+    <button role="tab" id="tab-hld" aria-selected="false" onclick="setView('hld')"><span class="t-full">System design</span><span class="t-abbr">HLD</span></button>
     <button role="tab" id="tab-iv" aria-selected="false" onclick="setView('iv')"><span class="t-full">Interview prep</span><span class="t-abbr">Interview</span></button>
     <button role="tab" id="tab-dsa" aria-selected="false" onclick="setView('dsa')"><span class="t-full">DSA patterns</span><span class="t-abbr">DSA</span></button>
     <button role="tab" id="tab-st" aria-selected="false" onclick="setView('st')"><span class="t-full">Java streams</span><span class="t-abbr">Streams</span></button>
@@ -9111,6 +9112,377 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
   </div>
 </section>
 
+</main>
+
+
+<main class="stage" id="stage-hld" data-deck="hld" data-slug="hld" hidden>
+
+<!-- decks/hld/01-orientation/01-what-this-deck-is.html -->
+<section class="slide" data-sec="Orientation" data-title="What this deck is">
+  <h2>Design the system before you design the classes</h2>
+  <p class="lede">High-level design (HLD) is where you decide what the components are, how data moves between them, where it is stored, and what happens when a piece fails or the load grows tenfold. This deck teaches that in three stages: the fundamentals and building blocks, the architectural and cloud patterns built from them, and then twelve interview designs worked step by step. It loosely follows the <a href="https://roadmap.sh/system-design" target="_blank" rel="noopener">roadmap.sh system design path</a>, and almost every idea comes with a diagram.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">11</span><p>topic sections: fundamentals, estimation, the building blocks, reliability, operations, and the patterns built from them.</p></div>
+    <div class="card lift"><span class="bignum">12</span><p>worked designs, from the URL shortener to a distributed key-value store. Each takes six slides and follows the same method.</p></div>
+    <div class="card lift"><span class="bignum">8</span><p>steps in the interview framework. Every sample design is walked through them in order, so the method becomes habit.</p></div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Diagram legend: rounded boxes are clients, square boxes services, copper boxes the component in focus, dashed boxes external systems, cylinders datastores, segmented bars queues or logs; grey arrows are plain calls, copper arrows synchronous calls on the critical path, dashed teal arrows asynchronous messages">
+        <rect x="20" y="28" width="120" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="80" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">Client</text>
+        <text x="80" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">user, app, actor</text>
+
+        <rect x="170" y="28" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="230" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">Service</text>
+        <text x="230" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">stateless compute</text>
+
+        <rect x="320" y="28" width="120" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="380" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">In focus</text>
+        <text x="380" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">the part under discussion</text>
+
+        <rect x="470" y="28" width="120" height="46" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="4 3"></rect>
+        <text x="530" y="56" text-anchor="middle" font-size="12.5" fill="currentColor">External</text>
+        <text x="530" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">not ours to change</text>
+
+        <path d="M630 34 a50 6 0 0 1 100 0 v34 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M630 34 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="680" y="60" text-anchor="middle" font-size="12.5" fill="currentColor">Datastore</text>
+        <text x="680" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">database, cache, blob</text>
+
+        <rect x="760" y="36" width="120" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <line x1="784" y1="36" x2="784" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="808" y1="36" x2="808" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="832" y1="36" x2="832" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="856" y1="36" x2="856" y2="66" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <text x="820" y="94" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">queue, topic, log</text>
+
+        <line x1="30" y1="150" x2="200" y2="150" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="115" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">call or data flow</text>
+
+        <line x1="320" y1="150" x2="520" y2="150" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="420" y="140" text-anchor="middle" font-size="10.5" fill="#D26A3F">sync</text>
+        <text x="420" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">synchronous, on the user's critical path</text>
+
+        <line x1="640" y1="150" x2="850" y2="150" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="745" y="140" text-anchor="middle" font-size="10.5" fill="#3AA79B">async</text>
+        <text x="745" y="176" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.75">asynchronous, off the request thread</text>
+      </svg>
+    </div>
+    <figcaption>This notation is used on every diagram in the deck. When a diagram shows a copper path, that is the chain the user is waiting on, so latency and availability add up along it. A dashed teal path can lag or fail without the user noticing straight away.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="panel">
+      <h3>How to use it</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Arrow keys</b> or the buttons move through slides, and <b>C</b> opens the contents. Each worked design is its own section there.</li>
+        <li><b>Self-study:</b> read one section per sitting, then redraw its diagrams from memory. If you can't redraw a diagram, you can't use it in an interview.</li>
+        <li><b>Teaching:</b> use sections 02–11 as lectures. Use the designs as exercises: show the requirements slide, let the group sketch a design for 15 minutes, then reveal the rest.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>What it assumes</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>You have built and deployed a web service with a database behind it. No distributed-systems background is needed.</li>
+        <li>Nothing is tied to one vendor, but real technology is named (PostgreSQL, Redis, Kafka, Cassandra, S3, a CDN), because interviewers want to hear concrete choices.</li>
+        <li>All numbers are rough, and each states its assumptions. In an interview, the reasoning behind a number counts for more than its precision.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The one habit worth building</span>Name the trade-off every time you choose something. "I'll use a cache" earns nothing. "I'll use a cache-aside Redis in front of the database. Profiles can be up to 60 seconds stale, and in return the database sees about 5% of reads" is the sentence that gets scored.</div>
+</section>
+<!-- decks/hld/01-orientation/02-hld-vs-lld.html -->
+<section class="slide" data-sec="Orientation" data-title="HLD vs LLD">
+  <h2>HLD draws the boxes and arrows; LLD fills in the boxes</h2>
+  <p class="dek">It is the same system at three zoom levels. High-level design stops at the service boundary: which services exist, how they talk to each other, and where the data lives. Low-level design opens one service up and decides its classes, interfaces and schema.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Three zoom levels. System level: clients, load balancer, order and payment services, database and queue. Service level: inside the order service, API, domain modules, repository and outbound adapter. Code level: classes OrderController, OrderService, Order and OrderRepository.">
+        <!-- panel frames -->
+        <rect x="8" y="30" width="286" height="250" rx="10" fill="none" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="308" y="30" width="286" height="250" rx="10" fill="none" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+        <rect x="608" y="30" width="286" height="250" rx="10" fill="none" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="151" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#D26A3F">1 · System: HLD</text>
+        <text x="451" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">2 · Service: where HLD meets LLD</text>
+        <text x="751" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor" opacity="0.8">3 · Code: LLD</text>
+
+        <!-- panel 1: system -->
+        <rect x="24" y="52" width="72" height="30" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="60" y="71" text-anchor="middle" font-size="11" fill="currentColor">Web</text>
+        <rect x="24" y="92" width="72" height="30" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="60" y="111" text-anchor="middle" font-size="11" fill="currentColor">Mobile</text>
+        <rect x="116" y="70" width="60" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="146" y="91" text-anchor="middle" font-size="11" fill="currentColor">LB</text>
+        <line x1="96" y1="67" x2="114" y2="80" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="96" y1="107" x2="114" y2="94" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="196" y="52" width="84" height="32" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="238" y="72" text-anchor="middle" font-size="11" fill="currentColor">Order svc</text>
+        <rect x="196" y="100" width="84" height="32" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="238" y="120" text-anchor="middle" font-size="11" fill="currentColor">Payment svc</text>
+        <line x1="176" y1="82" x2="194" y2="70" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="238" y1="84" x2="238" y2="98" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <path d="M60 170 a36 6 0 0 1 72 0 v34 a36 6 0 0 1 -72 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M60 170 a36 6 0 0 0 72 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="96" y="194" text-anchor="middle" font-size="11" fill="currentColor">Orders DB</text>
+        <rect x="170" y="176" width="110" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="225" y="193" text-anchor="middle" font-size="11" fill="currentColor">order-events</text>
+        <line x1="214" y1="84" x2="120" y2="164" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="258" y1="132" x2="240" y2="172" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="151" y="236" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">which services, which stores,</text>
+        <text x="151" y="252" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">sync or async, how it scales</text>
+
+        <!-- zoom 1 -> 2 -->
+        <line x1="280" y1="52" x2="308" y2="30" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="3 3"></line>
+        <line x1="280" y1="84" x2="308" y2="280" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="3 3"></line>
+
+        <!-- panel 2: service -->
+        <rect x="330" y="48" width="242" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="451" y="67" text-anchor="middle" font-size="11" fill="currentColor">REST / gRPC API · auth · validation</text>
+        <rect x="330" y="90" width="114" height="54" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="387" y="113" text-anchor="middle" font-size="11" fill="currentColor">order history</text>
+        <text x="387" y="129" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">module</text>
+        <rect x="458" y="90" width="114" height="54" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="515" y="113" text-anchor="middle" font-size="11" fill="currentColor">checkout</text>
+        <text x="515" y="129" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">module</text>
+        <rect x="330" y="160" width="114" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="387" y="179" text-anchor="middle" font-size="11" fill="currentColor">payment client</text>
+        <rect x="458" y="160" width="114" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="515" y="179" text-anchor="middle" font-size="11" fill="currentColor">repository</text>
+        <line x1="515" y1="78" x2="515" y2="88" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="387" y1="78" x2="387" y2="88" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="515" y1="144" x2="515" y2="158" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="470" y1="144" x2="430" y2="158" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="451" y="226" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">API contract, module boundaries,</text>
+        <text x="451" y="242" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">owned tables, outbound dependencies</text>
+
+        <!-- zoom 2 -> 3 -->
+        <line x1="572" y1="90" x2="608" y2="30" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></line>
+        <line x1="572" y1="144" x2="608" y2="280" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></line>
+
+        <!-- panel 3: classes -->
+        <rect x="626" y="46" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="626" y1="64" x2="746" y2="64" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="686" y="59" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">OrderController</text>
+        <text x="632" y="82" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+place(req)</text>
+        <rect x="760" y="46" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="760" y1="64" x2="880" y2="64" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="820" y="59" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">OrderService</text>
+        <text x="766" y="82" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+place(cmd): Order</text>
+        <rect x="626" y="126" width="120" height="66" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="626" y1="144" x2="746" y2="144" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="686" y="139" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Order</text>
+        <text x="632" y="160" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">-lines, -status</text>
+        <text x="632" y="178" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+cancel()</text>
+        <rect x="760" y="126" width="120" height="50" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <line x1="760" y1="144" x2="880" y2="144" stroke="currentColor" stroke-opacity="0.35"></line>
+        <text x="820" y="139" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">«interface» Repo</text>
+        <text x="766" y="162" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">+save(Order)</text>
+        <line x1="746" y1="71" x2="758" y2="71" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="790" y1="96" x2="730" y2="124" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="820" y1="96" x2="820" y2="124" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="751" y="226" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">classes, interfaces, patterns,</text>
+        <text x="751" y="242" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">schema DDL, algorithms</text>
+      </svg>
+    </div>
+    <figcaption>A system-design round lives mostly in panel 1 and dips into panel 2 during the deep dives. An object-oriented design or machine-coding round lives in panel 3. Answer at the level you were asked: drawing classes in an HLD round is a common way to run out of time.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>High-level design</th><th>Low-level design</th></tr></thead>
+      <tbody>
+        <tr><td>Question it answers</td><td>What are the parts, and how do they cooperate at scale?</td><td>How is one part built so it is correct and easy to change?</td></tr>
+        <tr><td>Decisions</td><td>Services and their boundaries, datastores, sync vs async, caching, partitioning, replication, consistency level, failure handling</td><td>Classes and interfaces, design patterns (Strategy, Factory…), concurrency inside a process, exact schema, algorithms</td></tr>
+        <tr><td>Artefacts</td><td>Architecture diagram, data-flow and sequence diagrams, capacity estimate, API contract, ADRs</td><td>Class and sequence diagrams, DDL, interface signatures, pseudo-code</td></tr>
+        <tr><td>Optimises for</td><td>Scalability, availability, latency, cost, team autonomy</td><td>Readability, testability, extensibility, correctness</td></tr>
+        <tr><td>Interview round</td><td>"System design", 45–60 min, whiteboard</td><td>"OOD" or "machine coding", 60–90 min, often compiles</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">Where they meet</span>The API contract and the data model belong to both. HLD decides that an order service owns the orders and exposes <code>POST /orders</code>. LLD decides the <code>Order</code> aggregate, its invariants, and the columns in the table. In an HLD round, sketch both at the level of resources and fields, not classes and methods.</div>
+</section>
+<!-- decks/hld/01-orientation/03-the-roadmap.html -->
+<section class="slide" data-sec="Orientation" data-title="The roadmap">
+  <h2>The roadmap, and where each stop lives in this deck</h2>
+  <p class="dek">The roadmap.sh system design path runs from vocabulary to cloud patterns. The deck follows the same arc but groups the stops by building block, and it ends where interviews start: with worked designs. Each stop below is tagged with the section that teaches it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 390" role="img" aria-label="A winding path of twenty stops from the roadmap: introduction, performance versus scalability, latency versus throughput, availability versus consistency, consistency patterns, availability patterns, background jobs, DNS, CDN, load balancers, application layer, databases, caching, asynchronism, idempotent operations, communication, performance antipatterns, monitoring, cloud design patterns, and finally the twelve worked designs. Each is tagged with a section number.">
+        <path d="M90 50 H810 A45 45 0 0 1 810 140 H90 A45 45 0 0 0 90 230 H810 A45 45 0 0 1 810 320 H90" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="3"></path>
+
+        <!-- row 1: left to right -->
+        <circle cx="90" cy="50" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="90" y="32" text-anchor="middle" font-size="11" fill="currentColor">Introduction</text>
+        <text x="90" y="74" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§01</text>
+        <circle cx="270" cy="50" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="270" y="32" text-anchor="middle" font-size="11" fill="currentColor">Performance vs scalability</text>
+        <text x="270" y="74" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§02</text>
+        <circle cx="450" cy="50" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="450" y="32" text-anchor="middle" font-size="11" fill="currentColor">Latency vs throughput</text>
+        <text x="450" y="74" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§02</text>
+        <circle cx="630" cy="50" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="630" y="32" text-anchor="middle" font-size="11" fill="currentColor">Availability vs consistency</text>
+        <text x="630" y="74" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§02 CAP</text>
+        <circle cx="810" cy="50" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="810" y="32" text-anchor="middle" font-size="11" fill="currentColor">Consistency patterns</text>
+        <text x="810" y="74" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§02</text>
+
+        <!-- row 2: right to left -->
+        <circle cx="810" cy="140" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="810" y="122" text-anchor="middle" font-size="11" fill="currentColor">Availability patterns</text>
+        <text x="810" y="164" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§02</text>
+        <circle cx="630" cy="140" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="630" y="122" text-anchor="middle" font-size="11" fill="currentColor">Background jobs</text>
+        <text x="630" y="164" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§07</text>
+        <circle cx="450" cy="140" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="450" y="122" text-anchor="middle" font-size="11" fill="currentColor">DNS</text>
+        <text x="450" y="164" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§04</text>
+        <circle cx="270" cy="140" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="270" y="122" text-anchor="middle" font-size="11" fill="currentColor">CDN</text>
+        <text x="270" y="164" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§04</text>
+        <circle cx="90" cy="140" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="90" y="122" text-anchor="middle" font-size="11" fill="currentColor">Load balancers</text>
+        <text x="90" y="164" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§04</text>
+
+        <!-- row 3: left to right -->
+        <circle cx="90" cy="230" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="90" y="212" text-anchor="middle" font-size="11" fill="currentColor">Application layer</text>
+        <text x="90" y="254" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§04 §10</text>
+        <circle cx="270" cy="230" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="270" y="212" text-anchor="middle" font-size="11" fill="currentColor">Databases</text>
+        <text x="270" y="254" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§05</text>
+        <circle cx="450" cy="230" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="450" y="212" text-anchor="middle" font-size="11" fill="currentColor">Caching</text>
+        <text x="450" y="254" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§06</text>
+        <circle cx="630" cy="230" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="630" y="212" text-anchor="middle" font-size="11" fill="currentColor">Asynchronism</text>
+        <text x="630" y="254" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§07</text>
+        <circle cx="810" cy="230" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="810" y="212" text-anchor="middle" font-size="11" fill="currentColor">Idempotent operations</text>
+        <text x="810" y="254" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§07</text>
+
+        <!-- row 4: right to left -->
+        <circle cx="810" cy="320" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="810" y="302" text-anchor="middle" font-size="11" fill="currentColor">Communication</text>
+        <text x="810" y="344" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§04</text>
+        <circle cx="630" cy="320" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="630" y="302" text-anchor="middle" font-size="11" fill="currentColor">Performance antipatterns</text>
+        <text x="630" y="344" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§09</text>
+        <circle cx="450" cy="320" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="450" y="302" text-anchor="middle" font-size="11" fill="currentColor">Monitoring</text>
+        <text x="450" y="344" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§09</text>
+        <circle cx="270" cy="320" r="8" style="fill:var(--surface)" stroke="#D26A3F" stroke-width="2"></circle>
+        <text x="270" y="302" text-anchor="middle" font-size="11" fill="currentColor">Cloud design patterns</text>
+        <text x="270" y="344" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§10 §11</text>
+        <circle cx="90" cy="320" r="11" fill="#D26A3F"></circle>
+        <text x="90" y="300" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">12 worked designs</text>
+        <text x="90" y="346" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">§12–§23</text>
+        <text x="90" y="366" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.6">added by this deck</text>
+      </svg>
+    </div>
+    <figcaption>Hollow stops are roadmap topics; the filled stop is where this deck goes further. The order matters less than it looks. Databases, caching and asynchronism (the third row) are what nearly every interview design turns on, so give them the most time.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Beyond the roadmap</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>§03</dt><dd>Back-of-the-envelope estimation: the numbers to know and a repeatable method.</dd>
+        <dt>§08</dt><dd>Reliability: timeouts, retries, circuit breakers, rate limiting, multi-region, consensus, unique IDs and clocks.</dd>
+        <dt>§09</dt><dd>Security: OAuth2/OIDC, tokens, securing the edge, and alerting on SLOs rather than on CPU.</dd>
+        <dt>§10</dt><dd>Architecture styles compared honestly, with a matrix for choosing between them.</dd>
+        <dt>§24</dt><dd>Wrap-up: a trade-offs cheat sheet, red flags, and an answer checklist.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>A four-week pace</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Week 1:</b> §01–§04. Learn the vocabulary, estimation, and the edge.</li>
+        <li><b>Week 2:</b> §05–§08. Data, caching, async and reliability, which is the core of the deck.</li>
+        <li><b>Week 3:</b> §09–§11 and the first six designs. Do each design yourself before reading it.</li>
+        <li><b>Week 4:</b> the last six designs, out loud and timed at 45 minutes, then §24.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<!-- decks/hld/01-orientation/04-the-interview-framework.html -->
+<section class="slide" data-sec="Orientation" data-title="The interview framework">
+  <h2>Eight steps in 45 minutes, and you drive</h2>
+  <p class="dek">A system-design round is scored on how you get to an answer, not on reaching one particular diagram. The eight steps make your reasoning visible and keep you from spending 30 minutes on the database schema. Every worked design in this deck follows them in order.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Timeline of a 45-minute round: clarify requirements 0 to 5 minutes, estimate 5 to 8, API 8 to 12, data model 12 to 15, high-level design 15 to 25, two deep dives 25 to 38, bottlenecks and failure 38 to 43, wrap-up 43 to 45. The high-level design and deep dives take about half the time.">
+        <rect x="20" y="72" width="95.6" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="115.6" y="72" width="57.3" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="172.9" y="72" width="76.4" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="249.3" y="72" width="57.4" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="306.7" y="72" width="191.1" height="34" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="497.8" y="72" width="248.4" height="34" fill="#D26A3F" fill-opacity="0.26" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="746.2" y="72" width="95.6" height="34" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <rect x="841.8" y="72" width="38.2" height="34" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+
+        <g font-size="13" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="67.8" y="94">1</text><text x="144.3" y="94">2</text><text x="211.1" y="94">3</text><text x="278" y="94">4</text>
+          <text x="402.3" y="94">5</text><text x="622" y="94">6</text><text x="794" y="94">7</text><text x="860.9" y="94">8</text>
+        </g>
+
+        <g font-size="11.5" fill="currentColor" text-anchor="middle">
+          <text x="67.8" y="42">Clarify requirements</text>
+          <text x="211.1" y="42">Define the API</text>
+          <text x="402.3" y="42">High-level design</text>
+          <text x="794" y="42">Bottlenecks &amp; failure</text>
+          <text x="144.3" y="130">Estimate</text>
+          <text x="278" y="130">Data model</text>
+          <text x="622" y="130">Deep dives ×2</text>
+          <text x="880" y="130" text-anchor="end">Wrap-up</text>
+        </g>
+        <g font-size="10" fill="currentColor" opacity="0.6" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="67.8" y="58">0–5 min</text>
+          <text x="211.1" y="58">8–12</text>
+          <text x="402.3" y="58">15–25</text>
+          <text x="794" y="58">38–43</text>
+          <text x="144.3" y="145">5–8</text>
+          <text x="278" y="145">12–15</text>
+          <text x="622" y="145">25–38</text>
+          <text x="880" y="145" text-anchor="end">43–45</text>
+        </g>
+
+        <path d="M306.7 164 v8 H746.2 v-8" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="526" y="190" text-anchor="middle" font-size="11" fill="#D26A3F">about half the round: the design and the two places you go deep</text>
+      </svg>
+    </div>
+    <figcaption>The time boxes are guides, not rules. If the interviewer pulls you into a deep dive at minute 12, follow them. Just make sure requirements, a rough scale and a whole end-to-end picture exist before you go deep on any one box.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Step</th><th>What you do</th><th>Say out loud, e.g.</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Clarify</td><td>Functional scope (3–5 core features), non-functional targets (scale, latency, availability, consistency), what is out of scope</td><td>"I'll focus on create and redirect. Analytics can be eventually consistent. Is that fair?"</td></tr>
+        <tr><td>2 · Estimate</td><td>DAU → QPS, peak, read:write ratio, storage over 5 years, bandwidth, cache size</td><td>"100 M writes a day is about 1,200 a second, so one Postgres primary can take it."</td></tr>
+        <tr><td>3 · API</td><td>The 3–5 endpoints or messages that serve the core features, including idempotency and paging</td><td>"<code>POST /v1/urls</code> takes an idempotency key, so a retried create can't make two links."</td></tr>
+        <tr><td>4 · Data model</td><td>Entities, key fields, access patterns, then SQL or NoSQL and the partition key</td><td>"Every read is by short code, so this is a key-value access pattern."</td></tr>
+        <tr><td>5 · High-level design</td><td>Clients → edge → services → stores → async consumers. Walk one request end to end.</td><td>"A redirect never touches the write path. Here's the read path…"</td></tr>
+        <tr><td>6 · Deep dives</td><td>The two hardest parts: usually the core algorithm and the scaling bottleneck</td><td>"The interesting problems are generating unique keys and keeping redirects under 10 ms."</td></tr>
+        <tr><td>7 · Bottlenecks</td><td>Hot spots, single points of failure, what breaks at 10×, the failure modes of each dependency</td><td>"If Redis dies, redirects fall back to the read replicas, which are sized to carry the full read load."</td></tr>
+        <tr><td>8 · Wrap-up</td><td>Summarise the trade-offs you made and what you would do next</td><td>"I chose availability over consistency for reads. Next I'd add multi-region."</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">What is actually scored</span>Four things: <b>navigating the problem</b> (did you find the hard part?), <b>the design</b> (does it work end to end?), <b>trade-offs</b> (did you name the alternatives and why you rejected them?), and <b>communication</b> (could the interviewer follow you?). Senior candidates are also expected to raise failure modes and operability without being asked.</div>
+    <div class="note warn"><span class="lbl">The classic ways to lose</span>Designing before clarifying. Drawing boxes with no data flow. Naming technologies without reasons ("Kafka, because it scales"). Going deep too early. Waiting for the interviewer to drive. And never mentioning what happens when something fails.</div>
+  </div>
+</section>
 </main>
 
 
