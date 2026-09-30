@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Cloud design patterns" data-title="Cloud design pattern map">
+  <h2>The cloud design patterns, grouped by the problem they solve</h2>
+  <p class="dek">The roadmap ends with the catalogue of cloud design patterns (popularised by Microsoft's Azure Architecture Center). They are named, reusable answers to recurring distributed-systems problems. Many have already appeared in this deck under their mechanism. This map puts the names on them, so you can use the vocabulary interviewers expect.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Six groups of patterns. Messaging: competing consumers, queue-based load leveling, publisher-subscriber, priority queue, pipes and filters, claim check, sequential convoy, asynchronous request-reply, choreography, scheduler agent supervisor. Data management: cache-aside, CQRS, event sourcing, materialized view, index table, sharding, static content hosting, valet key. Design and implementation: strangler fig, anti-corruption layer, backends for frontends, gateway routing, aggregation and offloading, sidecar, ambassador, external configuration store, compute resource consolidation, leader election. Reliability: retry, circuit breaker, bulkhead, throttling, compensating transaction, health endpoint monitoring, deployment stamps, geodes. Security: federated identity, gatekeeper, valet key. Management and monitoring: health endpoint monitoring, external configuration store, ambassador, sidecar.">
+        <g font-size="12" font-weight="600" fill="currentColor">
+          <text x="20" y="24">Messaging</text><text x="320" y="24">Data management</text><text x="620" y="24">Design &amp; implementation</text>
+          <text x="20" y="184">Reliability</text><text x="320" y="184">Security</text><text x="620" y="184">Management &amp; monitoring</text>
+        </g>
+        <g stroke-width="1.2">
+          <rect x="12" y="32" width="280" height="130" rx="8" fill="#3AA79B" fill-opacity="0.05" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+          <rect x="312" y="32" width="280" height="130" rx="8" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <rect x="612" y="32" width="278" height="130" rx="8" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="12" y="192" width="280" height="120" rx="8" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+          <rect x="312" y="192" width="280" height="120" rx="8" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <rect x="612" y="192" width="278" height="120" rx="8" fill="#3AA79B" fill-opacity="0.05" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        </g>
+        <g font-size="10" fill="currentColor">
+          <text x="24" y="54">competing consumers · §07</text><text x="24" y="70">queue-based load leveling · §07</text><text x="24" y="86">publisher / subscriber · §07</text>
+          <text x="24" y="102">async request-reply · §07</text><text x="24" y="118">priority queue · pipes &amp; filters</text><text x="24" y="134">claim check · sequential convoy</text>
+          <text x="24" y="150">choreography · scheduler-agent-sup.</text>
+
+          <text x="324" y="54">cache-aside · §06</text><text x="324" y="70">CQRS · event sourcing · §10</text><text x="324" y="86">sharding · §05</text>
+          <text x="324" y="102">materialized view · index table</text><text x="324" y="118">static content hosting</text><text x="324" y="134">valet key · §05, §09</text>
+
+          <text x="624" y="54">strangler fig · anti-corruption layer</text><text x="624" y="70">backends for frontends · §04</text><text x="624" y="86">gateway routing / aggregation /</text>
+          <text x="624" y="102">  offloading · §04</text><text x="624" y="118">sidecar · ambassador</text><text x="624" y="134">external configuration store</text>
+          <text x="624" y="150">compute consolidation · leader election</text>
+
+          <text x="24" y="214">retry · circuit breaker · bulkhead · §08</text><text x="24" y="230">throttling · §08</text><text x="24" y="246">compensating transaction · §05</text>
+          <text x="24" y="262">health endpoint monitoring</text><text x="24" y="278">deployment stamps · §10</text><text x="24" y="294">geodes</text>
+
+          <text x="324" y="214">federated identity · §09</text><text x="324" y="230">gatekeeper · §09</text><text x="324" y="246">valet key · §09</text>
+
+          <text x="624" y="214">health endpoint monitoring</text><text x="624" y="230">external configuration store</text><text x="624" y="246">ambassador · sidecar</text><text x="624" y="262">gateway offloading</text>
+        </g>
+        <text x="452" y="288" text-anchor="middle" font-size="10" fill="#D26A3F">"§NN" = already covered by mechanism;</text>
+        <text x="452" y="302" text-anchor="middle" font-size="10" fill="#D26A3F">the rest are on the next slides</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="note tip"><span class="lbl">How to use pattern names</span>Name the pattern and then say what it does in this design, in one breath: "I'd use a claim check here. The 20 MB document goes to object storage, and the message carries only its key." A name without the mechanism sounds memorised, and the mechanism without the name is fine too. Together they sound senior.</div>
+</section>

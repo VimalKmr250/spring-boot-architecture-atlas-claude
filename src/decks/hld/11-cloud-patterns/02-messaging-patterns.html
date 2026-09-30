@@ -1,0 +1,69 @@
+<section class="slide" data-sec="Cloud design patterns" data-title="Messaging patterns">
+  <h2>Four messaging patterns that turn up in almost every async design</h2>
+  <p class="dek">Beyond "put it on a queue", four named patterns cover most async needs. They scale consumers, prioritise urgent work, compose processing steps, and keep large payloads off the broker. A fifth, the sequential convoy, keeps order within a group while still processing in parallel across groups.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Competing consumers: one queue feeds several identical workers, each taking the next message, so throughput scales by adding workers. Priority queue: urgent and bulk messages go to separate queues, with more workers on the urgent one. Pipes and filters: a pipeline of independent steps, validate, enrich, transform and store, connected by queues, each scaled on its own. Claim check: a large payload is stored in object storage and the message carries only a reference, which the consumer uses to fetch it.">
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="450" y1="8" x2="450" y2="302"></line><line x1="8" y1="155" x2="892" y2="155"></line></g>
+        <g font-size="12" font-weight="600" fill="currentColor"><text x="20" y="26">Competing consumers</text><text x="470" y="26">Priority queue</text><text x="20" y="180">Pipes and filters</text><text x="470" y="180">Claim check</text></g>
+
+        <!-- competing consumers -->
+        <rect x="30" y="70" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <g stroke="#3AA79B" stroke-opacity="0.6"><line x1="58" y1="70" x2="58" y2="100"></line><line x1="86" y1="70" x2="86" y2="100"></line><line x1="114" y1="70" x2="114" y2="100"></line><line x1="142" y1="70" x2="142" y2="100"></line></g>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="250" y="40" width="80" height="26" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="290" y="57">worker 1</text>
+          <rect x="250" y="72" width="80" height="26" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="290" y="89">worker 2</text>
+          <rect x="250" y="104" width="80" height="26" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="290" y="121">worker 3</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3"><line x1="170" y1="80" x2="247" y2="53" marker-end="url(#arwB)"></line><line x1="170" y1="85" x2="247" y2="85" marker-end="url(#arwB)"></line><line x1="170" y1="90" x2="247" y2="117" marker-end="url(#arwB)"></line></g>
+        <text x="345" y="80" font-size="9.5" fill="currentColor" opacity="0.8">+ add workers</text>
+        <text x="345" y="94" font-size="9.5" fill="currentColor" opacity="0.8">to go faster</text>
+        <text x="220" y="146" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">each message is handled by exactly one worker; make them idempotent</text>
+
+        <!-- priority queue -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="46" width="70" height="30" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="515" y="65">producer</text>
+          <rect x="600" y="40" width="120" height="26" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="660" y="57">urgent queue</text>
+          <rect x="600" y="96" width="120" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="660" y="113">bulk queue</text>
+          <rect x="770" y="34" width="100" height="38" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="820" y="52">8 workers</text><text x="820" y="65" font-size="8.5" opacity="0.7">password resets</text>
+          <rect x="770" y="92" width="100" height="34" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="820" y="108">2 workers</text><text x="820" y="120" font-size="8.5" opacity="0.7">newsletters</text>
+        </g>
+        <g stroke-width="1.3"><line x1="550" y1="58" x2="597" y2="53" stroke="#D26A3F" marker-end="url(#arwA)"></line><line x1="550" y1="66" x2="597" y2="106" stroke="#3AA79B" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+          <line x1="720" y1="53" x2="767" y2="53" stroke="#D26A3F" marker-end="url(#arwA)"></line><line x1="720" y1="109" x2="767" y2="109" stroke="#3AA79B" stroke-dasharray="4 3" marker-end="url(#arwB)"></line></g>
+        <text x="670" y="146" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">bulk work can never starve urgent work</text>
+
+        <!-- pipes and filters -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="24" y="210" width="80" height="34" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="64" y="231">validate</text>
+          <rect x="134" y="210" width="80" height="34" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="174" y="231">enrich</text>
+          <rect x="244" y="210" width="80" height="34" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="284" y="231">transform ×4</text>
+          <rect x="354" y="210" width="80" height="34" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="394" y="231">store</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="104" y1="227" x2="131" y2="227" marker-end="url(#arwB)"></line><line x1="214" y1="227" x2="241" y2="227" marker-end="url(#arwB)"></line><line x1="324" y1="227" x2="351" y2="227" marker-end="url(#arwB)"></line></g>
+        <text x="228" y="268" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">each filter is independent and replaceable; queues between them;</text>
+        <text x="228" y="282" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">scale only the slow step (here: transform)</text>
+
+        <!-- claim check -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="206" width="80" height="34" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="520" y="227">producer</text>
+          <rect x="620" y="236" width="110" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="675" y="253">msg {ref: k7}</text>
+          <rect x="790" y="206" width="80" height="34" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="830" y="227">consumer</text>
+        </g>
+        <path d="M630 190 a45 6 0 0 1 90 0 v20 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></path>
+        <path d="M630 190 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F"></path>
+        <text x="675" y="208" text-anchor="middle" font-size="9" fill="currentColor">blob k7 · 20 MB</text>
+        <line x1="560" y1="214" x2="627" y2="200" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="560" y1="232" x2="617" y2="246" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <line x1="730" y1="246" x2="787" y2="230" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <line x1="787" y1="214" x2="723" y2="200" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <text x="675" y="290" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">brokers cap message size (~1 MB) and get slow with big ones</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Sequential convoy</h4><p>Some messages must be processed in order, but only relative to their group: all of order 17's events, but not order 17 against order 42. Route by group key to a partition or session (Kafka keys, SQS FIFO message groups, Service Bus sessions). Each group is then sequential, and different groups run in parallel.</p></div>
+    <div class="card"><h4>Trade-offs to mention</h4><p>Competing consumers break global ordering, so combine them with a convoy if order matters. Priority queues need separate worker pools, or urgent work still waits behind bulk work. Pipes and filters add a hop per step: great for throughput, not for low latency. With a claim check, delete the blob when the message is done (use lifecycle rules).</p></div>
+  </div>
+</section>

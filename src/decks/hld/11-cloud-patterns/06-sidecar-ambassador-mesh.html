@@ -1,0 +1,67 @@
+<section class="slide" data-sec="Cloud design patterns" data-title="Sidecar, ambassador and mesh">
+  <h2>Move cross-cutting plumbing out of the app and into a helper beside it</h2>
+  <p class="dek">Every service needs the same plumbing: TLS, retries, metrics, log shipping, config reload. Rebuilding that in every language and framework doesn't scale. A <b>sidecar</b> runs next to the app, in the same pod or host, and provides it. An <b>ambassador</b> is a sidecar specialised in outbound calls. A <b>service mesh</b> is sidecars everywhere, configured centrally.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Sidecar: a pod contains the app container plus a log-shipper sidecar and a proxy sidecar sharing its network and disk; the app writes logs to a file and the sidecar ships them. Ambassador: a legacy app calls localhost, and the ambassador adds retries, circuit breaking, TLS and routing before calling the remote service. Service mesh: a control plane pushes routing, security and telemetry configuration to an Envoy sidecar beside every service, and all service-to-service traffic flows through the sidecars as the data plane with mutual TLS.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="140" y="20">Sidecar</text><text x="430" y="20">Ambassador</text><text x="730" y="20">Service mesh</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="280" y1="8" x2="280" y2="282"></line><line x1="580" y1="8" x2="580" y2="282"></line></g>
+
+        <!-- sidecar -->
+        <rect x="20" y="40" width="240" height="170" rx="10" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="6 4"></rect>
+        <text x="32" y="58" font-size="10" fill="currentColor" opacity="0.7">pod / host</text>
+        <rect x="40" y="70" width="110" height="120" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="95" y="126" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">app</text>
+        <text x="95" y="142" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">any language</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="170" y="72" width="76" height="50" rx="5" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="208" y="94">log</text><text x="208" y="108">shipper</text>
+          <rect x="170" y="138" width="76" height="50" rx="5" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="208" y="160">proxy</text><text x="208" y="174">(TLS, metrics)</text>
+        </g>
+        <line x1="150" y1="97" x2="167" y2="97" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="150" y1="163" x2="167" y2="163" stroke="#8A94A3" stroke-width="1.2" marker-start="url(#arw)" marker-end="url(#arw)"></line>
+        <text x="140" y="236" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">shares network and disk; deploys and</text>
+        <text x="140" y="250" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">scales with the app; upgraded separately</text>
+
+        <!-- ambassador -->
+        <rect x="300" y="40" width="120" height="60" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="360" y="66" text-anchor="middle" font-size="10.5" fill="currentColor">legacy app</text>
+        <text x="360" y="82" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">GET localhost:9000</text>
+        <rect x="300" y="126" width="120" height="84" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="360" y="146" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">ambassador</text>
+        <g font-size="9" fill="currentColor"><text x="312" y="164">retries + breaker</text><text x="312" y="178">mTLS, auth token</text><text x="312" y="192">routing, metrics</text></g>
+        <line x1="360" y1="100" x2="360" y2="123" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="460" y="146" width="100" height="44" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect>
+        <text x="510" y="172" text-anchor="middle" font-size="10" fill="currentColor">remote API</text>
+        <line x1="420" y1="168" x2="457" y2="168" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="430" y="236" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">add resilience to apps you can't change,</text>
+        <text x="430" y="250" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">or route clients during a migration</text>
+
+        <!-- mesh -->
+        <rect x="660" y="36" width="140" height="36" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="730" y="52" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">control plane</text>
+        <text x="730" y="65" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">Istiod · Linkerd</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="600" y="110" width="80" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="632" y="136">svc A</text>
+          <rect x="664" y="104" width="24" height="18" rx="3" fill="#3AA79B" fill-opacity="0.45" stroke="#3AA79B"></rect>
+          <rect x="780" y="110" width="80" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="812" y="136">svc B</text>
+          <rect x="844" y="104" width="24" height="18" rx="3" fill="#3AA79B" fill-opacity="0.45" stroke="#3AA79B"></rect>
+          <rect x="690" y="190" width="80" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="722" y="216">svc C</text>
+          <rect x="754" y="184" width="24" height="18" rx="3" fill="#3AA79B" fill-opacity="0.45" stroke="#3AA79B"></rect>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1" stroke-dasharray="3 3"><line x1="700" y1="72" x2="676" y2="102"></line><line x1="760" y1="72" x2="852" y2="102"></line><line x1="730" y1="72" x2="766" y2="182"></line></g>
+        <text x="818" y="88" font-size="8.5" fill="#D26A3F">config (xDS)</text>
+        <g stroke="#3AA79B" stroke-width="1.4"><line x1="688" y1="118" x2="841" y2="118" marker-end="url(#arwB)"></line><line x1="676" y1="122" x2="752" y2="190" marker-end="url(#arwB)"></line></g>
+        <text x="764" y="112" text-anchor="middle" font-size="8.5" fill="#3AA79B">mTLS</text>
+        <text x="730" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">data plane: every hop goes through a proxy;</text>
+        <text x="730" y="276" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">policy changes need no redeploy</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>What a mesh buys</h4><p>mTLS and service identity everywhere without code changes. Retries, timeouts and circuit breaking as configuration. Traffic splitting for canaries. Uniform golden-signal metrics and traces for every hop, in every language.</p></div>
+    <div class="card"><h4>What it costs</h4><p>An extra proxy hop per call (roughly 1 ms of p99 each way), CPU and memory per pod, and a complex control plane to run and upgrade. Debugging now spans app, proxy and configuration. Worth it with dozens of services, rarely with five.</p></div>
+    <div class="card"><h4>Lighter options</h4><p>Proxyless gRPC with xDS, eBPF-based meshes (Cilium) that avoid per-pod proxies, or simply shared client libraries when there is a single language. Choose on the number of services, languages, and how badly you need zero-trust networking.</p></div>
+  </div>
+</section>

@@ -1,0 +1,87 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Monolith, modular monolith, microservices">
+  <h2>How much to split is a spectrum, and the middle is usually the right start</h2>
+  <p class="dek">The real axis is not "one process or many". It is how strongly the boundaries between parts of the business are enforced, and what price you pay for that enforcement. A <b>modular monolith</b> enforces boundaries in code at almost no operational cost. <b>Microservices</b> enforce them with the network, which buys independent deploys and scaling, and charges you distributed-systems problems in return.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Three shapes. Monolith: one deployable in which orders, users, catalog and payments call each other freely and share tables in one database. Modular monolith: one deployable whose four modules talk only through public interfaces and own separate schemas in one database. Microservices: four deployables, each with its own database, talking through synchronous APIs and asynchronous events on a bus. Underneath, an arrow shows coupling decreasing and operational complexity increasing from left to right.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="150" y="20">Monolith</text><text x="450" y="20">Modular monolith</text><text x="750" y="20">Microservices</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="248"></line><line x1="600" y1="8" x2="600" y2="248"></line></g>
+
+        <!-- monolith -->
+        <rect x="30" y="34" width="240" height="140" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="46" y="50" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.08"></rect><text x="86" y="69">orders</text>
+          <rect x="174" y="50" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.08"></rect><text x="214" y="69">users</text>
+          <rect x="46" y="128" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.08"></rect><text x="86" y="147">catalog</text>
+          <rect x="174" y="128" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.08"></rect><text x="214" y="147">payments</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1" stroke-opacity="0.7">
+          <line x1="126" y1="65" x2="174" y2="65"></line><line x1="86" y1="80" x2="86" y2="128"></line><line x1="214" y1="80" x2="214" y2="128"></line>
+          <line x1="126" y1="80" x2="174" y2="128"></line><line x1="174" y1="80" x2="126" y2="128"></line><line x1="126" y1="143" x2="174" y2="143"></line>
+        </g>
+        <text x="150" y="108" text-anchor="middle" font-size="9" fill="#D26A3F">anything calls anything</text>
+        <path d="M100 190 a50 6 0 0 1 100 0 v24 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M100 190 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="150" y="210" text-anchor="middle" font-size="9.5" fill="currentColor">shared tables</text>
+        <line x1="150" y1="174" x2="150" y2="184" stroke="#8A94A3" stroke-width="1.2"></line>
+        <text x="150" y="238" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">1 deploy · fast start · decays</text>
+
+        <!-- modular monolith -->
+        <rect x="330" y="34" width="240" height="140" rx="8" fill="#D26A3F" fill-opacity="0.04" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="342" y="46" width="104" height="54" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="394" y="70">orders</text><text x="394" y="86" font-size="8.5" opacity="0.7">api │ internal</text>
+          <rect x="454" y="46" width="104" height="54" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="506" y="70">users</text><text x="506" y="86" font-size="8.5" opacity="0.7">api │ internal</text>
+          <rect x="342" y="110" width="104" height="54" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="394" y="134">catalog</text><text x="394" y="150" font-size="8.5" opacity="0.7">api │ internal</text>
+          <rect x="454" y="110" width="104" height="54" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="506" y="134">payments</text><text x="506" y="150" font-size="8.5" opacity="0.7">api │ internal</text>
+        </g>
+        <line x1="446" y1="64" x2="452" y2="64" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="394" y1="100" x2="394" y2="108" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <path d="M380 190 a70 6 0 0 1 140 0 v24 a70 6 0 0 1 -140 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M380 190 a70 6 0 0 0 140 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <g stroke="currentColor" stroke-opacity="0.35"><line x1="415" y1="194" x2="415" y2="218"></line><line x1="450" y1="194" x2="450" y2="218"></line><line x1="485" y1="194" x2="485" y2="218"></line></g>
+        <text x="450" y="182" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">schema per module</text>
+        <text x="450" y="238" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">1 deploy · enforced boundaries</text>
+
+        <!-- microservices -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="620" y="36" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="670" y="60">orders</text>
+          <rect x="780" y="36" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="830" y="60">users</text>
+          <rect x="620" y="152" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="670" y="176">catalog</text>
+          <rect x="780" y="152" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="830" y="176">payments</text>
+        </g>
+        <g fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45">
+          <rect x="690" y="80" width="30" height="16" rx="5"></rect><rect x="850" y="80" width="30" height="16" rx="5"></rect><rect x="690" y="196" width="30" height="16" rx="5"></rect><rect x="850" y="196" width="30" height="16" rx="5"></rect>
+        </g>
+        <g font-size="8" fill="currentColor" text-anchor="middle"><text x="705" y="92">DB</text><text x="865" y="92">DB</text><text x="705" y="208">DB</text><text x="865" y="208">DB</text></g>
+        <rect x="660" y="112" width="180" height="22" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="750" y="127" text-anchor="middle" font-size="9.5" fill="currentColor">event bus</text>
+        <line x1="720" y1="56" x2="777" y2="56" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <text x="748" y="48" text-anchor="middle" font-size="8.5" fill="currentColor">API</text>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3">
+          <line x1="660" y1="76" x2="690" y2="110" marker-end="url(#arwB)"></line><line x1="700" y1="134" x2="680" y2="150" marker-end="url(#arwB)"></line><line x1="800" y1="134" x2="820" y2="150" marker-end="url(#arwB)"></line>
+        </g>
+        <text x="750" y="238" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">N deploys · own data · network</text>
+
+        <line x1="40" y1="266" x2="860" y2="266" stroke="#8A94A3" stroke-width="1.5" marker-start="url(#arw)" marker-end="url(#arw)"></line>
+        <text x="40" y="288" font-size="10.5" fill="#D26A3F">tighter coupling · simpler operations</text>
+        <text x="860" y="288" text-anchor="end" font-size="10.5" fill="#3AA79B">looser coupling · more to operate</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Monolith</th><th>Modular monolith</th><th>Microservices</th></tr></thead>
+      <tbody>
+        <tr><td>Deploy</td><td>All together</td><td>All together</td><td>Independently per service</td></tr>
+        <tr><td>Boundaries</td><td>Convention (erodes)</td><td>Enforced by build rules / tests</td><td>Enforced by the network</td></tr>
+        <tr><td>Data</td><td>Shared schema</td><td>Schema per module, no cross-joins</td><td>Database per service</td></tr>
+        <tr><td>Consistency</td><td>Local transactions everywhere</td><td>Local transactions; events between modules</td><td>Sagas, outbox, eventual consistency</td></tr>
+        <tr><td>Scaling</td><td>Whole app</td><td>Whole app (or run modules in separate deployments)</td><td>Per service</td></tr>
+        <tr><td>Fits</td><td>Prototypes, tiny teams</td><td>Most products, up to ~5–8 teams</td><td>Many teams needing autonomy; parts with very different scaling or compliance needs</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Four styles, honestly compared">Deck · Four styles, honestly compared</a><a data-deck="deck" data-slide="What it is, precisely">Deck · Modular monolith</a></p>
+</section>

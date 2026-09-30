@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Event sourcing">
+  <h2>Store what happened, and derive the current state from it</h2>
+  <p class="dek">Instead of overwriting a row with the latest state, event sourcing appends every change as an immutable event to a stream per entity. Current state is a fold over the stream. You get a perfect audit log, the ability to answer "what was true on March 1st", and the freedom to build new read models from history. The price is real complexity.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="The event stream for account 42 holds AccountOpened, Deposited 100, Withdrawn 30 and Deposited 50, versions 1 to 4. To handle a withdraw-20 command, the aggregate replays the stream, folding it to a balance of 120, checks the rule, and appends Withdrawn 20 as version 5, expecting version 4 so that concurrent writers conflict. A snapshot at version 4 avoids replaying from the start. Projections consume the stream to build a balance view and a monthly statement.">
+        <text x="20" y="24" font-size="11.5" font-weight="600" fill="currentColor">stream: account-42</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="20" y="34" width="130" height="44" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="85" y="52">v1 AccountOpened</text><text x="85" y="68" opacity="0.7">09-01</text>
+          <rect x="156" y="34" width="130" height="44" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="221" y="52">v2 Deposited 100</text><text x="221" y="68" opacity="0.7">09-03</text>
+          <rect x="292" y="34" width="130" height="44" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="357" y="52">v3 Withdrawn 30</text><text x="357" y="68" opacity="0.7">09-10</text>
+          <rect x="428" y="34" width="130" height="44" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="493" y="52">v4 Deposited 50</text><text x="493" y="68" opacity="0.7">09-21</text>
+          <rect x="564" y="34" width="130" height="44" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3"></rect><text x="629" y="52">v5 Withdrawn 20</text><text x="629" y="68" fill="#D26A3F">appending…</text>
+        </g>
+        <text x="710" y="52" font-size="9.5" fill="currentColor" opacity="0.8">append-only,</text>
+        <text x="710" y="66" font-size="9.5" fill="currentColor" opacity="0.8">never updated</text>
+        <path d="M424 84 v8 h-400 v-8" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <rect x="438" y="84" width="112" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect>
+        <text x="494" y="97" text-anchor="middle" font-size="9" fill="currentColor">snapshot @ v4: 120</text>
+
+        <rect x="200" y="130" width="250" height="80" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="325" y="150" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Aggregate: handle "withdraw 20"</text>
+        <text x="325" y="168" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">state = fold(events) → balance 120</text>
+        <text x="325" y="184" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">check 120 ≥ 20 ✓</text>
+        <text x="325" y="200" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">append(v5, expectedVersion = 4)</text>
+        <rect x="20" y="150" width="130" height="40" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="85" y="174" text-anchor="middle" font-size="10.5" fill="currentColor">command</text>
+        <line x1="150" y1="170" x2="197" y2="170" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="325" y1="102" x2="325" y2="127" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="332" y="118" font-size="9" fill="#3AA79B">load (snapshot + newer)</text>
+        <path d="M450 150 C 560 150, 620 110, 628 82" fill="none" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></path>
+        <text x="560" y="130" font-size="9" fill="#D26A3F">append; conflict if v5 exists</text>
+
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="560" y="200" width="140" height="36" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="630" y="222">balance view</text>
+          <rect x="720" y="200" width="160" height="36" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="800" y="222">monthly statement</text>
+        </g>
+        <path d="M700 78 C 700 150, 640 170, 632 197" fill="none" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <path d="M720 78 C 760 140, 790 170, 798 197" fill="none" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="760" y="140" font-size="9" fill="#3AA79B">projections</text>
+        <text x="450" y="268" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">"balance on 09-15?" → fold only the events up to that date (v1–v3 = 70)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Where it earns its keep</h4><p>Domains where history <em>is</em> the product or the regulation: ledgers and accounting, banking, trading, insurance claims, audit-heavy workflows. Also when you'll need read models nobody has thought of yet.</p></div>
+    <div class="card"><h4>What gets hard</h4><p>Event schemas are forever, so you need upcasters or versioned events. Queries across entities need projections. The right to erasure needs crypto-shredding. Long streams need snapshots. And the team has to think in events.</p></div>
+    <div class="card"><h4>Not the same as event-driven</h4><p>Event-driven means publishing events <em>between</em> services. Event sourcing means using events as a service's <em>own storage</em>. You can have either without the other, and most event-driven systems store state in ordinary tables.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Event sourcing: is it justified?">Deck · Event sourcing: is it justified?</a><a data-deck="deck" data-slide="Event sourcing mechanics">Deck · Event sourcing mechanics</a></p>
+</section>

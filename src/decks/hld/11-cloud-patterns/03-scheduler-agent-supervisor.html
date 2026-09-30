@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Cloud design patterns" data-title="Scheduler agent supervisor and compensation">
+  <h2>Make multi-step work finish, or undo it, even when steps fail silently</h2>
+  <p class="dek">Distributed workflows fail in awkward ways: a step times out, a remote service accepts a request and never answers, a worker dies mid-step. <b>Scheduler Agent Supervisor</b> gives such a workflow a durable memory and a watchdog. <b>Compensating transaction</b> gives each completed step an undo, so a workflow that can't finish can leave the system consistent.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Scheduler agent supervisor: the scheduler runs the workflow steps, recording each step's state and deadline in a durable state store; agents call the remote services for each step; the supervisor periodically scans the state store for steps that failed or passed their deadline and tells the scheduler to retry them or to start compensation. Compensation for a trip: book flight succeeds, book hotel succeeds, book car fails; the workflow then cancels the hotel and cancels the flight, in reverse order.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Scheduler · Agent · Supervisor</text>
+        <rect x="30" y="40" width="130" height="50" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="95" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Scheduler</text>
+        <text x="95" y="78" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">runs steps in order</text>
+        <path d="M150 150 a60 7 0 0 1 120 0 v40 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M150 150 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="210" y="172" text-anchor="middle" font-size="10.5" fill="currentColor">state store</text>
+        <text x="210" y="186" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">step · status · deadline</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="290" y="30" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="345" y="48">agent → flights</text>
+          <rect x="290" y="66" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="345" y="84">agent → hotels</text>
+          <rect x="290" y="102" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="345" y="120">agent → cars</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="160" y1="56" x2="287" y2="44" marker-end="url(#arwA)"></line><line x1="160" y1="64" x2="287" y2="80" marker-end="url(#arwA)"></line><line x1="160" y1="72" x2="287" y2="114" marker-end="url(#arwA)"></line></g>
+        <line x1="95" y1="90" x2="170" y2="146" stroke="#8A94A3" stroke-width="1.2" marker-start="url(#arw)" marker-end="url(#arw)"></line>
+        <text x="96" y="130" font-size="9" fill="currentColor" opacity="0.75">record</text>
+        <rect x="30" y="222" width="130" height="50" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="95" y="244" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Supervisor</text>
+        <text x="95" y="260" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">every 30 s</text>
+        <line x1="160" y1="236" x2="185" y2="200" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="200" y="232" font-size="9" fill="#3AA79B">find failed or overdue steps</text>
+        <path d="M40 222 C 10 170, 10 120, 40 92" fill="none" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></path>
+        <text x="4" y="160" font-size="9" fill="#3AA79B">retry /</text>
+        <text x="4" y="172" font-size="9" fill="#3AA79B">compensate</text>
+        <text x="215" y="292" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">the workflow survives crashes of any single component</text>
+
+        <line x1="440" y1="14" x2="440" y2="294" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Compensating transaction: book a trip</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="50" width="120" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="530" y="68">book flight</text><text x="530" y="82" font-size="9" fill="#3AA79B">✓ PNR X7Q2</text>
+          <rect x="610" y="50" width="120" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="670" y="68">book hotel</text><text x="670" y="82" font-size="9" fill="#3AA79B">✓ conf 55120</text>
+          <rect x="750" y="50" width="120" height="40" rx="5" fill="none" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3"></rect><text x="810" y="68">book car</text><text x="810" y="82" font-size="9" fill="#D26A3F">✕ none available</text>
+          <rect x="610" y="150" width="120" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="670" y="168">cancel hotel</text><text x="670" y="182" font-size="9" opacity="0.7">conf 55120</text>
+          <rect x="470" y="150" width="120" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="530" y="168">cancel flight</text><text x="530" y="182" font-size="9" opacity="0.7">PNR X7Q2, fee?</text>
+        </g>
+        <g stroke-width="1.4"><line x1="590" y1="70" x2="607" y2="70" stroke="#D26A3F" marker-end="url(#arwA)"></line><line x1="730" y1="70" x2="747" y2="70" stroke="#D26A3F" marker-end="url(#arwA)"></line></g>
+        <path d="M810 90 V170 H733" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="610" y1="170" x2="593" y2="170" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="820" y="134" font-size="9.5" fill="#3AA79B">undo in reverse</text>
+        <text x="670" y="224" text-anchor="middle" font-size="10" fill="currentColor">compensation is a <tspan font-weight="600">new</tspan> business action, not a rollback:</text>
+        <text x="670" y="240" text-anchor="middle" font-size="10" fill="currentColor">it may cost a fee, send an email, or itself fail and need a retry</text>
+        <text x="670" y="266" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">record each step's result, so compensation knows what to undo</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Make every step idempotent</h4><p>The supervisor will retry steps whose outcome is unknown, so "book hotel" might run twice. Pass a stable request id per step, so the remote service (or your agent) recognises a repeat.</p></div>
+    <div class="card"><h4>Deadlines, not just failures</h4><p>The dangerous case is the step that never answers. Record a deadline for each step. When the supervisor finds it expired, it queries the remote system for the real status before deciding to retry or compensate.</p></div>
+    <div class="card"><h4>Buy it rather than build it</h4><p>This is what workflow engines implement: Temporal, AWS Step Functions, Azure Durable Functions, Camunda. They give you durable state, timers, retries and compensation handlers as code. Build your own only if the workflow is trivial.</p></div>
+  </div>
+</section>

@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Picking a style">
+  <h2>No style wins everywhere, so pick by the forces you actually have</h2>
+  <p class="dek">Architecture styles aren't ranked; each trades some properties for others. Score them against what this system needs now: team size, how fast you must ship, how independently parts must deploy and scale, how strict the consistency is, and how much operational load you can carry. Then name the trigger that would make you change your mind.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Heat grid of six styles against seven criteria. Layered monolith: strong on time to first release, low operational cost and easy consistency; weak on large teams, independent deploys, fine-grained scaling and fault isolation. Modular monolith: strong on time to first release, operational cost and consistency; medium on team scale, independent deploys and fault isolation; weak on fine-grained scaling. Microservices: strong on team scale, independent deploys, scaling and fault isolation; weak on time to first release, operational cost and consistency. Event-driven: strong on team scale, independent deploys, scaling and isolation; medium on time and operational cost; weak on consistency. Serverless: strong on time, independent deploys, low operational load, scaling and isolation; medium on team scale and consistency. Cell-based: strong on team scale, scaling and isolation; medium on deploys and consistency; weak on time and operational cost.">
+        <g font-size="10" fill="currentColor" text-anchor="middle" font-weight="600">
+          <text x="220" y="30">large teams</text><text x="320" y="30">first release</text><text x="420" y="24">independent</text><text x="420" y="36">deploys</text>
+          <text x="520" y="24">low ops</text><text x="520" y="36">burden</text><text x="620" y="24">easy</text><text x="620" y="36">consistency</text>
+          <text x="720" y="24">fine-grained</text><text x="720" y="36">scaling</text><text x="820" y="24">fault</text><text x="820" y="36">isolation</text>
+        </g>
+        <g font-size="11" fill="currentColor" font-weight="600">
+          <text x="16" y="70">Layered monolith</text><text x="16" y="108">Modular monolith</text><text x="16" y="146">Microservices</text>
+          <text x="16" y="184">Event-driven</text><text x="16" y="222">Serverless</text><text x="16" y="260">Cell-based</text>
+        </g>
+        <!-- g=good t, m=medium grey, p=poor copper -->
+        <g stroke="currentColor" stroke-opacity="0.12">
+          <!-- row 1 -->
+          <rect x="172" y="50" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="272" y="50" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="372" y="50" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="472" y="50" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="572" y="50" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="672" y="50" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="772" y="50" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect>
+          <!-- row 2 -->
+          <rect x="172" y="88" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="272" y="88" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="372" y="88" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="472" y="88" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="572" y="88" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="672" y="88" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="772" y="88" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect>
+          <!-- row 3 -->
+          <rect x="172" y="126" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="272" y="126" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="372" y="126" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="472" y="126" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="572" y="126" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="672" y="126" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="772" y="126" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect>
+          <!-- row 4 -->
+          <rect x="172" y="164" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="272" y="164" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="372" y="164" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="472" y="164" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="572" y="164" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="672" y="164" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="772" y="164" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect>
+          <!-- row 5 -->
+          <rect x="172" y="202" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="272" y="202" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="372" y="202" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="472" y="202" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="572" y="202" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="672" y="202" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="772" y="202" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect>
+          <!-- row 6 -->
+          <rect x="172" y="240" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="272" y="240" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="372" y="240" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="472" y="240" width="96" height="32" fill="#D26A3F" fill-opacity="0.35"></rect><rect x="572" y="240" width="96" height="32" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="672" y="240" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect><rect x="772" y="240" width="96" height="32" fill="#3AA79B" fill-opacity="0.45"></rect>
+        </g>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <text x="220" y="70">1–2 teams</text><text x="320" y="70">fastest</text><text x="420" y="70">one artifact</text><text x="520" y="70">lowest</text><text x="620" y="70">ACID</text><text x="720" y="70">whole app</text><text x="820" y="70">shared fate</text>
+          <text x="220" y="108">≤ ~8 teams</text><text x="320" y="108">fast</text><text x="420" y="108">one artifact</text><text x="520" y="108">low</text><text x="620" y="108">ACID in module</text><text x="720" y="108">whole app</text><text x="820" y="108">bulkheads</text>
+          <text x="220" y="146">many teams</text><text x="320" y="146">slow start</text><text x="420" y="146">per service</text><text x="520" y="146">high</text><text x="620" y="146">sagas</text><text x="720" y="146">per service</text><text x="820" y="146">per service</text>
+          <text x="220" y="184">many teams</text><text x="320" y="184">moderate</text><text x="420" y="184">per consumer</text><text x="520" y="184">broker to run</text><text x="620" y="184">eventual</text><text x="720" y="184">per consumer</text><text x="820" y="184">temporal</text>
+          <text x="220" y="222">medium</text><text x="320" y="222">fast</text><text x="420" y="222">per function</text><text x="520" y="222">managed</text><text x="620" y="222">limited</text><text x="720" y="222">automatic</text><text x="820" y="222">per invocation</text>
+          <text x="220" y="260">many teams</text><text x="320" y="260">slow start</text><text x="420" y="260">per cell wave</text><text x="520" y="260">high</text><text x="620" y="260">strong in cell</text><text x="720" y="260">add cells</text><text x="820" y="260">per cell</text>
+        </g>
+        <g font-size="10" fill="currentColor">
+          <rect x="172" y="282" width="14" height="12" fill="#3AA79B" fill-opacity="0.45"></rect><text x="192" y="292">strength</text>
+          <rect x="262" y="282" width="14" height="12" fill="#8A94A3" fill-opacity="0.35"></rect><text x="282" y="292">it depends</text>
+          <rect x="362" y="282" width="14" height="12" fill="#D26A3F" fill-opacity="0.35"></rect><text x="382" y="292">cost you pay</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="note tip"><span class="lbl">A defensible default for most interview designs</span>"I'd start with a modular monolith, or a handful of coarse services, with clear data ownership. I'd use events for fan-out to things like notifications, search and analytics, and managed or serverless components for glue. Then I'd extract a service when a specific force appears: a part with a very different scaling profile, a separate team, or a compliance boundary." Then name that force for the system in front of you.</div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="The decision hierarchy">Deck · The decision hierarchy</a><a data-deck="deck" data-slide="Four styles, honestly compared">Deck · Four styles, honestly compared</a></p>
+</section>
