@@ -1,0 +1,70 @@
+<section class="slide" data-sec="Data" data-title="SQL or NoSQL">
+  <h2>Start from the access pattern, not from the database you like</h2>
+  <p class="dek">"SQL or NoSQL" is really two questions: do you need relational features (transactions across rows, joins, ad-hoc queries), and does the data or the write rate outgrow one primary? A relational database is the right default until you can name the requirement it fails. NoSQL stores trade that flexibility for scale along one specific access pattern.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Decision tree. If you need multi-row transactions, joins or ad-hoc queries, use a relational database: a single primary with replicas if one primary can take the writes and data, otherwise sharded SQL or NewSQL. If not, choose by access pattern: lookups by key go to a key-value store; self-contained aggregates to a document store; huge time-ordered write volume per key to a wide-column store; relationship traversal to a graph database; full-text search to a search engine; metrics to a time-series database.">
+        <rect x="290" y="12" width="320" height="44" rx="8" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="31" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Need transactions across rows, joins,</text>
+        <text x="450" y="47" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">or ad-hoc queries?</text>
+
+        <line x1="330" y1="56" x2="190" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="245" y="68" font-size="11" fill="currentColor">yes</text>
+        <line x1="570" y1="56" x2="640" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="620" y="68" font-size="11" fill="currentColor">no</text>
+
+        <rect x="40" y="94" width="300" height="42" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="190" y="120" text-anchor="middle" font-size="11.5" fill="currentColor">Will one primary take the writes and the size?</text>
+        <line x1="130" y1="136" x2="105" y2="172" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="100" y="156" font-size="10.5" fill="currentColor">yes</text>
+        <line x1="250" y1="136" x2="275" y2="172" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="270" y="156" font-size="10.5" fill="currentColor">no</text>
+        <rect x="20" y="174" width="170" height="64" rx="8" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="105" y="196" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Relational</text>
+        <text x="105" y="212" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">primary + read replicas</text>
+        <text x="105" y="227" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">PostgreSQL · MySQL</text>
+        <rect x="200" y="174" width="160" height="64" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="280" y="196" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Sharded / NewSQL</text>
+        <text x="280" y="212" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Vitess · Citus</text>
+        <text x="280" y="227" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Spanner · CockroachDB</text>
+        <text x="190" y="266" text-anchor="middle" font-size="10.5" fill="#D26A3F">the default; most systems stop at the left box</text>
+
+        <rect x="480" y="94" width="320" height="42" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="640" y="120" text-anchor="middle" font-size="11.5" fill="currentColor">What is the dominant access pattern?</text>
+        <g stroke="#8A94A3" stroke-width="1.1">
+          <line x1="500" y1="136" x2="455" y2="170"></line><line x1="560" y1="136" x2="545" y2="170"></line><line x1="620" y1="136" x2="635" y2="170"></line>
+          <line x1="680" y1="136" x2="725" y2="170"></line><line x1="740" y1="136" x2="815" y2="170"></line>
+        </g>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="410" y="172" width="86" height="92" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="453" y="190" font-weight="600">by key</text><text x="453" y="206" opacity="0.8">Key-value</text><text x="453" y="226" opacity="0.65">Redis</text><text x="453" y="240" opacity="0.65">DynamoDB</text>
+          <rect x="500" y="172" width="86" height="92" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="543" y="190" font-weight="600">aggregate</text><text x="543" y="206" opacity="0.8">Document</text><text x="543" y="226" opacity="0.65">MongoDB</text><text x="543" y="240" opacity="0.65">Firestore</text>
+          <rect x="590" y="172" width="86" height="92" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="633" y="190" font-weight="600">huge writes</text><text x="633" y="206" opacity="0.8">Wide-column</text><text x="633" y="226" opacity="0.65">Cassandra</text><text x="633" y="240" opacity="0.65">Bigtable</text>
+          <rect x="680" y="172" width="86" height="92" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="723" y="190" font-weight="600">traversal</text><text x="723" y="206" opacity="0.8">Graph</text><text x="723" y="226" opacity="0.65">Neo4j</text><text x="723" y="240" opacity="0.65">Neptune</text>
+          <rect x="770" y="172" width="110" height="92" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+          <text x="825" y="190" font-weight="600">text / metrics</text><text x="825" y="206" opacity="0.8">Search · TSDB</text><text x="825" y="226" opacity="0.65">OpenSearch</text><text x="825" y="240" opacity="0.65">Prometheus</text>
+        </g>
+        <text x="645" y="292" text-anchor="middle" font-size="10.5" fill="#3AA79B">each is excellent at its one pattern and awkward at the others</text>
+      </svg>
+    </div>
+    <figcaption>Most real systems use several: PostgreSQL for orders, Redis for sessions and counters, OpenSearch for search, object storage for media. That is <b>polyglot persistence</b>. The cost is keeping them in sync, usually by streaming changes out of the system of record (§07).</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Relational (SQL)</th><th>NoSQL (as a family)</th></tr></thead>
+      <tbody>
+        <tr><td>Data model</td><td>Normalised tables, schema enforced on write</td><td>Shaped for the query; schema often enforced by the application on read</td></tr>
+        <tr><td>Queries</td><td>Any query you can write; the optimiser finds a plan</td><td>Fast along the designed key; other queries mean a new table or index</td></tr>
+        <tr><td>Transactions</td><td>ACID across rows and tables</td><td>Usually per item or partition; some offer limited multi-item transactions</td></tr>
+        <tr><td>Scaling writes</td><td>Vertical, then sharding (hard, manual)</td><td>Horizontal partitioning built in</td></tr>
+        <tr><td>Consistency</td><td>Strong on the primary</td><td>Often eventual or tunable per request</td></tr>
+        <tr><td>Pick it when</td><td>Relationships and invariants matter; access patterns will change</td><td>The access pattern is known and stable, and the scale or shape demands it</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

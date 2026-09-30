@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Networking & edge" data-title="DNS">
+  <h2>DNS turns names into addresses, and it is also your first load balancer</h2>
+  <p class="dek">A lookup walks a hierarchy from the root to the top-level domain to the domain's own nameserver, and every answer is cached for its TTL. That caching makes DNS fast and massively scalable. It is also why a DNS change or DNS fail-over is never instant.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Sequence: the browser asks a recursive resolver for www.shop.com. On a cold cache, the resolver asks a root server, which refers it to the .com servers; the .com server refers it to shop.com's authoritative nameserver; that server returns the address with a 60-second TTL; the resolver caches it and answers the browser.">
+        <g font-size="11.5" fill="currentColor" text-anchor="middle">
+          <rect x="16" y="14" width="120" height="40" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="76" y="38">Browser / OS</text>
+          <rect x="190" y="14" width="140" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect><text x="260" y="38">Recursive resolver</text>
+          <rect x="384" y="14" width="120" height="40" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="444" y="38">Root ( . )</text>
+          <rect x="558" y="14" width="120" height="40" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="618" y="38">TLD ( .com )</text>
+          <rect x="732" y="14" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="807" y="38">shop.com authoritative</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="76" y1="54" x2="76" y2="310"></line><line x1="260" y1="54" x2="260" y2="310"></line>
+          <line x1="444" y1="54" x2="444" y2="310"></line><line x1="618" y1="54" x2="618" y2="310"></line><line x1="807" y1="54" x2="807" y2="310"></line>
+        </g>
+
+        <line x1="76" y1="80" x2="256" y2="80" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="166" y="73" text-anchor="middle" font-size="10.5" fill="currentColor">① A? www.shop.com</text>
+        <line x1="260" y1="108" x2="440" y2="108" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="350" y="101" text-anchor="middle" font-size="10.5" fill="currentColor">② www.shop.com?</text>
+        <line x1="444" y1="132" x2="264" y2="132" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="5 3" marker-end="url(#arw)"></line>
+        <text x="350" y="148" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">③ try the .com servers</text>
+        <line x1="260" y1="170" x2="614" y2="170" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="530" y="163" text-anchor="middle" font-size="10.5" fill="currentColor">④ www.shop.com?</text>
+        <line x1="618" y1="194" x2="264" y2="194" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="5 3" marker-end="url(#arw)"></line>
+        <text x="530" y="210" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">⑤ try ns1.shop.com</text>
+        <line x1="260" y1="232" x2="803" y2="232" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="700" y="225" text-anchor="middle" font-size="10.5" fill="currentColor">⑥ www.shop.com?</text>
+        <line x1="807" y1="256" x2="264" y2="256" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="700" y="272" text-anchor="middle" font-size="10.5" fill="#D26A3F">⑦ A 203.0.113.7 · TTL 60 s</text>
+        <line x1="260" y1="292" x2="80" y2="292" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="166" y="285" text-anchor="middle" font-size="10.5" fill="#D26A3F">⑧ 203.0.113.7</text>
+        <rect x="266" y="286" width="170" height="20" rx="4" fill="#3AA79B" fill-opacity="0.12"></rect>
+        <text x="351" y="300" text-anchor="middle" font-size="10" fill="#3AA79B">cached here for 60 s</text>
+      </svg>
+    </div>
+    <figcaption>Steps ②–⑦ happen only on a cold cache. The .com referral is typically cached for days, so most lookups are just ① and ⑧, answered from the resolver's cache in a few milliseconds. The browser and the operating system cache the answer too.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Records you'll mention</h4><p><code>A</code>/<code>AAAA</code> name → IPv4/IPv6. <code>CNAME</code> is an alias to another name (how you point at a CDN or load balancer). <code>NS</code> delegates to nameservers. <code>MX</code> is mail, <code>TXT</code> holds verification and SPF, and <code>SRV</code> gives a service's host and port.</p></div>
+    <div class="card"><h4>DNS as traffic management</h4><p>Managed DNS can answer differently per query. <b>Weighted</b> answers split traffic (canary 5%). <b>Latency</b> or <b>geo</b> answers send users to the nearest region. <b>Fail-over</b> answers stop returning an unhealthy region. That makes it the usual way to route between regions.</p></div>
+    <div class="card"><h4>TTL is a trade-off</h4><p>A short TTL (30–60 s) means faster fail-over and more lookups. A long TTL (hours) means fewer lookups and slow changes. Some clients and ISPs ignore TTLs, so plan for a stale tail of traffic after any change, and lower the TTL a day <em>before</em> a planned migration.</p></div>
+  </div>
+</section>

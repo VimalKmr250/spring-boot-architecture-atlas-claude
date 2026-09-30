@@ -1,0 +1,66 @@
+<section class="slide" data-sec="Data" data-title="2PC vs saga">
+  <h2>Across services, trade atomic commits for sagas that can undo</h2>
+  <p class="dek">Once an operation spans several databases (orders, payments, inventory), no single transaction covers it. <b>Two-phase commit</b> makes the databases agree atomically, by holding locks until a coordinator decides. A <b>saga</b> runs a sequence of local transactions and, if a step fails, runs compensating steps that semantically undo the earlier ones.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Two-phase commit: a coordinator sends prepare to the orders and payments databases; both vote yes and hold locks; the coordinator sends commit and both acknowledge. If the coordinator dies after prepare, participants block holding locks. Saga: create order as pending, reserve stock, charge the card; the card is declined, so the saga releases the stock and cancels the order, each a local transaction.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Two-phase commit</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="34" width="110" height="32" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="75" y="55">Coordinator</text>
+          <rect x="170" y="34" width="110" height="32" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="225" y="55">Orders DB</text>
+          <rect x="310" y="34" width="110" height="32" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="365" y="55">Payments DB</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="75" y1="66" x2="75" y2="262"></line><line x1="225" y1="66" x2="225" y2="262"></line><line x1="365" y1="66" x2="365" y2="262"></line></g>
+        <rect x="219" y="104" width="12" height="118" fill="#D26A3F" fill-opacity="0.25"></rect>
+        <rect x="359" y="112" width="12" height="118" fill="#D26A3F" fill-opacity="0.25"></rect>
+        <line x1="75" y1="92" x2="221" y2="100" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="75" y1="94" x2="361" y2="108" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="130" y="88" font-size="10" fill="currentColor">① prepare</text>
+        <line x1="219" y1="136" x2="79" y2="144" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <line x1="359" y1="146" x2="79" y2="154" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <text x="130" y="170" font-size="10" fill="currentColor">② yes, yes</text>
+        <line x1="75" y1="196" x2="221" y2="204" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="75" y1="198" x2="361" y2="212" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="130" y="192" font-size="10" fill="#D26A3F">③ commit</text>
+        <text x="296" y="170" text-anchor="middle" font-size="9.5" fill="#D26A3F">locks held</text>
+        <text x="215" y="282" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">coordinator dies after ②: participants wait, holding locks</text>
+
+        <line x1="450" y1="14" x2="450" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Saga (with compensation)</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="60" width="118" height="48" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="529" y="80">T1 create order</text><text x="529" y="96" font-size="9.5" opacity="0.7">status PENDING</text>
+          <rect x="616" y="60" width="118" height="48" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="675" y="80">T2 reserve stock</text><text x="675" y="96" font-size="9.5" opacity="0.7">inventory svc</text>
+          <rect x="762" y="60" width="118" height="48" rx="6" fill="none" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="5 3"></rect><text x="821" y="80">T3 charge card</text><text x="821" y="96" font-size="9.5" fill="#D26A3F">✕ declined</text>
+          <rect x="616" y="180" width="118" height="48" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="675" y="200">C2 release stock</text><text x="675" y="216" font-size="9.5" opacity="0.7">compensates T2</text>
+          <rect x="470" y="180" width="118" height="48" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="529" y="200">C1 cancel order</text><text x="529" y="216" font-size="9.5" opacity="0.7">status CANCELLED</text>
+        </g>
+        <line x1="588" y1="84" x2="613" y2="84" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="734" y1="84" x2="759" y2="84" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <path d="M821 108 V204 H737" fill="none" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="616" y1="204" x2="591" y2="204" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="830" y="150" font-size="10" fill="#3AA79B">undo in</text>
+        <text x="830" y="163" font-size="10" fill="#3AA79B">reverse</text>
+        <text x="675" y="256" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">each step commits locally; no locks held across services</text>
+        <text x="675" y="274" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">intermediate states (PENDING) are visible, so design for them</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Two-phase commit</th><th>Saga</th></tr></thead>
+      <tbody>
+        <tr><td>Guarantee</td><td>Atomic: all commit or none</td><td>Eventually consistent: all complete, or compensations run</td></tr>
+        <tr><td>Isolation</td><td>Full, with locks held across the protocol</td><td>None between steps; others may see PENDING states</td></tr>
+        <tr><td>Availability</td><td>Blocks if the coordinator or any participant is down</td><td>Each step retries independently; a durable log drives progress</td></tr>
+        <tr><td>Needs</td><td>Every participant supports XA / prepare</td><td>Idempotent steps, a compensation for each, a saga state store</td></tr>
+        <tr><td>Use</td><td>Inside one database cluster (Spanner, CockroachDB do this internally)</td><td>Across services and third parties (payments, shipping, email)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">Order the steps to shrink the undo</span>Put steps that can't be undone last. You can't un-send an email or un-ship a parcel. Do the reversible, likely-to-fail steps first: reserve stock before charging the card, and charge before shipping. Orchestrated sagas (a central coordinator) are easier to follow than choreographed ones once there are more than three steps.</div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Sagas">Deck · Sagas</a><a data-deck="ed" data-slide="Sagas with events">Events · Sagas with events</a></p>
+</section>

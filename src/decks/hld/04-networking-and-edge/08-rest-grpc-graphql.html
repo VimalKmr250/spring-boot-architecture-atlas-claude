@@ -1,0 +1,81 @@
+<section class="slide" data-sec="Networking & edge" data-title="REST, gRPC or GraphQL">
+  <h2>REST for public resources, gRPC between services, GraphQL for many-shaped clients</h2>
+  <p class="dek">All three can build any API. They differ in who shapes the response, the client or the server, what goes over the wire (text JSON or binary protobuf), and how well caches, browsers and tooling understand them. Here is the same question asked three ways: <em>user 42's name and last three orders</em>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="REST takes two round trips: GET /users/42, then GET /users/42/orders?limit=3, both JSON, possibly over-fetching. gRPC makes one call, UserService.GetUser with include_orders, returning a typed protobuf message over HTTP/2. GraphQL makes one POST whose query names exactly the fields wanted; the server's resolvers fetch user and orders and return only those fields.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="150" y="20">REST</text><text x="450" y="20">gRPC</text><text x="750" y="20">GraphQL</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="10" x2="300" y2="292"></line><line x1="600" y1="10" x2="600" y2="292"></line></g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="32" width="70" height="26" rx="10" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="55" y="49">client</text>
+          <rect x="210" y="32" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="245" y="49">server</text>
+          <rect x="320" y="32" width="70" height="26" rx="10" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="355" y="49">client</text>
+          <rect x="510" y="32" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="545" y="49">server</text>
+          <rect x="620" y="32" width="70" height="26" rx="10" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="655" y="49">client</text>
+          <rect x="810" y="32" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="845" y="49">server</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="55" y1="58" x2="55" y2="250"></line><line x1="245" y1="58" x2="245" y2="250"></line>
+          <line x1="355" y1="58" x2="355" y2="250"></line><line x1="545" y1="58" x2="545" y2="250"></line>
+          <line x1="655" y1="58" x2="655" y2="250"></line><line x1="845" y1="58" x2="845" y2="250"></line>
+        </g>
+
+        <!-- REST -->
+        <line x1="55" y1="86" x2="241" y2="86" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="150" y="80" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">GET /users/42</text>
+        <line x1="245" y1="110" x2="59" y2="110" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="150" y="124" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">{id, name, email, address, …}</text>
+        <line x1="55" y1="160" x2="241" y2="160" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="150" y="154" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">GET /users/42/orders?limit=3</text>
+        <line x1="245" y1="184" x2="59" y2="184" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="150" y="198" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">[{…}, {…}, {…}] JSON</text>
+        <text x="150" y="272" text-anchor="middle" font-size="10.5" fill="#D26A3F">2 round trips · extra fields</text>
+        <text x="150" y="287" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">but cacheable by any HTTP cache</text>
+
+        <!-- gRPC -->
+        <line x1="355" y1="100" x2="541" y2="100" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="450" y="86" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">UserService.GetUser(</text>
+        <text x="450" y="96" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">id: 42, orders: 3)</text>
+        <line x1="545" y1="132" x2="359" y2="132" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="450" y="148" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">UserReply (protobuf, binary)</text>
+        <rect x="370" y="170" width="160" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <text x="450" y="188" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">.proto contract → generated</text>
+        <text x="450" y="202" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">client and server stubs</text>
+        <text x="450" y="272" text-anchor="middle" font-size="10.5" fill="#D26A3F">1 round trip · compact · typed</text>
+        <text x="450" y="287" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">HTTP/2 streaming; needs a proxy for browsers</text>
+
+        <!-- GraphQL -->
+        <line x1="655" y1="100" x2="841" y2="100" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="750" y="76" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">POST /graphql</text>
+        <text x="750" y="89" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">{user(id:42){name orders(last:3){id total}}}</text>
+        <line x1="845" y1="132" x2="659" y2="132" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="750" y="148" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">exactly those fields, JSON</text>
+        <rect x="770" y="170" width="120" height="50" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="830" y="188" text-anchor="middle" font-size="9.5" fill="currentColor">resolvers fan out</text>
+        <text x="830" y="202" text-anchor="middle" font-size="9.5" fill="currentColor">to user + order</text>
+        <text x="830" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">services</text>
+        <text x="750" y="272" text-anchor="middle" font-size="10.5" fill="#D26A3F">1 round trip · client picks fields</text>
+        <text x="750" y="287" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">HTTP caching harder; watch N+1 queries</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>REST (JSON over HTTP)</th><th>gRPC (protobuf over HTTP/2)</th><th>GraphQL</th></tr></thead>
+      <tbody>
+        <tr><td>Best for</td><td>Public APIs, CRUD resources, anything cacheable</td><td>Internal service-to-service, low latency, streaming</td><td>Many client types with different data needs; aggregation layer</td></tr>
+        <tr><td>Contract</td><td>OpenAPI (optional, often drifts)</td><td><code>.proto</code>, required, with code generation</td><td>Schema, required, introspectable</td></tr>
+        <tr><td>Payload</td><td>Text, verbose, human-readable</td><td>Binary, typically 3–10× smaller, fast to parse</td><td>JSON, shaped by the query</td></tr>
+        <tr><td>Caching</td><td>Excellent: HTTP semantics, CDN, ETags</td><td>Application-level only</td><td>Hard at HTTP level (POST); needs persisted queries or client caches</td></tr>
+        <tr><td>Evolution</td><td>Versioned URLs or headers; add fields freely</td><td>Add fields with new numbers; never reuse one</td><td>Deprecate fields; no versions</td></tr>
+        <tr><td>Watch out for</td><td>Chatty clients, over- and under-fetching</td><td>Browser support (grpc-web), L4 load balancing</td><td>Expensive queries (depth and cost limits), N+1 in resolvers</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">A defensible default</span>"REST at the public edge, because it's cacheable and every client speaks it. gRPC between internal services, for the typed contracts and efficiency. And a GraphQL or BFF layer only if the mobile and web teams are fighting over response shapes." Also say how you would paginate (cursor, not offset) and make writes idempotent.</div>
+</section>

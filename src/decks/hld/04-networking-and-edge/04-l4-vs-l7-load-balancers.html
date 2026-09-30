@@ -1,0 +1,81 @@
+<section class="slide" data-sec="Networking & edge" data-title="L4 vs L7 load balancers">
+  <h2>An L4 balancer routes connections; an L7 balancer routes requests</h2>
+  <p class="dek">The layer tells you how much of the packet the balancer can read. A layer-4 balancer sees addresses and ports, so it forwards whole TCP or UDP connections, blindly and very fast. A layer-7 balancer terminates TLS and reads the HTTP request, so it can route on path, header or cookie, at the cost of more CPU per request.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="A request's layers: HTTP method, path, headers and cookies at layer 7; TLS; TCP ports at layer 4; IP addresses at layer 3. A layer-4 balancer sees only IP and TCP and pins each connection to a server by hashing the connection tuple. A layer-7 balancer sees everything after terminating TLS and routes slash api to the API pool, slash img to the image service, and requests with a beta cookie to a canary.">
+        <g font-size="11" fill="currentColor">
+          <rect x="30" y="30" width="290" height="50" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <text x="42" y="50" font-weight="600">L7 · HTTP</text>
+          <text x="42" y="68" font-family="IBM Plex Mono, monospace" font-size="10">GET /api/cart · Host · Cookie · JWT</text>
+          <rect x="30" y="86" width="290" height="38" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="42" y="110" font-weight="600">L6 · TLS</text><text x="130" y="110" font-size="10" opacity="0.7">encrypts everything above</text>
+          <rect x="30" y="130" width="290" height="38" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="42" y="154" font-weight="600">L4 · TCP</text><text x="130" y="154" font-family="IBM Plex Mono, monospace" font-size="10">src :51234 → dst :443</text>
+          <rect x="30" y="174" width="290" height="38" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="42" y="198" font-weight="600">L3 · IP</text><text x="130" y="198" font-family="IBM Plex Mono, monospace" font-size="10">198.51.100.4 → 203.0.113.7</text>
+        </g>
+        <path d="M332 130 h10 v82 h-10" fill="none" stroke="#3AA79B" stroke-width="1.4"></path>
+        <text x="350" y="168" font-size="10.5" fill="#3AA79B">L4 sees</text>
+        <text x="350" y="182" font-size="10.5" fill="#3AA79B">this</text>
+        <path d="M382 30 h10 v182 h-10" fill="none" stroke="#D26A3F" stroke-width="1.4"></path>
+        <text x="398" y="118" font-size="10.5" fill="#D26A3F">L7 sees</text>
+        <text x="398" y="132" font-size="10.5" fill="#D26A3F">all of it</text>
+        <text x="398" y="146" font-size="10" fill="currentColor" opacity="0.65">(after TLS)</text>
+        <text x="175" y="240" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">L4 can pass TLS through untouched (end-to-end encryption);</text>
+        <text x="175" y="256" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">L7 must decrypt to read the request</text>
+
+        <line x1="470" y1="20" x2="470" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="490" y="30" font-size="12" font-weight="600" fill="currentColor">L4 routing</text>
+        <rect x="490" y="46" width="90" height="36" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="535" y="69" text-anchor="middle" font-size="11" fill="currentColor">L4 LB</text>
+        <rect x="660" y="36" width="100" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="710" y="53" text-anchor="middle" font-size="10.5" fill="currentColor">server A</text>
+        <rect x="660" y="68" width="100" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="710" y="85" text-anchor="middle" font-size="10.5" fill="currentColor">server B</text>
+        <line x1="580" y1="60" x2="657" y2="50" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="580" y1="68" x2="657" y2="80" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="772" y="60" font-size="10" fill="currentColor" opacity="0.75">hash(5-tuple) →</text>
+        <text x="772" y="74" font-size="10" fill="currentColor" opacity="0.75">whole connection</text>
+        <text x="772" y="88" font-size="10" fill="currentColor" opacity="0.75">pinned to one server</text>
+
+        <text x="490" y="132" font-size="12" font-weight="600" fill="currentColor">L7 routing</text>
+        <rect x="490" y="186" width="90" height="46" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="535" y="206" text-anchor="middle" font-size="11" fill="currentColor">L7 LB</text>
+        <text x="535" y="222" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">per request</text>
+        <rect x="690" y="146" width="130" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="755" y="164" text-anchor="middle" font-size="10.5" fill="currentColor">API pool</text>
+        <rect x="690" y="196" width="130" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="755" y="214" text-anchor="middle" font-size="10.5" fill="currentColor">image service</text>
+        <rect x="690" y="246" width="130" height="28" rx="4" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        <text x="755" y="264" text-anchor="middle" font-size="10.5" fill="currentColor">API v2 (canary)</text>
+        <line x1="580" y1="196" x2="687" y2="162" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="580" y1="209" x2="687" y2="210" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="580" y1="222" x2="687" y2="258" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="600" y="168">/api/*</text>
+          <text x="610" y="203">/img/*</text>
+          <text x="590" y="258">cookie beta=1</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>In practice you often chain both: a managed L4 balancer (or anycast) takes millions of connections at the edge, and L7 proxies behind it do the smart routing. Inside Kubernetes the same split appears as <code>Service</code>, which is L4, and <code>Ingress</code> or Gateway API, which is L7.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Layer 4</th><th>Layer 7</th></tr></thead>
+      <tbody>
+        <tr><td>Routes on</td><td>IP, port, protocol</td><td>Host, path, method, headers, cookies, JWT claims</td></tr>
+        <tr><td>Unit of balancing</td><td>Connection: a long-lived HTTP/2 or gRPC connection sticks to one server</td><td>Request: can spread requests from one connection across servers</td></tr>
+        <tr><td>TLS</td><td>Pass-through (or terminate)</td><td>Terminates, and can re-encrypt to the backend</td></tr>
+        <tr><td>Extras</td><td>Very high throughput, low latency, any TCP/UDP protocol</td><td>Retries, header rewrites, compression, auth hooks, canary splits, WebSocket upgrade</td></tr>
+        <tr><td>Examples</td><td>AWS NLB, GCP Network LB, IPVS, HAProxy (TCP mode)</td><td>AWS ALB, Envoy, Nginx, HAProxy (HTTP mode), Traefik</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn"><span class="lbl">The gRPC gotcha</span>gRPC multiplexes many calls over one long-lived HTTP/2 connection. Behind an L4 balancer, each client's connection is pinned to one server, so load ends up badly skewed. Use an L7 proxy that balances per request, or client-side load balancing.</div>
+</section>

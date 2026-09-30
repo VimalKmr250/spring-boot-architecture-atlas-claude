@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Data" data-title="Consistent hashing">
+  <h2>Consistent hashing: adding a node moves only its share of keys</h2>
+  <p class="dek">With <code>hash(key) % N</code>, going from 3 to 4 nodes changes the answer for about 75% of keys. For a cache that means a sudden wave of misses; for a database it means a massive data migration. Consistent hashing places nodes and keys on the same ring and gives each key to the <b>next node clockwise</b>, so a new node only takes keys from its immediate neighbour.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Left ring: nodes A at the top, B at 4 o'clock and C at 8 o'clock; keys k1 and k2 belong to B, k3 and k4 to C, k5 and k6 to A, each going clockwise to the next node. Right ring: node D is added at 2 o'clock; only k1, which lies between A and D, moves from B to D; every other key stays where it was.">
+        <text x="200" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Three nodes</text>
+        <circle cx="200" cy="160" r="100" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"></circle>
+        <path d="M 200 60 A 100 100 0 0 1 286.6 210" fill="none" stroke="#8A94A3" stroke-width="5" stroke-opacity="0.35"></path>
+        <path d="M 286.6 210 A 100 100 0 0 1 113.4 210" fill="none" stroke="#3AA79B" stroke-width="5" stroke-opacity="0.35"></path>
+        <path d="M 113.4 210 A 100 100 0 0 1 200 60" fill="none" stroke="#D26A3F" stroke-width="5" stroke-opacity="0.35"></path>
+        <g font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">
+          <circle cx="200" cy="60" r="14" fill="#D26A3F"></circle><text x="200" y="65" fill="#fff">A</text>
+          <circle cx="286.6" cy="210" r="14" fill="#8A94A3"></circle><text x="286.6" y="215" fill="#fff">B</text>
+          <circle cx="113.4" cy="210" r="14" fill="#3AA79B"></circle><text x="113.4" y="215" fill="#fff">C</text>
+        </g>
+        <g fill="currentColor">
+          <circle cx="250" cy="73.4" r="4"></circle><circle cx="298.5" cy="142.6" r="4"></circle><circle cx="250" cy="246.6" r="4"></circle>
+          <circle cx="165.8" cy="254" r="4"></circle><circle cx="101.5" cy="142.6" r="4"></circle><circle cx="150" cy="73.4" r="4"></circle>
+        </g>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="258" y="68">k1→B</text><text x="306" y="140">k2→B</text><text x="256" y="262">k3→C</text>
+          <text x="118" y="276">k4→C</text><text x="46" y="140">k5→A</text><text x="104" y="66">k6→A</text>
+        </g>
+        <path d="M 330 110 A 140 140 0 0 1 340 160" fill="none" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#arw)"></path>
+        <text x="350" y="120" font-size="10" fill="currentColor" opacity="0.7">clockwise</text>
+
+        <line x1="420" y1="160" x2="470" y2="160" stroke="#8A94A3" stroke-width="1.5" marker-end="url(#arw)"></line>
+        <text x="445" y="150" text-anchor="middle" font-size="10.5" fill="currentColor">add D</text>
+
+        <text x="680" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Four nodes: only k1 moves</text>
+        <circle cx="680" cy="160" r="100" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"></circle>
+        <path d="M 680 60 A 100 100 0 0 1 766.6 110" fill="none" stroke="#D26A3F" stroke-width="6" stroke-opacity="0.7"></path>
+        <g font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">
+          <circle cx="680" cy="60" r="14" fill="#D26A3F"></circle><text x="680" y="65" fill="#fff">A</text>
+          <circle cx="766.6" cy="110" r="14" fill="#D26A3F" stroke="#fff" stroke-width="2"></circle><text x="766.6" y="115" fill="#fff">D</text>
+          <circle cx="766.6" cy="210" r="14" fill="#8A94A3"></circle><text x="766.6" y="215" fill="#fff">B</text>
+          <circle cx="593.4" cy="210" r="14" fill="#3AA79B"></circle><text x="593.4" y="215" fill="#fff">C</text>
+        </g>
+        <g fill="currentColor">
+          <circle cx="730" cy="73.4" r="5" fill="#D26A3F"></circle><circle cx="778.5" cy="142.6" r="4"></circle><circle cx="730" cy="246.6" r="4"></circle>
+          <circle cx="645.8" cy="254" r="4"></circle><circle cx="581.5" cy="142.6" r="4"></circle><circle cx="630" cy="73.4" r="4"></circle>
+        </g>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="702" y="46" fill="#D26A3F" font-weight="600">k1→D (moved)</text><text x="790" y="148">k2→B</text><text x="736" y="262">k3→C</text>
+          <text x="598" y="276">k4→C</text><text x="526" y="140">k5→A</text><text x="584" y="66">k6→A</text>
+        </g>
+        <text x="680" y="304" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">D took only the arc A→D, from B. With N nodes, about 1/N of keys move.</text>
+      </svg>
+    </div>
+    <figcaption>The arc just before a node, counter-clockwise back to the previous node, is the range that node owns. Removing a node hands its arc to the next node clockwise; nothing else changes. That property is why Dynamo, Cassandra, Riak, memcached client libraries and many load balancers use this scheme.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Virtual nodes fix the lumps</h4><p>Three random points on a ring give very uneven arcs. Each physical node therefore takes 100–256 <b>virtual nodes</b> spread around the ring, which evens out the load. A new node takes a little from everyone rather than a lot from one neighbour, and a bigger machine can simply own more vnodes.</p></div>
+    <div class="card"><h4>Replication falls out of it</h4><p>To keep N copies, store the key on the next N <em>distinct physical</em> nodes clockwise. That list is the key's <b>preference list</b>. It is how Cassandra and DynamoDB place replicas without a central directory.</p></div>
+    <div class="card"><h4>Alternatives worth naming</h4><p><b>Rendezvous (HRW) hashing</b>: each key goes to the node with the highest <code>hash(key, node)</code>. It's simple and needs no ring. <b>Jump hash</b>: fast, but nodes must be numbered. <b>Fixed hash slots</b> (Redis Cluster uses 16,384) make rebalancing a matter of moving whole slots.</p></div>
+  </div>
+</section>

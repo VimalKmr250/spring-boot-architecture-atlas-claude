@@ -1,0 +1,50 @@
+<section class="slide" data-sec="Data" data-title="Choosing a data store">
+  <h2>Every store trades query flexibility against scale</h2>
+  <p class="dek">Stores that answer any question (relational, OLAP) are harder to scale for writes. Stores that scale almost without limit (wide-column, KV, object storage) answer only the questions you designed for. Place the requirement on this map, and name what you give up.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Map of data stores by query flexibility, horizontally, and write scale, vertically. High scale, low flexibility: object storage, Cassandra, DynamoDB. High scale, high flexibility but costly: Spanner and CockroachDB, and analytics warehouses such as ClickHouse and BigQuery. Middle: MongoDB, OpenSearch, Redis, which is in-memory. Lower scale, high flexibility: PostgreSQL and MySQL. Lower scale, traversal: Neo4j.">
+        <rect x="90" y="24" width="385" height="123" fill="#3AA79B" fill-opacity="0.05"></rect>
+        <rect x="475" y="24" width="385" height="123" fill="#D26A3F" fill-opacity="0.05"></rect>
+        <line x1="90" y1="270" x2="866" y2="270" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#arw)"></line>
+        <line x1="90" y1="270" x2="90" y2="20" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#arw)"></line>
+        <text x="860" y="292" text-anchor="end" font-size="11" fill="currentColor" opacity="0.75">query flexibility: key lookups only → any SQL</text>
+        <text x="80" y="150" font-size="11" fill="currentColor" opacity="0.75" transform="rotate(-90 80 150)" text-anchor="middle">write scale / data size</text>
+        <text x="100" y="40" font-size="10" fill="#3AA79B" opacity="0.9">scale by design, ask only what you modelled</text>
+        <text x="850" y="40" text-anchor="end" font-size="10" fill="#D26A3F" opacity="0.9">both, at a price (cost, latency, ops)</text>
+
+        <g font-size="11" fill="currentColor">
+          <circle cx="128" cy="58" r="6" fill="#3AA79B"></circle><text x="138" y="62">Object storage</text>
+          <circle cx="244" cy="72" r="6" fill="#3AA79B"></circle><text x="254" y="76">Cassandra · Scylla</text>
+          <circle cx="336" cy="100" r="6" fill="#3AA79B"></circle><text x="346" y="104">DynamoDB</text>
+          <circle cx="706" cy="72" r="6" fill="#D26A3F"></circle><text x="716" y="76">Spanner · CockroachDB</text>
+          <circle cx="783" cy="112" r="6" fill="#D26A3F"></circle><text x="778" y="132" text-anchor="end">ClickHouse · BigQuery (OLAP)</text>
+          <circle cx="552" cy="150" r="6" fill="#8A94A3"></circle><text x="562" y="154">MongoDB</text>
+          <circle cx="629" cy="182" r="6" fill="#8A94A3"></circle><text x="639" y="186">OpenSearch (text, derived)</text>
+          <circle cx="167" cy="164" r="6" fill="#8A94A3"></circle><text x="177" y="168">Redis (bounded by RAM)</text>
+          <circle cx="744" cy="222" r="8" fill="#D26A3F" stroke="#fff" stroke-width="1.5"></circle><text x="734" y="248" text-anchor="end" font-weight="600">PostgreSQL · MySQL: the default</text>
+          <circle cx="480" cy="240" r="6" fill="#8A94A3"></circle><text x="490" y="244">Neo4j (graph)</text>
+        </g>
+        <path d="M744 212 C 744 180, 730 110, 712 82" fill="none" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <text x="752" y="170" font-size="9.5" fill="#D26A3F">outgrow it</text>
+      </svg>
+    </div>
+    <figcaption>The dashed arrow is the usual path. Start on PostgreSQL. When one primary can't take the writes, either shard it (Citus, Vitess) or move up to a distributed SQL database, or move the specific high-volume data (events, messages, metrics) to a store built for it.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Requirement</th><th>Reach for</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td>Money, orders, inventory, bookings</td><td>PostgreSQL / MySQL (or Spanner at global scale)</td><td>Transactions, constraints, strong consistency</td></tr>
+        <tr><td>Sessions, counters, rate limits, leaderboards</td><td>Redis</td><td>Sub-ms, atomic ops, TTLs, sorted sets</td></tr>
+        <tr><td>Chat messages, feeds, IoT, event history</td><td>Cassandra / ScyllaDB / DynamoDB</td><td>Write-heavy, partitioned by entity, time-ordered</td></tr>
+        <tr><td>Images, video, backups, logs archive</td><td>Object storage + CDN</td><td>Cheap, durable, unlimited; metadata in a DB</td></tr>
+        <tr><td>Product search, typo tolerance, facets</td><td>OpenSearch / Elasticsearch</td><td>Inverted index, relevance ranking</td></tr>
+        <tr><td>Dashboards over billions of rows</td><td>ClickHouse / BigQuery / Druid</td><td>Columnar storage, vectorised scans</td></tr>
+        <tr><td>Metrics and time series</td><td>Prometheus / TimescaleDB / InfluxDB</td><td>Compression, downsampling, time windows</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

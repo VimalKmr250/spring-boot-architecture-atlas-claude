@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Data" data-title="Partitioning strategies">
+  <h2>Sharding splits the data so each node holds, and writes, only a part</h2>
+  <p class="dek">Partitioning (sharding) is how you scale writes and storage past one machine. Each record lives on exactly one shard, chosen by its <b>partition key</b>. The strategy decides three things: whether load spreads evenly, whether range queries stay on one shard, and how hard it is to add shards later.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Range partitioning: keys A to F on shard 1, G to M on shard 2, N to Z on shard 3; range scans hit one shard, but time-ordered keys make the newest shard hot. Hash partitioning: hash of the key modulo the shard count spreads keys evenly, but a range query must ask every shard. Directory partitioning: a lookup service maps each key, such as tenant 17, to a shard; flexible, but an extra hop and a critical dependency.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="150" y="20">Range</text><text x="450" y="20">Hash</text><text x="750" y="20">Directory (lookup)</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="292"></line><line x1="600" y1="8" x2="600" y2="292"></line></g>
+
+        <!-- range -->
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="40" width="80" height="120" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="60" y="60" font-weight="600">shard 1</text><text x="60" y="80" font-family="IBM Plex Mono, monospace">A – F</text>
+          <rect x="110" y="40" width="80" height="120" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="150" y="60" font-weight="600">shard 2</text><text x="150" y="80" font-family="IBM Plex Mono, monospace">G – M</text>
+          <rect x="200" y="40" width="80" height="120" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.6"></rect>
+          <text x="240" y="60" font-weight="600">shard 3</text><text x="240" y="80" font-family="IBM Plex Mono, monospace">N – Z</text>
+        </g>
+        <rect x="30" y="140" width="60" height="12" fill="#8A94A3" fill-opacity="0.5"></rect>
+        <rect x="120" y="136" width="60" height="16" fill="#8A94A3" fill-opacity="0.5"></rect>
+        <rect x="210" y="96" width="60" height="56" fill="#D26A3F" fill-opacity="0.55"></rect>
+        <text x="240" y="126" text-anchor="middle" font-size="9.5" fill="currentColor">hot</text>
+        <text x="150" y="186" text-anchor="middle" font-size="10.5" fill="currentColor">✓ range scans stay on one shard</text>
+        <text x="150" y="204" text-anchor="middle" font-size="10.5" fill="currentColor">✓ easy to split a shard in two</text>
+        <text x="150" y="222" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ key = timestamp or sequence ⇒</text>
+        <text x="150" y="238" text-anchor="middle" font-size="10.5" fill="#D26A3F">all new writes land on the last shard</text>
+        <text x="150" y="272" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">HBase · Bigtable · Spanner · MongoDB ranges</text>
+
+        <!-- hash -->
+        <rect x="380" y="40" width="140" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="60" text-anchor="middle" font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">hash(user_id) % 3</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="320" y="100" width="80" height="60" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="360" y="124" font-weight="600">shard 0</text>
+          <rect x="410" y="100" width="80" height="60" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="124" font-weight="600">shard 1</text>
+          <rect x="500" y="100" width="80" height="60" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="540" y="124" font-weight="600">shard 2</text>
+        </g>
+        <rect x="330" y="140" width="60" height="12" fill="#3AA79B" fill-opacity="0.5"></rect>
+        <rect x="420" y="139" width="60" height="13" fill="#3AA79B" fill-opacity="0.5"></rect>
+        <rect x="510" y="140" width="60" height="12" fill="#3AA79B" fill-opacity="0.5"></rect>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="420" y1="70" x2="365" y2="97" marker-end="url(#arw)"></line><line x1="450" y1="70" x2="450" y2="97" marker-end="url(#arw)"></line><line x1="480" y1="70" x2="535" y2="97" marker-end="url(#arw)"></line></g>
+        <text x="450" y="186" text-anchor="middle" font-size="10.5" fill="currentColor">✓ even spread, no sequential hot spot</text>
+        <text x="450" y="204" text-anchor="middle" font-size="10.5" fill="currentColor">✓ lookup by key hits one shard</text>
+        <text x="450" y="222" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ range query ⇒ ask every shard</text>
+        <text x="450" y="238" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ mod N: changing N moves ~all keys</text>
+        <text x="450" y="272" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">Cassandra · DynamoDB · Redis Cluster (hash slots)</text>
+
+        <!-- directory -->
+        <rect x="690" y="40" width="120" height="48" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="750" y="60" text-anchor="middle" font-size="11" fill="currentColor">lookup service</text>
+        <text x="750" y="77" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">tenant 17 → s3</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="620" y="120" width="80" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="660" y="144">s1</text>
+          <rect x="710" y="120" width="80" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="750" y="144">s2</text>
+          <rect x="800" y="120" width="80" height="40" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="840" y="144">s3</text>
+        </g>
+        <line x1="790" y1="88" x2="832" y2="117" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="750" y="186" text-anchor="middle" font-size="10.5" fill="currentColor">✓ move any key or tenant anywhere</text>
+        <text x="750" y="204" text-anchor="middle" font-size="10.5" fill="currentColor">✓ isolate a big tenant on its own shard</text>
+        <text x="750" y="222" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ extra hop (cache the map)</text>
+        <text x="750" y="238" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ the directory must never go down</text>
+        <text x="750" y="272" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">multi-tenant SaaS · Vitess keyspace maps</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Choosing the partition key</h4><p>Choose a key with <b>high cardinality</b> (many distinct values), <b>even load</b> (no key far hotter than the rest), and that <b>matches the main query</b>, so the common request touches one shard. <code>user_id</code> for user data, <code>conversation_id</code> for messages, <code>tenant_id</code> for SaaS. Never a boolean, a country, or a raw timestamp.</p></div>
+    <div class="card"><h4>Secondary indexes</h4><p><b>Local</b> index: each shard indexes its own rows. Writes stay cheap, but a query by the indexed field must ask every shard. <b>Global</b> index: the index is itself partitioned by the indexed value. Reads go to one place, but each write updates another shard, usually asynchronously.</p></div>
+    <div class="card"><h4>What you give up</h4><p>Cross-shard joins, transactions and unique constraints. Design so the common operation stays inside one shard. For the rare cross-shard operation, use a saga or an async job, and denormalise the data a query needs onto the shard that serves it.</p></div>
+  </div>
+</section>

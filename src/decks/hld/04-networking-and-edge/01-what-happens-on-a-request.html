@@ -1,0 +1,89 @@
+<section class="slide" data-sec="Networking & edge" data-title="What happens on a request">
+  <h2>Follow one request from the browser to the database and back</h2>
+  <p class="dek">Nearly every design shares the same front half: name resolution, an edge that caches, a balancer that spreads load, a gateway that enforces policy, and a stateless service in front of a cache and a database. Know that path cold. Then each interview design is mostly a question of what changes behind the service.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Request path: 1, the client resolves the name through DNS. 2, it connects to a CDN edge, which serves static content and passes the rest on. 3, a load balancer terminates TLS and picks a healthy instance. 4, an API gateway authenticates and rate-limits. 5, a stateless service handles the request. 6, it reads from a cache and, 7, on a miss from the database. 8, slow side effects go to a queue and are handled by workers off the request path.">
+        <rect x="14" y="120" width="96" height="50" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="62" y="149" text-anchor="middle" font-size="12" fill="currentColor">Client</text>
+
+        <rect x="14" y="16" width="96" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="62" y="36" text-anchor="middle" font-size="11.5" fill="currentColor">DNS</text>
+        <text x="62" y="51" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">name → IP</text>
+        <line x1="50" y1="118" x2="50" y2="63" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="74" y1="63" x2="74" y2="118" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <circle cx="30" cy="90" r="9" fill="#D26A3F"></circle><text x="30" y="94" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">1</text>
+
+        <rect x="150" y="116" width="104" height="58" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="202" y="140" text-anchor="middle" font-size="11.5" fill="currentColor">CDN edge</text>
+        <text x="202" y="156" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">static · cached</text>
+        <line x1="110" y1="145" x2="147" y2="145" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <circle cx="130" cy="128" r="9" fill="#D26A3F"></circle><text x="130" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">2</text>
+
+        <rect x="294" y="116" width="104" height="58" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="346" y="140" text-anchor="middle" font-size="11.5" fill="currentColor">Load balancer</text>
+        <text x="346" y="156" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">TLS · health checks</text>
+        <line x1="254" y1="145" x2="291" y2="145" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <circle cx="274" cy="128" r="9" fill="#D26A3F"></circle><text x="274" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">3</text>
+
+        <rect x="438" y="116" width="104" height="58" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="490" y="140" text-anchor="middle" font-size="11.5" fill="currentColor">API gateway</text>
+        <text x="490" y="156" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">auth · rate limit</text>
+        <line x1="398" y1="145" x2="435" y2="145" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <circle cx="418" cy="128" r="9" fill="#D26A3F"></circle><text x="418" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">4</text>
+
+        <rect x="582" y="106" width="120" height="78" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="642" y="136" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Service</text>
+        <text x="642" y="152" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">stateless, N replicas</text>
+        <line x1="542" y1="145" x2="579" y2="145" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <circle cx="562" cy="128" r="9" fill="#D26A3F"></circle><text x="562" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">5</text>
+
+        <path d="M760 26 a50 6 0 0 1 100 0 v38 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M760 26 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="810" y="52" text-anchor="middle" font-size="11.5" fill="currentColor">Cache</text>
+        <path d="M760 124 a50 6 0 0 1 100 0 v38 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M760 124 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="810" y="150" text-anchor="middle" font-size="11.5" fill="currentColor">Database</text>
+        <line x1="702" y1="120" x2="757" y2="56" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <circle cx="722" cy="80" r="9" fill="#D26A3F"></circle><text x="722" y="84" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">6</text>
+        <line x1="702" y1="145" x2="757" y2="145" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="2 3" marker-end="url(#arwA)"></line>
+        <circle cx="730" cy="162" r="9" fill="#D26A3F"></circle><text x="730" y="166" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">7</text>
+        <text x="810" y="186" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">only on a cache miss</text>
+
+        <rect x="600" y="248" width="120" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <line x1="624" y1="248" x2="624" y2="278" stroke="#3AA79B" stroke-opacity="0.6"></line><line x1="648" y1="248" x2="648" y2="278" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <line x1="672" y1="248" x2="672" y2="278" stroke="#3AA79B" stroke-opacity="0.6"></line><line x1="696" y1="248" x2="696" y2="278" stroke="#3AA79B" stroke-opacity="0.6"></line>
+        <text x="660" y="298" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">queue</text>
+        <rect x="770" y="242" width="100" height="42" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="820" y="267" text-anchor="middle" font-size="11.5" fill="currentColor">Workers</text>
+        <line x1="642" y1="184" x2="655" y2="245" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="720" y1="263" x2="767" y2="263" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <circle cx="632" cy="218" r="9" fill="#3AA79B"></circle><text x="632" y="222" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">8</text>
+        <text x="540" y="268" text-anchor="end" font-size="10.5" fill="#3AA79B">emails, indexing, analytics:</text>
+        <text x="540" y="284" text-anchor="end" font-size="10.5" fill="#3AA79B">nobody waits for these</text>
+
+        <path d="M14 206 H702" stroke="currentColor" stroke-opacity="0.15"></path>
+        <text x="20" y="226" font-size="10.5" fill="currentColor" opacity="0.7">the copper chain is the user's latency budget:</text>
+        <text x="20" y="242" font-size="10.5" fill="currentColor" opacity="0.7">DNS (cached, ~0) + TLS (1–2 RTT) + edge + LB (~1 ms)</text>
+        <text x="20" y="258" font-size="10.5" fill="currentColor" opacity="0.7">+ gateway (~1–5 ms) + service + cache (~0.5 ms)</text>
+        <text x="20" y="274" font-size="10.5" fill="currentColor" opacity="0.7">+ database (1–10 ms) ≈ 20–100 ms end to end</text>
+      </svg>
+    </div>
+    <figcaption>Steps 1–4 are infrastructure you configure rather than build, and steps 5–7 are where your design lives. Step 8 is the most useful move in HLD: anything the user doesn't have to wait for comes off the copper chain and goes onto a queue.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Hop</th><th>Job</th><th>Scales by</th><th>If it fails</th></tr></thead>
+      <tbody>
+        <tr><td>DNS</td><td>Name → IP, and often geo- or latency-based routing</td><td>Managed, anycast</td><td>Cached answers keep working until their TTLs expire</td></tr>
+        <tr><td>CDN</td><td>Serve static and cacheable content near the user; absorb DDoS</td><td>Provider's global edge</td><td>Fail-open to the origin, which must be sized for it</td></tr>
+        <tr><td>Load balancer</td><td>Terminate TLS, spread requests, remove unhealthy instances</td><td>Managed or HA pair</td><td>Redundant pair; DNS fail-over across regions</td></tr>
+        <tr><td>API gateway</td><td>AuthN, rate limits, routing, request logging</td><td>Stateless replicas</td><td>Everything behind it is unreachable, so keep it thin</td></tr>
+        <tr><td>Service</td><td>Business logic</td><td>Horizontal replicas</td><td>The LB routes around it; retries with idempotency</td></tr>
+        <tr><td>Cache / DB</td><td>Hot reads / durable truth</td><td>Cluster / replicas and shards</td><td>Cache miss storm; DB fail-over (see §05, §06)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Data" data-title="Federation and denormalization">
+  <h2>Split the database by function, and copy data where reads need it</h2>
+  <p class="dek">Two cheaper moves often come before sharding. <b>Federation</b> (functional partitioning) splits one database into several by domain, so users, products and orders each get their own, with separate load and separate failures. <b>Denormalization</b> stores data redundantly in the shape the read needs, trading write complexity for join-free reads.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Federation: one database holding users, products and orders is split into three databases, one per domain, each owned by one service; joins across them move into application code. Denormalization: a normalized design joins orders to customers and order lines to products on every read; a denormalized order view stores the customer name and product titles in the order row, so a read is one lookup, and writes must update the copies, usually through events.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Federation</text>
+        <path d="M30 60 a60 7 0 0 1 120 0 v120 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M30 60 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="90" y="98">users</text><text x="90" y="128">products</text><text x="90" y="158">orders</text></g>
+        <text x="90" y="210" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">one DB, all load</text>
+        <line x1="160" y1="120" x2="210" y2="120" stroke="#8A94A3" stroke-width="1.5" marker-end="url(#arw)"></line>
+        <g>
+          <path d="M240 40 a45 6 0 0 1 90 0 v34 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M240 40 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M240 110 a45 6 0 0 1 90 0 v34 a45 6 0 0 1 -90 0 z" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></path>
+          <path d="M240 110 a45 6 0 0 0 90 0" fill="none" stroke="#3AA79B" stroke-width="1.3"></path>
+          <path d="M240 180 a45 6 0 0 1 90 0 v34 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></path>
+          <path d="M240 180 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        </g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="285" y="64">users DB</text><text x="285" y="134">products DB</text><text x="285" y="204">orders DB</text></g>
+        <g font-size="9.5" fill="currentColor" opacity="0.7"><text x="340" y="64">user svc</text><text x="340" y="134">catalog svc</text><text x="340" y="204">order svc</text></g>
+        <text x="215" y="252" text-anchor="middle" font-size="10.5" fill="currentColor">✓ smaller DBs, isolated load and failures</text>
+        <text x="215" y="270" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ no cross-DB joins or transactions</text>
+
+        <line x1="440" y1="14" x2="440" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Denormalization</text>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="460" y="40" width="100" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="468" y="56" font-weight="600">orders</text><text x="468" y="72">id, cust_id</text><text x="468" y="84">total</text>
+          <rect x="580" y="40" width="100" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="588" y="56" font-weight="600">customers</text><text x="588" y="72">id, name</text>
+          <rect x="460" y="104" width="100" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="468" y="120" font-weight="600">order_lines</text><text x="468" y="136">order_id</text><text x="468" y="148">sku, qty</text>
+          <rect x="580" y="104" width="100" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="588" y="120" font-weight="600">products</text><text x="588" y="136">sku, title</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.1"><line x1="560" y1="68" x2="580" y2="68"></line><line x1="510" y1="90" x2="510" y2="104"></line><line x1="560" y1="132" x2="580" y2="132"></line></g>
+        <text x="570" y="176" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">normalized: 3 joins per read</text>
+
+        <line x1="690" y1="98" x2="720" y2="98" stroke="#8A94A3" stroke-width="1.5" marker-end="url(#arw)"></line>
+        <rect x="726" y="40" width="160" height="116" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="734" y="58" font-weight="600">order_view</text>
+          <text x="734" y="76">id, total</text>
+          <text x="734" y="92" fill="#D26A3F">cust_name: "Ana"</text>
+          <text x="734" y="108" fill="#D26A3F">lines: [{sku, qty,</text>
+          <text x="734" y="122" fill="#D26A3F">  title: "Mug"}]</text>
+          <text x="734" y="144" opacity="0.7">1 lookup per read</text>
+        </g>
+        <text x="670" y="210" text-anchor="middle" font-size="10.5" fill="currentColor">✓ fast, join-free reads; shardable by order</text>
+        <text x="670" y="228" text-anchor="middle" font-size="10.5" fill="#D26A3F">✗ copies drift unless every change updates them</text>
+        <text x="670" y="252" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">keep copies fresh with events / CDC (§07)</text>
+        <text x="670" y="270" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">or make them deliberate snapshots (price at purchase)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Federation is service ownership</h4><p>In microservices, federation is the norm: each service owns its data and nobody else touches its tables (database per service, §10). The same split works inside a modular monolith, as schema per module. Cross-domain questions are then answered through APIs or read models, never joins.</p></div>
+    <div class="card"><h4>Some copies are features</h4><p>Copying the product title and price into the order line isn't really denormalization. It records what the customer actually bought, even if the catalogue changes tomorrow. Separate <b>snapshots</b>, which must never update, from <b>caches of truth</b>, which must.</p></div>
+    <div class="card"><h4>Materialized views</h4><p>A denormalized read model maintained automatically, either by the database (a materialized view) or by a consumer of change events (a projection). This is the read side of CQRS (§10). Accept that it lags the source by milliseconds to seconds.</p></div>
+  </div>
+
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Data ownership">Deck · Data ownership</a><a data-deck="deck" data-slide="Read models">Deck · Read models</a></p>
+</section>

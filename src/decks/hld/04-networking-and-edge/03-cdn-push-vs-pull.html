@@ -1,0 +1,67 @@
+<section class="slide" data-sec="Networking & edge" data-title="CDN: push vs pull">
+  <h2>A CDN moves bytes close to users so your origin never sees most requests</h2>
+  <p class="dek">A content delivery network is a fleet of caching proxies in hundreds of locations. It cuts latency (the edge might be 10 ms away when the origin is 150 ms away) and it absorbs load and DDoS traffic. The main decision is how content reaches the edge: fetched on first request (pull) or uploaded ahead of time (push).</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Pull CDN: user A requests an object; the edge misses, fetches it from the origin, caches it for its max-age and returns it; user B then gets it straight from the edge. Push CDN: the deploy pipeline uploads assets to CDN storage ahead of time; the edges serve every request and the origin is never on the request path.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Pull: fetched on first request</text>
+        <rect x="14" y="50" width="86" height="38" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="57" y="74" text-anchor="middle" font-size="11.5" fill="currentColor">User A</text>
+        <rect x="14" y="190" width="86" height="38" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="57" y="214" text-anchor="middle" font-size="11.5" fill="currentColor">User B</text>
+        <rect x="170" y="100" width="110" height="80" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="225" y="130" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Edge PoP</text>
+        <text x="225" y="148" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">cache: logo.png</text>
+        <text x="225" y="163" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">TTL 1 day</text>
+        <rect x="340" y="110" width="90" height="60" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="385" y="144" text-anchor="middle" font-size="11.5" fill="currentColor">Origin</text>
+        <line x1="100" y1="62" x2="196" y2="97" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="150" y="66" font-size="10" fill="currentColor">① GET</text>
+        <line x1="280" y1="124" x2="337" y2="124" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="309" y="116" text-anchor="middle" font-size="10" fill="currentColor">② miss</text>
+        <line x1="340" y1="158" x2="283" y2="158" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="5 3" marker-end="url(#arw)"></line>
+        <text x="310" y="184" text-anchor="middle" font-size="10" fill="currentColor">③ object +</text>
+        <text x="310" y="197" text-anchor="middle" font-size="10" fill="currentColor">max-age</text>
+        <line x1="168" y1="130" x2="66" y2="91" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="84" y="124" font-size="10" fill="currentColor">④ response</text>
+        <line x1="100" y1="206" x2="168" y2="170" stroke="#3AA79B" stroke-width="1.5" marker-start="url(#arwB)" marker-end="url(#arwB)"></line>
+        <text x="138" y="210" font-size="10" fill="#3AA79B">⑤ hit, ~10 ms</text>
+        <text x="215" y="262" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">first user per PoP pays the miss; everyone after is fast</text>
+
+        <line x1="450" y1="20" x2="450" y2="280" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="680" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Push: uploaded before anyone asks</text>
+        <rect x="480" y="50" width="120" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="540" y="70" text-anchor="middle" font-size="11.5" fill="currentColor">Deploy pipeline</text>
+        <text x="540" y="85" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">app.3f9a.js, video</text>
+        <rect x="660" y="50" width="120" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="720" y="70" text-anchor="middle" font-size="11.5" fill="currentColor">CDN storage</text>
+        <text x="720" y="85" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">you manage contents</text>
+        <line x1="600" y1="72" x2="657" y2="72" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="628" y="64" text-anchor="middle" font-size="10" fill="#3AA79B">upload</text>
+        <rect x="560" y="140" width="100" height="50" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="610" y="170" text-anchor="middle" font-size="11.5" fill="currentColor">Edge (EU)</text>
+        <rect x="720" y="140" width="100" height="50" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="770" y="170" text-anchor="middle" font-size="11.5" fill="currentColor">Edge (US)</text>
+        <line x1="700" y1="94" x2="630" y2="138" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <line x1="740" y1="94" x2="760" y2="138" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <rect x="560" y="226" width="100" height="34" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="610" y="248" text-anchor="middle" font-size="11" fill="currentColor">users</text>
+        <rect x="720" y="226" width="100" height="34" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="770" y="248" text-anchor="middle" font-size="11" fill="currentColor">users</text>
+        <line x1="610" y1="224" x2="610" y2="193" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="770" y1="224" x2="770" y2="193" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="850" y="212" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">always</text>
+        <text x="850" y="226" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">a hit</text>
+      </svg>
+    </div>
+    <figcaption>Pull is the default for websites and APIs: no pipeline changes, and the CDN fills itself. Push suits large, predictable content with low request counts per object, such as video libraries, game patches and software downloads, where a cold miss on a 2 GB file would hurt and you want to control exactly what is stored.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Cache keys and headers</h4><p><code>Cache-Control: public, max-age=86400</code> lets the edge cache a response, and <code>private</code> or <code>no-store</code> stops it. The cache key is usually URL plus selected headers, so keep the key small: an unneeded <code>Vary</code> header or a tracking query parameter destroys the hit ratio.</p></div>
+    <div class="card"><h4>Invalidation</h4><p>Prefer <b>versioned URLs</b> (<code>app.3f9a.js</code>, <code>/img/v2/…</code>): a new version is a new object, so nothing needs purging. Keep purge APIs for mistakes. For HTML, use short TTLs with <code>stale-while-revalidate</code>.</p></div>
+    <div class="card"><h4>More than static files</h4><p>Modern CDNs terminate TLS, run a WAF and absorb DDoS, cache public API responses for seconds, sign URLs for private media, and run small functions at the edge. An <b>origin shield</b> (a mid-tier cache) stops 300 PoPs from all missing to the origin at once.</p></div>
+  </div>
+</section>
