@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Reliability" data-title="Timeouts, retries and backoff">
+  <h2>Retry with exponential backoff and jitter, or your retries become the outage</h2>
+  <p class="dek">Retries hide transient failures. But when a dependency is struggling, every client retrying on the same schedule multiplies its load exactly when it can least absorb it. Three rules keep retries helpful: back off exponentially, add random jitter, and cap retries with a budget.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: requests per 100 ms bucket after a brief outage. Without jitter, 1,000 clients retry together at 1, 2 and 4 seconds, producing tall synchronized spikes. With full jitter the same retries spread evenly across each window, staying under the server's capacity line. Right: a deadline budget propagated down a call chain: the edge allows 2 seconds, service A passes 1.5 seconds on, service B 1 second, and the database query times out at 300 ms.">
+        <text x="225" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Retry storm vs jitter (1,000 clients)</text>
+        <line x1="40" y1="120" x2="420" y2="120" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="40" y1="250" x2="420" y2="250" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="40" y1="68" x2="420" y2="68" stroke="#D26A3F" stroke-dasharray="4 3" stroke-opacity="0.8"></line>
+        <line x1="40" y1="198" x2="420" y2="198" stroke="#D26A3F" stroke-dasharray="4 3" stroke-opacity="0.8"></line>
+        <text x="418" y="62" text-anchor="end" font-size="9.5" fill="#D26A3F">server capacity</text>
+        <text x="256" y="44" font-size="10.5" fill="currentColor" font-weight="600">no jitter: sleep 1 s, 2 s, 4 s</text>
+        <g fill="#D26A3F" fill-opacity="0.75">
+          <rect x="84" y="36" width="10" height="84"></rect><rect x="134" y="50" width="10" height="70"></rect><rect x="234" y="60" width="10" height="60"></rect>
+        </g>
+        <text x="46" y="174" font-size="10.5" fill="currentColor" font-weight="600">full jitter: sleep random(0, 2ⁿ s)</text>
+        <g fill="#3AA79B" fill-opacity="0.75">
+          <rect x="44" y="230" width="10" height="20"></rect><rect x="56" y="226" width="10" height="24"></rect><rect x="68" y="232" width="10" height="18"></rect><rect x="80" y="228" width="10" height="22"></rect>
+          <rect x="92" y="230" width="10" height="20"></rect><rect x="104" y="234" width="10" height="16"></rect><rect x="116" y="229" width="10" height="21"></rect><rect x="128" y="233" width="10" height="17"></rect>
+          <rect x="140" y="236" width="10" height="14"></rect><rect x="152" y="238" width="10" height="12"></rect><rect x="164" y="236" width="10" height="14"></rect><rect x="176" y="239" width="10" height="11"></rect>
+          <rect x="188" y="240" width="10" height="10"></rect><rect x="200" y="241" width="10" height="9"></rect><rect x="212" y="240" width="10" height="10"></rect><rect x="224" y="242" width="10" height="8"></rect>
+          <rect x="236" y="243" width="10" height="7"></rect><rect x="248" y="243" width="10" height="7"></rect><rect x="260" y="244" width="10" height="6"></rect><rect x="272" y="244" width="10" height="6"></rect>
+          <rect x="284" y="245" width="10" height="5"></rect><rect x="296" y="245" width="10" height="5"></rect><rect x="308" y="246" width="10" height="4"></rect><rect x="320" y="246" width="10" height="4"></rect>
+        </g>
+        <g font-size="9.5" fill="currentColor" opacity="0.6" text-anchor="middle"><text x="40" y="266">0 s</text><text x="140" y="266">2</text><text x="240" y="266">4</text><text x="340" y="266">6 s</text></g>
+        <text x="225" y="284" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">same retries, spread out: the server recovers instead of being re-flattened</text>
+
+        <line x1="460" y1="14" x2="460" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="680" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Deadlines shrink as they propagate</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="490" y="44" width="380" height="36" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="680" y="67">Edge: user budget 2,000 ms</text>
+          <rect x="520" y="96" width="320" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="680" y="119">Service A: 1,500 ms left, 1 retry max</text>
+          <rect x="560" y="148" width="240" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="680" y="171">Service B: 1,000 ms left</text>
+          <rect x="600" y="200" width="160" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="680" y="223">DB query: 300 ms</text>
+        </g>
+        <text x="680" y="262" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">pass the remaining deadline downstream (gRPC does it natively);</text>
+        <text x="680" y="276" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">stop work nobody is waiting for any more</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">backoff with full jitter</div>
+<pre><code class="language-python">def call_with_retry(op, attempts=3, base=0.1, cap=2.0):
+    for n in range(attempts):
+        try:
+            return op(timeout=remaining_deadline())
+        except (Timeout, ServiceUnavailable, ConnectionReset):   # transient only
+            if n == attempts - 1 or not retry_budget.try_acquire():
+                raise
+            time.sleep(random.uniform(0, min(cap, base * 2 ** n)))
+        # 4xx, validation errors, "insufficient funds": never retried</code></pre>
+    </div>
+    <div class="panel">
+      <h3>Rules that prevent retry storms</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>Retry only <b>transient</b> errors, and only <b>idempotent</b> operations (or ones carrying an idempotency key).</li>
+        <li>Retry at <b>one layer</b>. Three layers × 3 attempts = 27 calls per user click.</li>
+        <li>Keep a <b>retry budget</b>: retries may add at most 10% extra load, and once it's spent, fail fast.</li>
+        <li>Honour <code>Retry-After</code> and <code>429</code>. The server knows better than your constant.</li>
+      </ul>
+    </div>
+  </div>
+</section>

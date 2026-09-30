@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Reliability" data-title="Unique IDs at scale">
+  <h2>Generate IDs without a central counter by putting time and machine in the bits</h2>
+  <p class="dek">An auto-increment column works until you have several databases, several regions, or a client that needs an ID before the insert. Distributed ID schemes let every node mint unique IDs with no coordination. The better ones are also roughly <b>time-sortable</b>, which keeps B-tree inserts sequential and makes "latest first" queries cheap.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Snowflake, 64 bits: 1 sign bit, 41 bits of milliseconds since a custom epoch, about 69 years, 10 bits of machine id for 1,024 generators, and 12 bits of sequence for 4,096 ids per millisecond per machine. UUIDv7, 128 bits: 48 bits of Unix milliseconds, 4 version bits, 12 random bits, 2 variant bits and 62 random bits; sortable by time with no coordination. UUIDv4: 122 random bits, unique but not sortable.">
+        <text x="50" y="30" font-size="12" font-weight="600" fill="currentColor">Snowflake · 64 bits</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="50" y="40" width="12.5" height="36" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="62.5" y="40" width="512.5" height="36" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F"></rect><text x="318" y="62">41 bits · ms since custom epoch (~69 years)</text>
+          <rect x="575" y="40" width="125" height="36" fill="#3AA79B" fill-opacity="0.25" stroke="#3AA79B"></rect><text x="637" y="62">10 · machine</text>
+          <rect x="700" y="40" width="150" height="36" fill="#8A94A3" fill-opacity="0.3" stroke="#8A94A3"></rect><text x="775" y="62">12 · sequence</text>
+        </g>
+        <g font-size="9.5" fill="currentColor" opacity="0.75" text-anchor="middle"><text x="56" y="92">0</text><text x="318" y="92">time-ordered prefix</text><text x="637" y="92">1,024 generators</text><text x="775" y="92">4,096 / ms / machine</text></g>
+
+        <text x="50" y="130" font-size="12" font-weight="600" fill="currentColor">UUIDv7 · 128 bits (RFC 9562)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="50" y="140" width="300" height="36" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F"></rect><text x="200" y="162">48 · Unix ms timestamp</text>
+          <rect x="350" y="140" width="25" height="36" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.4"></rect><text x="362" y="162">v</text>
+          <rect x="375" y="140" width="75" height="36" fill="#8A94A3" fill-opacity="0.3" stroke="#8A94A3"></rect><text x="412" y="162">12 rand</text>
+          <rect x="450" y="140" width="12.5" height="36" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="462.5" y="140" width="387.5" height="36" fill="#8A94A3" fill-opacity="0.3" stroke="#8A94A3"></rect><text x="656" y="162">62 · random</text>
+        </g>
+        <text x="450" y="194" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">sortable by creation time · no machine ids to assign · standard type in most databases</text>
+
+        <text x="50" y="228" font-size="12" font-weight="600" fill="currentColor">UUIDv4 · 128 bits</text>
+        <rect x="50" y="238" width="800" height="22" fill="#8A94A3" fill-opacity="0.18" stroke="#8A94A3" stroke-opacity="0.6"></rect>
+        <text x="450" y="253" text-anchor="middle" font-size="10" fill="currentColor">122 random bits: unique, but random order scatters B-tree inserts</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Scheme</th><th>Size</th><th>Sortable</th><th>Coordination</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>DB auto-increment</td><td>8 B</td><td>Yes</td><td>One writer per sequence</td><td>Single point of contention; leaks volume ("order 1,000,017"); hard to merge shards</td></tr>
+        <tr><td>Ticket server / ID ranges</td><td>8 B</td><td>Roughly</td><td>Nodes lease blocks (e.g. 1,000 at a time)</td><td>The allocator must be HA; gaps after crashes (fine)</td></tr>
+        <tr><td>Snowflake-style</td><td>8 B</td><td>Yes (per ms)</td><td>Assign unique machine ids once</td><td>Clock going backwards (wait or refuse); running out of sequence in a hot millisecond</td></tr>
+        <tr><td>UUIDv7</td><td>16 B</td><td>Yes (per ms)</td><td>None</td><td>Twice the size of a long; exposes creation time</td></tr>
+        <tr><td>UUIDv4</td><td>16 B</td><td>No</td><td>None</td><td>Index fragmentation and poor locality on large tables</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">A good default</span>Use UUIDv7 (or ULID) for entity ids: no coordination, and time-ordered, so it's index-friendly. Use a Snowflake-style 64-bit id when size matters at huge volume (tweets, messages). For short <em>public</em> codes (a URL shortener, an order reference), encode a number in base62 and don't make them guessable where that matters (§12).</div>
+</section>

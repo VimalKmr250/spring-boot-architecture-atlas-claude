@@ -1,0 +1,56 @@
+<section class="slide" data-sec="Asynchronism" data-title="Ordering and partition keys">
+  <h2>Order is guaranteed per partition, so key by the thing whose order matters</h2>
+  <p class="dek">A log scales by splitting a topic into partitions that are read in parallel. Order holds <em>within</em> a partition, not across them. Messages with the same key always land in the same partition, so choose the key as the entity whose events must stay in sequence, usually the aggregate id.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="A producer sends order events keyed by order id. Hashing the key sends every event for order 42 to partition 0, order 17 to partition 1 and order 9 to partition 2. Within partition 1, order 17's Created, Paid and Shipped stay in that order. A consumer group of three consumers reads one partition each, in parallel. There is no ordering between partitions.">
+        <rect x="16" y="100" width="110" height="60" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="71" y="124" text-anchor="middle" font-size="11.5" fill="currentColor">Producer</text>
+        <text x="71" y="142" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">key = order_id</text>
+        <rect x="150" y="112" width="92" height="36" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="196" y="134" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">hash(key) % 3</text>
+        <line x1="126" y1="130" x2="147" y2="130" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="242" y1="122" x2="277" y2="62" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="242" y1="130" x2="277" y2="130" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="242" y1="138" x2="277" y2="198" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+
+        <g font-size="10.5" font-weight="600" fill="currentColor"><text x="282" y="42">partition 0</text><text x="282" y="110">partition 1</text><text x="282" y="178">partition 2</text></g>
+        <rect x="280" y="48" width="400" height="30" rx="3" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <rect x="280" y="116" width="400" height="30" rx="3" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <rect x="280" y="184" width="400" height="30" rx="3" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.3"></rect>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="286" y="52" width="110" height="22" rx="3" fill="#8A94A3" fill-opacity="0.3"></rect><text x="341" y="67">42 · Created</text>
+          <rect x="402" y="52" width="110" height="22" rx="3" fill="#8A94A3" fill-opacity="0.3"></rect><text x="457" y="67">42 · Cancelled</text>
+          <rect x="286" y="120" width="110" height="22" rx="3" fill="#D26A3F" fill-opacity="0.3"></rect><text x="341" y="135">17 · Created</text>
+          <rect x="402" y="120" width="110" height="22" rx="3" fill="#D26A3F" fill-opacity="0.3"></rect><text x="457" y="135">17 · Paid</text>
+          <rect x="518" y="120" width="110" height="22" rx="3" fill="#D26A3F" fill-opacity="0.3"></rect><text x="573" y="135">17 · Shipped</text>
+          <rect x="286" y="188" width="110" height="22" rx="3" fill="#3AA79B" fill-opacity="0.3"></rect><text x="341" y="203">9 · Created</text>
+        </g>
+        <line x1="286" y1="160" x2="628" y2="160" stroke="#D26A3F" stroke-width="1.2" marker-end="url(#arwA)"></line>
+        <text x="457" y="174" text-anchor="middle" font-size="9.5" fill="#D26A3F">always read in this order</text>
+
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="740" y="46" width="130" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="805" y="67">consumer 0</text>
+          <rect x="740" y="114" width="130" height="34" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="805" y="135">consumer 1</text>
+          <rect x="740" y="182" width="130" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="805" y="203">consumer 2</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3">
+          <line x1="680" y1="63" x2="737" y2="63" marker-end="url(#arwB)"></line><line x1="680" y1="131" x2="737" y2="131" marker-end="url(#arwB)"></line><line x1="680" y1="199" x2="737" y2="199" marker-end="url(#arwB)"></line>
+        </g>
+        <rect x="732" y="36" width="146" height="190" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="5 4"></rect>
+        <text x="805" y="244" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">consumer group: one partition</text>
+        <text x="805" y="258" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">per consumer at a time</text>
+        <text x="480" y="252" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">no ordering between 42, 17 and 9, and none is needed</text>
+      </svg>
+    </div>
+    <figcaption>Parallelism is capped by the partition count. Three partitions means at most three active consumers in a group, so choose partitions for your peak consumer parallelism. Adding partitions later changes <code>hash % N</code> and breaks per-key ordering during the change.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Choosing the key</h4><p>Key by the entity whose history must be sequential: <code>order_id</code>, <code>account_id</code>, <code>conversation_id</code>. Avoid keys with a few huge values (a tenant with half the traffic), which create a hot partition, and don't key randomly if anything downstream depends on order.</p></div>
+    <div class="card"><h4>How order still breaks</h4><p>Producer retries without idempotence enabled, a consumer that processes one partition with a thread pool, retry topics that re-queue a failed message behind newer ones, and replicas in other regions. Carry a <b>version</b> or sequence number and reject stale updates at the consumer.</p></div>
+    <div class="card"><h4>Global order is expensive</h4><p>Total order over everything means one partition, and so the throughput of one consumer. Almost nothing needs it. When something seems to, it usually needs per-entity order plus a timestamp for display.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="ed" data-slide="Ordering">Events · Ordering</a><a data-deck="ed" data-slide="Partitioning">Events · Partitioning</a></p>
+</section>

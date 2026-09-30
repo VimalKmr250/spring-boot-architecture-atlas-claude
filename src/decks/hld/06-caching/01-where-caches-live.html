@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Caching" data-title="Where caches live">
+  <h2>Caches sit at every layer, and the earliest hit is the cheapest</h2>
+  <p class="dek">A cache keeps a copy of expensive-to-get data somewhere faster. Between the user and the database there are half a dozen places to keep that copy, each closer, faster and less consistent than the one behind it. A good design caches each kind of data at the earliest layer where its freshness requirements still hold.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Layers from the client to the database: browser or app cache, zero milliseconds; CDN edge, about 10 to 30 ms; reverse proxy cache, about 1 ms; in-process application cache, microseconds; distributed cache such as Redis, about 0.5 ms; database buffer pool, then disk. Each hit stops the request going further. Earlier layers are faster and more stale; later layers are fresher and more expensive.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="60" width="125" height="70" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="72" y="86" font-weight="600">Client</text><text x="72" y="102" font-size="9.5" opacity="0.7">browser / app cache</text><text x="72" y="118" font-size="9.5" fill="#3AA79B">~0 ms</text>
+          <rect x="155" y="60" width="125" height="70" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="217" y="86" font-weight="600">CDN edge</text><text x="217" y="102" font-size="9.5" opacity="0.7">static, public GETs</text><text x="217" y="118" font-size="9.5" fill="#3AA79B">~10–30 ms</text>
+          <rect x="300" y="60" width="125" height="70" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="362" y="86" font-weight="600">Reverse proxy</text><text x="362" y="102" font-size="9.5" opacity="0.7">whole responses</text><text x="362" y="118" font-size="9.5" fill="#3AA79B">~1 ms</text>
+          <rect x="445" y="60" width="125" height="70" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="507" y="86" font-weight="600">In-process</text><text x="507" y="102" font-size="9.5" opacity="0.7">Caffeine, a map</text><text x="507" y="118" font-size="9.5" fill="#3AA79B">~µs</text>
+          <rect x="590" y="60" width="140" height="70" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+          <text x="660" y="86" font-weight="600">Distributed cache</text><text x="660" y="102" font-size="9.5" opacity="0.7">Redis · Memcached</text><text x="660" y="118" font-size="9.5" fill="#3AA79B">~0.5 ms</text>
+        </g>
+        <path d="M770 66 a55 7 0 0 1 110 0 v58 a55 7 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M770 66 a55 7 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="825" y="96" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Database</text>
+        <text x="825" y="112" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">buffer pool → disk</text>
+        <text x="825" y="126" text-anchor="middle" font-size="9.5" fill="#D26A3F">1–10+ ms</text>
+        <g stroke="#D26A3F" stroke-width="1.4">
+          <line x1="135" y1="95" x2="152" y2="95" marker-end="url(#arwA)"></line><line x1="280" y1="95" x2="297" y2="95" marker-end="url(#arwA)"></line>
+          <line x1="425" y1="95" x2="442" y2="95" marker-end="url(#arwA)"></line><line x1="570" y1="95" x2="587" y2="95" marker-end="url(#arwA)"></line>
+          <line x1="730" y1="95" x2="767" y2="95" marker-end="url(#arwA)"></line>
+        </g>
+        <text x="450" y="36" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.8">a request continues right only on a miss</text>
+
+        <defs>
+          <linearGradient id="hldFresh" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#3AA79B" stop-opacity="0.55"></stop><stop offset="1" stop-color="#D26A3F" stop-opacity="0.55"></stop>
+          </linearGradient>
+        </defs>
+        <rect x="10" y="160" width="870" height="14" rx="7" fill="url(#hldFresh)"></rect>
+        <text x="10" y="194" font-size="10.5" fill="#3AA79B">faster · cheaper per hit · more stale · harder to invalidate</text>
+        <text x="880" y="194" text-anchor="end" font-size="10.5" fill="#D26A3F">slower · costlier · fresher · the source of truth</text>
+
+        <g font-size="10" fill="currentColor" opacity="0.8" text-anchor="middle">
+          <text x="72" y="228">Cache-Control,</text><text x="72" y="242">ETag, offline data</text>
+          <text x="217" y="228">images, JS, video,</text><text x="217" y="242">public API GETs</text>
+          <text x="362" y="228">rendered pages,</text><text x="362" y="242">anonymous traffic</text>
+          <text x="507" y="228">config, hot keys,</text><text x="507" y="242">tiny reference data</text>
+          <text x="660" y="228">sessions, profiles,</text><text x="660" y="242">computed results, feeds</text>
+          <text x="825" y="228">hot pages in RAM</text><text x="825" y="242">automatically</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>A cache helps in proportion to its <b>hit ratio</b> and the cost of a miss. At 95% hits, the database sees 5% of reads, a 20× reduction. At 99% it sees 1%, so the step from 95% to 99% is another 5×. Measure hit ratio per cache and per key pattern; a cache sitting at 30% hits is usually adding latency and cost for nothing.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>What is worth caching</h4><p>Data that is read far more often than it's written, is expensive to compute or fetch, and can tolerate some staleness. Classic examples: product pages, user profiles, rendered feeds, permission sets, and the results of heavy aggregations.</p></div>
+    <div class="card"><h4>What isn't</h4><p>Data that must be exact at the moment you read it: balances at payment time, stock at checkout, a password hash during login. Also anything with a unique key per request (a near-zero hit ratio), and data cheaper to recompute than to fetch over the network.</p></div>
+    <div class="card"><h4>In-process vs distributed</h4><p>In-process is the fastest, but each instance holds its own copy, so N servers keep N inconsistent copies and N times the memory. Use it for tiny, slow-changing data or a 1–5 s shield in front of hot keys. Use a distributed cache for everything that must be shared or larger than one heap.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Caching">Deck · Caching</a></p>
+</section>

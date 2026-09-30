@@ -1,0 +1,82 @@
+<section class="slide" data-sec="Caching" data-title="Cache-aside and read-through">
+  <h2>On a miss, someone has to load from the database: your code or the cache</h2>
+  <p class="dek"><b>Cache-aside</b> (lazy loading) is the default. The application checks the cache, reads the database on a miss, and fills the cache itself. <b>Read-through</b> moves that loading logic into the cache layer, so the application only ever talks to the cache. Both load only what is actually requested, so the cache fills with the hot set.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Cache-aside: the app gets key k from the cache and misses; the app reads the row from the database; the app sets k in the cache with a TTL; the app returns the value. Next time the get hits. Read-through: the app asks the cache for k; on a miss the cache calls its loader, which reads the database; the cache stores the value and returns it to the app.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Cache-aside</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="30" width="90" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="65" y="50">App</text>
+          <rect x="170" y="30" width="90" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="215" y="50">Cache</text>
+          <rect x="320" y="30" width="90" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="365" y="50">DB</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="65" y1="60" x2="65" y2="270"></line><line x1="215" y1="60" x2="215" y2="270"></line><line x1="365" y1="60" x2="365" y2="270"></line></g>
+        <line x1="65" y1="84" x2="211" y2="84" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="140" y="78" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">① GET k</text>
+        <line x1="215" y1="104" x2="69" y2="104" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <text x="140" y="118" text-anchor="middle" font-size="10" fill="#D26A3F">miss (nil)</text>
+        <line x1="65" y1="140" x2="361" y2="140" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="290" y="134" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">② SELECT … WHERE id=k</text>
+        <line x1="365" y1="160" x2="69" y2="160" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="290" y="174" text-anchor="middle" font-size="10" fill="currentColor">row</text>
+        <line x1="65" y1="196" x2="211" y2="196" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <text x="140" y="190" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">③ SET k v EX 300</text>
+        <text x="65" y="226" text-anchor="middle" font-size="10" fill="currentColor">④ return v</text>
+        <text x="215" y="258" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">the app owns the logic; next GET k is a hit</text>
+
+        <line x1="450" y1="10" x2="450" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Read-through</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="30" width="90" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="515" y="50">App</text>
+          <rect x="610" y="30" width="130" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="675" y="50">Cache + loader</text>
+          <rect x="790" y="30" width="90" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="835" y="50">DB</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="515" y1="60" x2="515" y2="270"></line><line x1="675" y1="60" x2="675" y2="270"></line><line x1="835" y1="60" x2="835" y2="270"></line></g>
+        <line x1="515" y1="84" x2="671" y2="84" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="595" y="78" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">① get(k)</text>
+        <rect x="669" y="96" width="12" height="100" fill="#D26A3F" fill-opacity="0.2"></rect>
+        <text x="662" y="116" text-anchor="end" font-size="10" fill="#D26A3F">miss</text>
+        <line x1="681" y1="130" x2="831" y2="130" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="756" y="124" text-anchor="middle" font-size="10" fill="currentColor">② loader reads</text>
+        <line x1="835" y1="152" x2="685" y2="152" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="756" y="166" text-anchor="middle" font-size="10" fill="currentColor">row</text>
+        <text x="690" y="190" font-size="10" fill="#3AA79B">③ store</text>
+        <line x1="675" y1="214" x2="519" y2="214" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <text x="595" y="208" text-anchor="middle" font-size="10" fill="currentColor">④ v</text>
+        <text x="675" y="258" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">app code sees one call; loading is centralised</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">cache-aside, the whole pattern</div>
+<pre><code class="language-python">def get_profile(user_id):
+    key = f"profile:{user_id}"
+    cached = redis.get(key)
+    if cached is not None:
+        return deserialize(cached)            # hit
+    row = db.query("SELECT … FROM profiles WHERE id = %s", user_id)
+    if row is None:
+        redis.set(key, NOT_FOUND, ex=60)      # cache the miss too
+        return None
+    redis.set(key, serialize(row), ex=300 + random.randint(0, 60))
+    return row
+
+def update_profile(user_id, changes):
+    db.update(user_id, changes)               # 1. write the truth
+    redis.delete(f"profile:{user_id}")        # 2. then invalidate, don't update</code></pre>
+    </div>
+    <div class="panel">
+      <h3>Trade-offs to state</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Resilient:</b> if the cache dies, reads fall through to the database. That is slower but still correct, provided the database can take it.</li>
+        <li><b>First request is slow:</b> every miss costs a cache round trip plus a database read. Warm critical keys at deploy time.</li>
+        <li><b>Stale window:</b> data can be stale until the TTL expires or an invalidation lands. Pick the TTL from how stale the business can tolerate.</li>
+        <li>The random extra TTL (jitter) stops thousands of keys set together from expiring together.</li>
+      </ul>
+    </div>
+  </div>
+</section>

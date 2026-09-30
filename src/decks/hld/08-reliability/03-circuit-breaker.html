@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Reliability" data-title="Circuit breaker">
+  <h2>Stop calling a dependency that is failing, and check back later</h2>
+  <p class="dek">A circuit breaker wraps calls to one dependency and watches their outcomes. When failures or slow calls cross a threshold, it <b>opens</b> and fails subsequent calls immediately, without making them. That protects the caller's threads and gives the dependency room to recover. After a cool-down it lets a few trial calls through to see whether the dependency is healthy again.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="State machine. Closed: calls pass through and outcomes are recorded. When the failure or slow-call rate reaches 50 percent of the last 20 calls, it moves to Open, where calls fail fast to a fallback without being made. After a 30-second wait it moves to Half-open and lets a few trial calls through. If they succeed it returns to Closed; if one fails it goes back to Open.">
+        <circle cx="170" cy="140" r="62" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.8"></circle>
+        <text x="170" y="136" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">CLOSED</text>
+        <text x="170" y="154" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">normal</text>
+        <circle cx="730" cy="140" r="62" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.8"></circle>
+        <text x="730" y="136" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">OPEN</text>
+        <text x="730" y="154" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">fail fast</text>
+        <circle cx="450" cy="250" r="52" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.6"></circle>
+        <text x="450" y="247" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">HALF-OPEN</text>
+        <text x="450" y="264" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">probing</text>
+
+        <line x1="232" y1="126" x2="665" y2="126" stroke="#D26A3F" stroke-width="1.7" marker-end="url(#arwA)"></line>
+        <text x="450" y="110" text-anchor="middle" font-size="11" fill="currentColor">failure or slow-call rate ≥ 50% over the last 20 calls</text>
+        <line x1="690" y1="188" x2="500" y2="238" stroke="#8A94A3" stroke-width="1.5" marker-end="url(#arw)"></line>
+        <text x="648" y="236" font-size="10.5" fill="currentColor">wait 30 s</text>
+        <line x1="400" y1="236" x2="214" y2="186" stroke="#3AA79B" stroke-width="1.7" marker-end="url(#arwB)"></line>
+        <text x="200" y="236" font-size="10.5" fill="#3AA79B">5 trial calls succeed</text>
+        <path d="M500 262 Q 700 310 740 205" fill="none" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwA)"></path>
+        <text x="690" y="296" font-size="10.5" fill="#D26A3F">a trial fails</text>
+
+        <path d="M148 80 C 120 30, 220 30, 192 80" fill="none" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <text x="170" y="26" text-anchor="middle" font-size="10.5" fill="currentColor">call passes, outcome recorded</text>
+        <path d="M708 80 C 680 30, 780 30, 752 80" fill="none" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></path>
+        <text x="730" y="26" text-anchor="middle" font-size="10.5" fill="currentColor">no call made → fallback in µs</text>
+      </svg>
+    </div>
+    <figcaption>The breaker's real value is what happens while it is open. Without it, every request would wait out the full timeout on a dead dependency, and 200 threads × 2 s timeouts is a caller that can no longer serve anything else.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Choose the fallback first</h4><p>An open breaker is only as good as what you return instead: a cached or default value ("recommended for you" becomes "bestsellers"), a degraded response ("shipping estimate unavailable"), a queued write ("we'll confirm by email"), or, for critical paths, a clear, fast error.</p></div>
+    <div class="card"><h4>Tune per dependency</h4><p>Base the window and threshold on each dependency's normal error rate. Count slow calls as failures, not just errors. Use one breaker per dependency (or per endpoint), never one for the whole application. Emit state changes as metrics and alert when a breaker opens.</p></div>
+    <div class="card"><h4>Where it lives</h4><p>In-process libraries (Resilience4j, Polly) or in the mesh (Envoy's outlier detection ejects bad hosts from the pool). Combine it with timeouts, which bound each call; retries, which go inside the breaker; and bulkheads, which bound concurrency.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Resilience">Deck · Resilience</a></p>
+</section>

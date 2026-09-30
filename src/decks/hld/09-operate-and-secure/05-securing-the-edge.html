@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Operate & secure" data-title="Securing the edge">
+  <h2>Defence in depth: every layer assumes the one in front of it failed</h2>
+  <p class="dek">Security in an HLD answer is a set of layers, each stopping a different class of attack. Volumetric floods stop at the edge, malicious payloads at the WAF, and unauthenticated calls at the gateway. Unauthorised access to someone else's data is stopped in the service, and a stolen disk is useless because the data is encrypted. Naming each layer and what it blocks is what interviewers are looking for.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Nested layers from outside in: DDoS absorption by anycast and CDN scrubbing; a web application firewall with OWASP rules, bot management and rate limits; TLS everywhere; an API gateway acting as gatekeeper, authenticating tokens and enforcing quotas; services checking object-level authorization and validating input; and data encrypted at rest with keys in a KMS and least-privilege database roles. On the right, the valet key pattern: the app issues a short-lived, scoped token, and the client talks to storage directly.">
+        <rect x="10" y="14" width="600" height="266" rx="14" fill="#D26A3F" fill-opacity="0.04" stroke="#D26A3F" stroke-opacity="0.45"></rect>
+        <rect x="40" y="46" width="540" height="226" rx="12" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-opacity="0.55"></rect>
+        <rect x="70" y="78" width="480" height="186" rx="10" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="100" y="110" width="420" height="146" rx="10" fill="#3AA79B" fill-opacity="0.05" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <rect x="130" y="142" width="360" height="106" rx="8" fill="#3AA79B" fill-opacity="0.07" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+        <rect x="160" y="174" width="300" height="66" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <g font-size="10.5" fill="currentColor">
+          <text x="24" y="34" font-weight="600">① DDoS: anycast + CDN scrubbing absorb volumetric floods</text>
+          <text x="54" y="66" font-weight="600">② WAF: OWASP rules, bot management, IP reputation, rate limits</text>
+          <text x="84" y="98" font-weight="600">③ TLS everywhere: edge, and mTLS inside</text>
+          <text x="114" y="130" font-weight="600">④ Gateway = gatekeeper: authN, quotas, size limits</text>
+          <text x="144" y="162" font-weight="600">⑤ Service: object-level authZ, input validation</text>
+          <text x="174" y="196" font-weight="600">⑥ Data: encrypted at rest (KMS),</text>
+          <text x="174" y="212" font-weight="600">least-privilege DB roles, PII tokenised</text>
+          <text x="174" y="230" opacity="0.75">audit log of every access</text>
+        </g>
+
+        <text x="760" y="30" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Valet key</text>
+        <rect x="650" y="46" width="90" height="36" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="695" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">Client</text>
+        <rect x="790" y="46" width="96" height="36" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="838" y="68" text-anchor="middle" font-size="10.5" fill="currentColor">App</text>
+        <path d="M690 180 a50 6 0 0 1 100 0 v40 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M690 180 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="740" y="206" text-anchor="middle" font-size="10.5" fill="currentColor">Storage</text>
+        <line x1="740" y1="58" x2="787" y2="58" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="787" y1="72" x2="743" y2="72" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="760" y="104" text-anchor="middle" font-size="9.5" fill="#D26A3F">scoped token: 1 key,</text>
+        <text x="760" y="118" text-anchor="middle" font-size="9.5" fill="#D26A3F">PUT only, 10 min</text>
+        <line x1="695" y1="82" x2="715" y2="172" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <text x="668" y="150" font-size="9.5" fill="#3AA79B">direct</text>
+        <text x="760" y="252" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">least privilege for one operation,</text>
+        <text x="760" y="266" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">and the bytes bypass your servers</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Secrets</h4><p>No secrets in code, images or environment files in git. Use a secrets manager (Vault, a cloud secrets manager) with short-lived, automatically rotated credentials, and workload identity instead of static keys wherever the platform supports it.</p></div>
+    <div class="card"><h4>Zero trust inside</h4><p>A request from inside the network is not trusted for that reason alone. Every service authenticates its callers (mTLS), authorises each call, and logs it. Segment the network so that a compromised pod can't reach the database of another domain.</p></div>
+    <div class="card"><h4>Privacy by design</h4><p>Collect less. Keep PII in a few well-guarded stores and pass references or tokens elsewhere. Encrypt sensitive fields at the application level. Build deletion (GDPR erasure) into the design from the start, including caches, search indexes, logs and backups.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Privacy by design">Deck · Privacy by design</a><a data-deck="deck" data-slide="Config and secrets">Deck · Config and secrets</a></p>
+</section>

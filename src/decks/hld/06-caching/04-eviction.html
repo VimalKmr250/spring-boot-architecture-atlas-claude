@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Caching" data-title="Eviction policies">
+  <h2>A full cache must forget something; the policy decides what</h2>
+  <p class="dek">Memory is finite, so a cache evicts entries to make room. The policy is a bet about the future. <b>LRU</b> bets that recently used items will be used again, <b>LFU</b> that frequently used ones will, and <b>TTL</b> expiry that data goes bad after a while regardless. The best policy depends on the access pattern, which is why it's measured, not guessed.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="LRU: a hash map points into a doubly linked list ordered from most recently used at the head to least recently used at the tail. A GET of k9 moves it to the head in constant time; inserting when full evicts k4 at the tail. LFU: per-key hit counters; the key with the fewest hits, k5 with 2, is evicted even if it was used recently.">
+        <text x="300" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">LRU: hash map + doubly linked list, O(1) everything</text>
+        <rect x="20" y="40" width="90" height="170" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="58" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">hash map</text>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="34" y="84">k2 →</text><text x="34" y="112">k4 →</text><text x="34" y="140">k7 →</text><text x="34" y="168">k9 →</text></g>
+
+        <text x="195" y="152" text-anchor="middle" font-size="10" fill="#3AA79B">head (MRU)</text>
+        <text x="495" y="152" text-anchor="middle" font-size="10" fill="#D26A3F">tail (LRU)</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="160" y="100" width="70" height="36" rx="5" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-width="1.3"></rect><text x="195" y="123">k7</text>
+          <rect x="260" y="100" width="70" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="295" y="123">k2</text>
+          <rect x="360" y="100" width="70" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="395" y="123">k9</text>
+          <rect x="460" y="100" width="70" height="36" rx="5" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.3"></rect><text x="495" y="123">k4</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.1">
+          <line x1="230" y1="112" x2="258" y2="112" marker-end="url(#arw)"></line><line x1="258" y1="124" x2="232" y2="124" marker-end="url(#arw)"></line>
+          <line x1="330" y1="112" x2="358" y2="112" marker-end="url(#arw)"></line><line x1="358" y1="124" x2="332" y2="124" marker-end="url(#arw)"></line>
+          <line x1="430" y1="112" x2="458" y2="112" marker-end="url(#arw)"></line><line x1="458" y1="124" x2="432" y2="124" marker-end="url(#arw)"></line>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-width="1">
+          <path d="M84 80 C 130 80, 240 70, 290 98" fill="none"></path>
+          <path d="M84 108 C 150 150, 420 170, 490 138" fill="none"></path>
+          <path d="M84 136 C 120 130, 150 120, 160 118" fill="none"></path>
+          <path d="M84 164 C 200 190, 360 170, 392 138" fill="none"></path>
+        </g>
+        <path d="M395 100 C 380 60, 230 60, 205 96" fill="none" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></path>
+        <text x="300" y="58" text-anchor="middle" font-size="10" fill="#3AA79B">GET k9 → unlink, move to head</text>
+        <line x1="530" y1="118" x2="580" y2="118" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="586" y="114" font-size="10" fill="#D26A3F">full? evict</text>
+        <text x="586" y="128" font-size="10" fill="#D26A3F">the tail</text>
+        <text x="300" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">every access: O(1) map lookup + O(1) relink; eviction: pop the tail</text>
+        <text x="300" y="250" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">(Redis approximates this by sampling a few keys and evicting the oldest)</text>
+
+        <line x1="660" y1="14" x2="660" y2="270" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="775" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">LFU: count the hits</text>
+        <line x1="690" y1="210" x2="870" y2="210" stroke="currentColor" stroke-opacity="0.4"></line>
+        <g>
+          <rect x="700" y="70" width="30" height="140" fill="#3AA79B" fill-opacity="0.55"></rect>
+          <rect x="745" y="120" width="30" height="90" fill="#3AA79B" fill-opacity="0.55"></rect>
+          <rect x="790" y="150" width="30" height="60" fill="#3AA79B" fill-opacity="0.55"></rect>
+          <rect x="835" y="196" width="30" height="14" fill="#D26A3F" fill-opacity="0.75"></rect>
+        </g>
+        <g font-size="10" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="715" y="226">k1</text><text x="760" y="226">k3</text><text x="805" y="226">k8</text><text x="850" y="226">k5</text>
+          <text x="715" y="64">41</text><text x="760" y="114">26</text><text x="805" y="144">17</text><text x="850" y="190">2</text>
+        </g>
+        <text x="775" y="248" text-anchor="middle" font-size="10" fill="#D26A3F">evict k5, even if it was just used</text>
+        <text x="775" y="264" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">counters decay so old stars can fade</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Policy</th><th>Evicts</th><th>Good when</th><th>Fails when</th></tr></thead>
+      <tbody>
+        <tr><td>LRU</td><td>Least recently used</td><td>Recency predicts reuse (sessions, feeds, most web traffic)</td><td>A one-off scan (a batch job, a crawler) flushes the hot set</td></tr>
+        <tr><td>LFU</td><td>Least frequently used</td><td>Stable popularity (top products, reference data)</td><td>Popularity shifts and old counts linger, unless counters decay</td></tr>
+        <tr><td>FIFO</td><td>Oldest inserted</td><td>Simplicity; data that ages uniformly</td><td>Hot old keys get evicted anyway</td></tr>
+        <tr><td>TTL expiry</td><td>Anything past its time to live</td><td>Freshness bounds ("prices at most 60 s old")</td><td>Used as the only policy: memory still fills</td></tr>
+        <tr><td>Random</td><td>A random key</td><td>Huge caches where bookkeeping costs more than precision</td><td>Small caches with a clear hot set</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><span class="lbl">In Redis terms</span>Set <code>maxmemory</code> and a policy. <code>allkeys-lru</code> or <code>allkeys-lfu</code> for a pure cache. <code>volatile-lru</code> or <code>volatile-ttl</code> when the same instance also holds keys that must not be evicted (it then evicts only keys with a TTL). And never <code>noeviction</code> for a cache: once memory is full, writes start failing. Watch <code>evicted_keys</code> and the hit ratio together.</div>
+</section>
