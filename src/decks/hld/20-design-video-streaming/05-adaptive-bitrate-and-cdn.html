@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: adaptive bitrate and the CDN">
+  <h2>Deep dive 2: the player adapts every few seconds, and the CDN keeps the popular head close</h2>
+  <p class="dek">Smooth playback comes from two cooperating pieces. On the client, an ABR algorithm chooses the rendition for each next segment from measured throughput and how much video is buffered. In the network, a tiered CDN serves the few popular videos, which get most of the views, from caches near the viewer, and fetches the long tail on demand.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Left: adaptive bitrate over time. Throughput starts high, drops sharply as if entering a tunnel, then recovers. The player starts at 240p for a fast first frame and climbs to 480p, 720p and 1080p as the buffer fills. When throughput drops it steps down to 480p then 240p, letting the buffer drain but not empty, then climbs back to 720p and 1080p as throughput recovers. Right: CDN tiers carry bytes from origin through a few regional shields to hundreds of edge locations and caches embedded in ISPs, near viewers. Popularity follows a long tail: a few percent of videos get most views and are served from the edge, pre-positioned off-peak; the long tail is fetched on demand from the shield or origin.">
+        <text x="225" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">ABR: the player decides per segment</text>
+        <g font-size="8.5" fill="currentColor"><rect x="60" y="24" width="12" height="8" fill="#8A94A3" fill-opacity="0.4"></rect><text x="76" y="32">throughput</text><line x1="150" y1="28" x2="170" y2="28" stroke="#D26A3F" stroke-width="2"></line><text x="174" y="32">chosen rendition</text><line x1="270" y1="28" x2="290" y2="28" stroke="#3AA79B" stroke-width="2"></line><text x="294" y="32">buffer</text></g>
+        <polygon points="40,42 150,42 170,75 185,125 240,128 262,95 285,46 430,42 430,150 40,150" fill="#8A94A3" fill-opacity="0.25"></polygon>
+        <line x1="40" y1="150" x2="430" y2="150" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2 3"><line x1="40" y1="60" x2="430" y2="60"></line><line x1="40" y1="90" x2="430" y2="90"></line><line x1="40" y1="115" x2="430" y2="115"></line><line x1="40" y1="135" x2="430" y2="135"></line></g>
+        <path d="M40 135 H66 V115 H92 V90 H118 V60 H196 V115 H222 V135 H248 V115 H274 V90 H300 V60 H430" fill="none" stroke="#D26A3F" stroke-width="2.2"></path>
+        <g font-size="8" fill="currentColor" text-anchor="end" opacity="0.8"><text x="36" y="63">1080p</text><text x="36" y="93">720p</text><text x="36" y="118">480p</text><text x="36" y="138">240p</text><text x="36" y="200">buffer</text></g>
+        <line x1="40" y1="222" x2="430" y2="222" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="40" y1="206" x2="430" y2="206" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="4 3"></line>
+        <text x="430" y="216" text-anchor="end" font-size="8" fill="#D26A3F">panic level</text>
+        <polyline points="40,220 118,190 170,178 196,186 222,198 248,202 274,196 300,188 430,176" fill="none" stroke="#3AA79B" stroke-width="2"></polyline>
+        <text x="225" y="244" text-anchor="middle" font-size="9.5" fill="currentColor">start low for a fast first frame; climb as the buffer fills</text>
+        <text x="225" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">step down before the buffer empties: a softer picture beats a spinner</text>
+
+        <line x1="450" y1="10" x2="450" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">CDN: bring the bytes close, cache the head</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="468" y="34" width="80" height="40" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="508" y="51">origin</text><text x="508" y="64" font-size="8" opacity="0.75">object storage</text>
+          <rect x="568" y="34" width="90" height="40" rx="4" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F"></rect><text x="613" y="51">shields</text><text x="613" y="64" font-size="8" opacity="0.75">a few regions</text>
+          <rect x="678" y="34" width="95" height="40" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.3"></rect><text x="725" y="51">edge PoPs</text><text x="725" y="64" font-size="8" opacity="0.75">hundreds</text>
+          <rect x="793" y="34" width="92" height="40" rx="4" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.5"></rect><text x="839" y="51">in-ISP caches</text><text x="839" y="64" font-size="8" opacity="0.75">next to viewers</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.4"><line x1="548" y1="54" x2="565" y2="54" marker-end="url(#arwA)"></line><line x1="658" y1="54" x2="675" y2="54" marker-end="url(#arwA)"></line><line x1="773" y1="54" x2="790" y2="54" marker-end="url(#arwA)"></line></g>
+        <polygon points="480,112 500,130 520,152 540,170 560,182 560,210 480,210" fill="#D26A3F" fill-opacity="0.35"></polygon>
+        <polygon points="560,182 600,194 650,200 720,204 800,206 880,207 880,210 560,210" fill="#3AA79B" fill-opacity="0.25"></polygon>
+        <polyline points="480,112 500,130 520,152 540,170 560,182 600,194 650,200 720,204 800,206 880,207" fill="none" stroke="currentColor" stroke-opacity="0.6" stroke-width="1.3"></polyline>
+        <line x1="480" y1="210" x2="880" y2="210" stroke="currentColor" stroke-opacity="0.45"></line>
+        <text x="568" y="132" font-size="9" fill="#D26A3F" font-weight="600">head: a few % of videos,</text>
+        <text x="568" y="145" font-size="9" fill="#D26A3F">most of the views → edge + ISP</text>
+        <text x="720" y="192" font-size="9" fill="#3AA79B">long tail → shield / origin on demand</text>
+        <text x="880" y="224" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">videos ranked by popularity →</text>
+        <text x="675" y="246" text-anchor="middle" font-size="9.5" fill="currentColor">pre-position tomorrow's hits overnight, off-peak</text>
+        <text x="675" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">a first-view miss on a rare video is acceptable</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>ABR algorithms</h4><p>Throughput-based algorithms pick the highest bitrate below the recent measured throughput, with a safety margin. Buffer-based ones (BOLA) pick from buffer occupancy, which is more stable. Production players blend both and add switch penalties so quality doesn't oscillate every segment.</p></div>
+    <div class="card"><h4>Start fast</h4><p>Time to first frame is what users notice. Fetch the manifest while the title card shows, start at a low rendition with short first segments, preconnect to the CDN host, and serve the first seconds of popular videos from the edge.</p></div>
+    <div class="card"><h4>Multi-CDN</h4><p>At tens of Tbps, one CDN is both a single point of failure and a weak negotiating position. Steer each session to a CDN by measured performance and cost, and fail over mid-stream. Segments are plain files, so any CDN can serve them.</p></div>
+  </div>
+</section>

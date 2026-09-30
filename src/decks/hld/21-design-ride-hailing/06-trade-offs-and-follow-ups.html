@@ -1,0 +1,56 @@
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: trade-offs and follow-ups">
+  <h2>Cities are natural cells, and surge pricing is a control loop you must damp</h2>
+  <p class="dek">Almost every ride starts and ends in one metro area. That makes the city the natural unit of sharding and of failure: each city (or cluster of small cities) runs its own location, matching and trip stack, and only accounts, payments and analytics are global. The other thing interviewers probe is surge pricing, a feedback loop between price, demand and supply that oscillates if nobody damps it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: an edge router routes each request by pickup location to a city cell: San Francisco, New York or London. Each cell has its own gateway and location service, geo index and matching, and trips database. Global services are accounts, payments, pricing rules and asynchronous analytics. A bad deploy or database failure affects one city, not everywhere; a trip crossing a border belongs to the pickup city. Right: surge as a control loop. Demand per hexagon, requests per minute, and supply per hexagon, free drivers, feed a surge job that computes a multiplier per hexagon every minute. Riders see the price, and some wait or walk, reducing demand. Drivers see a heat map and move toward demand, increasing supply. Damp it with smoothing and caps or prices oscillate.">
+        <text x="220" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Shard by city: each city is a cell</text>
+        <rect x="140" y="32" width="160" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="220" y="48" text-anchor="middle" font-size="10" fill="currentColor">edge router</text><text x="220" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">by pickup location</text>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="180" y1="68" x2="90" y2="97" marker-end="url(#arw)"></line><line x1="220" y1="68" x2="220" y2="97" marker-end="url(#arw)"></line><line x1="260" y1="68" x2="350" y2="97" marker-end="url(#arw)"></line></g>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="22" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="87" y="118" font-size="10" font-weight="600">San Francisco</text><text x="87" y="138">gateway · location</text><text x="87" y="154">geo index · matching</text><text x="87" y="170">trips DB</text><text x="87" y="188" opacity="0.7">+ replicas in 2 AZs</text>
+          <rect x="155" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="220" y="118" font-size="10" font-weight="600">New York</text><text x="220" y="138">gateway · location</text><text x="220" y="154">geo index · matching</text><text x="220" y="170">trips DB</text><text x="220" y="188" opacity="0.7">+ replicas in 2 AZs</text>
+          <rect x="288" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="353" y="118" font-size="10" font-weight="600">London</text><text x="353" y="138">gateway · location</text><text x="353" y="154">geo index · matching</text><text x="353" y="170">trips DB</text><text x="353" y="188" opacity="0.7">EU data residency</text>
+        </g>
+        <rect x="22" y="212" width="396" height="28" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="220" y="230" text-anchor="middle" font-size="9.5" fill="currentColor">global: accounts · payments · pricing rules · analytics (async)</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">a bad deploy or DB failure hits one city, not the planet</text>
+        <text x="220" y="280" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">a trip across a city boundary belongs to the pickup city</text>
+
+        <line x1="440" y1="10" x2="440" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Surge pricing is a control loop</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="34" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="545" y="51">demand per hex</text><text x="545" y="65" font-size="8.5" opacity="0.75">requests / min</text>
+          <rect x="730" y="34" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="805" y="51">supply per hex</text><text x="805" y="65" font-size="8.5" opacity="0.75">free drivers</text>
+          <rect x="590" y="106" width="170" height="46" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="675" y="125" font-weight="600">surge job</text><text x="675" y="140" font-size="8.5">multiplier per hex, every minute</text>
+          <rect x="470" y="186" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="545" y="203">riders see price</text><text x="545" y="217" font-size="8.5" opacity="0.8">some wait or walk</text>
+          <rect x="730" y="186" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="805" y="203">drivers see heat map</text><text x="805" y="217" font-size="8.5" opacity="0.8">move toward demand</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.4"><line x1="560" y1="74" x2="620" y2="103" marker-end="url(#arwA)"></line><line x1="790" y1="74" x2="730" y2="103" marker-end="url(#arwA)"></line><line x1="630" y1="152" x2="575" y2="183" marker-end="url(#arwA)"></line><line x1="720" y1="152" x2="775" y2="183" marker-end="url(#arwA)"></line></g>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="490" y1="186" x2="490" y2="77" marker-end="url(#arwB)"></line><line x1="860" y1="186" x2="860" y2="77" marker-end="url(#arwB)"></line></g>
+        <g font-size="8.5" fill="#3AA79B"><text x="484" y="134" text-anchor="end">less</text><text x="484" y="146" text-anchor="end">demand</text><text x="866" y="134">more</text><text x="866" y="146">supply</text></g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">damp it (smoothing, caps, hysteresis) or prices oscillate</text>
+        <text x="675" y="274" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">computed from the location and request streams, not the trips DB</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Shared rides</td><td>Matching becomes route insertion: add a rider to a moving trip only if every passenger's detour stays under a limit.</td></tr>
+          <tr><td>Accurate ETAs</td><td>A routing engine over a road graph with live traffic (contraction hierarchies for speed), corrected by ML trained on past trips.</td></tr>
+          <tr><td>GPS spoofing</td><td>Reject impossible speeds and teleports, cross-check with network location, and use device attestation.</td></tr>
+          <tr><td>Payment</td><td>Authorise an estimate at request time, capture the final fare at completion; tips are a separate later capture.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Drivers stream locations over sockets into a per-city in-memory cell index and a Kafka stream. Matching reads nearby cells, ranks candidates by road ETA, and offers under a short lock. The trip is a state machine whose assignment is a guarded write with one active trip per driver. Cities are cells, so failures stay local, and surge is a damped loop fed by the streams."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Cells and deployment stamps">HLD · Cells and deployment stamps</a><a data-deck="hld" data-slide="Polling, SSE and WebSockets">HLD · Polling, SSE and WebSockets</a></p>
+</section>

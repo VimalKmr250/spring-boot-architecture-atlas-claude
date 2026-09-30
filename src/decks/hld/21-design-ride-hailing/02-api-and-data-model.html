@@ -1,0 +1,54 @@
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: API and data model">
+  <h2>Locations stream in over a persistent connection; trips are guarded rows</h2>
+  <p class="dek">Drivers push a location every few seconds, so use a long-lived connection (WebSocket or MQTT) rather than a new HTTPS request each time. Riders create a trip with one idempotent POST and then receive updates by push. The data splits along the ephemeral/durable line: locations are latest-value-wins data with a TTL, and trips are transactional rows with a status and a version.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http"># driver app: one persistent connection, a message every ~4 s
+WS  /v1/driver/stream   → { "lat": 37.7749, "lng": -122.4194,
+                            "heading": 90, "seq": 1841, "ts": … }
+                        ← { "type": "offer", "offerId": "of_3", "ttl": 10 }
+
+POST /v1/rides   Idempotency-Key: 5d1e…
+{ "pickup": {…}, "dropoff": {…}, "product": "standard" }
+→ 202 { "rideId": "r_77", "status": "MATCHING" }
+
+POST /v1/offers/of_3/accept         # driver, within 10 s
+GET  /v1/rides/r_77  → status, driver, car, ETA   (+ push updates)</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Data model. Above the line, ephemeral: driver state in Redis per city, driver id mapped to latitude, longitude, heading, timestamp and cell, and a status of free, offered or on trip, with a 30 second TTL so a silent driver drops out. A geo index maps each cell, H3 resolution 9 of about 0.1 square kilometres, to the set of driver ids in it. Location history streams through Kafka to object storage for route replay and ML. Below the line, durable: trips in PostgreSQL per city with trip id, rider, driver, status, version, the driver offered, pickup, drop-off, distance and fare, and a unique index so a driver has at most one active trip.">
+          <rect x="10" y="14" width="400" height="60" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></rect>
+          <text x="20" y="32" font-size="10.5" font-weight="600" fill="currentColor">driver_state · Redis, per city</text><text x="400" y="32" text-anchor="end" font-size="9" fill="currentColor" opacity="0.75">TTL 30 s</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="50">driver_id → {lat, lng, heading, ts, cell}</text><text x="20" y="64">status: free | offered | on_trip</text></g>
+          <rect x="10" y="98" width="190" height="58" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></rect>
+          <text x="20" y="116" font-size="10.5" font-weight="600" fill="currentColor">geo index</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="134">cell → {driver ids}</text><text x="20" y="148" opacity="0.75">H3 res 9 ≈ 0.1 km²</text></g>
+          <rect x="220" y="98" width="190" height="58" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="230" y="116" font-size="10.5" font-weight="600" fill="currentColor">location history</text>
+          <g font-size="9" fill="currentColor"><text x="230" y="134">Kafka → object storage</text><text x="230" y="148" opacity="0.75">route replay · disputes · ML</text></g>
+          <g stroke="#8A94A3" stroke-width="1.2"><line x1="105" y1="74" x2="105" y2="95" marker-end="url(#arw)"></line></g>
+          <line x1="315" y1="74" x2="315" y2="95" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+          <g font-size="8.5" fill="currentColor" opacity="0.8"><text x="112" y="89">cell changed: move id</text><text x="322" y="89">every point, async</text></g>
+
+          <line x1="10" y1="174" x2="410" y2="174" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="5 4"></line>
+          <text x="410" y="168" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">↑ ephemeral · ↓ durable</text>
+
+          <rect x="10" y="186" width="400" height="92" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="20" y="204" font-size="10.5" font-weight="600" fill="currentColor">trips · PostgreSQL, per city</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="222">trip_id PK · rider_id · driver_id</text><text x="20" y="236">status · version · offered_to</text><text x="20" y="250">pickup · dropoff · route_km · fare</text><text x="20" y="266" fill="#D26A3F">UNIQUE (driver_id) WHERE active</text></g>
+          <text x="210" y="302" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">a lost Redis node is rebuilt from the stream in seconds;</text>
+          <text x="210" y="318" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">a lost trip row is a lost ride, so trips get the real database</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Sequence numbers, not trust</h4><p>Mobile networks deliver updates late and out of order. Each update carries a per-driver <code>seq</code>, and the server drops anything older than the last one applied. Clients buffer points while offline and send them in a batch for the route history, but only the newest point updates the live index.</p></div>
+    <div class="card"><h4>Update less often, when you can</h4><p>Four seconds is for moving drivers. A parked, available driver can report every 15–30 s, and the app can skip updates that moved less than about 20 m. That cuts the write rate a lot during quiet periods at no cost in matching quality.</p></div>
+    <div class="card"><h4>Offers expire</h4><p>An offer is a short-lived record (Redis, TTL 10 s) linking a trip and a driver. The driver's accept is valid only while it exists and only if the trip is still <code>MATCHING</code>, which the database checks, not the app.</p></div>
+  </div>
+</section>

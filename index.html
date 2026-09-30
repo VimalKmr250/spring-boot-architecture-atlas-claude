@@ -17920,6 +17920,687 @@ GET  /v1/orders/o_5521   → PENDING | CONFIRMED | CANCELLED | SHIPPED</code></p
   </div>
   <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="2PC vs saga" href="#hld/40">HLD · 2PC vs saga</a><a data-deck="hld" data-slide="Dual write and outbox" href="#hld/55">HLD · Dual write and outbox</a><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck/23">Deck · Concurrency and idempotency</a></p>
 </section>
+<!-- decks/hld/20-design-video-streaming/01-requirements.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: requirements">
+  <h2>Design video on demand: a batch pipeline to prepare every upload, and a CDN to deliver it</h2>
+  <p class="dek">Creators upload videos, and viewers watch them on any device and network, starting quickly and without stalling. The estimate settles the architecture in two lines. Processing uploads is heavy but can take minutes, so it is an asynchronous pipeline. Viewing produces tens of terabits per second of egress, which only a CDN can deliver.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million uploads a day at 300 megabytes each is 300 terabytes of originals a day, about 3.5 gigabytes a second of ingest; with renditions about 600 terabytes a day, about 200 petabytes a year, so tiered storage. One billion views a day at 10 minutes each is about 7 million concurrent viewers, peaking about twice that; at 5 megabits a second that is about 35 terabits a second of egress, which only a CDN can serve. Playback should start in under 2 seconds from the edge, with small low-bitrate first segments, and a rebuffering ratio under half a percent, achieved with adaptive bitrate streaming.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M uploads/day × 300 MB</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">≈ 300 TB/day of originals</text><text x="140" y="125" font-size="9.5" opacity="0.75">(≈ 3.5 GB/s of ingest)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="140" y="173">+ renditions ≈ 600 TB/day</text><text x="140" y="190" font-weight="600">≈ 200 PB/year: tier it</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">1 B views/day × 10 min</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 7 M concurrent viewers</text><text x="450" y="125" font-size="9.5" opacity="0.75">(peak about 2×)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="173">× 5 Mbps ≈ 35 Tbps egress</text><text x="450" y="190" font-weight="600">only a CDN can serve this</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">start playing in &lt; 2 s</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">first segment from the edge</text><text x="760" y="125" font-size="9.5" opacity="0.75">(short, low-bitrate start)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">rebuffering &lt; 0.5% of time</text><text x="760" y="190" font-weight="600">adaptive bitrate (ABR)</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the write path is an async batch pipeline; the read path is a CDN problem</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Upload large videos, resumable over flaky networks.</li>
+      <li>Process into streamable renditions, thumbnails and captions.</li>
+      <li>Stream on web, mobile and TV at a quality that suits the network.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Never lose an original: it is the only irreplaceable byte.</li>
+      <li>Playback highly available and fast to start; processing may take minutes.</li>
+      <li>Cost-aware: storage and egress dominate the bill, not compute.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Video on demand only, or live too? VOD first; live is a follow-up.</li>
+      <li>DRM needed (studio content), or only signed URLs?</li>
+      <li>Global audience? Limits on upload size and duration?</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/20-design-video-streaming/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: API and data model">
+  <h2>Upload in resumable chunks; play back as plain files that any CDN can cache</h2>
+  <p class="dek">The upload API hands out a signed, resumable upload URL, so large files go straight to object storage in chunks and a failed chunk is retried on its own. Playback isn't an API call per frame. The video becomes a <b>manifest</b> listing renditions, and each rendition is a list of short <b>segments</b>. Both are ordinary HTTP files, which is exactly what a CDN is good at.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/uploads   { "filename": "trip.mov", "size": 2147483648 }
+→ 201 { "videoId": "v_8Kq", "chunkSize": 8388608,
+        "uploadUrl": "https://upload…/v_8Kq?sig=…" }
+
+PUT  {uploadUrl}   Content-Range: bytes 0-8388607/2147483648
+                   # resumable: retry only the failed chunk
+POST /v1/videos/v_8Kq/complete   → 202 { "status": "PROCESSING" }
+
+GET  /v1/videos/v_8Kq
+→ { "status": "READY", "duration": 312,
+    "manifest": "https://cdn…/v_8Kq/master.m3u8?token=…" }</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 340" role="img" aria-label="HLS structure. A master playlist lists four renditions: 240p at 0.4 megabits a second, 480p at 1.2, 720p at 3 and 1080p at 6. Each rendition has its own playlist of 4 second segments in fMP4 or CMAF: segment 1, 2, 3 and so on. The player chooses a rendition for each segment. Metadata tables: videos has video id, owner, title, status and duration; renditions has video id, profile, codec, bitrate and the storage path.">
+          <rect x="120" y="12" width="180" height="40" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="210" y="30" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">master.m3u8</text>
+          <text x="210" y="44" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">lists renditions + bitrates</text>
+          <g font-size="9.5" fill="currentColor" text-anchor="middle">
+            <rect x="10" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="57" y="106" font-weight="600">240p</text><text x="57" y="121" font-size="8.5">0.4 Mbps</text>
+            <rect x="112" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="159" y="106" font-weight="600">480p</text><text x="159" y="121" font-size="8.5">1.2 Mbps</text>
+            <rect x="214" y="88" width="94" height="44" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="261" y="106" font-weight="600">720p</text><text x="261" y="121" font-size="8.5">3 Mbps</text>
+            <rect x="316" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="363" y="106" font-weight="600">1080p</text><text x="363" y="121" font-size="8.5">6 Mbps</text>
+          </g>
+          <g stroke="#8A94A3" stroke-width="1.2"><line x1="180" y1="52" x2="60" y2="85" marker-end="url(#arw)"></line><line x1="200" y1="52" x2="160" y2="85" marker-end="url(#arw)"></line><line x1="220" y1="52" x2="258" y2="85" marker-end="url(#arw)"></line><line x1="240" y1="52" x2="360" y2="85" marker-end="url(#arw)"></line></g>
+          <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+            <rect x="120" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="151" y="184">seg 1</text>
+            <rect x="190" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="221" y="184">seg 2</text>
+            <rect x="260" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="291" y="184">seg 3</text>
+            <rect x="330" y="166" width="62" height="28" rx="3" fill="none" stroke="#3AA79B" stroke-dasharray="3 3"></rect><text x="361" y="184">…</text>
+          </g>
+          <g stroke="#D26A3F" stroke-width="1.2"><line x1="250" y1="132" x2="156" y2="163" marker-end="url(#arwA)"></line><line x1="258" y1="132" x2="224" y2="163" marker-end="url(#arwA)"></line><line x1="266" y1="132" x2="288" y2="163" marker-end="url(#arwA)"></line><line x1="274" y1="132" x2="356" y2="163" marker-end="url(#arwA)"></line></g>
+          <text x="10" y="178" font-size="9" fill="currentColor" opacity="0.8">720p playlist:</text>
+          <text x="256" y="212" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">4 s each · fMP4 / CMAF · same boundaries in every rendition</text>
+
+          <rect x="10" y="232" width="400" height="66" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="252" font-weight="600">videos</text><text x="100" y="252">video_id · owner · title · status · duration</text><text x="20" y="270" font-weight="600">renditions</text><text x="100" y="270">video_id · profile · codec · bitrate · path</text><text x="20" y="288" font-weight="600">views</text><text x="100" y="288" opacity="0.8">counted async from player events</text></g>
+          <text x="210" y="326" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">aligned segments let the player switch quality at any boundary</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Upload straight to storage</h4><p>API servers never proxy gigabytes. They issue a signed resumable URL (S3 multipart, GCS resumable) and the client uploads directly in 8 MB chunks. The <code>complete</code> call, or the storage event, triggers processing. Keep the original forever, in a colder storage tier.</p></div>
+    <div class="card"><h4>HLS and DASH, one set of segments</h4><p>HLS (Apple) and DASH (everyone else) differ mainly in the manifest. With CMAF-packaged fMP4 segments, both manifests point at the <em>same</em> segment files, halving storage and CDN cache footprint compared with packaging each format separately.</p></div>
+    <div class="card"><h4>Metadata is small</h4><p>Videos and renditions are ordinary rows: tens of millions of videos, a few KB each, in a sharded SQL or wide-column store, heavily cached. View counts are events aggregated asynchronously, never a row update per view.</p></div>
+  </div>
+</section>
+<!-- decks/hld/20-design-video-streaming/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: high-level design">
+  <h2>Uploads flow through an event-driven transcoding pipeline; playback never touches it</h2>
+  <p class="dek">Upload and playback share only two things: object storage and the metadata store. The upload side is asynchronous. A stored original emits an event, an orchestrator runs a transcoding DAG on a worker fleet, and the video flips to READY when renditions exist. The playback side is a thin API that hands out a signed manifest URL, and the CDN does the rest.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Upload and processing: the creator gets a signed upload URL from the upload API, then uploads chunks directly to object storage for originals. Storing the original emits a video.uploaded event to Kafka; a transcode orchestrator runs a DAG of tasks on a fleet of encode workers, often on spot capacity, which write renditions to object storage and mark the video READY in the metadata database. Playback: the viewer asks the playback API for metadata and a signed manifest URL, then fetches manifests and segments from the CDN edge, choosing a bitrate per segment. Misses go to a regional origin shield that collapses duplicate requests and reads renditions from object storage; only about 5 percent of bytes come from origin.">
+        <text x="20" y="22" font-size="11.5" font-weight="600" fill="#3AA79B">Upload + processing (async, minutes)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="40" width="80" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="60" y="66">creator</text>
+          <rect x="130" y="40" width="100" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="180" y="59">upload API</text><text x="180" y="73" font-size="8.5" opacity="0.75">signed URL</text>
+          <rect x="390" y="47" width="80" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="430" y="60" font-size="9">Kafka</text><text x="430" y="71" font-size="8">video.uploaded</text>
+          <rect x="500" y="40" width="120" height="44" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="560" y="59">orchestrator</text><text x="560" y="73" font-size="8.5" opacity="0.8">transcode DAG</text>
+          <rect x="658" y="34" width="110" height="44" rx="5" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+          <rect x="654" y="38" width="110" height="44" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-opacity="0.8"></rect>
+          <rect x="650" y="42" width="110" height="44" rx="5" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect><text x="705" y="61">encode workers</text><text x="705" y="75" font-size="8.5" opacity="0.8">spot VMs · GPUs</text>
+        </g>
+        <path d="M260 44 a50 6 0 0 1 100 0 v36 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M260 44 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="310" y="66" text-anchor="middle" font-size="10" fill="currentColor">originals</text><text x="310" y="79" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">cold tier later</text>
+        <line x1="100" y1="62" x2="127" y2="62" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <path d="M60 84 C 60 116, 310 116, 310 89" fill="none" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></path>
+        <text x="185" y="124" text-anchor="middle" font-size="9" fill="#D26A3F">chunks go direct to storage</text>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="360" y1="62" x2="387" y2="62" marker-end="url(#arwB)"></line><line x1="470" y1="62" x2="497" y2="62" marker-end="url(#arwB)"></line><line x1="620" y1="62" x2="647" y2="62" marker-end="url(#arwB)"></line><line x1="740" y1="86" x2="812" y2="126" marker-end="url(#arwB)"></line><line x1="560" y1="84" x2="560" y2="121" marker-end="url(#arwB)"></line></g>
+        <text x="568" y="106" font-size="8.5" fill="#3AA79B">status READY</text>
+
+        <path d="M500 126 a60 6 0 0 1 120 0 v34 a60 6 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M500 126 a60 6 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="560" y="150" text-anchor="middle" font-size="10" fill="currentColor">metadata DB</text>
+        <path d="M780 132 a52 6 0 0 1 104 0 v62 a52 6 0 0 1 -104 0 z" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M780 132 a52 6 0 0 0 104 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="832" y="160" text-anchor="middle" font-size="10" fill="currentColor">renditions</text><text x="832" y="174" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">object storage</text>
+
+        <line x1="10" y1="178" x2="470" y2="178" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="20" y="198" font-size="11.5" font-weight="600" fill="#D26A3F">Playback (all egress via CDN)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="236" width="80" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="60" y="255">viewer</text><text x="60" y="269" font-size="8.5" opacity="0.75">ABR player</text>
+          <rect x="160" y="208" width="130" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="225" y="225">playback API</text><text x="225" y="239" font-size="8.5" opacity="0.75">metadata · signed URL</text>
+          <rect x="160" y="268" width="130" height="44" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.6"></rect><text x="225" y="287" font-weight="600">CDN edge</text><text x="225" y="301" font-size="8.5">~95% of bytes</text>
+          <rect x="340" y="268" width="120" height="44" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="400" y="287">origin shield</text><text x="400" y="301" font-size="8.5">collapses misses</text>
+        </g>
+        <line x1="100" y1="248" x2="157" y2="230" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="290" y1="222" x2="497" y2="150" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <g stroke="#D26A3F" stroke-width="1.6" fill="none"><line x1="100" y1="268" x2="157" y2="288" marker-end="url(#arwA)"></line><line x1="290" y1="290" x2="337" y2="290" marker-end="url(#arwA)"></line><path d="M460 290 H832 V209" marker-end="url(#arwA)"></path></g>
+        <g font-size="9" fill="currentColor"><text x="104" y="226" opacity="0.8">1 play</text><text x="104" y="298" fill="#D26A3F">2 segments</text><text x="646" y="284" text-anchor="middle" fill="#D26A3F">miss: read the rendition (~5% of bytes)</text></g>
+      </svg>
+    </div>
+    <figcaption>Teal is the asynchronous upload pipeline and copper is the playback byte path. A backlog in transcoding delays new videos becoming READY but has no effect on videos that are already playing. The two halves scale and fail independently.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>An event starts the pipeline</h4><p>The storage "object created" event, or the <code>complete</code> call, publishes <code>video.uploaded</code>. The orchestrator builds a DAG for that video, fans tasks out to a queue and tracks them. Every task is idempotent, keyed by <code>(video, chunk, profile)</code>, so a retry overwrites instead of duplicating.</p></div>
+    <div class="card"><h4>Signed, short-lived URLs</h4><p>The playback API authorises the viewer (region rights, age, subscription) and returns a manifest URL with a token valid for a few hours. The CDN checks the token at the edge, so authorisation stays centralised while bytes stay local. Studio content adds DRM on top.</p></div>
+    <div class="card"><h4>An origin shield protects storage</h4><p>Hundreds of edge locations missing on the same new segment would each hit origin. A regional shield layer collapses those into one fetch and caches it. Origin load becomes the number of regions, not the number of edges.</p></div>
+  </div>
+</section>
+<!-- decks/hld/20-design-video-streaming/04-the-transcoding-pipeline.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: the transcoding pipeline">
+  <h2>Deep dive 1: split the video into chunks, then encode chunks × renditions in parallel</h2>
+  <p class="dek">Encoding one long file serially on one machine takes about as long as the video itself for every rendition, and a crash means starting over. Instead, split the original at keyframes into short chunks. Each chunk × rendition pair is then an independent, retryable task, and the whole thing finishes in minutes on a large pool of cheap workers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Transcoding DAG. The original is validated and probed, then split at keyframes into chunks of about 10 seconds. A matrix of tasks, 8 chunks by 5 renditions from 240p to 4K, runs in parallel: the first columns are done, some are running and the rest are queued. When all tasks for a rendition are done, a stitch and package step produces CMAF segments with HLS and DASH manifests. In parallel branches from the validated original: thumbnails, audio tracks with automatic captions, and moderation and copyright checks. Publish marks the video READY when every branch has finished. Timing: serial encoding of a 10 minute video into 5 renditions takes about 50 minutes; chunked and parallel takes about 2 minutes plus stitching.">
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="90" width="80" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="50" y="112">original</text><text x="50" y="126" font-size="8.5" opacity="0.75">2 GB .mov</text>
+          <rect x="110" y="90" width="90" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="155" y="112">validate</text><text x="155" y="126" font-size="8.5" opacity="0.75">probe · reject bad</text>
+          <rect x="220" y="90" width="90" height="50" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="265" y="112">split</text><text x="265" y="126" font-size="8.5" opacity="0.8">at keyframes</text>
+          <rect x="620" y="90" width="110" height="50" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="675" y="110">stitch + package</text><text x="675" y="124" font-size="8.5" opacity="0.8">CMAF · HLS · DASH</text>
+          <rect x="760" y="90" width="120" height="50" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="820" y="110" font-weight="600">publish</text><text x="820" y="124" font-size="8.5">status = READY</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="90" y1="115" x2="107" y2="115" marker-end="url(#arw)"></line><line x1="200" y1="115" x2="217" y2="115" marker-end="url(#arw)"></line><line x1="310" y1="115" x2="327" y2="115" marker-end="url(#arw)"></line><line x1="600" y1="115" x2="617" y2="115" marker-end="url(#arw)"></line><line x1="730" y1="115" x2="757" y2="115" marker-end="url(#arw)"></line></g>
+
+        <text x="484" y="60" text-anchor="middle" font-size="9.5" fill="currentColor">chunk 1 … 8 (≈10 s each)</text>
+        <g font-size="8.5" fill="currentColor" text-anchor="end"><text x="366" y="83">240p</text><text x="366" y="103">480p</text><text x="366" y="123">720p</text><text x="366" y="143">1080p</text><text x="366" y="163">4K</text></g>
+        <g fill="#3AA79B" fill-opacity="0.5">
+          <rect x="372" y="70" width="24" height="18"></rect><rect x="400" y="70" width="24" height="18"></rect><rect x="428" y="70" width="24" height="18"></rect><rect x="456" y="70" width="24" height="18"></rect><rect x="484" y="70" width="24" height="18"></rect>
+          <rect x="372" y="90" width="24" height="18"></rect><rect x="400" y="90" width="24" height="18"></rect><rect x="428" y="90" width="24" height="18"></rect><rect x="456" y="90" width="24" height="18"></rect>
+          <rect x="372" y="110" width="24" height="18"></rect><rect x="400" y="110" width="24" height="18"></rect><rect x="428" y="110" width="24" height="18"></rect>
+          <rect x="372" y="130" width="24" height="18"></rect><rect x="400" y="130" width="24" height="18"></rect>
+          <rect x="372" y="150" width="24" height="18"></rect>
+        </g>
+        <g fill="#D26A3F" fill-opacity="0.5">
+          <rect x="512" y="70" width="24" height="18"></rect><rect x="484" y="90" width="24" height="18"></rect><rect x="456" y="110" width="24" height="18"></rect><rect x="484" y="110" width="24" height="18"></rect><rect x="428" y="130" width="24" height="18"></rect><rect x="456" y="130" width="24" height="18"></rect><rect x="400" y="150" width="24" height="18"></rect><rect x="428" y="150" width="24" height="18"></rect>
+        </g>
+        <g fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.25">
+          <rect x="540" y="70" width="24" height="18"></rect><rect x="568" y="70" width="24" height="18"></rect>
+          <rect x="512" y="90" width="24" height="18"></rect><rect x="540" y="90" width="24" height="18"></rect><rect x="568" y="90" width="24" height="18"></rect>
+          <rect x="512" y="110" width="24" height="18"></rect><rect x="540" y="110" width="24" height="18"></rect><rect x="568" y="110" width="24" height="18"></rect>
+          <rect x="484" y="130" width="24" height="18"></rect><rect x="512" y="130" width="24" height="18"></rect><rect x="540" y="130" width="24" height="18"></rect><rect x="568" y="130" width="24" height="18"></rect>
+          <rect x="456" y="150" width="24" height="18"></rect><rect x="484" y="150" width="24" height="18"></rect><rect x="512" y="150" width="24" height="18"></rect><rect x="540" y="150" width="24" height="18"></rect><rect x="568" y="150" width="24" height="18"></rect>
+        </g>
+        <g font-size="8.5" fill="currentColor"><rect x="372" y="178" width="10" height="10" fill="#3AA79B" fill-opacity="0.5"></rect><text x="386" y="187">done</text><rect x="424" y="178" width="10" height="10" fill="#D26A3F" fill-opacity="0.5"></rect><text x="438" y="187">running</text><rect x="486" y="178" width="10" height="10" fill="currentColor" fill-opacity="0.12"></rect><text x="500" y="187">queued · 40 independent tasks</text></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="200" width="110" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="75" y="220">thumbnails</text>
+          <rect x="140" y="200" width="110" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="195" y="220">audio · captions</text>
+          <rect x="260" y="200" width="130" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="325" y="220">moderation · copyright</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.1" fill="none"><line x1="145" y1="140" x2="78" y2="197" marker-end="url(#arw)"></line><line x1="155" y1="140" x2="193" y2="197" marker-end="url(#arw)"></line><line x1="165" y1="140" x2="318" y2="197" marker-end="url(#arw)"></line><path d="M390 216 H820 V143" marker-end="url(#arw)"></path></g>
+        <text x="605" y="232" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">publish waits for every branch</text>
+
+        <g font-size="9" fill="currentColor"><text x="20" y="268">serial</text><text x="20" y="288">chunked</text></g>
+        <rect x="80" y="258" width="560" height="14" fill="#8A94A3" fill-opacity="0.45"></rect><text x="648" y="269" font-size="9" fill="currentColor">≈ 50 min for a 10-min video × 5 renditions</text>
+        <rect x="80" y="278" width="26" height="14" fill="#D26A3F" fill-opacity="0.7"></rect><text x="114" y="289" font-size="9" fill="#D26A3F" font-weight="600">≈ 2 min + stitching</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why chunking works</h4><p>Each chunk starts on a keyframe, so it can be encoded without its neighbours. Parallelism turns wall-clock time from "length × renditions" into roughly "one chunk". A failed task retries only its 10 seconds of video, and slow stragglers can be speculatively re-run on another worker.</p></div>
+    <div class="card"><h4>Per-title bitrate ladders</h4><p>A cartoon needs far fewer bits than a football match at the same quality. Analyse complexity first and pick each video's ladder (resolutions and bitrates) to match. Encode popular videos in efficient codecs such as AV1 or HEVC later, when viewing numbers justify the extra compute.</p></div>
+    <div class="card"><h4>Cheap, preemptible compute</h4><p>Transcoding is batch work that can be retried, which is ideal for spot or preemptible instances at a fraction of the price. Use priority queues so a partner's premiere is processed before a backlog of long-tail uploads, and autoscale the fleet on queue depth.</p></div>
+  </div>
+</section>
+<!-- decks/hld/20-design-video-streaming/05-adaptive-bitrate-and-cdn.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: adaptive bitrate and the CDN">
+  <h2>Deep dive 2: the player adapts every few seconds, and the CDN keeps the popular head close</h2>
+  <p class="dek">Smooth playback comes from two cooperating pieces. On the client, an ABR algorithm chooses the rendition for each next segment from measured throughput and how much video is buffered. In the network, a tiered CDN serves the few popular videos, which get most of the views, from caches near the viewer, and fetches the long tail on demand.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Left: adaptive bitrate over time. Throughput starts high, drops sharply as if entering a tunnel, then recovers. The player starts at 240p for a fast first frame and climbs to 480p, 720p and 1080p as the buffer fills. When throughput drops it steps down to 480p then 240p, letting the buffer drain but not empty, then climbs back to 720p and 1080p as throughput recovers. Right: CDN tiers carry bytes from origin through a few regional shields to hundreds of edge locations and caches embedded in ISPs, near viewers. Popularity follows a long tail: a few percent of videos get most views and are served from the edge, pre-positioned off-peak; the long tail is fetched on demand from the shield or origin.">
+        <text x="225" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">ABR: the player decides per segment</text>
+        <g font-size="8.5" fill="currentColor"><rect x="60" y="24" width="12" height="8" fill="#8A94A3" fill-opacity="0.4"></rect><text x="76" y="32">throughput</text><line x1="150" y1="28" x2="170" y2="28" stroke="#D26A3F" stroke-width="2"></line><text x="174" y="32">chosen rendition</text><line x1="270" y1="28" x2="290" y2="28" stroke="#3AA79B" stroke-width="2"></line><text x="294" y="32">buffer</text></g>
+        <polygon points="40,42 150,42 170,75 185,125 240,128 262,95 285,46 430,42 430,150 40,150" fill="#8A94A3" fill-opacity="0.25"></polygon>
+        <line x1="40" y1="150" x2="430" y2="150" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2 3"><line x1="40" y1="60" x2="430" y2="60"></line><line x1="40" y1="90" x2="430" y2="90"></line><line x1="40" y1="115" x2="430" y2="115"></line><line x1="40" y1="135" x2="430" y2="135"></line></g>
+        <path d="M40 135 H66 V115 H92 V90 H118 V60 H196 V115 H222 V135 H248 V115 H274 V90 H300 V60 H430" fill="none" stroke="#D26A3F" stroke-width="2.2"></path>
+        <g font-size="8" fill="currentColor" text-anchor="end" opacity="0.8"><text x="36" y="63">1080p</text><text x="36" y="93">720p</text><text x="36" y="118">480p</text><text x="36" y="138">240p</text><text x="36" y="200">buffer</text></g>
+        <line x1="40" y1="222" x2="430" y2="222" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="40" y1="206" x2="430" y2="206" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="4 3"></line>
+        <text x="430" y="216" text-anchor="end" font-size="8" fill="#D26A3F">panic level</text>
+        <polyline points="40,220 118,190 170,178 196,186 222,198 248,202 274,196 300,188 430,176" fill="none" stroke="#3AA79B" stroke-width="2"></polyline>
+        <text x="225" y="244" text-anchor="middle" font-size="9.5" fill="currentColor">start low for a fast first frame; climb as the buffer fills</text>
+        <text x="225" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">step down before the buffer empties: a softer picture beats a spinner</text>
+
+        <line x1="450" y1="10" x2="450" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">CDN: bring the bytes close, cache the head</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="468" y="34" width="80" height="40" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="508" y="51">origin</text><text x="508" y="64" font-size="8" opacity="0.75">object storage</text>
+          <rect x="568" y="34" width="90" height="40" rx="4" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F"></rect><text x="613" y="51">shields</text><text x="613" y="64" font-size="8" opacity="0.75">a few regions</text>
+          <rect x="678" y="34" width="95" height="40" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.3"></rect><text x="725" y="51">edge PoPs</text><text x="725" y="64" font-size="8" opacity="0.75">hundreds</text>
+          <rect x="793" y="34" width="92" height="40" rx="4" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.5"></rect><text x="839" y="51">in-ISP caches</text><text x="839" y="64" font-size="8" opacity="0.75">next to viewers</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.4"><line x1="548" y1="54" x2="565" y2="54" marker-end="url(#arwA)"></line><line x1="658" y1="54" x2="675" y2="54" marker-end="url(#arwA)"></line><line x1="773" y1="54" x2="790" y2="54" marker-end="url(#arwA)"></line></g>
+        <polygon points="480,112 500,130 520,152 540,170 560,182 560,210 480,210" fill="#D26A3F" fill-opacity="0.35"></polygon>
+        <polygon points="560,182 600,194 650,200 720,204 800,206 880,207 880,210 560,210" fill="#3AA79B" fill-opacity="0.25"></polygon>
+        <polyline points="480,112 500,130 520,152 540,170 560,182 600,194 650,200 720,204 800,206 880,207" fill="none" stroke="currentColor" stroke-opacity="0.6" stroke-width="1.3"></polyline>
+        <line x1="480" y1="210" x2="880" y2="210" stroke="currentColor" stroke-opacity="0.45"></line>
+        <text x="568" y="132" font-size="9" fill="#D26A3F" font-weight="600">head: a few % of videos,</text>
+        <text x="568" y="145" font-size="9" fill="#D26A3F">most of the views → edge + ISP</text>
+        <text x="720" y="192" font-size="9" fill="#3AA79B">long tail → shield / origin on demand</text>
+        <text x="880" y="224" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">videos ranked by popularity →</text>
+        <text x="675" y="246" text-anchor="middle" font-size="9.5" fill="currentColor">pre-position tomorrow's hits overnight, off-peak</text>
+        <text x="675" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">a first-view miss on a rare video is acceptable</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>ABR algorithms</h4><p>Throughput-based algorithms pick the highest bitrate below the recent measured throughput, with a safety margin. Buffer-based ones (BOLA) pick from buffer occupancy, which is more stable. Production players blend both and add switch penalties so quality doesn't oscillate every segment.</p></div>
+    <div class="card"><h4>Start fast</h4><p>Time to first frame is what users notice. Fetch the manifest while the title card shows, start at a low rendition with short first segments, preconnect to the CDN host, and serve the first seconds of popular videos from the edge.</p></div>
+    <div class="card"><h4>Multi-CDN</h4><p>At tens of Tbps, one CDN is both a single point of failure and a weak negotiating position. Steer each session to a CDN by measured performance and cost, and fail over mid-stream. Segments are plain files, so any CDN can serve them.</p></div>
+  </div>
+</section>
+<!-- decks/hld/20-design-video-streaming/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: trade-offs and follow-ups">
+  <h2>The bill is storage and egress, so trade compute for bytes where views pay it back</h2>
+  <p class="dek">Most of the trade-offs here are about money. Keep every rendition of every video hot and storage grows without bound. Encode everything in the most efficient codec and compute costs explode. The answer for both is to let popularity decide: tier storage by age and views, and spend expensive encoding only on videos that will be watched enough to earn it back in egress savings.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Left: storage lifecycle. From upload to 30 days, all renditions are kept in hot standard storage. From 30 days to a year, they move to an infrequent-access tier. After a year, if unwatched, the original moves to archive storage and rarely watched high renditions are deleted, to be re-transcoded on demand if someone asks. Right: codecs, illustrative. For the same quality, H.264 needs 100 percent of the bits at 1 times the encode cost, HEVC or VP9 about 65 percent at about 4 times, and AV1 about 50 percent at about 10 times or more. Encode in AV1 only when views times egress saved exceed the extra encode cost.">
+        <text x="215" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Tier storage by age and views</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="20" y="40" width="120" height="70" rx="4" fill="#D26A3F" fill-opacity="0.20" stroke="#D26A3F"></rect><text x="30" y="58" font-weight="600">hot</text><text x="30" y="74" font-size="9">all renditions</text><text x="30" y="88" font-size="9">standard tier</text><text x="30" y="102" font-size="9" opacity="0.75">0–30 days</text>
+          <rect x="150" y="40" width="120" height="70" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-opacity="0.7"></rect><text x="160" y="58" font-weight="600">warm</text><text x="160" y="74" font-size="9">infrequent access</text><text x="160" y="88" font-size="9">~half the price</text><text x="160" y="102" font-size="9" opacity="0.75">30 days – 1 year</text>
+          <rect x="280" y="40" width="130" height="70" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="290" y="58" font-weight="600">cold</text><text x="290" y="74" font-size="9">original → archive</text><text x="290" y="88" font-size="9">drop unwatched 4K</text><text x="290" y="102" font-size="9" opacity="0.75">&gt; 1 year, few views</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="140" y1="75" x2="147" y2="75" marker-end="url(#arw)"></line><line x1="270" y1="75" x2="277" y2="75" marker-end="url(#arw)"></line></g>
+        <path d="M345 110 C 345 150, 120 150, 90 114" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="215" y="160" text-anchor="middle" font-size="9" fill="#3AA79B">old video goes viral → re-transcode from the original</text>
+        <text x="215" y="194" text-anchor="middle" font-size="9.5" fill="currentColor">the original is the only irreplaceable file:</text>
+        <text x="215" y="210" text-anchor="middle" font-size="9.5" fill="currentColor">keep it forever (cheaply); renditions are a cache</text>
+        <text x="215" y="236" text-anchor="middle" font-size="9.5" fill="#D26A3F">storage cost follows age; egress cost follows views</text>
+
+        <line x1="440" y1="10" x2="440" y2="252" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Codecs: fewer bits cost more compute</text>
+        <g font-size="8.5" fill="currentColor"><rect x="560" y="30" width="10" height="10" fill="#3AA79B" fill-opacity="0.55"></rect><text x="574" y="39">bits for the same quality</text><rect x="690" y="30" width="10" height="10" fill="#D26A3F" fill-opacity="0.55"></rect><text x="704" y="39">encode compute</text></g>
+        <g font-size="9.5" fill="currentColor" text-anchor="end"><text x="540" y="72">H.264</text><text x="540" y="122">HEVC / VP9</text><text x="540" y="172">AV1</text></g>
+        <rect x="550" y="56" width="300" height="14" fill="#3AA79B" fill-opacity="0.55"></rect><text x="856" y="67" font-size="8.5" fill="currentColor">100%</text>
+        <rect x="550" y="72" width="20" height="14" fill="#D26A3F" fill-opacity="0.55"></rect><text x="576" y="83" font-size="8.5" fill="currentColor">1×</text>
+        <rect x="550" y="106" width="195" height="14" fill="#3AA79B" fill-opacity="0.55"></rect><text x="751" y="117" font-size="8.5" fill="currentColor">≈ 65%</text>
+        <rect x="550" y="122" width="80" height="14" fill="#D26A3F" fill-opacity="0.55"></rect><text x="636" y="133" font-size="8.5" fill="currentColor">≈ 4×</text>
+        <rect x="550" y="156" width="150" height="14" fill="#3AA79B" fill-opacity="0.55"></rect><text x="706" y="167" font-size="8.5" fill="currentColor">≈ 50%</text>
+        <rect x="550" y="172" width="200" height="14" fill="#D26A3F" fill-opacity="0.55"></rect><text x="756" y="183" font-size="8.5" fill="currentColor">≈ 10× or more</text>
+        <text x="670" y="212" text-anchor="middle" font-size="9.5" fill="currentColor">worth it when views × egress saved &gt; extra encode cost:</text>
+        <text x="670" y="228" text-anchor="middle" font-size="9.5" fill="#D26A3F">H.264 for everything, AV1 for the popular head</text>
+        <text x="670" y="248" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">illustrative; varies by encoder, preset and content</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Live streaming</td><td>Ingest over RTMP or SRT, transcode in real time, and publish short CMAF parts (LL-HLS) for 2–5 s latency. Manifests refresh continuously and the CDN caches very briefly.</td></tr>
+          <tr><td>DRM and piracy</td><td>Encrypt segments once (CENC) and license through Widevine, FairPlay and PlayReady; use forensic watermarks for leaks.</td></tr>
+          <tr><td>View counts</td><td>Player events go to a stream processor that dedupes and filters bots; counts are approximate in real time and exact in a daily batch.</td></tr>
+          <tr><td>Resume where I left off</td><td>A per-user KV of (video → position), written every ~10 s and read at play time.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Resumable uploads go straight to object storage. An event-driven DAG splits each video into chunks and encodes chunks × renditions in parallel on spot capacity, then packages CMAF with HLS and DASH manifests. Playback is signed manifests plus ABR over a tiered, multi-CDN edge. Storage is tiered by age, and costly codecs are used only where views repay them."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="CDN: push vs pull" href="#hld/22">HLD · CDN: push vs pull</a><a data-deck="hld" data-slide="Object storage" href="#hld/41">HLD · Object storage</a></p>
+</section>
+<!-- decks/hld/21-design-ride-hailing/01-requirements.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: requirements">
+  <h2>Design ride-hailing: a firehose of moving points, and a trip record that must never double-book</h2>
+  <p class="dek">Riders request a trip, the system finds a nearby driver, both follow the trip live on a map, and the rider pays at the end. Two very different workloads hide in that sentence. Driver locations are a huge, ephemeral write stream where only the latest point matters. The trip itself is low-volume state that must be strongly consistent: one driver per trip, one trip per driver.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million drivers online at peak, each sending a location every 4 seconds, is about 250 thousand location writes a second; only the latest position matters, so keep it in an in-memory geo index. 20 million rides a day is about 230 a second, about 1,000 ride requests a second at peak, each needing a nearby search, ETA ranking and an offer. Five million riders with the app open refresh nearby cars every 5 seconds, about 1 million geo reads a second, sharded by city and cacheable per cell.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M drivers online at peak</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">÷ a location every 4 s</text><text x="140" y="125" font-size="9.5" opacity="0.75">(only the latest one matters)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="140" y="173">≈ 250 k location writes/s</text><text x="140" y="190" font-weight="600">in-memory geo index</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">20 M rides / day</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 230 rides/s average</text><text x="450" y="125" font-size="9.5" opacity="0.75">(evening peak about 4×)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="173">~1 k ride requests/s</text><text x="450" y="190" font-weight="600">search + rank + offer each</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">5 M riders with the app open</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">"cars near me" every 5 s</text><text x="760" y="125" font-size="9.5" opacity="0.75">(approximate is fine)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.3"></rect><text x="760" y="173">≈ 1 M geo reads/s</text><text x="760" y="190" font-weight="600">cacheable per map cell</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">ephemeral locations in memory; durable trips in a transactional store; everything sharded by city</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Riders see nearby cars and an ETA, then request a ride.</li>
+      <li>Match to a driver, who accepts or declines within seconds.</li>
+      <li>Live tracking during pickup and trip; fare and payment at the end.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Match within a few seconds; locations at most a few seconds stale.</li>
+      <li><b>Never</b> assign one driver to two trips, or one trip to two drivers.</li>
+      <li>Highly available per city: an outage in one city mustn't spread.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Ride types (standard, XL)? Shared rides (pooling) are a follow-up.</li>
+      <li>Surge pricing in scope? Payments through a provider?</li>
+      <li>How many cities and regions? Is data residency required?</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/21-design-ride-hailing/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: API and data model">
+  <h2>Locations stream in over a persistent connection; trips are guarded rows</h2>
+  <p class="dek">Drivers push a location every few seconds, so use a long-lived connection (WebSocket or MQTT) rather than a new HTTPS request each time. Riders create a trip with one idempotent POST and then receive updates by push. The data splits along the ephemeral/durable line: locations are latest-value-wins data with a TTL, and trips are transactional rows with a status and a version.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http"># driver app: one persistent connection, a message every ~4 s
+WS  /v1/driver/stream   → { "lat": 37.7749, "lng": -122.4194,
+                            "heading": 90, "seq": 1841, "ts": … }
+                        ← { "type": "offer", "offerId": "of_3", "ttl": 10 }
+
+POST /v1/rides   Idempotency-Key: 5d1e…
+{ "pickup": {…}, "dropoff": {…}, "product": "standard" }
+→ 202 { "rideId": "r_77", "status": "MATCHING" }
+
+POST /v1/offers/of_3/accept         # driver, within 10 s
+GET  /v1/rides/r_77  → status, driver, car, ETA   (+ push updates)</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Data model. Above the line, ephemeral: driver state in Redis per city, driver id mapped to latitude, longitude, heading, timestamp and cell, and a status of free, offered or on trip, with a 30 second TTL so a silent driver drops out. A geo index maps each cell, H3 resolution 9 of about 0.1 square kilometres, to the set of driver ids in it. Location history streams through Kafka to object storage for route replay and ML. Below the line, durable: trips in PostgreSQL per city with trip id, rider, driver, status, version, the driver offered, pickup, drop-off, distance and fare, and a unique index so a driver has at most one active trip.">
+          <rect x="10" y="14" width="400" height="60" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></rect>
+          <text x="20" y="32" font-size="10.5" font-weight="600" fill="currentColor">driver_state · Redis, per city</text><text x="400" y="32" text-anchor="end" font-size="9" fill="currentColor" opacity="0.75">TTL 30 s</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="50">driver_id → {lat, lng, heading, ts, cell}</text><text x="20" y="64">status: free | offered | on_trip</text></g>
+          <rect x="10" y="98" width="190" height="58" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></rect>
+          <text x="20" y="116" font-size="10.5" font-weight="600" fill="currentColor">geo index</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="134">cell → {driver ids}</text><text x="20" y="148" opacity="0.75">H3 res 9 ≈ 0.1 km²</text></g>
+          <rect x="220" y="98" width="190" height="58" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="230" y="116" font-size="10.5" font-weight="600" fill="currentColor">location history</text>
+          <g font-size="9" fill="currentColor"><text x="230" y="134">Kafka → object storage</text><text x="230" y="148" opacity="0.75">route replay · disputes · ML</text></g>
+          <g stroke="#8A94A3" stroke-width="1.2"><line x1="105" y1="74" x2="105" y2="95" marker-end="url(#arw)"></line></g>
+          <line x1="315" y1="74" x2="315" y2="95" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+          <g font-size="8.5" fill="currentColor" opacity="0.8"><text x="112" y="89">cell changed: move id</text><text x="322" y="89">every point, async</text></g>
+
+          <line x1="10" y1="174" x2="410" y2="174" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="5 4"></line>
+          <text x="410" y="168" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">↑ ephemeral · ↓ durable</text>
+
+          <rect x="10" y="186" width="400" height="92" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="20" y="204" font-size="10.5" font-weight="600" fill="currentColor">trips · PostgreSQL, per city</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="222">trip_id PK · rider_id · driver_id</text><text x="20" y="236">status · version · offered_to</text><text x="20" y="250">pickup · dropoff · route_km · fare</text><text x="20" y="266" fill="#D26A3F">UNIQUE (driver_id) WHERE active</text></g>
+          <text x="210" y="302" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">a lost Redis node is rebuilt from the stream in seconds;</text>
+          <text x="210" y="318" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">a lost trip row is a lost ride, so trips get the real database</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Sequence numbers, not trust</h4><p>Mobile networks deliver updates late and out of order. Each update carries a per-driver <code>seq</code>, and the server drops anything older than the last one applied. Clients buffer points while offline and send them in a batch for the route history, but only the newest point updates the live index.</p></div>
+    <div class="card"><h4>Update less often, when you can</h4><p>Four seconds is for moving drivers. A parked, available driver can report every 15–30 s, and the app can skip updates that moved less than about 20 m. That cuts the write rate a lot during quiet periods at no cost in matching quality.</p></div>
+    <div class="card"><h4>Offers expire</h4><p>An offer is a short-lived record (Redis, TTL 10 s) linking a trip and a driver. The driver's accept is valid only while it exists and only if the trip is still <code>MATCHING</code>, which the database checks, not the app.</p></div>
+  </div>
+</section>
+<!-- decks/hld/21-design-ride-hailing/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: high-level design">
+  <h2>A location pipeline and a ride pipeline that meet only at the geo index</h2>
+  <p class="dek">Drivers hold persistent connections to a gateway fleet. Their locations update an in-memory geo index and flow on to a stream for everything else: ETAs, surge, trip tracking and history. Ride requests go through a matching service that queries the index, ranks candidates by ETA and pushes an offer down the driver's open connection. The trip service records the outcome with a guarded write.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Location pipeline: the driver app holds a WebSocket to a gateway fleet; the location service validates, drops stale sequence numbers and updates the geo index in Redis, sharded by city, and publishes every point to a Kafka locations topic consumed by ETA, surge pricing, trip tracking and history. Ride pipeline: the rider app calls the API gateway, then the ride service, then matching. Matching queries the geo index for nearby free drivers, ranks them by ETA, and sends an offer through the WebSocket gateway to the chosen driver, who accepts. The trip service then assigns the driver with a guarded update in the trips database.">
+        <text x="20" y="18" font-size="11" font-weight="600" fill="#3AA79B">Location pipeline (≈ 250 k writes/s)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="40" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="60">driver app</text><text x="65" y="74" font-size="8.5" opacity="0.75">GPS every 4 s</text>
+          <rect x="140" y="40" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="60">WS gateway</text><text x="200" y="74" font-size="8.5" opacity="0.75">millions of conns</text>
+          <rect x="290" y="40" width="110" height="46" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="345" y="60">location svc</text><text x="345" y="74" font-size="8.5" opacity="0.8">drop stale seq</text>
+          <rect x="440" y="40" width="130" height="46" rx="5" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.5"></rect><text x="505" y="60" font-weight="600">geo index</text><text x="505" y="74" font-size="8.5">Redis · per city</text>
+          <rect x="610" y="48" width="110" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="665" y="67" font-size="9.5">Kafka: locations</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="110" y1="63" x2="137" y2="63" marker-end="url(#arw)"></line><line x1="260" y1="63" x2="287" y2="63" marker-end="url(#arw)"></line><line x1="400" y1="63" x2="437" y2="63" marker-end="url(#arw)"></line></g>
+        <path d="M345 40 V28 H665 V45" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="720" y1="63" x2="747" y2="63" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g font-size="9" fill="currentColor"><text x="752" y="46">ETA service</text><text x="752" y="60">surge pricing</text><text x="752" y="74">trip tracking</text><text x="752" y="88">history → storage</text></g>
+
+        <text x="20" y="196" font-size="11" font-weight="600" fill="#D26A3F">Ride pipeline (≈ 1 k requests/s, strongly consistent)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="212" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="239">rider app</text>
+          <rect x="140" y="212" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="232">API gateway</text><text x="200" y="246" font-size="8.5" opacity="0.75">auth · idempotency</text>
+          <rect x="290" y="212" width="110" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="345" y="232">ride service</text><text x="345" y="246" font-size="8.5">create MATCHING</text>
+          <rect x="440" y="212" width="130" height="46" rx="5" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.6"></rect><text x="505" y="232" font-weight="600">matching</text><text x="505" y="246" font-size="8.5">nearby · rank by ETA</text>
+          <rect x="610" y="212" width="110" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="665" y="232">trip service</text><text x="665" y="246" font-size="8.5">state machine</text>
+        </g>
+        <path d="M760 214 a55 6 0 0 1 110 0 v36 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M760 214 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="815" y="238" text-anchor="middle" font-size="10" fill="currentColor">trips DB</text><text x="815" y="251" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">PostgreSQL</text>
+        <g stroke="#D26A3F" stroke-width="1.6" fill="none">
+          <line x1="110" y1="235" x2="137" y2="235" marker-end="url(#arwA)"></line><line x1="260" y1="235" x2="287" y2="235" marker-end="url(#arwA)"></line><line x1="400" y1="235" x2="437" y2="235" marker-end="url(#arwA)"></line>
+          <line x1="520" y1="212" x2="520" y2="89" marker-end="url(#arwA)"></line>
+          <line x1="455" y1="212" x2="230" y2="89" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+          <line x1="570" y1="235" x2="607" y2="235" marker-end="url(#arwA)"></line><line x1="720" y1="235" x2="757" y2="235" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="9" fill="#D26A3F"><text x="528" y="140">2 free drivers in</text><text x="528" y="152">nearby cells</text><text x="252" y="140" text-anchor="end">3 offer via the</text><text x="252" y="152" text-anchor="end">driver's socket;</text><text x="252" y="164" text-anchor="end">4 accept</text><text x="120" y="228">1</text><text x="589" y="252" text-anchor="middle">5 assign</text></g>
+        <text x="450" y="296" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">location writes never touch the trips DB; the trips DB never sees 250 k writes/s</text>
+      </svg>
+    </div>
+    <figcaption>Teal is the high-volume, loss-tolerant location path: a dropped point is replaced four seconds later. Copper is the ride path, where every step is idempotent and the final assignment is a single guarded write. Each city, or group of small cities, runs its own copy of both.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>The gateway fleet is stateful</h4><p>Millions of long-lived sockets need a connection registry (driver → gateway node) so matching can push an offer to the right node. It's the same pattern as chat presence. When a gateway node dies, its drivers reconnect elsewhere and re-register within seconds.</p></div>
+    <div class="card"><h4>Why the stream matters</h4><p>One point feeds many consumers: the rider's live map during the trip, ETA models, surge computation per cell, fraud checks for teleporting phones, and the fare's distance. A topic keyed by driver id lets each consume independently and keeps per-driver order.</p></div>
+    <div class="card"><h4>Rider updates by push</h4><p>While matching and during the trip, the rider's app receives status changes and the driver's position (every few seconds) over its own socket or push channel. Don't poll <code>GET /rides</code>, which multiplies reads for no benefit.</p></div>
+  </div>
+</section>
+<!-- decks/hld/21-design-ride-hailing/04-the-geospatial-index.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: the geospatial index">
+  <h2>Deep dive 1: turn "drivers near this point" into "drivers in these few cells"</h2>
+  <p class="dek">A database scan over latitude and longitude doesn't scale to a million moving points. Instead, divide the map into cells, keep a set of driver ids per cell, and answer "nearby" by reading the rider's cell and its neighbours. The three common cell schemes trade simplicity, adaptiveness and uniform distances.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Three cell schemes. Geohash: a square grid where each cell has a base-32 string such as 9q8yy, and longer strings are smaller cells; a rider and a driver can be metres apart but in cells with different prefixes, so always search the cell and its 8 neighbours. Six characters is about 1.2 by 0.6 kilometres, seven about 150 metres. Quadtree: split a cell into four whenever it holds more than N drivers, so downtown has small leaves and suburbs large ones; it adapts to density but is costlier to update. H3 hexagons: every neighbour of a hexagon is the same distance away; kRing of radius 1 is 7 cells, widened if too few drivers are found; Uber uses H3 for matching and surge.">
+        <text x="155" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Geohash grid</text>
+        <g stroke="currentColor" stroke-opacity="0.3" fill="none">
+          <rect x="60" y="36" width="180" height="180"></rect>
+          <line x1="96" y1="36" x2="96" y2="216"></line><line x1="132" y1="36" x2="132" y2="216"></line><line x1="168" y1="36" x2="168" y2="216"></line><line x1="204" y1="36" x2="204" y2="216"></line>
+          <line x1="60" y1="72" x2="240" y2="72"></line><line x1="60" y1="108" x2="240" y2="108"></line><line x1="60" y1="144" x2="240" y2="144"></line><line x1="60" y1="180" x2="240" y2="180"></line>
+        </g>
+        <rect x="96" y="72" width="108" height="108" fill="#3AA79B" fill-opacity="0.16"></rect>
+        <rect x="132" y="108" width="36" height="36" fill="#D26A3F" fill-opacity="0.30" stroke="#D26A3F"></rect>
+        <text x="150" y="140" text-anchor="middle" font-size="8" fill="currentColor" font-family="IBM Plex Mono, monospace">9q8yy</text>
+        <circle cx="162" cy="115" r="4" fill="#D26A3F"></circle>
+        <circle cx="173" cy="104" r="4" fill="currentColor" fill-opacity="0.7"></circle>
+        <circle cx="110" cy="160" r="4" fill="currentColor" fill-opacity="0.7"></circle>
+        <circle cx="222" cy="52" r="4" fill="currentColor" fill-opacity="0.35"></circle>
+        <text x="150" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">neighbours can have different prefixes:</text>
+        <text x="150" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">search the cell and its 8 neighbours</text>
+        <text x="150" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">6 chars ≈ 1.2 × 0.6 km · 7 chars ≈ 150 m</text>
+
+        <line x1="300" y1="10" x2="300" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="450" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Quadtree</text>
+        <rect x="360" y="36" width="90" height="90" fill="#D26A3F" fill-opacity="0.10"></rect>
+        <g stroke="currentColor" stroke-opacity="0.35" fill="none">
+          <rect x="360" y="36" width="180" height="180"></rect>
+          <line x1="450" y1="36" x2="450" y2="216"></line><line x1="360" y1="126" x2="540" y2="126"></line>
+          <line x1="405" y1="36" x2="405" y2="126"></line><line x1="360" y1="81" x2="450" y2="81"></line>
+          <line x1="427.5" y1="81" x2="427.5" y2="126"></line><line x1="405" y1="103.5" x2="450" y2="103.5"></line>
+        </g>
+        <g fill="currentColor" fill-opacity="0.7">
+          <circle cx="412" cy="88" r="2.5"></circle><circle cx="419" cy="96" r="2.5"></circle><circle cx="434" cy="90" r="2.5"></circle><circle cx="442" cy="97" r="2.5"></circle>
+          <circle cx="411" cy="111" r="2.5"></circle><circle cx="420" cy="119" r="2.5"></circle><circle cx="433" cy="112" r="2.5"></circle><circle cx="444" cy="120" r="2.5"></circle>
+          <circle cx="416" cy="108" r="2.5"></circle><circle cx="438" cy="84" r="2.5"></circle><circle cx="398" cy="60" r="2.5"></circle><circle cx="380" cy="100" r="2.5"></circle><circle cx="425" cy="50" r="2.5"></circle>
+          <circle cx="500" cy="70" r="2.5"></circle><circle cx="480" cy="180" r="2.5"></circle><circle cx="520" cy="160" r="2.5"></circle><circle cx="390" cy="190" r="2.5"></circle>
+        </g>
+        <text x="450" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">split a cell when it holds &gt; N drivers</text>
+        <text x="450" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">downtown: small leaves · suburbs: big ones</text>
+        <text x="450" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">adapts to density; costlier to update</text>
+
+        <line x1="600" y1="10" x2="600" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="750" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">H3 hexagons</text>
+        <g stroke="#3AA79B" stroke-opacity="0.8" fill="#3AA79B" fill-opacity="0.14">
+          <polygon points="802.0,98.0 827.9,113.0 827.9,143.0 802.0,158.0 776.0,143.0 776.0,113.0"></polygon>
+          <polygon points="776.0,143.0 802.0,158.0 802.0,188.0 776.0,203.0 750.0,188.0 750.0,158.0"></polygon>
+          <polygon points="724.0,143.0 750.0,158.0 750.0,188.0 724.0,203.0 698.0,188.0 698.0,158.0"></polygon>
+          <polygon points="698.0,98.0 724.0,113.0 724.0,143.0 698.0,158.0 672.1,143.0 672.1,113.0"></polygon>
+          <polygon points="724.0,53.0 750.0,68.0 750.0,98.0 724.0,113.0 698.0,98.0 698.0,68.0"></polygon>
+          <polygon points="776.0,53.0 802.0,68.0 802.0,98.0 776.0,113.0 750.0,98.0 750.0,68.0"></polygon>
+        </g>
+        <polygon points="750.0,98.0 776.0,113.0 776.0,143.0 750.0,158.0 724.0,143.0 724.0,113.0" fill="#D26A3F" fill-opacity="0.30" stroke="#D26A3F" stroke-width="1.4"></polygon>
+        <circle cx="750" cy="128" r="4" fill="#D26A3F"></circle>
+        <g stroke="#8A94A3" stroke-width="1" stroke-dasharray="3 2"><line x1="750" y1="128" x2="802" y2="128"></line><line x1="750" y1="128" x2="724" y2="173"></line><line x1="750" y1="128" x2="776" y2="83"></line></g>
+        <text x="750" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">every neighbour is the same distance away</text>
+        <text x="750" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">kRing(cell, 1) = 7 cells; widen k if too few</text>
+        <text x="750" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">used for matching and surge alike</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Redis GEO, or your own index</h4><p><code>GEOADD</code> and <code>GEOSEARCH</code> store points in a sorted set scored by a 52-bit geohash. That's simple and fast per city. At larger scale, matching services keep an in-process map of cell → drivers for their shard of cells, fed directly from the location stream.</p></div>
+    <div class="card"><h4>250 k writes/s is mostly overwrites</h4><p>A driver changes cell only every few updates. Update the position in place, and move the id between cell sets only when the cell changes. Shard by city, then by cell range within big cities, so no single node sees more than tens of thousands of writes a second.</p></div>
+    <div class="card"><h4>"Cars near me" is a cache</h4><p>Riders browsing the map don't need an exact live query. Publish a per-cell snapshot every 2–5 s, including jittered positions for driver privacy, and serve it from a cache. A million reads a second become cheap cache hits.</p></div>
+  </div>
+</section>
+<!-- decks/hld/21-design-ride-hailing/05-matching-and-trip-state.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: matching and trip state">
+  <h2>Deep dive 2: rank by road ETA, offer one driver at a time, and let a guarded write settle races</h2>
+  <p class="dek">The closest driver in a straight line is often not the fastest to arrive, because of rivers, one-way streets and highways. Matching ranks candidates by ETA from a routing engine, then offers the trip to the best one under a short lock. The trip itself is a state machine whose transitions are conditional updates, so two drivers accepting at the same instant can never both win.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: a map with a river. Driver A is 0.9 kilometres from the rider in a straight line but across the river, so the road route via a bridge takes 9 minutes. Driver B is 1.3 kilometres away on the same side and arrives in 3 minutes, so B gets the offer. Driver C is 6 minutes away. Steps: find free drivers in kRing k equals 1, widening to 2 or 3; rank by road ETA; offer to the best while holding a short lock on the driver; on accept, do a guarded update, on decline or timeout move to the next. Right: trip state machine. MATCHING goes to ASSIGNED on accept, then ARRIVED at pickup, then ON TRIP when started, then COMPLETED at drop-off. MATCHING goes to CANCELLED when no driver is found or the rider cancels; ASSIGNED can go to CANCELLED, or back to MATCHING if the driver cancels. The assignment is: update trips set status ASSIGNED and the driver where the id matches and status is MATCHING; zero rows means another driver won. A unique index allows one active trip per driver.">
+        <text x="220" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Nearest is not fastest</text>
+        <rect x="20" y="28" width="400" height="150" rx="4" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <path d="M270 28 C 282 60, 258 100, 272 130 S 284 165, 278 178" fill="none" stroke="#3AA79B" stroke-width="14" stroke-opacity="0.28"></path>
+        <line x1="252" y1="46" x2="296" y2="46" stroke="currentColor" stroke-opacity="0.55" stroke-width="4"></line>
+        <text x="300" y="42" font-size="8" fill="currentColor" opacity="0.7">bridge</text>
+        <path d="M322 100 C 312 76, 305 50, 290 46 L 258 46 C 240 52, 236 80, 233 102" fill="none" stroke="#8A94A3" stroke-width="1.5" stroke-dasharray="4 3"></path>
+        <line x1="322" y1="100" x2="236" y2="110" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="2 3"></line>
+        <path d="M120 150 C 150 150, 190 132, 225 114" fill="none" stroke="#D26A3F" stroke-width="2"></path>
+        <circle cx="230" cy="110" r="5.5" fill="#D26A3F"></circle><text x="230" y="130" text-anchor="middle" font-size="9" fill="currentColor" font-weight="600">rider</text>
+        <circle cx="322" cy="100" r="4.5" fill="currentColor" fill-opacity="0.65"></circle>
+        <circle cx="120" cy="150" r="4.5" fill="#D26A3F" fill-opacity="0.85"></circle>
+        <circle cx="90" cy="62" r="4.5" fill="currentColor" fill-opacity="0.45"></circle>
+        <g font-size="9" fill="currentColor"><text x="332" y="98">A · 0.9 km</text><text x="332" y="112" opacity="0.8">ETA 9 min</text><text x="100" y="60" opacity="0.8">C · ETA 6 min</text></g>
+        <text x="40" y="170" font-size="9" fill="#D26A3F" font-weight="600">B · 1.3 km · ETA 3 min → offer</text>
+        <g font-size="9.5" fill="currentColor">
+          <text x="24" y="200">1 free drivers in kRing(k = 1); widen to k = 2, 3</text>
+          <text x="24" y="218">2 rank by road ETA from the routing engine</text>
+          <text x="24" y="236">3 offer the best one, holding a lock (SET NX, 15 s)</text>
+          <text x="24" y="254">4 accept → guarded update; decline or timeout → next</text>
+        </g>
+        <text x="220" y="278" text-anchor="middle" font-size="9.5" fill="#D26A3F">locks stop double offers; the database stops double assignment</text>
+
+        <line x1="440" y1="10" x2="440" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">The trip state machine</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="460" y="58" width="100" height="30" rx="15" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="510" y="77">MATCHING</text>
+          <rect x="590" y="58" width="100" height="30" rx="15" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5"></rect><text x="640" y="77" font-weight="600">ASSIGNED</text>
+          <rect x="720" y="58" width="110" height="30" rx="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="775" y="77">ARRIVED</text>
+          <rect x="720" y="124" width="110" height="30" rx="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="775" y="143">ON_TRIP</text>
+          <rect x="590" y="124" width="100" height="30" rx="15" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.3"></rect><text x="640" y="143">COMPLETED</text>
+          <rect x="460" y="124" width="100" height="30" rx="15" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="4 3"></rect><text x="510" y="143" opacity="0.8">CANCELLED</text>
+        </g>
+        <line x1="560" y1="73" x2="587" y2="73" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <g stroke="#8A94A3" stroke-width="1.3" fill="none">
+          <line x1="690" y1="73" x2="717" y2="73" marker-end="url(#arw)"></line>
+          <line x1="775" y1="88" x2="775" y2="121" marker-end="url(#arw)"></line>
+          <line x1="720" y1="139" x2="693" y2="139" marker-end="url(#arw)"></line>
+          <line x1="510" y1="88" x2="510" y2="121" marker-end="url(#arw)"></line>
+          <line x1="612" y1="88" x2="563" y2="126" marker-end="url(#arw)"></line>
+          <path d="M622 58 C 614 38, 536 38, 530 55" marker-end="url(#arw)"></path>
+        </g>
+        <g font-size="8.5" fill="currentColor" opacity="0.85">
+          <text x="575" y="34" text-anchor="middle">driver cancels → re-match</text>
+          <text x="575" y="104" text-anchor="middle" fill="#D26A3F">accept</text>
+          <text x="705" y="104" text-anchor="middle">at pickup</text>
+          <text x="782" y="108">start</text>
+          <text x="705" y="170" text-anchor="middle">drop-off</text>
+          <text x="516" y="104">no driver</text><text x="516" y="116">or cancel</text>
+        </g>
+        <rect x="460" y="186" width="425" height="56" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="470" y="204">UPDATE trips SET status = 'ASSIGNED', driver_id = :d</text><text x="470" y="218">WHERE id = :t AND status = 'MATCHING';</text><text x="470" y="234" fill="#D26A3F">-- 0 rows: someone else won; release the lock</text></g>
+        <text x="670" y="262" text-anchor="middle" font-size="9.5" fill="currentColor">+ a unique index: at most one active trip per driver</text>
+        <text x="670" y="278" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">every transition emits an event: rider app, billing, analytics</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>One offer at a time, or a few?</h4><p>Offering to one driver at a time is fair and simple but adds up to 10 s per decline. Offering to the top 2–3 at once is faster, but all but one of them see "taken", which frustrates drivers. Many systems offer sequentially with short timeouts, and widen when demand is high.</p></div>
+    <div class="card"><h4>Batch matching</h4><p>Greedy matching (each request takes its best driver immediately) is locally optimal but globally poor. Collecting requests for 1–2 s and solving an assignment over the batch, minimising total ETA, noticeably cuts average pickup time in busy areas.</p></div>
+    <div class="card"><h4>Idempotent everything</h4><p>Ride creation uses an idempotency key, so a double tap makes one ride. Accepts are keyed by offer id, so a retried accept is a no-op. Driver status (free or on trip) is derived from the trip row, not maintained as a separate flag that can drift.</p></div>
+  </div>
+</section>
+<!-- decks/hld/21-design-ride-hailing/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: trade-offs and follow-ups">
+  <h2>Cities are natural cells, and surge pricing is a control loop you must damp</h2>
+  <p class="dek">Almost every ride starts and ends in one metro area. That makes the city the natural unit of sharding and of failure: each city (or cluster of small cities) runs its own location, matching and trip stack, and only accounts, payments and analytics are global. The other thing interviewers probe is surge pricing, a feedback loop between price, demand and supply that oscillates if nobody damps it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: an edge router routes each request by pickup location to a city cell: San Francisco, New York or London. Each cell has its own gateway and location service, geo index and matching, and trips database. Global services are accounts, payments, pricing rules and asynchronous analytics. A bad deploy or database failure affects one city, not everywhere; a trip crossing a border belongs to the pickup city. Right: surge as a control loop. Demand per hexagon, requests per minute, and supply per hexagon, free drivers, feed a surge job that computes a multiplier per hexagon every minute. Riders see the price, and some wait or walk, reducing demand. Drivers see a heat map and move toward demand, increasing supply. Damp it with smoothing and caps or prices oscillate.">
+        <text x="220" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Shard by city: each city is a cell</text>
+        <rect x="140" y="32" width="160" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="220" y="48" text-anchor="middle" font-size="10" fill="currentColor">edge router</text><text x="220" y="61" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">by pickup location</text>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="180" y1="68" x2="90" y2="97" marker-end="url(#arw)"></line><line x1="220" y1="68" x2="220" y2="97" marker-end="url(#arw)"></line><line x1="260" y1="68" x2="350" y2="97" marker-end="url(#arw)"></line></g>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="22" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="87" y="118" font-size="10" font-weight="600">San Francisco</text><text x="87" y="138">gateway · location</text><text x="87" y="154">geo index · matching</text><text x="87" y="170">trips DB</text><text x="87" y="188" opacity="0.7">+ replicas in 2 AZs</text>
+          <rect x="155" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="220" y="118" font-size="10" font-weight="600">New York</text><text x="220" y="138">gateway · location</text><text x="220" y="154">geo index · matching</text><text x="220" y="170">trips DB</text><text x="220" y="188" opacity="0.7">+ replicas in 2 AZs</text>
+          <rect x="288" y="100" width="130" height="98" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect><text x="353" y="118" font-size="10" font-weight="600">London</text><text x="353" y="138">gateway · location</text><text x="353" y="154">geo index · matching</text><text x="353" y="170">trips DB</text><text x="353" y="188" opacity="0.7">EU data residency</text>
+        </g>
+        <rect x="22" y="212" width="396" height="28" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="220" y="230" text-anchor="middle" font-size="9.5" fill="currentColor">global: accounts · payments · pricing rules · analytics (async)</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">a bad deploy or DB failure hits one city, not the planet</text>
+        <text x="220" y="280" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">a trip across a city boundary belongs to the pickup city</text>
+
+        <line x1="440" y1="10" x2="440" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Surge pricing is a control loop</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="34" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="545" y="51">demand per hex</text><text x="545" y="65" font-size="8.5" opacity="0.75">requests / min</text>
+          <rect x="730" y="34" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="805" y="51">supply per hex</text><text x="805" y="65" font-size="8.5" opacity="0.75">free drivers</text>
+          <rect x="590" y="106" width="170" height="46" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="675" y="125" font-weight="600">surge job</text><text x="675" y="140" font-size="8.5">multiplier per hex, every minute</text>
+          <rect x="470" y="186" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="545" y="203">riders see price</text><text x="545" y="217" font-size="8.5" opacity="0.8">some wait or walk</text>
+          <rect x="730" y="186" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="805" y="203">drivers see heat map</text><text x="805" y="217" font-size="8.5" opacity="0.8">move toward demand</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.4"><line x1="560" y1="74" x2="620" y2="103" marker-end="url(#arwA)"></line><line x1="790" y1="74" x2="730" y2="103" marker-end="url(#arwA)"></line><line x1="630" y1="152" x2="575" y2="183" marker-end="url(#arwA)"></line><line x1="720" y1="152" x2="775" y2="183" marker-end="url(#arwA)"></line></g>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="490" y1="186" x2="490" y2="77" marker-end="url(#arwB)"></line><line x1="860" y1="186" x2="860" y2="77" marker-end="url(#arwB)"></line></g>
+        <g font-size="8.5" fill="#3AA79B"><text x="484" y="134" text-anchor="end">less</text><text x="484" y="146" text-anchor="end">demand</text><text x="866" y="134">more</text><text x="866" y="146">supply</text></g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">damp it (smoothing, caps, hysteresis) or prices oscillate</text>
+        <text x="675" y="274" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">computed from the location and request streams, not the trips DB</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Shared rides</td><td>Matching becomes route insertion: add a rider to a moving trip only if every passenger's detour stays under a limit.</td></tr>
+          <tr><td>Accurate ETAs</td><td>A routing engine over a road graph with live traffic (contraction hierarchies for speed), corrected by ML trained on past trips.</td></tr>
+          <tr><td>GPS spoofing</td><td>Reject impossible speeds and teleports, cross-check with network location, and use device attestation.</td></tr>
+          <tr><td>Payment</td><td>Authorise an estimate at request time, capture the final fare at completion; tips are a separate later capture.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Drivers stream locations over sockets into a per-city in-memory cell index and a Kafka stream. Matching reads nearby cells, ranks candidates by road ETA, and offers under a short lock. The trip is a state machine whose assignment is a guarded write with one active trip per driver. Cities are cells, so failures stay local, and surge is a damped loop fed by the streams."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Cells and deployment stamps" href="#hld/80">HLD · Cells and deployment stamps</a><a data-deck="hld" data-slide="Polling, SSE and WebSockets" href="#hld/28">HLD · Polling, SSE and WebSockets</a></p>
+</section>
 </main>
 
 

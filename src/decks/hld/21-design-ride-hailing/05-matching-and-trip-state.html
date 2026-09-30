@@ -1,0 +1,71 @@
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: matching and trip state">
+  <h2>Deep dive 2: rank by road ETA, offer one driver at a time, and let a guarded write settle races</h2>
+  <p class="dek">The closest driver in a straight line is often not the fastest to arrive, because of rivers, one-way streets and highways. Matching ranks candidates by ETA from a routing engine, then offers the trip to the best one under a short lock. The trip itself is a state machine whose transitions are conditional updates, so two drivers accepting at the same instant can never both win.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: a map with a river. Driver A is 0.9 kilometres from the rider in a straight line but across the river, so the road route via a bridge takes 9 minutes. Driver B is 1.3 kilometres away on the same side and arrives in 3 minutes, so B gets the offer. Driver C is 6 minutes away. Steps: find free drivers in kRing k equals 1, widening to 2 or 3; rank by road ETA; offer to the best while holding a short lock on the driver; on accept, do a guarded update, on decline or timeout move to the next. Right: trip state machine. MATCHING goes to ASSIGNED on accept, then ARRIVED at pickup, then ON TRIP when started, then COMPLETED at drop-off. MATCHING goes to CANCELLED when no driver is found or the rider cancels; ASSIGNED can go to CANCELLED, or back to MATCHING if the driver cancels. The assignment is: update trips set status ASSIGNED and the driver where the id matches and status is MATCHING; zero rows means another driver won. A unique index allows one active trip per driver.">
+        <text x="220" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Nearest is not fastest</text>
+        <rect x="20" y="28" width="400" height="150" rx="4" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.2"></rect>
+        <path d="M270 28 C 282 60, 258 100, 272 130 S 284 165, 278 178" fill="none" stroke="#3AA79B" stroke-width="14" stroke-opacity="0.28"></path>
+        <line x1="252" y1="46" x2="296" y2="46" stroke="currentColor" stroke-opacity="0.55" stroke-width="4"></line>
+        <text x="300" y="42" font-size="8" fill="currentColor" opacity="0.7">bridge</text>
+        <path d="M322 100 C 312 76, 305 50, 290 46 L 258 46 C 240 52, 236 80, 233 102" fill="none" stroke="#8A94A3" stroke-width="1.5" stroke-dasharray="4 3"></path>
+        <line x1="322" y1="100" x2="236" y2="110" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="2 3"></line>
+        <path d="M120 150 C 150 150, 190 132, 225 114" fill="none" stroke="#D26A3F" stroke-width="2"></path>
+        <circle cx="230" cy="110" r="5.5" fill="#D26A3F"></circle><text x="230" y="130" text-anchor="middle" font-size="9" fill="currentColor" font-weight="600">rider</text>
+        <circle cx="322" cy="100" r="4.5" fill="currentColor" fill-opacity="0.65"></circle>
+        <circle cx="120" cy="150" r="4.5" fill="#D26A3F" fill-opacity="0.85"></circle>
+        <circle cx="90" cy="62" r="4.5" fill="currentColor" fill-opacity="0.45"></circle>
+        <g font-size="9" fill="currentColor"><text x="332" y="98">A · 0.9 km</text><text x="332" y="112" opacity="0.8">ETA 9 min</text><text x="100" y="60" opacity="0.8">C · ETA 6 min</text></g>
+        <text x="40" y="170" font-size="9" fill="#D26A3F" font-weight="600">B · 1.3 km · ETA 3 min → offer</text>
+        <g font-size="9.5" fill="currentColor">
+          <text x="24" y="200">1 free drivers in kRing(k = 1); widen to k = 2, 3</text>
+          <text x="24" y="218">2 rank by road ETA from the routing engine</text>
+          <text x="24" y="236">3 offer the best one, holding a lock (SET NX, 15 s)</text>
+          <text x="24" y="254">4 accept → guarded update; decline or timeout → next</text>
+        </g>
+        <text x="220" y="278" text-anchor="middle" font-size="9.5" fill="#D26A3F">locks stop double offers; the database stops double assignment</text>
+
+        <line x1="440" y1="10" x2="440" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">The trip state machine</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="460" y="58" width="100" height="30" rx="15" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="510" y="77">MATCHING</text>
+          <rect x="590" y="58" width="100" height="30" rx="15" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5"></rect><text x="640" y="77" font-weight="600">ASSIGNED</text>
+          <rect x="720" y="58" width="110" height="30" rx="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="775" y="77">ARRIVED</text>
+          <rect x="720" y="124" width="110" height="30" rx="15" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="775" y="143">ON_TRIP</text>
+          <rect x="590" y="124" width="100" height="30" rx="15" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.3"></rect><text x="640" y="143">COMPLETED</text>
+          <rect x="460" y="124" width="100" height="30" rx="15" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="4 3"></rect><text x="510" y="143" opacity="0.8">CANCELLED</text>
+        </g>
+        <line x1="560" y1="73" x2="587" y2="73" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <g stroke="#8A94A3" stroke-width="1.3" fill="none">
+          <line x1="690" y1="73" x2="717" y2="73" marker-end="url(#arw)"></line>
+          <line x1="775" y1="88" x2="775" y2="121" marker-end="url(#arw)"></line>
+          <line x1="720" y1="139" x2="693" y2="139" marker-end="url(#arw)"></line>
+          <line x1="510" y1="88" x2="510" y2="121" marker-end="url(#arw)"></line>
+          <line x1="612" y1="88" x2="563" y2="126" marker-end="url(#arw)"></line>
+          <path d="M622 58 C 614 38, 536 38, 530 55" marker-end="url(#arw)"></path>
+        </g>
+        <g font-size="8.5" fill="currentColor" opacity="0.85">
+          <text x="575" y="34" text-anchor="middle">driver cancels → re-match</text>
+          <text x="575" y="104" text-anchor="middle" fill="#D26A3F">accept</text>
+          <text x="705" y="104" text-anchor="middle">at pickup</text>
+          <text x="782" y="108">start</text>
+          <text x="705" y="170" text-anchor="middle">drop-off</text>
+          <text x="516" y="104">no driver</text><text x="516" y="116">or cancel</text>
+        </g>
+        <rect x="460" y="186" width="425" height="56" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="470" y="204">UPDATE trips SET status = 'ASSIGNED', driver_id = :d</text><text x="470" y="218">WHERE id = :t AND status = 'MATCHING';</text><text x="470" y="234" fill="#D26A3F">-- 0 rows: someone else won; release the lock</text></g>
+        <text x="670" y="262" text-anchor="middle" font-size="9.5" fill="currentColor">+ a unique index: at most one active trip per driver</text>
+        <text x="670" y="278" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">every transition emits an event: rider app, billing, analytics</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>One offer at a time, or a few?</h4><p>Offering to one driver at a time is fair and simple but adds up to 10 s per decline. Offering to the top 2–3 at once is faster, but all but one of them see "taken", which frustrates drivers. Many systems offer sequentially with short timeouts, and widen when demand is high.</p></div>
+    <div class="card"><h4>Batch matching</h4><p>Greedy matching (each request takes its best driver immediately) is locally optimal but globally poor. Collecting requests for 1–2 s and solving an assignment over the batch, minimising total ETA, noticeably cuts average pickup time in busy areas.</p></div>
+    <div class="card"><h4>Idempotent everything</h4><p>Ride creation uses an idempotency key, so a double tap makes one ride. Accepts are keyed by offer id, so a retried accept is a no-op. Driver status (free or on trip) is derived from the trip row, not maintained as a separate flag that can drift.</p></div>
+  </div>
+</section>

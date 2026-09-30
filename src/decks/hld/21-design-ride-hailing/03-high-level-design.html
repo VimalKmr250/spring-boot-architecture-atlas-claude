@@ -1,0 +1,50 @@
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: high-level design">
+  <h2>A location pipeline and a ride pipeline that meet only at the geo index</h2>
+  <p class="dek">Drivers hold persistent connections to a gateway fleet. Their locations update an in-memory geo index and flow on to a stream for everything else: ETAs, surge, trip tracking and history. Ride requests go through a matching service that queries the index, ranks candidates by ETA and pushes an offer down the driver's open connection. The trip service records the outcome with a guarded write.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Location pipeline: the driver app holds a WebSocket to a gateway fleet; the location service validates, drops stale sequence numbers and updates the geo index in Redis, sharded by city, and publishes every point to a Kafka locations topic consumed by ETA, surge pricing, trip tracking and history. Ride pipeline: the rider app calls the API gateway, then the ride service, then matching. Matching queries the geo index for nearby free drivers, ranks them by ETA, and sends an offer through the WebSocket gateway to the chosen driver, who accepts. The trip service then assigns the driver with a guarded update in the trips database.">
+        <text x="20" y="18" font-size="11" font-weight="600" fill="#3AA79B">Location pipeline (≈ 250 k writes/s)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="40" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="60">driver app</text><text x="65" y="74" font-size="8.5" opacity="0.75">GPS every 4 s</text>
+          <rect x="140" y="40" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="60">WS gateway</text><text x="200" y="74" font-size="8.5" opacity="0.75">millions of conns</text>
+          <rect x="290" y="40" width="110" height="46" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="345" y="60">location svc</text><text x="345" y="74" font-size="8.5" opacity="0.8">drop stale seq</text>
+          <rect x="440" y="40" width="130" height="46" rx="5" fill="#3AA79B" fill-opacity="0.16" stroke="#3AA79B" stroke-width="1.5"></rect><text x="505" y="60" font-weight="600">geo index</text><text x="505" y="74" font-size="8.5">Redis · per city</text>
+          <rect x="610" y="48" width="110" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="665" y="67" font-size="9.5">Kafka: locations</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="110" y1="63" x2="137" y2="63" marker-end="url(#arw)"></line><line x1="260" y1="63" x2="287" y2="63" marker-end="url(#arw)"></line><line x1="400" y1="63" x2="437" y2="63" marker-end="url(#arw)"></line></g>
+        <path d="M345 40 V28 H665 V45" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="720" y1="63" x2="747" y2="63" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g font-size="9" fill="currentColor"><text x="752" y="46">ETA service</text><text x="752" y="60">surge pricing</text><text x="752" y="74">trip tracking</text><text x="752" y="88">history → storage</text></g>
+
+        <text x="20" y="196" font-size="11" font-weight="600" fill="#D26A3F">Ride pipeline (≈ 1 k requests/s, strongly consistent)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="212" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="239">rider app</text>
+          <rect x="140" y="212" width="120" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="232">API gateway</text><text x="200" y="246" font-size="8.5" opacity="0.75">auth · idempotency</text>
+          <rect x="290" y="212" width="110" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="345" y="232">ride service</text><text x="345" y="246" font-size="8.5">create MATCHING</text>
+          <rect x="440" y="212" width="130" height="46" rx="5" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.6"></rect><text x="505" y="232" font-weight="600">matching</text><text x="505" y="246" font-size="8.5">nearby · rank by ETA</text>
+          <rect x="610" y="212" width="110" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="665" y="232">trip service</text><text x="665" y="246" font-size="8.5">state machine</text>
+        </g>
+        <path d="M760 214 a55 6 0 0 1 110 0 v36 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M760 214 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="815" y="238" text-anchor="middle" font-size="10" fill="currentColor">trips DB</text><text x="815" y="251" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">PostgreSQL</text>
+        <g stroke="#D26A3F" stroke-width="1.6" fill="none">
+          <line x1="110" y1="235" x2="137" y2="235" marker-end="url(#arwA)"></line><line x1="260" y1="235" x2="287" y2="235" marker-end="url(#arwA)"></line><line x1="400" y1="235" x2="437" y2="235" marker-end="url(#arwA)"></line>
+          <line x1="520" y1="212" x2="520" y2="89" marker-end="url(#arwA)"></line>
+          <line x1="455" y1="212" x2="230" y2="89" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+          <line x1="570" y1="235" x2="607" y2="235" marker-end="url(#arwA)"></line><line x1="720" y1="235" x2="757" y2="235" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="9" fill="#D26A3F"><text x="528" y="140">2 free drivers in</text><text x="528" y="152">nearby cells</text><text x="252" y="140" text-anchor="end">3 offer via the</text><text x="252" y="152" text-anchor="end">driver's socket;</text><text x="252" y="164" text-anchor="end">4 accept</text><text x="120" y="228">1</text><text x="589" y="252" text-anchor="middle">5 assign</text></g>
+        <text x="450" y="296" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">location writes never touch the trips DB; the trips DB never sees 250 k writes/s</text>
+      </svg>
+    </div>
+    <figcaption>Teal is the high-volume, loss-tolerant location path: a dropped point is replaced four seconds later. Copper is the ride path, where every step is idempotent and the final assignment is a single guarded write. Each city, or group of small cities, runs its own copy of both.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>The gateway fleet is stateful</h4><p>Millions of long-lived sockets need a connection registry (driver → gateway node) so matching can push an offer to the right node. It's the same pattern as chat presence. When a gateway node dies, its drivers reconnect elsewhere and re-register within seconds.</p></div>
+    <div class="card"><h4>Why the stream matters</h4><p>One point feeds many consumers: the rider's live map during the trip, ETA models, surge computation per cell, fraud checks for teleporting phones, and the fare's distance. A topic keyed by driver id lets each consume independently and keeps per-driver order.</p></div>
+    <div class="card"><h4>Rider updates by push</h4><p>While matching and during the trip, the rider's app receives status changes and the driver's position (every few seconds) over its own socket or push channel. Don't poll <code>GET /rides</code>, which multiplies reads for no benefit.</p></div>
+  </div>
+</section>
