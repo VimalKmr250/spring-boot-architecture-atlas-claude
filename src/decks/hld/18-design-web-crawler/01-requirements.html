@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · Web crawler" data-title="Web crawler: requirements">
+  <h2>Design a web crawler: a billion pages a month, without hammering anyone's server</h2>
+  <p class="dek">Start from seed URLs, then fetch pages, extract links and repeat, feeding a search index or an archive. Raw throughput is the easy part. The hard parts are <b>politeness</b> (never overload a host), <b>deduplication</b> (most links point to pages you've already seen) and <b>robustness</b> against a web that is malformed, slow and sometimes adversarial.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One billion pages a month divided by 2.6 million seconds is about 400 pages a second, about 1,000 at peak. Times 500 kilobytes per page is about 200 megabytes a second, 1.6 gigabits, and 500 terabytes a month raw, about 30 petabytes over five years. Times about 50 links per page is about 20 thousand discovered URLs a second, most already seen; a seen-set of 10 billion URLs as a Bloom filter with 1 percent false positives takes about 12 gigabytes.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 B pages / month</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">÷ 2.6 M s per month</text><text x="140" y="125" font-size="9.5" opacity="0.75">(new pages + recrawls)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">≈ 400 pages/s average</text><text x="140" y="190" font-weight="600">≈ 1 k pages/s at peak</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">× 500 KB per page</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 200 MB/s ≈ 1.6 Gbps in</text><text x="450" y="125" font-size="9.5" opacity="0.75">(before compression)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="173">500 TB / month raw</text><text x="450" y="190" font-weight="600">≈ 30 PB over 5 years</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">× ~50 links per page</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">≈ 20 k URLs/s discovered</text><text x="760" y="125" font-size="9.5" opacity="0.75">(the vast majority already seen)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">seen-set of 10 B URLs</text><text x="760" y="190" font-weight="600">Bloom filter ≈ 12 GB (1% FP)</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">fetching scales out easily; politeness, duplicates and traps are what make it hard</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>From seed URLs, fetch pages, extract links, and crawl the new ones.</li>
+      <li>Store raw content for downstream consumers (indexer, archive).</li>
+      <li>Recrawl pages so changes show up; faster for pages that change often.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li><b>Polite:</b> obey robots.txt; at most one connection and about one request per few seconds per host.</li>
+      <li><b>Robust:</b> survive bad HTML, slow servers, redirect loops and crawler traps.</li>
+      <li><b>Scalable and extensible:</b> add nodes and new content types (PDF, images) without a redesign.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Purpose: search index, archive or data set? It sets priority and freshness.</li>
+      <li>HTML only, or render JavaScript too? Rendering costs 10–100× more per page.</li>
+      <li>Whole web or a list of domains? Keep old versions or only the latest?</li>
+    </ul></div>
+  </div>
+</section>

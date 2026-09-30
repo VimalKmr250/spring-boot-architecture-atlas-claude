@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Design · E-commerce" data-title="E-commerce: inventory without overselling">
+  <h2>Deep dive 1: a guarded update for everyday traffic, a gate in front of it for a flash sale</h2>
+  <p class="dek">Overselling happens when two buyers read "1 left" and both decrement it. The fix is to make check-and-decrement one atomic statement and to hold stock with an expiry rather than subtracting it. That covers normal traffic. A flash sale turns one SKU row into a hotspot, so you add a cheap atomic gate in front of the database and let only the winners through.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Left: normal traffic. Stock moves from available to reserved, with a 15 minute TTL, then to sold when payment succeeds; if the hold expires, payment fails or the order is cancelled, it is released back to available. The reservation is one guarded update: set reserved to reserved plus one where the SKU matches and on hand minus reserved is at least one; one row updated means held, zero rows means out of stock. The row lock serialises buyers of one SKU, which is fine at tens per second but a bottleneck in a flash sale. Right: flash sale of 10,000 units to 500,000 people. Everyone arrives in the first minute and gets a static sale page from the CDN. A waiting room at the edge admits users at checkout's pace. A Redis DECR gate hands out 10,000 tokens; a result below zero is answered as sold out in about a millisecond. Only winners write a durable hold row in PostgreSQL with a 10 minute TTL. If payment fails, the hold expires and the gate is incremented back.">
+        <text x="225" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Everyday: an atomic check-and-hold</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="52" width="110" height="36" rx="18" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect><text x="75" y="74">available</text>
+          <rect x="170" y="52" width="120" height="36" rx="18" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="230" y="68" font-weight="600">reserved</text><text x="230" y="81" font-size="8.5">TTL 15 min</text>
+          <rect x="330" y="52" width="100" height="36" rx="18" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect><text x="380" y="74">sold</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="130" y1="70" x2="167" y2="70" marker-end="url(#arwA)"></line></g>
+        <line x1="290" y1="70" x2="327" y2="70" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <path d="M230 88 C 230 128, 75 128, 75 91" fill="none" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></path>
+        <g font-size="9" fill="currentColor" text-anchor="middle"><text x="148" y="46">reserve</text><text x="308" y="46">paid</text><text x="152" y="134" opacity="0.85">release: expired · payment failed · cancelled</text></g>
+        <rect x="20" y="152" width="410" height="66" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="30" y="172">UPDATE inventory SET reserved = reserved + 1</text><text x="30" y="188">WHERE sku = :sku AND on_hand - reserved &gt;= 1;</text><text x="30" y="206" fill="#D26A3F">-- 1 row: held · 0 rows: out of stock</text></g>
+        <text x="225" y="244" text-anchor="middle" font-size="9.5" fill="currentColor">the row lock serialises buyers of one SKU: fine at tens per second</text>
+        <text x="225" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">a flash sale sends thousands per second at that one row</text>
+
+        <line x1="450" y1="10" x2="450" y2="292" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Flash sale: 10,000 units, 500,000 people</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="475" y="34" width="405" height="26" rx="3" fill="#8A94A3" fill-opacity="0.30"></rect><text x="485" y="51">500 k people in the first minute · static sale page from the CDN</text>
+          <rect x="475" y="78" width="260" height="26" rx="3" fill="#3AA79B" fill-opacity="0.30"></rect><text x="485" y="95">waiting room at the edge</text><text x="745" y="95" opacity="0.85">admits at checkout's pace</text>
+          <rect x="475" y="122" width="180" height="26" rx="3" fill="#D26A3F" fill-opacity="0.35"></rect><text x="485" y="139" font-weight="600">Redis DECR gate</text><text x="665" y="139" opacity="0.85">&lt; 0 → "sold out" in ~1 ms</text>
+          <rect x="475" y="166" width="120" height="26" rx="3" fill="#D26A3F" fill-opacity="0.55"></rect><text x="485" y="183" font-weight="600">10 k holds</text><text x="605" y="183" opacity="0.85">PostgreSQL rows, TTL 10 min</text>
+          <rect x="475" y="210" width="90" height="26" rx="3" fill="#3AA79B" fill-opacity="0.45"></rect><text x="485" y="227" font-weight="600">pay</text><text x="575" y="227" opacity="0.85">fails → hold expires → INCR the gate</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="520" y1="60" x2="520" y2="75" marker-end="url(#arw)"></line><line x1="520" y1="104" x2="520" y2="119" marker-end="url(#arw)"></line><line x1="520" y1="148" x2="520" y2="163" marker-end="url(#arw)"></line><line x1="520" y1="192" x2="520" y2="207" marker-end="url(#arw)"></line></g>
+        <text x="675" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F" font-weight="600">every "no" comes from the edge or Redis; only winners touch the DB</text>
+        <text x="675" y="280" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">Redis is the gate, PostgreSQL is the truth; a job reconciles them</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>No Redis? Split the row</h4><p>Spread a hot SKU's stock across N bucket rows (for example 10 rows of 1,000). Each attempt tries a random bucket and falls back to others when it's empty. Contention drops about N-fold, and the guarded update is still the thing preventing oversell.</p></div>
+    <div class="card"><h4>Idempotent, one per customer</h4><p>Put a unique constraint on <code>(customer_id, sale_id)</code> and an idempotency key on the purchase request, so double clicks, retries and scripts can't take two units. Add per-account and per-device limits at the edge for bots.</p></div>
+    <div class="card"><h4>Holds must expire</h4><p>A sweeper, or a delayed message per hold, releases expired reservations. It decrements <code>reserved</code>, marks the row released and returns the token to the gate, all idempotently. Without expiry, abandoned carts quietly make stock "sell out" while nothing is sold.</p></div>
+  </div>
+</section>

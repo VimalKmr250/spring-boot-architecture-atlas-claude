@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · E-commerce" data-title="E-commerce: requirements">
+  <h2>Design an online store: two systems in one, browse at scale and checkout without mistakes</h2>
+  <p class="dek">Shoppers search, browse product pages, fill a cart, check out and pay. The numbers split the problem in two. Browsing is a huge, read-heavy workload that tolerates slightly stale data. Checkout is small in volume but must never oversell stock or charge a card twice. Say this early, because it justifies every later choice.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 50 million daily users times 20 page views is 1 billion views a day, about 12 thousand a second, about 60 thousand a second at sale peaks. 2 million orders a day is about 25 a second on average, up to 20 times more in a flash sale, about 500 checkouts a second: small, but it must be exact. 100 million SKUs times 10 kilobytes is about 1 terabyte of catalog data, plus about 5 images each, about 100 terabytes, in object storage behind a CDN.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">50 M DAU × 20 page views</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">1 B views/day ≈ 12 k/s</text><text x="140" y="125" font-size="9.5" opacity="0.75">(search, category, product pages)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="140" y="173">≈ 60 k/s at sale peaks</text><text x="140" y="190" font-weight="600">read path: cache + CDN</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">2 M orders / day</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 25 orders/s average</text><text x="450" y="125" font-size="9.5" opacity="0.75">(up to ×20 in a flash sale)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="173">~500 checkouts/s peak</text><text x="450" y="190" font-weight="600">small, but must be exact</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">100 M SKUs × 10 KB</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">≈ 1 TB of catalog data</text><text x="760" y="125" font-size="9.5" opacity="0.75">(+ ~5 images per SKU)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.3"></rect><text x="760" y="173">~100 TB of images</text><text x="760" y="190" font-weight="600">object storage + CDN</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">browsing is a read-scaling problem; checkout is a correctness problem. Design them separately.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Search and browse the catalog; product pages with price and availability.</li>
+      <li>Cart that survives across devices and sessions.</li>
+      <li>Checkout, payment, order status and history; cancellations and refunds.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Browse p99 &lt; 200 ms and highly available; a slightly stale stock badge is acceptable.</li>
+      <li>Checkout: <b>never oversell, never double-charge</b>. Strong consistency where money and stock change.</li>
+      <li>Peaks of 10–20× at sales, which are planned, so scale ahead of time.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Own stock only, or a marketplace with third-party sellers?</li>
+      <li>Payments through a provider (Stripe, Adyen)? Yes: never store card numbers, to stay out of most PCI scope.</li>
+      <li>Flash sales with contested stock? One region or several?</li>
+    </ul></div>
+  </div>
+</section>
