@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Library" data-title="Library · class diagram">
+  <h2>Library: copies carry the status, members carry the limits, the library carries the rules between them</h2>
+  <p class="dek">Status belongs to the copy, because it is the copy that is on loan or on hold. Loan limits belong to the member's tier. The rules that involve several objects (can this member take this copy, who gets a returned copy) live in the <code>Library</code> service, the one class that sees all of them.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">Library</span>                           <span class="c">the service; one lock</span>
+  - books : Map&lt;isbn, Book&gt;
+  - copies : Map&lt;barcode, Copy&gt;
+  - members : Map&lt;id, Member&gt;
+  - loans : Map&lt;barcode, Loan&gt;       <span class="c">active loans only</span>
+  - waitlists : Map&lt;isbn, Deque&lt;memberId&gt;&gt;
+  - fines : FinePolicy
+  - listeners : List&lt;LibraryListener&gt;
+  + borrow(memberId, barcode) : Loan
+  + giveBack(barcode) : long         <span class="c">the fine</span>
+  + reserve(memberId, isbn)
+  + search(text) : List&lt;Book&gt;
+  ◆── * Copy   ◇── * Member   ◆── * Loan
+  ──> 1 FinePolicy   ──> * LibraryListener
+
+<span class="h">«record» Book</span>    isbn, title, authors
+<span class="h">Copy</span>
+  - barcode   - book : Book   - status : CopyStatus
+  - heldFor : memberId (0..1)
+  ──> 1 Book
+<span class="h">Member</span>
+  - id   - tier : Tier   - onLoan : int   - finesDue : long
+  + canBorrow() : boolean
+<span class="h">«record» Loan</span>    barcode, memberId, borrowed, due
+
+<span class="h">«enum» Tier</span>        STANDARD(3, 14)  PREMIUM(5, 28)
+<span class="h">«enum» CopyStatus</span>  AVAILABLE  ON_LOAN  ON_HOLD  REFERENCE_ONLY
+
+<span class="h">«interface» FinePolicy</span>       fineFor(daysLate) : long
+<span class="h">«interface» LibraryListener</span>  holdReady(Member, Book, until)</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">Copy status transitions</span>
+  AVAILABLE ──borrow──>  ON_LOAN
+  ON_LOAN   ──return──>  AVAILABLE   <span class="c">nobody waiting</span>
+  ON_LOAN   ──return──>  ON_HOLD     <span class="c">for the first in line</span>
+  ON_HOLD   ──borrow──>  ON_LOAN     <span class="c">by that member only</span>
+  REFERENCE_ONLY                     <span class="c">never moves</span></div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td><code>Copy</code></td><td>Its status, and who may borrow it while on hold</td></tr>
+            <tr><td><code>Member</code></td><td>Whether they are allowed to borrow at all (limit, fines)</td></tr>
+            <tr><td><code>Tier</code></td><td>How many loans, for how long</td></tr>
+            <tr><td><code>FinePolicy</code></td><td>What lateness costs</td></tr>
+            <tr><td><code>Library</code></td><td>The waiting list, and who a returned copy goes to</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why a listener, not an email call</span>The library raises "hold ready" and does not care how the member hears about it. Email, SMS and the app's inbox are subscribers. That is the <a data-deck="lld" data-slide="Observer">observer pattern</a>, and it keeps the notification vendor out of the domain.</div>
+    </div>
+  </div>
+</section>

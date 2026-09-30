@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Command">
+  <h2>Command: turn a request into an object you can store, undo and replay</h2>
+  <p class="dek">A command object holds everything needed to perform an action later: the receiver, the arguments, and enough state to reverse it. Once requests are objects you can keep a history (undo and redo), queue them (a job scheduler), log them (an audit trail) or send them elsewhere. Chess moves, editor edits and ATM transactions are all commands.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CommandDemo.java · an editor with undo and redo</div>
+<pre><code class="language-java">import java.util.*;
+
+interface Command {
+    void execute();
+    void undo();
+}
+
+final class Document {                          // the receiver
+    final StringBuilder text = new StringBuilder();
+    @Override public String toString() { return "\"" + text + "\""; }
+}
+
+record Insert(Document doc, int at, String s) implements Command {
+    public void execute() { doc.text.insert(at, s); }
+    public void undo()    { doc.text.delete(at, at + s.length()); }
+}
+
+final class Delete implements Command {
+    private final Document doc;
+    private final int from, to;
+    private String removed = "";                // captured for undo
+    Delete(Document doc, int from, int to) { this.doc = doc; this.from = from; this.to = to; }
+    public void execute() {
+        removed = doc.text.substring(from, to);
+        doc.text.delete(from, to);
+    }
+    public void undo() { doc.text.insert(from, removed); }
+}
+
+final class Editor {                            // the invoker
+    private final Deque&lt;Command&gt; undo = new ArrayDeque&lt;&gt;();
+    private final Deque&lt;Command&gt; redo = new ArrayDeque&lt;&gt;();
+    void run(Command c) { c.execute(); undo.push(c); redo.clear(); }
+    boolean undo() {
+        if (undo.isEmpty()) return false;
+        Command c = undo.pop(); c.undo(); redo.push(c);
+        return true;
+    }
+    boolean redo() {
+        if (redo.isEmpty()) return false;
+        Command c = redo.pop(); c.execute(); undo.push(c);
+        return true;
+    }
+}
+
+public class CommandDemo {
+    public static void main(String[] args) {
+        var doc = new Document();
+        var ed = new Editor();
+        ed.run(new Insert(doc, 0, "hello world"));   System.out.println("insert  " + doc);
+        ed.run(new Delete(doc, 5, 11));             System.out.println("delete  " + doc);
+        ed.run(new Insert(doc, 5, ", LLD"));        System.out.println("insert  " + doc);
+        ed.undo();                                  System.out.println("undo    " + doc);
+        ed.undo();                                  System.out.println("undo    " + doc);
+        ed.redo();                                  System.out.println("redo    " + doc);
+        ed.run(new Insert(doc, 0, "&gt;&gt; "));           System.out.println("insert  " + doc);
+        System.out.println("redo after a new edit: " + ed.redo());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · CommandDemo.java</div>
+<pre><code class="language-plaintext">insert  "hello world"
+delete  "hello"
+insert  "hello, LLD"
+undo    "hello"
+undo    "hello world"
+redo    "hello"
+insert  "&gt;&gt; hello"
+redo after a new edit: false</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Two ways to undo</span>Each command stores what it needs to reverse itself, as <code>Delete</code> stores the removed text. Or the invoker stores a snapshot of the whole state before each command (<a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">memento</a>). Reverse operations are cheap; snapshots are simpler and always correct. Chess uses the first: a <code>Move</code> remembers the captured piece.</div>
+      <div class="note warn"><span class="lbl">The redo rule</span>A new command after an undo must clear the redo stack. Otherwise redo replays an edit on top of text it was never meant for. Interviewers test this exact case.</div>
+      <div class="note tip"><span class="lbl">Command or strategy?</span>Both are objects holding behaviour. A strategy answers <b>how</b> to do something the context always does. A command <b>is</b> a request: it knows its receiver and arguments, and can be stored and undone.</div>
+    </div>
+  </div>
+</section>

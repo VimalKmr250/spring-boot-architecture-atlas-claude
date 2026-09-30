@@ -1,0 +1,31 @@
+<section class="slide" data-sec="SOLID and friends" data-title="DRY, KISS, YAGNI">
+  <h2>DRY, KISS and YAGNI keep SOLID from turning into over-engineering</h2>
+  <p class="dek">SOLID pushes you towards more interfaces and more classes. These three push back. In an interview the right amount of design is whatever the stated requirements, plus the one change you can see coming, need. Anything beyond that is time you did not spend on the working code.</p>
+
+  <div class="grid3">
+    <div class="card"><h4>DRY · Don't repeat yourself</h4><p>Every piece of <b>knowledge</b> should have one authoritative home. The late-fee rule lives in one place, not in the checkout screen and in the nightly job.</p><p><b>Misread as</b> "never write similar code twice". Two methods that look alike today but change for different reasons are not duplication. Merging them creates the wrong abstraction, which is worse than the copy.</p></div>
+    <div class="card"><h4>KISS · Keep it simple</h4><p>Choose the simplest structure that meets the requirement. If vehicle types differ only in a size, an enum with a field beats a class hierarchy. If there is one pricing rule, a method beats a strategy interface.</p><p><b>Misread as</b> "no design". Simple means few concepts, not one giant method.</p></div>
+    <div class="card"><h4>YAGNI · You aren't gonna need it</h4><p>Do not build for requirements you imagined. Multi-currency, plug-in loading and a rules engine are rarely asked for in an hour.</p><p><b>Misread as</b> "no seams". Leaving an interface where the prompt hints at change ("pricing may vary") is not speculation; it is reading the requirements.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">KISS · when behaviour is only data, use an enum</div>
+<pre><code class="language-java">enum VehicleType {
+    MOTORBIKE(SpotSize.SMALL, 20),
+    CAR(SpotSize.MEDIUM, 40),
+    TRUCK(SpotSize.LARGE, 90);
+
+    final SpotSize needs;
+    final int hourlyRate;
+    VehicleType(SpotSize needs, int hourlyRate) {
+        this.needs = needs;
+        this.hourlyRate = hourlyRate;
+    }
+}
+// Promote to classes only when the types start to
+// behave differently, not just carry different numbers.</code></pre>
+    </div>
+    <div class="note tip"><span class="lbl">What to say out loud</span>"I'll keep vehicle types as an enum, because right now they differ only in size and rate. If you tell me trucks need a permit check, I'll turn it into a sealed interface. That's a ten-minute change, because nothing outside <code>VehicleType</code> switches on it." That one sentence shows KISS, YAGNI and an awareness of OCP together, and interviewers notice it.</div>
+  </div>
+</section>

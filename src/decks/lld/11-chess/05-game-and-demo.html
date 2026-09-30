@@ -1,0 +1,82 @@
+<section class="slide" data-sec="Chess" data-title="Chess · game and demo">
+  <h2>Chess: the shortest checkmate, a pin, a promotion, and undo</h2>
+  <p class="dek">The first game plays fool's mate, the fastest possible checkmate, with two illegal attempts along the way. The second starts from a position written as text. It shows a pinned bishop, a promotion, and a black rook that cannot capture because moving it would expose its own king to the new queen.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChessDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class ChessDemo {
+    static void play(Game g, String from, String to) {
+        try {
+            Move m = g.move(from, to);
+            System.out.printf("  %-9s %s to move, %s%n", m, g.turn(), g.status());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            System.out.printf("  %s-%s     refused: %s%n", from, to, e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        System.out.println("Fool's mate");
+        var g = new Game(Board.standard());
+        play(g, "e7", "e5");                    // black cannot start
+        play(g, "e2", "e5");                    // pawns do not jump
+        play(g, "f2", "f3");
+        play(g, "e7", "e5");
+        play(g, "g2", "g4");
+        play(g, "d8", "h4");                    // checkmate
+        play(g, "a2", "a3");
+        g.undo();
+        System.out.println("  undo      " + g.turn() + " to move, " + g.status());
+
+        System.out.println("Pin and promotion");
+        var p = new Game(Board.fromRows(
+                "....r..k",
+                "P.......",
+                "........",
+                "........",
+                "........",
+                "........",
+                "....B...",
+                "....K..."));
+        play(p, "e2", "d3");                    // bishop is pinned
+        play(p, "a7", "a8");                    // promotes to a queen
+        play(p, "e8", "e2");                    // would uncover h8
+        play(p, "h8", "h7");
+        play(p, "a8", "e8");
+        System.out.println(p.render());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ChessDemo.java</div>
+<pre><code class="language-plaintext">Fool's mate
+  e7-e5     refused: it is WHITE's turn
+  e2-e5     refused: P cannot move e2-e5
+  Pf2-f3    BLACK to move, ACTIVE
+  Pe7-e5    WHITE to move, ACTIVE
+  Pg2-g4    BLACK to move, ACTIVE
+  Qd8-h4    WHITE to move, CHECKMATE
+  a2-a3     refused: game over: CHECKMATE
+  undo      BLACK to move, ACTIVE
+Pin and promotion
+  e2-d3     refused: that leaves your king in check
+  Pa7-a8=Q  BLACK to move, ACTIVE
+  e8-e2     refused: that leaves your king in check
+  Kh8-h7    WHITE to move, ACTIVE
+  Qa8xe8    BLACK to move, ACTIVE
+8 ....Q...
+7 .......k
+6 ........
+5 ........
+4 ........
+3 ........
+2 ....B...
+1 ....K...
+  abcdefgh</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Positions as text are a test tool</span><code>Board.fromRows</code> costs ten lines and makes every rule testable in isolation: a pin, a stalemate, a promotion. In a machine-coding round, write it early. It is also how you answer "how would you test this?"</div>
+      <div class="note tip"><span class="lbl">What undo restores</span>After undoing the mating move, it is black's turn again and the status is recomputed from the board, not remembered. Deriving status from the position means undo can never leave a stale "checkmate" behind.</div>
+    </div>
+  </div>
+</section>

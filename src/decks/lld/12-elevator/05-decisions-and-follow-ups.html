@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Elevator" data-title="Elevator · decisions and follow-ups">
+  <h2>Elevator: the choices to defend, and the follow-ups to expect</h2>
+  <p class="dek">The demo's last call shows why dispatch must be swappable: under zoning, car A travels from floor 8 to floor 1 while car B sits idle one floor away. Zoning wins at 9 a.m., when everyone comes from the lobby, and loses at 3 p.m. Interviewers want you to say which rule fits which traffic, then show the rule is one class.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>Dispatch as a strategy</td><td>The rule changes with traffic and time of day; the cars do not. Swapped at runtime by <code>useDispatcher</code>.</td></tr>
+          <tr><td>LOOK inside the car</td><td>Routing uses only the car's own stops, so it belongs to the car (information expert).</td></tr>
+          <tr><td>Hall calls assigned once</td><td>Simple and predictable. Real controllers re-assign pending calls every few seconds as cars move; a follow-up.</td></tr>
+          <tr><td>Discrete ticks</td><td>Deterministic and testable. A real system is event-driven, with timers for travel and doors.</td></tr>
+          <tr><td>Arrivals as events</td><td>Displays, chimes and logs subscribe. The car does not know about any of them.</td></tr>
+          <tr><td>One lock on the system</td><td>Button presses, ticks and strategy swaps all serialise. At a few events per second that costs nothing, and it rules out a car being given a stop mid-step.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">The listener runs inside the lock</span>In the demo a listener presses a car button from inside <code>tick</code>, which works because Java's intrinsic locks are re-entrant. A slow listener (a network call to a display) would hold up every car, though. In production, publish events to a queue and let listeners consume them on another thread. It is the same trade-off as synchronous and asynchronous <a data-deck="lld" data-slide="Observer">observers</a>.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>Honour hall-call direction</td><td>Keep up-stops and down-stops in separate sets; a car serves a floor on the way up only for an up call. <code>step</code> reads the set for its current direction. The dispatcher already accounts for it.</td></tr>
+        <tr><td>Capacity</td><td>Each car tracks its load; the dispatcher skips full cars, and a full car ignores hall-call stops until riders get out.</td></tr>
+        <tr><td>A car out of service</td><td>A <code>serviceable</code> flag, or a State for the car. The dispatcher filters it out; its pending hall calls are handed back to the dispatcher.</td></tr>
+        <tr><td>Destination dispatch</td><td>Riders enter their floor in the lobby, so a hall call carries its destination. The dispatcher groups riders by destination, and returns which car to wait for.</td></tr>
+        <tr><td>Rush-hour switching</td><td>A <code>ScheduledDispatcher</code> that delegates to zoning or nearest-car by time of day: a strategy that picks a strategy. No other class changes.</td></tr>
+        <tr><td>Fire mode</td><td>A system-wide state: every car cancels its stops and returns to the lobby, and hall calls are refused.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

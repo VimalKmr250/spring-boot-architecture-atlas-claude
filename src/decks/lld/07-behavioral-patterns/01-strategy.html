@@ -1,0 +1,75 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Strategy">
+  <h2>Strategy: put a varying algorithm behind an interface and choose it at runtime</h2>
+  <p class="dek">The most used pattern in LLD rounds. Whenever the prompt says the rule "may vary" (fares, parking fees, how to split a bill, which elevator answers a call), the context class holds a strategy and delegates to it. In modern Java a one-method strategy is a functional interface, so a new rule can be a lambda, an enum constant or a class.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">StrategyDemo.java · fares as lambdas, a factory, and an enum</div>
+<pre><code class="language-java">import java.util.*;
+
+record Trip(int km, int minutes, boolean shared) {}
+
+@FunctionalInterface
+interface FareStrategy {                      // domain name, one method
+    long fare(Trip t);
+}
+
+final class FareCalculator {                  // the context
+    private static final long MINIMUM = 50;   // a rule every strategy shares
+    private FareStrategy strategy;
+    FareCalculator(FareStrategy strategy) { this.strategy = strategy; }
+    void use(FareStrategy s) { strategy = Objects.requireNonNull(s); }
+    long quote(Trip t) { return Math.max(MINIMUM, strategy.fare(t)); }
+}
+
+enum Plan implements FareStrategy {           // strategies as enum constants
+    STANDARD { public long fare(Trip t) { return 12L * t.km() + 2L * t.minutes(); } },
+    POOL     { public long fare(Trip t) {
+                   long base = STANDARD.fare(t);
+                   return t.shared() ? base * 70 / 100 : base; } }
+}
+
+public class StrategyDemo {
+    static FareStrategy surge(int percent) {  // a strategy factory
+        return t -&gt; Plan.STANDARD.fare(t) * percent / 100;
+    }
+
+    public static void main(String[] args) {
+        Map&lt;String, FareStrategy&gt; byName = new LinkedHashMap&lt;&gt;();
+        byName.put("standard", Plan.STANDARD);
+        byName.put("pool", Plan.POOL);
+        byName.put("surge 150%", surge(150));
+        byName.put("flat airport", t -&gt; 799);  // a one-off rule, as a lambda
+
+        var trips = List.of(new Trip(10, 25, true), new Trip(2, 6, false));
+        var calc = new FareCalculator(Plan.STANDARD);
+        for (var e : byName.entrySet()) {
+            calc.use(e.getValue());           // swap at runtime
+            System.out.printf("%-13s %s%n", e.getKey(),
+                    trips.stream().map(calc::quote).toList());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · StrategyDemo.java</div>
+<pre><code class="language-plaintext">standard      [170, 50]
+pool          [119, 50]
+surge 150%    [255, 54]
+flat airport  [799, 799]</code></pre>
+      </div>
+<div class="tree"><span class="h">FareCalculator</span>          <span class="c">the context</span>
+  - strategy : FareStrategy
+  + quote(Trip) : long
+  ──> 1 FareStrategy
+
+<span class="h">«interface» FareStrategy</span>
+  + fare(Trip) : long
+  ┄┄▷ Plan.STANDARD, Plan.POOL
+  ┄┄▷ lambdas: surge(p), flat</div>
+      <div class="note"><span class="lbl">Where the shared rule goes</span>The minimum fare applies to every strategy, so it lives in the context, not copied into each one. If a rule applies to some strategies but not others, it is a <a data-deck="lld" data-slide="Decorator">decorator</a>.</div>
+      <div class="note tip"><span class="lbl">Who picks the strategy?</span>Say it explicitly: a factory from configuration, the lot's settings, or the user's choice. "Strategy" without a chooser is half an answer.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,23 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Patterns that look alike">
+  <h2>Patterns that share a class diagram, and the question that tells them apart</h2>
+  <p class="dek">Several patterns have almost the same structure: an interface, an implementation, and a class that holds one. What differs is the intent, meaning who creates the object, who changes it, and why. "Isn't that just a strategy?" is a common follow-up, and these are the answers.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Pair</th><th>Same shape</th><th>The difference</th><th>Ask yourself</th></tr></thead>
+      <tbody>
+        <tr><td><a data-deck="lld" data-slide="Strategy">Strategy</a> vs <a data-deck="lld" data-slide="State">State</a></td><td>A context delegates to an interface</td><td>A strategy is chosen from outside and stays put. A state replaces itself as events arrive.</td><td>Who decides the next implementation: the client, or the current one?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Strategy">Strategy</a> vs <a data-deck="lld" data-slide="Template method">Template method</a></td><td>Vary part of an algorithm</td><td>Strategy uses composition and can change at runtime. Template method uses inheritance and is fixed per subclass.</td><td>Do the varying steps belong together, or mix and match?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Strategy">Strategy</a> vs <a data-deck="lld" data-slide="Command">Command</a></td><td>An object wrapping behaviour</td><td>A strategy is <b>how</b> the context does its job. A command is a <b>request</b>, with its receiver and arguments, that can be stored, queued and undone.</td><td>Would you ever put it in a history list?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Decorator">Decorator</a> vs <a data-deck="lld" data-slide="Proxy">Proxy</a></td><td>Same interface, wraps the target</td><td>A decorator adds behaviour and is stacked by the client. A proxy controls access (lazy, cached, remote, secured) and usually manages the target itself.</td><td>Does the caller know, and choose, the wrapping?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Adapter">Adapter</a> vs <a data-deck="lld" data-slide="Facade">Facade</a></td><td>A class in front of other code</td><td>An adapter makes one interface look like another. A facade makes many classes look like one simpler interface.</td><td>One object translated, or many coordinated?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Adapter">Adapter</a> vs <a data-deck="lld" data-slide="Bridge and flyweight">Bridge</a></td><td>An abstraction holding an implementor</td><td>An adapter is applied after the fact to make existing code fit. A bridge is designed up front to let two hierarchies vary independently.</td><td>Retrofitting, or planning?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Composite">Composite</a> vs <a data-deck="lld" data-slide="Decorator">Decorator</a></td><td>Recursive composition of one interface</td><td>A composite holds many children and aggregates them. A decorator holds exactly one and adds to it.</td><td>One wrapped object, or a tree?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Observer">Observer</a> vs <a data-deck="lld" data-slide="Iterator, mediator, memento, visitor">Mediator</a></td><td>Objects are decoupled from each other</td><td>Observer broadcasts one-way from a subject to anyone listening. A mediator holds the coordination logic between peers.</td><td>Is there logic in the middle, or just a list?</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Factory method">Factory method</a> vs <a data-deck="lld" data-slide="Abstract factory">Abstract factory</a> vs <a data-deck="lld" data-slide="Builder">Builder</a></td><td>Creation is hidden from the caller</td><td>A factory method picks the class of one product. An abstract factory creates a matching family. A builder assembles one complex product step by step.</td><td>Which class? Which family? Or which fields?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The honest answer is often "both"</span>The parking-fee rule is a strategy, wrapped in decorators for discounts, created by a factory from the lot's configuration. Naming each role, and why it is there, is a better answer than choosing one label.</div>
+</section>

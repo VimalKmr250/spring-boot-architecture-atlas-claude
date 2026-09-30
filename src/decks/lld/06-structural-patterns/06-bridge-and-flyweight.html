@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Structural patterns" data-title="Bridge and flyweight">
+  <h2>Bridge splits two dimensions of variation; flyweight shares what never changes</h2>
+  <p class="dek"><b>Bridge:</b> when a type varies in two independent ways, such as kind of alert and delivery channel, a subclass per pair means <i>m × n</i> classes. Hold the second dimension as a field instead, and you need <i>m + n</i>. <b>Flyweight:</b> when a program has thousands of small objects with the same intrinsic state, share one immutable instance and pass the rest (the position, the owner) in from outside.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">BridgeFlyweight.java · alerts × channels, and shared chess glyphs</div>
+<pre><code class="language-java">import java.util.*;
+
+interface Channel { String deliver(String to, String text); }  // implementor
+record Email() implements Channel {
+    public String deliver(String to, String t) { return "[email " + to + "] " + t; }
+}
+record Sms() implements Channel {
+    public String deliver(String to, String t) { return "[sms " + to + "] " + t; }
+}
+
+abstract class Alert {                          // abstraction: holds the bridge
+    protected final Channel channel;
+    Alert(Channel channel) { this.channel = channel; }
+    abstract String send(String to);
+}
+final class OutageAlert extends Alert {
+    OutageAlert(Channel c) { super(c); }
+    String send(String to) { return channel.deliver(to, "OUTAGE: lift 2 down"); }
+}
+final class ReminderAlert extends Alert {
+    private final String what;
+    ReminderAlert(Channel c, String what) { super(c); this.what = what; }
+    String send(String to) { return channel.deliver(to, "Reminder: " + what); }
+}
+
+record Glyph(char symbol, String name) {}       // flyweight: intrinsic state
+
+final class Glyphs {                            // the flyweight factory
+    private static final Map&lt;Character, Glyph&gt; CACHE = new HashMap&lt;&gt;();
+    private static final Map&lt;Character, String&gt; NAMES = Map.of('K', "king",
+            'Q', "queen", 'R', "rook", 'B', "bishop", 'N', "knight", 'P', "pawn");
+    static Glyph of(char c) {
+        return CACHE.computeIfAbsent(c, k -&gt;
+                new Glyph(k, NAMES.get(Character.toUpperCase(k))));
+    }
+}
+
+record PlacedPiece(Glyph glyph, int square) {}  // extrinsic state
+
+public class BridgeFlyweight {
+    public static void main(String[] args) {
+        List&lt;Alert&gt; alerts = List.of(new OutageAlert(new Email()),
+                new OutageAlert(new Sms()), new ReminderAlert(new Sms(), "book return"));
+        alerts.forEach(a -&gt; System.out.println(a.send("ana")));
+
+        String setup = "RNBQKBNRPPPPPPPPpppppppprnbqkbnr";
+        List&lt;PlacedPiece&gt; pieces = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; setup.length(); i++)
+            pieces.add(new PlacedPiece(Glyphs.of(setup.charAt(i)), i &lt; 16 ? i : i + 32));
+        Set&lt;Glyph&gt; distinct = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());
+        pieces.forEach(p -&gt; distinct.add(p.glyph()));
+        System.out.println(pieces.size() + " pieces share " + distinct.size() + " glyph objects");
+        System.out.println("Integer.valueOf(127) shared: " + (Integer.valueOf(127) == Integer.valueOf(127)));
+        System.out.println("Integer.valueOf(128) shared: " + (Integer.valueOf(128) == Integer.valueOf(128)));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · BridgeFlyweight.java</div>
+<pre><code class="language-plaintext">[email ana] OUTAGE: lift 2 down
+[sms ana] OUTAGE: lift 2 down
+[sms ana] Reminder: book return
+32 pieces share 12 glyph objects
+Integer.valueOf(127) shared: true
+Integer.valueOf(128) shared: false</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Bridge in one sentence</span>"Alert type and channel vary independently, so the alert holds a channel instead of extending one." Adding WhatsApp is one class, not one per alert type. It is composition over inheritance applied to two axes.</div>
+      <div class="note"><span class="lbl">Flyweight rules</span>The shared object must be immutable, since everyone holds the same instance. The extrinsic state (here, the square) lives outside it. The JDK's <code>Integer.valueOf</code> caches -128 to 127, which is why <code>==</code> on boxed integers works in tests and fails in production.</div>
+      <div class="note warn"><span class="lbl">Only when there are many</span>Flyweight is a memory optimisation. Mention it for 10⁶ map tiles or characters in an editor; for 32 chess pieces it is a talking point, not a need.</div>
+    </div>
+  </div>
+</section>

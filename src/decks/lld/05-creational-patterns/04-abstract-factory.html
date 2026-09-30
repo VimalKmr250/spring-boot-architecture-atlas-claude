@@ -1,0 +1,65 @@
+<section class="slide" data-sec="Creational patterns" data-title="Abstract factory">
+  <h2>Abstract factory: create a family of objects that must match</h2>
+  <p class="dek">Use it when several objects vary together and mixing them would be a bug. A checkout in India needs a UPI authoriser, 18% GST and rupees. A checkout in Germany needs SEPA, 19% VAT and euros. One factory per region makes each checkout internally consistent, and the checkout code never names a region.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">AbstractFactoryDemo.java · one kit per region</div>
+<pre><code class="language-java">interface Authorizer { String authorize(long minor); }
+interface TaxRule { long taxOn(long minor); }
+
+interface RegionKit {                       // the abstract factory
+    Authorizer authorizer();
+    TaxRule taxRule();
+    String currency();
+}
+
+final class IndiaKit implements RegionKit {
+    public Authorizer authorizer() { return m -&gt; "UPI mandate for " + m; }
+    public TaxRule taxRule() { return m -&gt; m * 18 / 100; }      // GST
+    public String currency() { return "INR"; }
+}
+
+final class GermanyKit implements RegionKit {
+    public Authorizer authorizer() { return m -&gt; "SEPA debit for " + m; }
+    public TaxRule taxRule() { return m -&gt; m * 19 / 100; }      // VAT
+    public String currency() { return "EUR"; }
+}
+
+final class Checkout {                      // knows only the interfaces
+    private final RegionKit kit;
+    Checkout(RegionKit kit) { this.kit = kit; }
+    String pay(long netMinor) {
+        long gross = netMinor + kit.taxRule().taxOn(netMinor);
+        return kit.authorizer().authorize(gross) + " " + kit.currency();
+    }
+}
+
+public class AbstractFactoryDemo {
+    public static void main(String[] args) {
+        for (RegionKit kit : new RegionKit[] { new IndiaKit(), new GermanyKit() })
+            System.out.println(new Checkout(kit).pay(10_000));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · AbstractFactoryDemo.java</div>
+<pre><code class="language-plaintext">UPI mandate for 11800 INR
+SEPA debit for 11900 EUR</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Factory method</th><th>Abstract factory</th></tr></thead>
+          <tbody>
+            <tr><td>Creates</td><td>One product</td><td>A family of related products</td></tr>
+            <tr><td>Chosen by</td><td>An argument, or a subclass</td><td>Which factory object you hold</td></tr>
+            <tr><td>Adding a variant</td><td>A new case or subclass</td><td>A new factory class</td></tr>
+            <tr><td>Adding a product</td><td>A new method</td><td>A new method on every factory</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">When it earns its place</span>Rarely in a one-hour LLD round. It shows up in "support multiple regions", "support light and dark themes" and "support two database vendors". If there is only one product, you want a factory method; if nothing has to match, you want separate strategies.</div>
+    </div>
+  </div>
+</section>

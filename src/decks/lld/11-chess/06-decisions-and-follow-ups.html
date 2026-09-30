@@ -1,0 +1,36 @@
+<section class="slide" data-sec="Chess" data-title="Chess · decisions and follow-ups">
+  <h2>Chess: the choices to defend, and where the missing rules would go</h2>
+  <p class="dek">The chess follow-ups are almost all rules that depend on history (castling, en passant, repetition), which the stateless pieces cannot see. The answer is always the same: the game, which owns the history, adds those moves to the candidate list, and the check-by-simulation filter keeps working unchanged.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>Pieces generate, the game filters</td><td>One rule for check covers every piece and every pin. Encoding check in each piece duplicates it six times, and gets pins wrong.</td></tr>
+          <tr><td>Legality by apply-test-undo</td><td>Simple and obviously correct. An engine would compute pins and attack maps instead, and be much faster.</td></tr>
+          <tr><td>Sealed <code>Piece</code> hierarchy</td><td>Six types fixed by the rules. Inheritance is right here: each piece really <i>is a</i> piece, and the loops really are shared.</td></tr>
+          <tr><td>Status derived, not stored</td><td>Recomputed after every move and undo, so it cannot drift from the board.</td></tr>
+          <tr><td>Undo by reversal</td><td>Each move stores the captured and placed piece. Cheaper than copying the board, but every new move type needs a correct <code>undo</code>.</td></tr>
+          <tr><td>Exceptions for illegal moves</td><td>The UI shows the reason. For an AI searching millions of moves, <code>legalMoves</code> is the API, and exceptions never occur.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><span class="lbl">Castling, the classic follow-up</span>Castling needs four facts: the king and that rook have never moved, the squares between them are empty, the king is not in check, and it does not pass through or land on an attacked square. The first fact is history, so <code>Game</code> keeps a set of squares whose piece has moved (or checks <code>history</code>). <code>legalMoves</code> adds castling candidates when all four hold. A <code>Castle</code> move moves two pieces, so <code>Move</code> becomes a sealed interface with <code>Simple</code>, <code>Castle</code> and <code>EnPassant</code> records, each with its own <code>apply</code> and <code>undo</code>.</div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>En passant</td><td>Allowed only immediately after an enemy pawn's two-square move, so <code>Game</code> reads the last move in <code>history</code>. An <code>EnPassant</code> move captures on a square other than its target, so it needs its own <code>undo</code>.</td></tr>
+        <tr><td>Choose the promotion piece</td><td><code>move(from, to, promoteTo)</code>; <code>legalMoves</code> generates four moves per promoting pawn.</td></tr>
+        <tr><td>Draw by threefold repetition</td><td>Hash each position after a move (the board, the side to move, castling and en passant rights) and count repeats in a map. Undo decrements.</td></tr>
+        <tr><td>Players, clocks, resignation</td><td>A <code>Player</code> with a <code>Clock</code>; the game switches clocks on each move. Resignation and timeout set a result without a board reason.</td></tr>
+        <tr><td>Save and load</td><td>Moves in standard notation (PGN) replay the game; a position string (FEN) restores a board. <code>Board.fromRows</code> is most of a FEN parser already.</td></tr>
+        <tr><td>Online play</td><td>The <code>Game</code> becomes the server's authority; clients send moves, the server validates and broadcasts. A version number on the game rejects moves made against a stale board.</td></tr>
+        <tr><td>A computer opponent</td><td>A <code>MoveChooser</code> strategy: random, then minimax over <code>legalMoves</code> using apply and undo. The model needs no changes, which is the payoff for keeping the command's undo exact.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,110 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="State">
+  <h2>State: when every method starts with a check on the status field, make the status an object</h2>
+  <p class="dek">A vending machine answers "select item" differently when it has no money, has money, or is sold out. Written with an enum and <code>if</code>s, every method re-checks the status and the rules for one state are spread across all of them. With the State pattern each state is a class that handles every event, and returns the next state. Each state's rules live in one class.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">StateDemo.java · a vending machine</div>
+<pre><code class="language-java">import java.util.*;
+
+interface State {                                   // each event, with a
+    default State insert(Machine m, int coin) {     // safe default
+        m.say("coin returned: " + coin); return this;
+    }
+    default State select(Machine m, String item) {
+        m.say("insert money first"); return this;
+    }
+    default State cancel(Machine m) { return this; }
+}
+
+final class Idle implements State {
+    public State insert(Machine m, int coin) { m.credit += coin; return new HasCredit(); }
+}
+
+final class HasCredit implements State {
+    public State insert(Machine m, int coin) { m.credit += coin; return this; }
+    public State select(Machine m, String item) {
+        int price = m.price(item);
+        if (m.stock(item) == 0) { m.say(item + " sold out"); return this; }
+        if (m.credit &lt; price) { m.say("need " + (price - m.credit) + " more"); return this; }
+        m.vend(item, price);
+        return m.empty() ? new SoldOut() : m.credit &gt; 0 ? this : new Idle();
+    }
+    public State cancel(Machine m) { m.refund(); return new Idle(); }
+}
+
+final class SoldOut implements State {
+    public State insert(Machine m, int coin) { m.say("sold out, coin returned"); return this; }
+    public State cancel(Machine m) { m.refund(); return this; }
+}
+
+final class Machine {                                 // the context
+    private final Map&lt;String, int[]&gt; items = new TreeMap&lt;&gt;();   // price, stock
+    private State state = new Idle();
+    int credit;
+
+    Machine add(String item, int price, int stock) { items.put(item, new int[] { price, stock }); return this; }
+    void insert(int coin)      { state = state.insert(this, coin); show(); }
+    void select(String item)   { state = state.select(this, item); show(); }
+    void cancel()              { state = state.cancel(this); show(); }
+
+    int price(String item) { return items.get(item)[0]; }
+    int stock(String item) { return items.get(item)[1]; }
+    boolean empty() { return items.values().stream().allMatch(v -&gt; v[1] == 0); }
+    void vend(String item, int price) { items.get(item)[1]--; credit -= price; say("vend " + item); }
+    void refund() { if (credit &gt; 0) say("refund " + credit); credit = 0; }
+    void say(String s) { System.out.print(s + "; "); }
+    private void show() {
+        System.out.println("[" + state.getClass().getSimpleName() + ", credit " + credit + "]");
+    }
+}
+
+public class StateDemo {
+    public static void main(String[] args) {
+        var m = new Machine().add("chips", 20, 1).add("cola", 30, 1);
+        m.select("cola");
+        m.insert(20);
+        m.select("cola");
+        m.insert(20);
+        m.select("cola");
+        m.select("chips");
+        m.select("cola");
+        m.cancel();
+        m.insert(10);
+        m.select("chips");
+        m.insert(10);
+        m.select("chips");
+        m.insert(5);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · StateDemo.java</div>
+<pre><code class="language-plaintext">insert money first; [Idle, credit 0]
+[HasCredit, credit 20]
+need 10 more; [HasCredit, credit 20]
+[HasCredit, credit 40]
+vend cola; [HasCredit, credit 10]
+need 10 more; [HasCredit, credit 10]
+cola sold out; [HasCredit, credit 10]
+refund 10; [Idle, credit 0]
+[HasCredit, credit 10]
+need 10 more; [HasCredit, credit 10]
+[HasCredit, credit 20]
+vend chips; [SoldOut, credit 0]
+sold out, coin returned; [SoldOut, credit 0]</code></pre>
+      </div>
+<div class="tree"><span class="h">Transitions</span>
+  Idle      ──insert──>  HasCredit
+  HasCredit ──insert──>  HasCredit
+  HasCredit ──select──>  Idle        <span class="c">no credit left</span>
+                         HasCredit   <span class="c">change remains</span>
+                         SoldOut     <span class="c">last item gone</span>
+  HasCredit ──cancel──>  Idle        <span class="c">refund</span>
+  SoldOut   ──insert──>  SoldOut     <span class="c">coin returned</span></div>
+      <div class="note"><span class="lbl">State or strategy?</span>The classes look the same. The difference is who changes them. A <b>strategy</b> is chosen from outside and stays until someone swaps it. A <b>state</b> changes itself: each handler returns the next state, so the transitions are part of the design.</div>
+      <div class="note tip"><span class="lbl">Enum with a switch is fine for small machines</span>With three states and two events, an enum plus a <code>switch</code> is shorter and easy to read. Move to state classes when states have their own data, or the switch appears in more than one method. The <a data-deck="lld" data-slide="ATM · services and demo">ATM</a> uses state classes.</div>
+    </div>
+  </div>
+</section>

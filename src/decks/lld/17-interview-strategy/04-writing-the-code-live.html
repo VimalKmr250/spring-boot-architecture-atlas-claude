@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Interview strategy" data-title="Writing the code live">
+  <h2>Writing the code live: inside out, compiling as you go, talking the whole time</h2>
+  <p class="dek">Write in the order things depend on each other: values and enums, then entities with their rules, then interfaces, then the service, then the demo. Each layer compiles on its own, so if time runs out you have a working model rather than a service that calls methods you never wrote.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Step</th><th>Write</th><th>Minutes</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Enums and records: <code>VehicleType</code>, <code>SpotSize</code>, <code>Vehicle</code>, <code>Ticket</code></td><td class="num">3</td></tr>
+          <tr><td>2</td><td>Entities with their invariants: <code>ParkingSpot.occupy</code> throws if taken</td><td class="num">5</td></tr>
+          <tr><td>3</td><td>The variation points: <code>PricingStrategy</code> and one implementation</td><td class="num">3</td></tr>
+          <tr><td>4</td><td>The service: <code>park</code> and <code>leave</code>, validating input first</td><td class="num">7</td></tr>
+          <tr><td>5</td><td><code>main</code> or a test: the happy path, then two edge cases</td><td class="num">4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Habits that score</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Names from the domain.</b> <code>claim</code>, <code>release</code>, <code>heldUntil</code>, not <code>process</code>, <code>handle</code>, <code>data</code>.</li>
+        <li><b>Fields private and final</b> where possible; no setters for state with rules.</li>
+        <li><b>Validate at the boundary</b>, in constructors and service entry points, then trust the data inside.</li>
+        <li><b>Small methods.</b> A method longer than the screen is hiding a class.</li>
+        <li><b>Inject time and ids.</b> <code>Clock</code>, id generators: tests and demos stay deterministic.</li>
+        <li><b>Exceptions with messages</b> the caller could show a user: "A4 is held", not "error".</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note"><span class="lbl">Narrate decisions, not keystrokes</span>"I'm making the ticket a record because it never changes after issue." "This lock is per floor so gates on different floors don't wait." One sentence per decision. Silence reads as stuck; typing commentary ("now I'm writing a for loop") reads as filler.</div>
+    <div class="note warn"><span class="lbl">Stubs are allowed; say so</span>If the payment gateway would take five minutes, write the interface and a one-line fake, and say "the real one is an adapter over the vendor's SDK". Interviewers want the seam, not the HTTP client.</div>
+  </div>
+</section>

@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Splitwise" data-title="Splitwise · decisions and follow-ups">
+  <h2>Splitwise: the choices to defend, and why "fewest payments" is harder than it looks</h2>
+  <p class="dek">The greedy simplifier never needs more than <i>n</i> − 1 payments, and it is what most answers use. It is not always optimal, though. The true minimum is found by splitting people into as many groups as possible whose balances sum to zero, which is NP-hard. Knowing that, and having a small counterexample ready, is the strongest answer to the last question of the round.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Decision</th><th>Why, and the alternative</th></tr></thead>
+        <tbody>
+          <tr><td>Paise in a <code>long</code></td><td>Exact, fast, and the rounding rule is explicit. <code>BigDecimal</code> everywhere also works; a <code>double</code> never does.</td></tr>
+          <tr><td>One rounding function</td><td>Equal, share and percent splits all call <code>byWeight</code>, so they cannot disagree about the extra paisa.</td></tr>
+          <tr><td>Sealed split rules</td><td>A closed set the parser must handle; records validate themselves.</td></tr>
+          <tr><td>Debts netted per pair</td><td>The app shows one line per friend; the reverse direction is never stored.</td></tr>
+          <tr><td>Expenses kept</td><td>The ledger is derivable from the expense list, which makes edit and delete possible (rebuild) and gives an audit trail.</td></tr>
+          <tr><td>Greedy simplifier</td><td>O(<i>n</i> log <i>n</i>), at most <i>n</i> − 1 payments, easy to explain. Exact search is exponential; use it only for small groups.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">Greedy is not optimal: balances +6 +4 −4 −3 −3</span>
+  <span class="c">greedy, biggest with biggest</span>
+  −4 pays +6: 4     +6 now +2
+  −3 pays +4: 3     +4 now +1
+  −3 pays +2: 2     −3 now −1
+  −1 pays +1: 1                      <span class="c">4 payments</span>
+
+  <span class="c">optimal: two zero-sum groups</span>
+  {+6, −3, −3}  →  2 payments
+  {+4, −4}      →  1 payment         <span class="g">3 payments</span></div>
+      <div class="note"><span class="lbl">How to find the optimum, if asked</span>The number of payments is <i>n</i> minus the number of zero-sum groups, so maximise the groups. For up to about 20 people, a DP over subsets finds it: mark each subset whose balances sum to zero, and combine them. Say it, and say you would ship the greedy one.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Follow-up</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>Groups</td><td>A <code>Group</code> owns its own <code>Ledger</code>; a user's overall balance is the sum across groups. Simplify within a group, never across groups, because people expect group debts to stay in the group.</td></tr>
+        <tr><td>Several payers on one expense</td><td>An expense gets a <code>payments</code> map as well as a <code>shares</code> map; each person's position is paid minus share, recorded against the payers pro rata.</td></tr>
+        <tr><td>Edit or delete an expense</td><td>Record a reversing expense (an accountant's approach, and an audit trail), or rebuild the ledger from the expense list.</td></tr>
+        <tr><td>Multiple currencies</td><td>Money becomes a value object with a currency; ledgers are per currency, and conversion happens only at settlement, at a recorded rate.</td></tr>
+        <tr><td>Concurrent edits from phones</td><td>Each expense carries a client-generated id, so a retried upload is recorded once; the ledger's methods are already <code>synchronized</code> for one process. See <a data-deck="lld" data-slide="Idempotency and optimistic locking">idempotency</a>.</td></tr>
+        <tr><td>Notify on new expense</td><td>The ledger publishes <code>ExpenseAdded</code>; a notifier subscribes. The ledger stays free of email code.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

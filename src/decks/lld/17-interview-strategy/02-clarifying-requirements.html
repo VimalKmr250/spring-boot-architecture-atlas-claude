@@ -1,0 +1,40 @@
+<section class="slide" data-sec="Interview strategy" data-title="Clarifying requirements">
+  <h2>Clarifying requirements: the questions that change the design, and none that do not</h2>
+  <p class="dek">A good clarifying question has an answer that changes a class, a relationship or a lock. "What colour are the cars?" changes nothing. "Can a car park in a bigger spot?" changes the allocation rule. Ask five or six questions of the first kind, write down the answers, and state your own assumption for anything the interviewer leaves open.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Ask about</th><th>Example</th><th>It decides</th></tr></thead>
+        <tbody>
+          <tr><td>Actors</td><td>"Who uses it: customers, staff, other systems?"</td><td>Which interfaces and permissions exist</td></tr>
+          <tr><td>Core use cases</td><td>"The three things it must do, in priority order?"</td><td>What gets coded first</td></tr>
+          <tr><td>Variation</td><td>"Can the pricing rule change? Per lot, or per day?"</td><td>Where the interfaces go</td></tr>
+          <tr><td>Cardinality</td><td>"One lot or many? Several copies of a title?"</td><td>Multiplicities, and the title/copy-style splits</td></tr>
+          <tr><td>Lifecycle</td><td>"Does a hold expire? Can a booking be cancelled after payment?"</td><td>States and transitions</td></tr>
+          <tr><td>Concurrency</td><td>"Several entry gates? Many users on one show?"</td><td>Locks and atomic operations</td></tr>
+          <tr><td>Failure</td><td>"What if payment fails, or the dispenser jams?"</td><td>Ordering and compensation</td></tr>
+          <tr><td>Scale, briefly</td><td>"In memory for now, or should I assume a database?"</td><td>Repositories, ids and time</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Write it down like this, where both of you can see it</div>
+<pre><code class="language-plaintext">IN SCOPE
+  1. park: assign smallest free spot that fits, issue ticket
+  2. leave: fee = hourly rate by vehicle type, part hours round up
+  3. show free spots per floor
+
+OUT OF SCOPE
+  payments, reservations, EV charging
+
+ASSUMPTIONS
+  - larger spot allowed if own size is full
+  - several gates call park() concurrently
+  - one lot, in memory</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Two ways to get this phase wrong</span>Asking nothing and designing the parking lot you once read about, which the interviewer then changes under you. Or asking twenty questions and reaching minute twelve with no classes. Five to six questions, then "I'll assume the rest; stop me if any of that is wrong."</div>
+    </div>
+  </div>
+</section>

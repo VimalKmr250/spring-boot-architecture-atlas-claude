@@ -1,0 +1,76 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Liskov substitution">
+  <h2>L · A subtype must keep every promise its supertype makes</h2>
+  <p class="dek">Code written against a type must still work when handed any subtype. The test is behaviour, not whether the types compile. A square is a rectangle in geometry, but a mutable <code>Square</code> breaks a promise a mutable <code>Rectangle</code> makes: that setting the width leaves the height alone.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LiskovDemo.java · the broken subtype, then the fix</div>
+<pre><code class="language-java">import java.util.*;
+
+class Rectangle {
+    protected int w, h;
+    void setWidth(int w)  { this.w = w; }     // promise: height unchanged
+    void setHeight(int h) { this.h = h; }     // promise: width unchanged
+    int area() { return w * h; }
+}
+
+class Square extends Rectangle {              // compiles, and is wrong
+    @Override void setWidth(int s)  { w = s; h = s; }
+    @Override void setHeight(int s) { w = s; h = s; }
+}
+
+sealed interface Shape permits Rect, Sq { int area(); }
+record Rect(int w, int h) implements Shape {  // immutable: no setter
+    public int area() { return w * h; }       // promise to break
+}
+record Sq(int side) implements Shape {
+    public int area() { return side * side; }
+}
+
+public class LiskovDemo {
+    static void resize(Rectangle r) {         // written for Rectangle
+        r.setWidth(5);
+        r.setHeight(4);
+        System.out.println(r.getClass().getSimpleName()
+                + ": expected 20, got " + r.area());
+    }
+
+    public static void main(String[] args) {
+        resize(new Rectangle());
+        resize(new Square());
+
+        List&lt;Shape&gt; shapes = List.of(new Rect(5, 4), new Sq(4));
+        shapes.forEach(s -&gt; System.out.println(s + " area " + s.area()));
+
+        List&lt;Integer&gt; fixed = List.of(1, 2);  // the JDK's own compromise
+        try { fixed.add(3); }
+        catch (UnsupportedOperationException e) {
+            System.out.println("List.of(..).add -&gt; " + e.getClass().getSimpleName());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · LiskovDemo.java</div>
+<pre><code class="language-plaintext">Rectangle: expected 20, got 20
+Square: expected 20, got 16
+Rect[w=5, h=4] area 20
+Sq[side=4] area 16
+List.of(..).add -&gt; UnsupportedOperationException</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>A subtype may not</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>Demand more of its inputs</td><td>An override that rejects a <code>null</code> the parent accepted</td></tr>
+            <tr><td>Promise less about its result</td><td>A <code>sort</code> override that sometimes leaves the list unsorted</td></tr>
+            <tr><td>Break an invariant</td><td>A <code>Square</code> whose sides can no longer be set separately</td></tr>
+            <tr><td>Throw what the parent does not</td><td>A <code>ReadOnlyAccount.withdraw</code> that throws <code>UnsupportedOperationException</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">The fix is usually in the hierarchy</span>If a subtype has to refuse a method, it is not really that type. Make the shapes immutable, or give them a common interface with only the operations every one supports. Java's <code>List.of</code> breaks LSP on purpose, and documents the "optional operation"; your design should not need to.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Concurrency" data-title="Virtual threads and structured concurrency">
+  <h2>Virtual threads: a thread per task is cheap again, but the downstream is not</h2>
+  <p class="dek">Java 21 made virtual threads final <span class="tag a">since 21</span>. A virtual thread that blocks on I/O or <code>sleep</code> unmounts from its carrier thread, so a program can hold millions of them. In an LLD answer this means "one virtual thread per request" is a reasonable design, and a fixed thread pool is no longer the default. The limit moves to the service you call, so bound that explicitly.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">VirtualThreads.java · one thread per task, a semaphore for the slow dependency</div>
+<pre><code class="language-java">import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+
+public class VirtualThreads {
+    static final Semaphore priceApi = new Semaphore(3);    // it allows 3 at once
+    static final AtomicInteger inFlight = new AtomicInteger();
+    static final AtomicInteger peak = new AtomicInteger();
+
+    static int quote(String showId) throws InterruptedException {
+        priceApi.acquire();
+        try {
+            peak.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+            Thread.sleep(Duration.ofMillis(20));           // blocking: unmounts
+            return showId.length() * 100;
+        } finally {
+            inFlight.decrementAndGet();
+            priceApi.release();
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        List&lt;String&gt; shows = IntStream.range(0, 50).mapToObj(i -&gt; "SHOW-" + i).toList();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List&lt;Future&lt;Integer&gt;&gt; quotes = shows.stream()
+                    .map(s -&gt; executor.submit(() -&gt; quote(s))).toList();
+            int total = 0;
+            for (Future&lt;Integer&gt; f : quotes) total += f.get();
+            System.out.println("quoted " + quotes.size() + " shows, total " + total);
+        }
+        System.out.println("peak concurrent calls to the price API: " + peak.get());
+
+        var slept = new AtomicInteger();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 10_000; i++)
+                executor.submit(() -&gt; {
+                    Thread.sleep(Duration.ofMillis(100));
+                    return slept.incrementAndGet();
+                });
+        }                                                   // waits for all
+        System.out.println(slept.get() + " virtual threads each slept 100 ms");
+
+        Thread t = Thread.ofVirtual().name("booking-", 1).unstarted(() -&gt; { });
+        System.out.println(t.getName() + " is virtual: " + t.isVirtual());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · VirtualThreads.java</div>
+<pre><code class="language-plaintext">quoted 50 shows, total 34000
+peak concurrent calls to the price API: 3
+10000 virtual threads each slept 100 ms
+booking-1 is virtual: true</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Rule</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Never pool virtual threads</td><td>They are cheap to create; a pool only adds a queue. Create one per task.</td></tr>
+            <tr><td>Limit the resource, not the threads</td><td>A <code>Semaphore</code> or a connection pool protects the database or API. Ten thousand threads will otherwise open ten thousand connections.</td></tr>
+            <tr><td>Avoid blocking inside <code>synchronized</code> on 21</td><td>On JDK 21 to 23 it pins the carrier thread. Use <code>ReentrantLock</code> around blocking calls. JDK 24 removed most pinning (JEP 491).</td></tr>
+            <tr><td>Use <code>ThreadLocal</code> sparingly</td><td>A million threads mean a million copies. Scoped values are the replacement, and are final from JDK 25.</td></tr>
+            <tr><td>CPU-bound work gains nothing</td><td>Virtual threads help waiting, not computing. Use a pool sized to the cores, or parallel streams.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Structured concurrency, on its way</span><code>StructuredTaskScope</code> runs subtasks as a unit: if one fails, the others are cancelled, and none outlive the block. It is a preview API on JDK 21 through 25, so it needs <code>--enable-preview</code> and is not used in this tab's code. Mention it for "fetch price and seat map in parallel, fail fast".</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Interview strategy" data-title="A two-week practice plan">
+  <h2>A two-week practice plan: an hour or two a day, ending with timed mocks</h2>
+  <p class="dek">LLD improves with repetition under a clock more than with reading. The plan below works through the tab in order, then spends the second week solving problems cold, in 45 minutes, before comparing with the solutions. Always compare responsibilities first ("who owns this decision?"), then code.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Day</th><th>Study</th><th>Practise</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td><a data-deck="lld" data-sec="Foundations">Foundations</a></td><td>Rewrite one of your own classes with records, sealed types and an injected clock</td></tr>
+        <tr><td class="num">2</td><td><a data-deck="lld" data-sec="SOLID and friends">SOLID and friends</a></td><td>Find one violation of each principle in code you have written</td></tr>
+        <tr><td class="num">3</td><td><a data-deck="lld" data-sec="Creational patterns">Creational</a> and <a data-deck="lld" data-sec="Structural patterns">structural</a> patterns</td><td>Write builder, decorator and adapter from memory</td></tr>
+        <tr><td class="num">4</td><td><a data-deck="lld" data-sec="Behavioral patterns">Behavioural patterns</a></td><td>Write strategy, state, command and observer from memory; explain the look-alikes aloud</td></tr>
+        <tr><td class="num">5</td><td><a data-deck="lld" data-sec="Parking lot">Parking lot</a>, <a data-deck="lld" data-sec="Library">Library</a></td><td>Read requirements only; solve in 45 minutes; then compare</td></tr>
+        <tr><td class="num">6</td><td><a data-deck="lld" data-sec="ATM">ATM</a>, <a data-deck="lld" data-sec="Chess">Chess</a></td><td>Same method. For chess, add castling yourself</td></tr>
+        <tr><td class="num">7</td><td><a data-deck="lld" data-sec="Elevator">Elevator</a>, <a data-deck="lld" data-sec="Movie booking">Movie booking</a>, <a data-deck="lld" data-sec="Splitwise">Splitwise</a></td><td>Same method. For booking, write the 100-thread test first</td></tr>
+        <tr><td class="num">8</td><td><a data-deck="lld" data-sec="Concurrency">Concurrency</a></td><td>LRU cache and token bucket from memory, with a concurrent test for each</td></tr>
+        <tr><td class="num">9</td><td><a data-deck="lld" data-sec="Scale and distribution">Scale and distribution</a></td><td>For each of the seven problems, say the shard key and the conditional write aloud</td></tr>
+        <tr><td class="num">10–13</td><td>New problems, cold: vending machine, hotel booking, snake and ladder, food delivery, a logger, a file system, a cab-booking app, an online auction</td><td>45 minutes each, timed, out loud, ideally with a friend playing interviewer and adding a requirement at minute 35</td></tr>
+        <tr><td class="num">14</td><td><a data-deck="lld" data-sec="Interview questions">Interview questions</a></td><td>Answer each in 30 seconds, then review your weakest two problems</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">Map new problems to known ones</span>A vending machine is the ATM's state machine. A hotel is movie booking with dates. Snake and ladder is a smaller chess. Food delivery is the elevator's dispatcher with drivers instead of cars. A logger is chain of responsibility plus observers. Name the parent problem in the first minute and borrow its structure.</div>
+</section>

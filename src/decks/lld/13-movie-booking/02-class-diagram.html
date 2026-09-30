@@ -1,0 +1,55 @@
+<section class="slide" data-sec="Movie booking" data-title="Movie booking · class diagram">
+  <h2>Movie booking: the show owns who holds each seat, the booking owns its own lifecycle</h2>
+  <p class="dek">Seat ownership lives in one concurrent map per show: seat to booking id. A seat is free when it has no entry, or when its booking has expired or been cancelled. The booking decides, under its own lock, whether it is still alive. The service is a facade that coordinates the two with pricing and payment.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">BookingService</span>                    <span class="c">facade</span>
+  - bookings : ConcurrentMap&lt;id, Booking&gt;
+  - pricing : PricingStrategy
+  - payments : PaymentGateway
+  - clock : Clock
+  + hold(user, Show, seats) : Optional&lt;Booking&gt;
+  + confirm(bookingId) : Booking
+  + cancel(bookingId)
+  + seatMap(Show) : String
+  ──> PricingStrategy   ──> PaymentGateway   ◆── * Booking
+
+<span class="h">Show</span>
+  - id   - movie : Movie   - start : LocalDateTime
+  - seats : SortedMap&lt;label, Seat&gt;
+  - claims : ConcurrentMap&lt;Seat, bookingId&gt;
+  + claim(Seat, id) : boolean            <span class="c">putIfAbsent</span>
+  + reclaim(Seat, fromId, toId) : boolean <span class="c">replace: CAS</span>
+  + release(Seat, id)                    <span class="c">remove(key, value)</span>
+
+<span class="h">Booking</span>                           <span class="c">synchronized methods</span>
+  - id   - user   - seats : List&lt;Seat&gt;   - amount
+  - heldUntil : Instant   - status : BookingStatus
+  + tryConfirm(now, paymentRef) : boolean
+  + tryExpire(now) : boolean   <span class="c">true: its seats may go</span>
+  + cancel() : boolean
+
+<span class="h">«record» Seat</span>  row, number, category   <span class="c">Comparable</span>
+<span class="h">«enum» SeatCategory</span>  REGULAR 200, PREMIUM 350, RECLINER 600
+<span class="h">«enum» BookingStatus</span> HELD, CONFIRMED, EXPIRED, CANCELLED</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">Booking lifecycle</span>
+  HELD ──tryConfirm, before heldUntil──> CONFIRMED
+  HELD ──tryExpire, after heldUntil───> EXPIRED
+  HELD ──cancel──────────────────────> CANCELLED
+  <span class="c">CONFIRMED, EXPIRED and CANCELLED are final</span></div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td><code>Show</code></td><td>Which booking holds each seat, changed only by atomic map operations</td></tr>
+            <tr><td><code>Booking</code></td><td>Whether it is still alive, and the single transition out of <code>HELD</code></td></tr>
+            <tr><td><code>BookingService</code></td><td>All-or-nothing holds, the payment sequence, refunds</td></tr>
+            <tr><td><code>PricingStrategy</code></td><td>What a seat costs for this show</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why the map stores ids, not bookings</span>The claim map needs only an identity to compare and swap. <code>ConcurrentHashMap.replace(seat, oldId, newId)</code> compares with <code>equals</code>, so it succeeds only if the seat still belongs to the dead booking. Storing ids also keeps the show free of any reference to payments or users.</div>
+    </div>
+  </div>
+</section>

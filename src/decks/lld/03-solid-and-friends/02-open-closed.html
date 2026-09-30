@@ -1,0 +1,47 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Open/closed">
+  <h2>O · Open for extension, closed for modification, at the points you expect to change</h2>
+  <p class="dek">When a requirement you expected arrives, such as a new pricing rule, you should be able to add a class rather than edit a working one. That needs a seam: an interface at the point of variation. You cannot be closed against every change, so choose the seams from the requirements, and say which ones you chose.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Before · every new rule edits this method</div>
+<pre><code class="language-java">long fee(Ticket t, Instant exit) {
+    long hours = t.hoursUntil(exit);
+    switch (t.lot().pricingMode()) {
+        case "HOURLY":  return hours * 40;
+        case "WEEKEND": return isWeekend(exit) ? 100 : hours * 40;
+        case "EVENT":   return 300;
+        // next month: "EV_DISCOUNT" goes here, and the tests
+        // for the other three rules must run again
+        default: throw new IllegalStateException();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">After · a new rule is a new class</div>
+<pre><code class="language-java">interface PricingStrategy {
+    long fee(Ticket t, Instant exit);
+}
+final class HourlyPricing implements PricingStrategy {
+    public long fee(Ticket t, Instant exit) { return t.hoursUntil(exit) * 40; }
+}
+final class FlatEventPricing implements PricingStrategy {
+    public long fee(Ticket t, Instant exit) { return 300; }
+}
+// EV discount: a decorator that wraps any strategy, no edits
+final class EvDiscount implements PricingStrategy {
+    private final PricingStrategy inner;
+    EvDiscount(PricingStrategy inner) { this.inner = inner; }
+    public long fee(Ticket t, Instant exit) {
+        long base = inner.fee(t, exit);
+        return t.vehicle().electric() ? base * 80 / 100 : base;
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note"><span class="lbl">The honest version</span>Something still has to choose which strategy to use: a factory, a configuration map, or the composition root in <code>main</code>. That one place is allowed to change. OCP moves the change to where it is cheap and safe; it does not remove it.</div>
+    <div class="note tip"><span class="lbl">When a switch is the better answer</span>If the <b>types</b> are fixed (a sealed <code>Vehicle</code>) and <b>operations</b> keep being added, a <code>switch</code> over the sealed type is closed in a different way: the compiler finds every switch that needs a new case. Say which axis you expect to change. See <a data-deck="lld" data-slide="The Java 21 toolkit for LLD">the Java 21 toolkit</a>.</div>
+  </div>
+</section>

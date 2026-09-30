@@ -1,0 +1,54 @@
+<section class="slide" data-sec="Chess" data-title="Chess · class diagram">
+  <h2>Chess: pieces generate moves, the game decides which are legal</h2>
+  <p class="dek">Each piece answers one question: which squares could I move to from here, ignoring check? Sliding pieces (queen, rook, bishop) share the slide-until-blocked loop; stepping pieces (king, knight) share the one-step loop. That shared loop is a template method in each abstract class, and the subclasses supply only their directions. The game filters for legality and owns turn and status.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">Game</span>
+  - board : Board   - turn : Color   - status : Status
+  - history : Deque&lt;Move&gt;             <span class="c">undo stack</span>
+  + move(from, to) : Move
+  + undo()
+  + legalMoves(Color) : List&lt;Move&gt;
+  ◆── 1 Board   ◆── * Move
+
+<span class="h">Board</span>
+  - grid : Piece[8][8]
+  + at(Position) : Piece   + put(Position, Piece)
+  + isAttacked(Position, by: Color) : boolean
+  + inCheck(Color) : boolean
+  + fromRows(String...) : Board      <span class="c">uses Pieces.of(char)</span>
+  ◇── * Piece
+
+<span class="h">«sealed abstract» Piece</span>
+  # color : Color
+  + targets(Board, from) : List&lt;Position&gt;   <span class="c">ignores check</span>
+  + attacks(Board, from, square) : boolean
+  ──▷ «sealed abstract» SlidingPiece   <span class="c">template: slide loop</span>
+        ──▷ Queen   ──▷ Rook   ──▷ Bishop   <span class="c">give directions()</span>
+  ──▷ «sealed abstract» SteppingPiece  <span class="c">template: one-step loop</span>
+        ──▷ King    ──▷ Knight            <span class="c">give offsets()</span>
+  ──▷ Pawn                              <span class="c">its own rules</span>
+
+<span class="h">«record» Move</span>   from, to, moved, captured, placed
+  + apply(Board)   + undo(Board)      <span class="c">command</span>
+<span class="h">«record» Position</span>  file 0..7, rank 0..7
+<span class="h">«enum» Color</span>   WHITE, BLACK
+<span class="h">«enum» Status</span>  ACTIVE, CHECK, CHECKMATE, STALEMATE</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td>Each <code>Piece</code></td><td>Its movement pattern, and which squares it attacks</td></tr>
+            <tr><td><code>Board</code></td><td>What is where; whether a square is attacked</td></tr>
+            <tr><td><code>Move</code></td><td>How to apply itself and exactly how to reverse it</td></tr>
+            <tr><td><code>Game</code></td><td>Whose turn, which moves are legal, and whether the game is over</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Why <code>Piece</code> is sealed</span>The six types are fixed by the rules of chess; nobody will add a seventh. Sealing documents that, and lets a <code>switch</code> over pieces (for rendering or scoring) be exhaustive. It is the right place for a closed hierarchy.</div>
+      <div class="note"><span class="lbl">Why moves are records</span>A move stores the captured piece and the piece it placed, so <code>undo</code> restores exactly what was there, promotion included. That is the <a data-deck="lld" data-slide="Command">command pattern</a>. Undo by reversal is cheap; the alternative is copying the whole board before each move (<a data-deck="lld" data-slide="Prototype">prototype</a>).</div>
+      <div class="note warn"><span class="lbl">Why <code>attacks</code> is separate from <code>targets</code></span>A pawn moves straight but attacks diagonally, so "can it move there" and "does it attack there" differ. Every other piece attacks where it can move, so the default implementation reuses <code>targets</code> and only <code>Pawn</code> overrides it.</div>
+    </div>
+  </div>
+</section>

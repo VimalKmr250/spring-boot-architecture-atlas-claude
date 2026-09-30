@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Creational patterns" data-title="Builder">
+  <h2>Builder: many optional fields, one validated, immutable result</h2>
+  <p class="dek">A constructor with seven parameters, four of them optional, is unreadable at the call site (<code>new ShowSearch("Pune", d, null, null, true, 0, false)</code>) and easy to call with two arguments swapped. A builder names every argument, takes the required ones up front, and checks the rules that span several fields once, in <code>build()</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">BuilderDemo.java · required fields first, cross-field rules in build()</div>
+<pre><code class="language-java">import java.time.LocalDate;
+import java.util.*;
+
+final class ShowSearch {
+    private final String city;
+    private final LocalDate date;
+    private final List&lt;String&gt; languages;
+    private final Integer maxPrice;             // null means no limit
+    private final boolean imaxOnly;
+
+    private ShowSearch(Builder b) {             // only the builder calls this
+        city = b.city;
+        date = b.date;
+        languages = List.copyOf(b.languages);   // defensive, immutable copy
+        maxPrice = b.maxPrice;
+        imaxOnly = b.imaxOnly;
+    }
+
+    static Builder in(String city, LocalDate date) {   // required up front
+        return new Builder(city, date);
+    }
+
+    @Override public String toString() {
+        return "ShowSearch[" + city + " " + date + " " + languages
+                + (maxPrice == null ? "" : " max " + maxPrice)
+                + (imaxOnly ? " IMAX" : "") + "]";
+    }
+
+    static final class Builder {
+        private final String city;
+        private final LocalDate date;
+        private final Set&lt;String&gt; languages = new LinkedHashSet&lt;&gt;();
+        private Integer maxPrice;
+        private boolean imaxOnly;
+
+        private Builder(String city, LocalDate date) {
+            this.city = Objects.requireNonNull(city, "city");
+            this.date = Objects.requireNonNull(date, "date");
+        }
+        Builder language(String l) { languages.add(l); return this; }
+        Builder maxPrice(int p) {
+            if (p &lt;= 0) throw new IllegalArgumentException("maxPrice must be &gt; 0");
+            maxPrice = p;
+            return this;
+        }
+        Builder imaxOnly() { imaxOnly = true; return this; }
+
+        ShowSearch build() {                    // rules across fields
+            if (imaxOnly &amp;&amp; maxPrice != null &amp;&amp; maxPrice &lt; 300)
+                throw new IllegalStateException("no IMAX show costs under 300");
+            return new ShowSearch(this);
+        }
+    }
+}
+
+public class BuilderDemo {
+    public static void main(String[] args) {
+        LocalDate day = LocalDate.of(2026, 10, 2);
+        System.out.println(ShowSearch.in("Pune", day)
+                .language("Hindi").language("English").maxPrice(450).build());
+        System.out.println(ShowSearch.in("Pune", day).imaxOnly().build());
+        try {
+            ShowSearch.in("Pune", day).imaxOnly().maxPrice(200).build();
+        } catch (IllegalStateException e) {
+            System.out.println("rejected: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · BuilderDemo.java</div>
+<pre><code class="language-plaintext">ShowSearch[Pune 2026-10-02 [Hindi, English] max 450]
+ShowSearch[Pune 2026-10-02 [] IMAX]
+rejected: no IMAX show costs under 300</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Why the object is immutable</h4><p>Once <code>build()</code> returns, no one can break the rules it checked. The builder is mutable, but it never escapes the method that uses it.</p></div>
+        <div class="card"><h4>Records instead</h4><p>With three or four fields, all required, a record with a compact constructor is shorter and just as safe. Reach for a builder when there are optional fields or cross-field rules.</p></div>
+      </div>
+      <div class="note"><span class="lbl">Say where it goes</span>Builders fit query objects, bookings with optional add-ons, and test fixtures. Lombok's <code>@Builder</code> writes the boilerplate, but it does not do the <code>build()</code> validation, which is the part the interviewer is looking for.</div>
+    </div>
+  </div>
+</section>

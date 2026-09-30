@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Template method">
+  <h2>Template method: fix the algorithm's skeleton, let subclasses fill in the steps</h2>
+  <p class="dek">A base class defines the order of steps in a <code>final</code> method and leaves some steps abstract. Subclasses supply those steps but cannot reorder or skip the skeleton. Use it when several variants share the same sequence and differ in a few steps: importers, report generators, a game's turn loop, a chess piece's move generation.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TemplateDemo.java · two importers, one skeleton</div>
+<pre><code class="language-java">import java.util.*;
+
+abstract class Importer&lt;T&gt; {
+    final String run(List&lt;String&gt; lines) {          // the template method
+        List&lt;T&gt; good = new ArrayList&lt;&gt;();
+        List&lt;String&gt; errors = new ArrayList&lt;&gt;();
+        int start = hasHeader() ? 1 : 0;
+        for (int i = start; i &lt; lines.size(); i++) {
+            try {
+                T record = parse(lines.get(i).split(","));
+                validate(record);                    // hook
+                good.add(record);
+            } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
+                errors.add("line " + (i + 1) + ": " + e.getMessage());
+            }
+        }
+        save(good);
+        return name() + ": " + good.size() + " saved, errors " + errors;
+    }
+    protected abstract String name();
+    protected abstract T parse(String[] cells);      // required step
+    protected abstract void save(List&lt;T&gt; records);   // required step
+    protected void validate(T record) {}             // hook: optional
+    protected boolean hasHeader() { return true; }   // hook: optional
+}
+
+record Member(String id, String email) {}
+record Book(String isbn, int copies) {}
+
+final class MemberImporter extends Importer&lt;Member&gt; {
+    final List&lt;Member&gt; db = new ArrayList&lt;&gt;();
+    protected String name() { return "members"; }
+    protected Member parse(String[] c) { return new Member(c[0], c[1]); }
+    protected void validate(Member m) {
+        if (!m.email().contains("@")) throw new IllegalArgumentException("bad email " + m.email());
+    }
+    protected void save(List&lt;Member&gt; ms) { db.addAll(ms); }
+}
+
+final class BookImporter extends Importer&lt;Book&gt; {
+    final List&lt;Book&gt; db = new ArrayList&lt;&gt;();
+    protected String name() { return "books"; }
+    protected boolean hasHeader() { return false; }
+    protected Book parse(String[] c) { return new Book(c[0], Integer.parseInt(c[1])); }
+    protected void save(List&lt;Book&gt; bs) { db.addAll(bs); }
+}
+
+public class TemplateDemo {
+    public static void main(String[] args) {
+        var members = new MemberImporter();
+        System.out.println(members.run(List.of("id,email", "M1,ana@x.io", "M2,bo-at-x", "M3")));
+        var books = new BookImporter();
+        System.out.println(books.run(List.of("111,2", "222,two", "333,1")));
+        System.out.println(members.db + " " + books.db);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · TemplateDemo.java</div>
+<pre><code class="language-plaintext">members: 1 saved, errors [line 3: bad email bo-at-x, line 4: Index 1 out of bounds for length 1]
+books: 2 saved, errors [line 2: For input string: "two"]
+[Member[id=M1, email=ana@x.io]] [Book[isbn=111, copies=2], Book[isbn=333, copies=1]]</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Abstract step</h4><p>Every subclass must provide it: <code>parse</code>, <code>save</code>.</p></div>
+        <div class="card"><h4>Hook</h4><p>An optional step with a default that subclasses may override: <code>validate</code>, <code>hasHeader</code>.</p></div>
+      </div>
+      <div class="note"><span class="lbl">Make the template final</span>Otherwise a subclass can override <code>run</code> and skip validation, and the guarantee is gone. The <b>Hollywood principle</b> ("don't call us, we'll call you") describes the flow: the base class calls the subclass, never the reverse.</div>
+      <div class="note warn"><span class="lbl">The composition alternative</span>Template method is inheritance, with its coupling. If the steps vary independently (any parser with any store), pass them in as strategies instead: <code>new Importer&lt;&gt;(parser, validator, store)</code>. Choose template method when the steps belong together.</div>
+    </div>
+  </div>
+</section>

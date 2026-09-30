@@ -1,0 +1,156 @@
+<section class="slide" data-sec="ATM" data-title="ATM · services and demo">
+  <h2>ATM: four states that each handle every event, and a withdrawal that is safe to fail</h2>
+  <p class="dek">A withdrawal checks the amount, plans the notes, debits the bank, then dispenses. Each step that can fail comes before the next one that is hard to undo. If the dispenser jams after the debit, the debit is reversed. Everything the states do not handle falls through to a default in the interface that refuses politely.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">AtmDemo.java · 2 of 3 · the states and the context</div>
+<pre><code class="language-java">interface AtmState {
+    default AtmState insertCard(Atm atm, Card c) { atm.show("busy: a card is inside"); return this; }
+    default AtmState enterPin(Atm atm, String pin) { atm.show("insert a card first"); return this; }
+    default AtmState balance(Atm atm) { atm.show("enter your PIN first"); return this; }
+    default AtmState withdraw(Atm atm, int amount) { atm.show("enter your PIN first"); return this; }
+    default AtmState eject(Atm atm) { return this; }
+}
+
+final class Idle implements AtmState {
+    public AtmState insertCard(Atm atm, Card c) { atm.takeCard(c); return new CardInserted(); }
+    public AtmState balance(Atm atm) { atm.show("insert a card first"); return this; }
+    public AtmState withdraw(Atm atm, int amount) { return balance(atm); }
+}
+
+final class CardInserted implements AtmState {
+    private int attemptsLeft = 3;                 // per card, dies with the state
+    public AtmState enterPin(Atm atm, String pin) {
+        if (atm.bank().verifyPin(atm.card(), pin)) { atm.show("PIN accepted"); return new Authenticated(); }
+        if (--attemptsLeft == 0) { atm.keepCard(); return new Idle(); }
+        atm.show("wrong PIN, " + attemptsLeft + " left");
+        return this;
+    }
+    public AtmState eject(Atm atm) { atm.returnCard(); return new Idle(); }
+}
+
+final class Authenticated implements AtmState {
+    private static final int MAX = 10_000;
+    public AtmState balance(Atm atm) {
+        atm.show("balance " + atm.bank().balance(atm.card()));
+        return this;
+    }
+    public AtmState withdraw(Atm atm, int amount) {
+        if (amount &lt;= 0 || amount % 100 != 0 || amount &gt; MAX) {
+            atm.show("amount must be a multiple of 100, up to " + MAX);
+            return this;
+        }
+        var plan = atm.dispenser().plan(amount);  // 1. can we pay it out?
+        if (plan.isEmpty()) { atm.show("cannot make " + amount + " from the notes left"); return this; }
+        String txn;
+        try { txn = atm.bank().debit(atm.card(), amount); }          // 2. debit
+        catch (IllegalStateException e) { atm.show("declined: " + e.getMessage()); return this; }
+        try { atm.dispenser().dispense(plan.get()); }                // 3. dispense
+        catch (IllegalStateException e) {
+            atm.bank().reverse(txn);                                 // 4. or undo
+            atm.show(e.getMessage() + ", " + txn + " reversed");
+            return this;
+        }
+        atm.show("take " + amount + " as " + plan.get() + " (" + txn + ")");
+        if (atm.dispenser().isEmpty()) { atm.returnCard(); atm.show("out of cash"); return new OutOfService(); }
+        return this;
+    }
+    public AtmState eject(Atm atm) { atm.returnCard(); return new Idle(); }
+}
+
+final class OutOfService implements AtmState {
+    public AtmState insertCard(Atm atm, Card c) { atm.show("out of service, card returned"); return this; }
+}
+
+final class Atm {
+    private final Bank bank;
+    private final CashDispenser dispenser;
+    private AtmState state = new Idle();
+    private Card card;
+
+    Atm(Bank bank, CashDispenser dispenser) { this.bank = bank; this.dispenser = dispenser; }
+
+    void insertCard(Card c)  { state = state.insertCard(this, c); }
+    void enterPin(String p)  { state = state.enterPin(this, p); }
+    void balance()           { state = state.balance(this); }
+    void withdraw(int a)     { state = state.withdraw(this, a); }
+    void eject()             { state = state.eject(this); }
+
+    Bank bank() { return bank; }
+    CashDispenser dispenser() { return dispenser; }
+    Card card() { return card; }
+    void takeCard(Card c) { card = c; }
+    void returnCard() { show("card returned"); card = null; }
+    void keepCard() { show("card kept after 3 wrong PINs"); card = null; }
+    void show(String message) { System.out.println("   &gt; " + message); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">AtmDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class AtmDemo {
+    public static void main(String[] args) {
+        var bank = new InMemoryBank();
+        var ana = new Card("4000-01"); bank.open(ana, "1234", 5_000);
+        var bo  = new Card("4000-02"); bank.open(bo, "4321", 900);
+        var cy  = new Card("4000-03"); bank.open(cy, "0000", 100);
+        var dispenser = new CashDispenser(1, 3, 0);  // 500x1, 200x3, 100x0
+        var atm = new Atm(bank, dispenser);
+
+        System.out.println("ana");
+        atm.withdraw(500);
+        atm.insertCard(ana);
+        atm.enterPin("1111");
+        atm.enterPin("1234");
+        atm.withdraw(650);
+        atm.withdraw(600);                        // greedy would fail
+        atm.withdraw(400);                        // only a 500 is left
+        atm.balance();
+        atm.eject();
+
+        System.out.println("cy");
+        atm.insertCard(cy);
+        for (String pin : List.of("1", "2", "3")) atm.enterPin(pin);
+
+        System.out.println("bo");
+        atm.insertCard(bo);
+        atm.enterPin("4321");
+        dispenser.jamNextDispense();
+        atm.withdraw(500);
+        atm.balance();
+        atm.withdraw(500);                        // the last note
+
+        System.out.println("ana again");
+        atm.insertCard(ana);
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · AtmDemo.java</div>
+<pre><code class="language-plaintext">ana
+   &gt; insert a card first
+   &gt; wrong PIN, 2 left
+   &gt; PIN accepted
+   &gt; amount must be a multiple of 100, up to 10000
+   &gt; take 600 as {200=3} (TX1)
+   &gt; cannot make 400 from the notes left
+   &gt; balance 4400
+   &gt; card returned
+cy
+   &gt; wrong PIN, 2 left
+   &gt; wrong PIN, 1 left
+   &gt; card kept after 3 wrong PINs
+bo
+   &gt; PIN accepted
+   &gt; dispenser jammed, TX2 reversed
+   &gt; balance 900
+   &gt; take 500 as {500=1} (TX3)
+   &gt; card returned
+   &gt; out of cash
+ana again
+   &gt; out of service, card returned</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

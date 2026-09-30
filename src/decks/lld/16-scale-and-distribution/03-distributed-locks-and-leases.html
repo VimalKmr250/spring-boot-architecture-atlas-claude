@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Scale and distribution" data-title="Distributed locks and leases">
+  <h2>Distributed locks: prefer a conditional write, and if you must lock, use a lease with a fencing token</h2>
+  <p class="dek">A lock across servers is harder than it looks. The holder can pause (a long GC, a network partition) past the lock's expiry, wake up, and write, not knowing another server now holds the lock. Most LLD scale questions do not need a lock at all, because a conditional write in the database already makes the decision atomic. When one is needed, it must expire, and the resource it guards must reject stale holders.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Option</th><th>How</th><th>Watch out for</th></tr></thead>
+        <tbody>
+          <tr><td>No lock: conditional write</td><td>The unique key or <code>WHERE</code> clause decides the winner</td><td>Nothing, which is the point. Try this first.</td></tr>
+          <tr><td>Database row lock</td><td><code>SELECT … FOR UPDATE</code> inside a transaction</td><td>Held for the whole transaction; keep it short</td></tr>
+          <tr><td>Redis lease</td><td><code>SET lock:seat:B1 &lt;owner&gt; NX PX 30000</code>; release with a script that deletes only if the value is still yours</td><td>Expiry during a pause; a failover losing the key. Not safe on its own for correctness.</td></tr>
+          <tr><td>ZooKeeper / etcd</td><td>Ephemeral node or lease, with a monotonically increasing revision</td><td>More infrastructure; the revision gives you a fencing token for free</td></tr>
+        </tbody>
+      </table>
+    </div>
+<div class="tree"><span class="h">Why a lease alone is not enough</span>
+  t0  A gets lease, token 33
+  t1  A pauses (GC)                <span class="c">lease expires</span>
+  t2  B gets lease, token 34
+  t3  B writes with token 34       <span class="g">accepted</span>
+  t4  A wakes, writes with token 33
+        storage: 33 &lt; 34 seen      <span class="c">rejected</span>
+
+<span class="h">Fencing</span>: every write carries the token,
+and the resource refuses any token lower
+than the highest it has already seen.</div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Seat holds</h4><p>A hold <b>is</b> a lease: <code>SET seat:S1:B1 BK7 NX PX 480000</code> claims with an expiry. The booking row is the source of truth, and confirmation checks it conditionally, so a late Redis key cannot sell a seat twice.</p></div>
+    <div class="card"><h4>One sweeper job</h4><p>Hold expiry and overdue reminders should run on one instance. Take a lease named after the job; the holder runs it and renews; if it dies, the lease lapses and another instance takes over.</p></div>
+    <div class="card"><h4>What to say</h4><p>"I'd avoid a distributed lock by making the write conditional. If I needed one, I'd use a lease with a fencing token checked by the database, not a bare Redis lock."</p></div>
+  </div>
+</section>

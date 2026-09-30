@@ -1,0 +1,52 @@
+<section class="slide" data-sec="Interview strategy" data-title="Testing and extending on the spot">
+  <h2>Testing and extending on the spot: prove it works, then show it bends</h2>
+  <p class="dek">Before the interviewer asks, run your code or walk it through: the main flow, then the edges. Then the change request arrives. Treat it as the real test of the design. Say which classes change before touching the keyboard; if the answer is "one new class and one line in the factory", say that too, because it is the point of the whole exercise.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Edge cases worth one line each</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Empty and full:</b> no spots left; nothing to undo; an empty waiting list.</li>
+          <li><b>Twice:</b> the same ticket redeemed twice; the same plate entering twice; a double click on "book".</li>
+          <li><b>Boundaries:</b> exactly one hour; exactly at <code>heldUntil</code>; an amount of zero.</li>
+          <li><b>Rounding:</b> ₹100 split three ways; a percentage that does not divide.</li>
+          <li><b>Order:</b> cancel after confirm; return a copy that is not on loan.</li>
+          <li><b>Concurrency:</b> two threads on the last spot or seat.</li>
+        </ul>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">A concurrency test worth writing, in JUnit 5</div>
+<pre><code class="language-java">@Test
+void onlyOneOfManyUsersHoldsTheLastSeat() throws Exception {
+    var service = new BookingService(pricing, fakeGateway, fixedClock);
+    var winners = new AtomicInteger();
+    try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+        for (int i = 0; i < 100; i++) {
+            String user = "u" + i;
+            pool.submit(() -> service.hold(user, show, List.of("B1"))
+                                     .ifPresent(b -> winners.incrementAndGet()));
+        }
+    }
+    assertEquals(1, winners.get());          // an invariant, not a schedule
+}</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>The change request</th><th>A good first sentence</th></tr></thead>
+          <tbody>
+            <tr><td>"Add a new vehicle type"</td><td>"One enum constant; the allocation loop and pricing map already handle it."</td></tr>
+            <tr><td>"Weekend pricing"</td><td>"A new <code>PricingStrategy</code>, or a decorator around the hourly one. Nothing else changes."</td></tr>
+            <tr><td>"Make it thread-safe"</td><td>"The shared state is the free lists; the invariant is one vehicle per spot; I'll make claim atomic per floor."</td></tr>
+            <tr><td>"Notify users when…"</td><td>"The domain publishes an event; a notifier subscribes. The domain doesn't learn about email."</td></tr>
+            <tr><td>"Persist it"</td><td>"Maps become repositories behind interfaces; check-then-act becomes a conditional update."</td></tr>
+            <tr><td>"Add undo"</td><td>"Actions become command objects that know how to reverse themselves."</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">When the change does not fit</span>Sometimes the request cuts across your design. Say so plainly: "This touches three classes, because I modelled X as Y. With this requirement I'd restructure like this." Recognising a design limit calmly scores better than forcing the change in.</div>
+    </div>
+  </div>
+</section>
