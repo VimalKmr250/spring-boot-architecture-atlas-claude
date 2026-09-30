@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: requirements">
+  <h2>Design a distributed rate limiter for a public API</h2>
+  <p class="dek">Every request to the API must be checked against its caller's allowance, across dozens of gateway instances, adding almost no latency. The limiter must not become the outage it was meant to prevent. The core difficulties are shared, contended counters across machines, and deciding what happens when the counter store itself is unavailable.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million API requests per second at peak each need one limit check, so the counter store must do a million atomic operations a second; at about 100 thousand per Redis shard that is roughly 10 shards plus replicas. State: 10 million active keys times about 100 bytes for tokens, timestamp and key is about 1 gigabyte. Latency budget: the check must add under 1 to 2 milliseconds at p99.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M API req/s at peak</text>
+          <rect x="30" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="125">× 1 atomic check each</text>
+          <rect x="30" y="170" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="189">1 M ops/s ÷ ~100 k per shard</text><text x="140" y="206" font-weight="600">≈ 10 Redis shards + replicas</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">10 M active API keys</text>
+          <rect x="340" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="119">× ~100 B (key, tokens, ts)</text><text x="450" y="133" font-size="9.5" opacity="0.7">TTL-expired when idle</text>
+          <rect x="340" y="170" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="198" font-weight="600">≈ 1 GB of state: tiny</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">50 gateway instances</text>
+          <rect x="650" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="125">all share each key's counter</text>
+          <rect x="650" y="170" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="189">budget: +1–2 ms p99</text><text x="760" y="206" font-weight="600">a network hop, no more</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="97" marker-end="url(#arw)"></line><line x1="140" y1="140" x2="140" y2="167" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="97" marker-end="url(#arw)"></line><line x1="450" y1="140" x2="450" y2="167" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="97" marker-end="url(#arw)"></line><line x1="760" y1="140" x2="760" y2="167" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="242" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard part isn't size, it's contention: many machines updating one counter atomically</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Limit by API key, user, IP and endpoint, e.g. "100 req/s, bursts to 200" and "10k/day".</li>
+      <li>Return <code>429</code> with <code>Retry-After</code> and remaining-quota headers.</li>
+      <li>Change rules without a deploy, and per customer tier.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Adds &lt; 2 ms p99. Must not reduce API availability.</li>
+      <li>Accurate to within a few percent. Briefly exceeding a limit by 5% is fine.</li>
+      <li>Scales linearly with gateways and keys.</li>
+    </ul></div>
+    <div class="card"><h4>Ask about the purpose</h4><ul class="tight">
+      <li><b>Protective</b> (keep us up) → fail open if the limiter breaks.</li>
+      <li><b>Contractual</b> (billing tiers) → accuracy matters, and you may fail closed.</li>
+      <li>This one decision drives the failure design (deep dive 2).</li>
+    </ul></div>
+  </div>
+</section>

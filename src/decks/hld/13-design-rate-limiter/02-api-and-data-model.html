@@ -1,0 +1,69 @@
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: API and data model">
+  <h2>Rules are configuration, counters are tiny keys with a TTL</h2>
+  <p class="dek">A rate limiter has two kinds of data with opposite profiles. <b>Rules</b> are small, rarely change, and are read on every request, so they're cached in every gateway. <b>Counters</b> are one small record per (rule, client), updated on every request, and expired when idle.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">rules (config store, pushed to gateways)</div>
+<pre><code class="language-yaml">- id: free-tier-default
+  match: { tier: free }
+  key: api_key
+  algorithm: token_bucket
+  rate: 10/s
+  burst: 20
+- id: pro-search
+  match: { tier: pro, route: "GET /v1/search" }
+  key: api_key
+  algorithm: token_bucket
+  rate: 100/s
+  burst: 200
+- id: login-per-ip
+  match: { route: "POST /v1/login" }
+  key: client_ip
+  algorithm: sliding_window
+  limit: 10/min</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">response on rejection</div>
+<pre><code class="language-http">HTTP/1.1 429 Too Many Requests
+Retry-After: 2
+RateLimit-Limit: 100
+RateLimit-Remaining: 0
+RateLimit-Reset: 2</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Rules live in a config store and are pushed to each gateway's in-memory rule cache. For each request the gateway matches a rule and builds a counter key such as rl:pro-search:key_7Fq2, which lives in Redis as a small hash with a token count and a last-refill timestamp and a TTL of a few minutes.">
+          <path d="M20 26 a60 7 0 0 1 120 0 v40 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+          <path d="M20 26 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+          <text x="80" y="52" text-anchor="middle" font-size="10.5" fill="currentColor">config store</text>
+          <text x="80" y="66" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">rules, versioned</text>
+          <rect x="220" y="20" width="180" height="64" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="310" y="40" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">gateway × 50</text>
+          <text x="310" y="56" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">in-memory rule cache</text>
+          <text x="310" y="70" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">match → build key</text>
+          <line x1="140" y1="46" x2="217" y2="46" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+          <text x="178" y="38" text-anchor="middle" font-size="8.5" fill="#3AA79B">push on change</text>
+
+          <rect x="40" y="140" width="340" height="150" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="210" y="160" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Redis Cluster: counters</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <rect x="54" y="172" width="312" height="48" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+            <text x="62" y="190">rl:pro-search:key_7Fq2</text>
+            <text x="62" y="208" opacity="0.85">{ tokens: 143.5, ts: 1727… }  TTL 120s</text>
+            <rect x="54" y="228" width="312" height="48" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+            <text x="62" y="246">rl:login-per-ip:203.0.113.9</text>
+            <text x="62" y="264" opacity="0.85">{ prev: 6, cur: 3, win: 1727… }  TTL 120s</text>
+          </g>
+          <line x1="310" y1="84" x2="290" y2="137" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+          <text x="304" y="116" font-size="8.5" fill="#D26A3F">1 atomic call</text>
+          <text x="210" y="312" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">key hashed to a shard; idle keys simply expire</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Rule evaluation is local</h4><p>Matching a request to its rules must not need a network call. Gateways hold the full rule set in memory, subscribe to changes, and stamp every decision with the rule version it used. That makes audits and debugging possible.</p></div>
+    <div class="card"><h4>Multiple rules per request</h4><p>A request can hit several rules at once: per key, per org, per endpoint, and global. Check them all in one round trip (a single Lua call over several keys, or a pipeline). Reject if any rule rejects, and report the tightest one in the headers.</p></div>
+    <div class="card"><h4>Shadow mode</h4><p>New or tightened rules first run in "log only" mode: count what would have been rejected, without rejecting. Promote a rule to enforcement once you've seen whom it would hit. This single feature prevents most rate-limit incidents.</p></div>
+  </div>
+</section>

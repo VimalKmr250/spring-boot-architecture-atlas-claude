@@ -11304,11 +11304,11 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
         <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
           <text x="256" y="56" fill="#D26A3F">_id: "order-881"</text>
           <text x="256" y="72">customer: {id: 42,</text>
-          <text x="256" y="86">  name: "Ana"}</text>
+          <text x="268" y="86">name: "Ana"}</text>
           <text x="256" y="102">status: "PAID"</text>
           <text x="256" y="118">lines: [</text>
-          <text x="256" y="132">  {sku: "A1", qty: 2},</text>
-          <text x="256" y="146">  {sku: "B7", qty: 1} ]</text>
+          <text x="268" y="132">{sku: "A1", qty: 2},</text>
+          <text x="268" y="146">{sku: "B7", qty: 1} ]</text>
         </g>
         <g font-size="10.5" fill="currentColor" opacity="0.8" text-anchor="middle">
           <text x="337" y="190">one self-contained aggregate</text><text x="337" y="206">query and index by any field</text><text x="337" y="222">joins are awkward</text>
@@ -11842,7 +11842,7 @@ kafka-consumer-groups.sh --bootstrap-server $B --group projection-order-history 
           <text x="734" y="76">id, total</text>
           <text x="734" y="92" fill="#D26A3F">cust_name: "Ana"</text>
           <text x="734" y="108" fill="#D26A3F">lines: [{sku, qty,</text>
-          <text x="734" y="122" fill="#D26A3F">  title: "Mug"}]</text>
+          <text x="746" y="122" fill="#D26A3F">title: "Mug"}]</text>
           <text x="734" y="144" opacity="0.7">1 lookup per read</text>
         </g>
         <text x="670" y="210" text-anchor="middle" font-size="10.5" fill="currentColor">✓ fast, join-free reads; shardable by order</text>
@@ -14605,7 +14605,7 @@ def update_profile(user_id, changes):
           <text x="324" y="102">materialized view · index table</text><text x="324" y="118">static content hosting</text><text x="324" y="134">valet key · §05, §09</text>
 
           <text x="624" y="54">strangler fig · anti-corruption layer</text><text x="624" y="70">backends for frontends · §04</text><text x="624" y="86">gateway routing / aggregation /</text>
-          <text x="624" y="102">  offloading · §04</text><text x="624" y="118">sidecar · ambassador</text><text x="624" y="134">external configuration store</text>
+          <text x="636" y="102">offloading · §04</text><text x="624" y="118">sidecar · ambassador</text><text x="624" y="134">external configuration store</text>
           <text x="624" y="150">compute consolidation · leader election</text>
 
           <text x="24" y="214">retry · circuit breaker · bulkhead · §08</text><text x="24" y="230">throttling · §08</text><text x="24" y="246">compensating transaction · §05</text>
@@ -15097,6 +15097,1470 @@ def update_profile(user_id, changes):
     <div class="card"><h4>Geodes vs deployment stamps</h4><p>Both deploy many copies of the stack. <b>Stamps/cells</b> partition users: each copy owns a subset of tenants, and a user always lands in their cell. <b>Geodes</b> are interchangeable: any copy serves any user, routed by proximity, with data replicated everywhere. Geodes give the lowest latency and survive the loss of a region. Cells give the tightest blast radius.</p></div>
     <div class="card"><h4>Consolidation vs isolation</h4><p>Packing services onto shared nodes (Kubernetes) cuts cost and idle capacity, and it creates noisy-neighbour risk. Protect yourself with resource requests and limits, priority classes, and separate node pools for critical or bursty workloads. It's the bulkhead trade-off again, at the infrastructure level.</p></div>
   </div>
+</section>
+<!-- decks/hld/12-design-url-shortener/01-requirements.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: requirements">
+  <h2>Design a URL shortener: a tiny write path and an enormous read path</h2>
+  <p class="dek">The classic warm-up question (think bit.ly or tinyurl). It looks trivial, which is the point: the interviewer wants to see whether you find the real problems. Those are generating short unique keys without coordination, and serving redirects in milliseconds at 100× the write rate, with analytics on the side.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. Writes: 100 million new links a month is about 40 a second, 200 at peak; over five years that is 6 billion links at about 500 bytes, 3 terabytes. Reads: 100 times the writes is 10 billion redirects a month, about 4,000 a second, 20,000 at peak. Keys: seven base62 characters give 3.5 trillion codes, far more than 6 billion. Cache: about 20 percent of the daily hot set is roughly 5 gigabytes.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="120" y="20" font-weight="600">Writes</text><text x="420" y="20" font-weight="600">Reads</text><text x="740" y="20" font-weight="600">Key space &amp; cache</text>
+          <rect x="30" y="32" width="180" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="120" y="55">100 M new links / month</text>
+          <rect x="30" y="90" width="180" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="120" y="113">≈ 40 /s · peak ≈ 200 /s</text>
+          <rect x="30" y="148" width="180" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="120" y="167">5 yr: 6 B links × 500 B</text><text x="120" y="184" font-weight="600">≈ 3 TB total</text>
+          <rect x="330" y="32" width="180" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="420" y="55">× 100 read:write</text>
+          <rect x="330" y="90" width="180" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="420" y="113">10 B redirects / month</text>
+          <rect x="330" y="148" width="180" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="420" y="167">≈ 4 k/s avg</text><text x="420" y="184" font-weight="600">≈ 20 k/s at peak</text>
+          <rect x="630" y="32" width="220" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="740" y="51">62⁷ ≈ 3.5 trillion codes</text><text x="740" y="68" font-size="10" opacity="0.75">≫ 6 B needed (7 chars is plenty)</text>
+          <rect x="630" y="100" width="220" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="740" y="119">hot set: ~50 M links/day</text><text x="740" y="136" font-size="10" opacity="0.75">× 20% × 500 B</text>
+          <rect x="630" y="168" width="220" height="30" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="740" y="188" font-weight="600">cache ≈ 5 GB: one small Redis</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="120" y1="68" x2="120" y2="87" marker-end="url(#arw)"></line><line x1="120" y1="126" x2="120" y2="145" marker-end="url(#arw)"></line>
+          <line x1="420" y1="68" x2="420" y2="87" marker-end="url(#arw)"></line><line x1="420" y1="126" x2="420" y2="145" marker-end="url(#arw)"></line>
+          <line x1="740" y1="78" x2="740" y2="97" marker-end="url(#arw)"></line><line x1="740" y1="146" x2="740" y2="165" marker-end="url(#arw)"></line>
+          <line x1="210" y1="50" x2="327" y2="50" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="228" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">conclusion: storage and writes are easy; the design is about the 20k/s read path and key generation</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Shorten a long URL to a 7-character code.</li>
+      <li>Redirect <code>short.ly/Ab3xK9q</code> to the long URL.</li>
+      <li>Optional custom alias and expiry date.</li>
+      <li>Click statistics per link (may lag by minutes).</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Redirect p99 &lt; 50 ms, availability 99.99%. A broken link breaks someone else's product.</li>
+      <li>Links are durable: never lost, never re-pointed.</li>
+      <li>Codes are not trivially enumerable.</li>
+      <li>Read-heavy at 100:1; writes may be slightly slower.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify, then scope out</h4><ul class="tight">
+      <li>"Same long URL twice: same code or new?" Different codes per user is simpler.</li>
+      <li>"Do links ever get edited?" No: immutability helps caching.</li>
+      <li>Out of scope: link previews, QR codes, billing.</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/12-design-url-shortener/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: API and data model">
+  <h2>Three endpoints and one hot table keyed by code</h2>
+  <p class="dek">Every redirect is a lookup by exact key, and links never change once created. That is a key-value access pattern with no joins on the hot path, so the store choice is easy. Click data is append-only and analytical, so it goes to a different store entirely.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/urls
+Idempotency-Key: 7c1e…            # retries can't create duplicates
+{ "long_url": "https://…", "alias": "spring-sale", "expires_at": "2027-01-01" }
+→ 201 { "code": "Ab3xK9q", "short_url": "https://short.ly/Ab3xK9q" }
+
+GET /{code}
+→ 302 Location: https://…          # or 404 / 410 Gone if expired
+
+GET /v1/urls/{code}/stats?from=…&amp;to=…
+→ 200 { "clicks": 18234, "by_day": […], "top_countries": […] }
+
+DELETE /v1/urls/{code}             # owner only; tombstones the code</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 300" role="img" aria-label="Data model: a users table with id, email and plan; a urls table keyed by code with long_url, owner_id referencing users, created_at and expires_at; a click_events table in an analytics store with code, timestamp, country, referrer and device. Users have many urls; urls have many click events.">
+          <rect x="10" y="20" width="150" height="90" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="10" y1="40" x2="160" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="85" y="34" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">users</text>
+          <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="18" y="58">id  PK</text><text x="18" y="76">email</text><text x="18" y="94">plan</text></g>
+
+          <rect x="230" y="20" width="180" height="130" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <line x1="230" y1="40" x2="410" y2="40" stroke="#D26A3F" stroke-opacity="0.7"></line>
+          <text x="320" y="34" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">urls  (hot path)</text>
+          <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="238" y="58" fill="#D26A3F">code  PK  char(7)</text><text x="238" y="76">long_url  text</text><text x="238" y="94">owner_id  FK</text><text x="238" y="112">created_at</text><text x="238" y="130">expires_at  null</text></g>
+
+          <rect x="230" y="190" width="180" height="100" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <line x1="230" y1="210" x2="410" y2="210" stroke="#3AA79B" stroke-opacity="0.7"></line>
+          <text x="320" y="204" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">click_events (OLAP)</text>
+          <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="238" y="228">code, ts</text><text x="238" y="246">country, referrer</text><text x="238" y="264">device</text><text x="238" y="282" opacity="0.7">append-only</text></g>
+
+          <line x1="160" y1="66" x2="228" y2="84" stroke="#8A94A3" stroke-width="1.3"></line>
+          <text x="170" y="60" font-size="10" fill="currentColor">1</text><text x="216" y="96" font-size="10" fill="currentColor">N</text>
+          <line x1="320" y1="150" x2="320" y2="188" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"></line>
+          <text x="328" y="164" font-size="10" fill="currentColor">1</text><text x="328" y="184" font-size="10" fill="currentColor">N</text>
+          <text x="85" y="160" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">KV store, partition</text>
+          <text x="85" y="174" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">key = code:</text>
+          <text x="85" y="188" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">DynamoDB / Cassandra,</text>
+          <text x="85" y="202" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">or PostgreSQL sharded</text>
+          <text x="85" y="216" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">by hash(code)</text>
+          <text x="85" y="248" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">"my links" query needs</text>
+          <text x="85" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">an index table by owner</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>302, not 301 (by default)</h4><p>A <code>301 Moved Permanently</code> is cached by browsers, so repeat clicks never reach you. That means less load, but no analytics and no way to expire the link. Use 302 when stats or expiry matter. Offer 301 for "permanent, no stats" links.</p></div>
+    <div class="card"><h4>Why a KV store fits</h4><p>Lookup by exact key, no joins, immutable values, 3 TB growing steadily. Any of DynamoDB, Cassandra or sharded PostgreSQL works. Say which and why: "PostgreSQL until a few TB, because the team knows it. The schema is already shard-friendly."</p></div>
+    <div class="card"><h4>Idempotent creates</h4><p>A mobile client that retries a timed-out create shouldn't get two codes. The <code>Idempotency-Key</code> maps to the first response for 24 hours. Custom aliases use a conditional insert (<code>INSERT … IF NOT EXISTS</code>), so a collision returns 409.</p></div>
+  </div>
+</section>
+<!-- decks/hld/12-design-url-shortener/03-high-level-design.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: high-level design">
+  <h2>Split the write path from the read path, and keep redirects in memory</h2>
+  <p class="dek">Two services with very different shapes share one table. <b>Shorten</b> is low-volume and needs unique keys. <b>Redirect</b> is 100× busier, needs single-digit-millisecond lookups, and scales independently. Clicks go onto a stream, so analytics never slows a redirect.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Clients go through a CDN and a load balancer. POST requests go to the shorten service, which takes a key from its local block, fetched from the key generation service, and inserts the row into the URL database. GET redirects go to the redirect service, which reads Redis first and the database on a miss, and returns 302. Each redirect publishes a click event to Kafka; an analytics consumer aggregates clicks into ClickHouse, which the stats API reads.">
+        <rect x="10" y="140" width="80" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="50" y="167" text-anchor="middle" font-size="11" fill="currentColor">Clients</text>
+        <rect x="110" y="140" width="80" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="150" y="160" text-anchor="middle" font-size="10.5" fill="currentColor">CDN / edge</text>
+        <text x="150" y="175" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">301s, abuse block</text>
+        <rect x="210" y="140" width="70" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="245" y="167" text-anchor="middle" font-size="10.5" fill="currentColor">LB</text>
+        <line x1="90" y1="162" x2="107" y2="162" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="190" y1="162" x2="207" y2="162" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <rect x="330" y="50" width="140" height="56" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="400" y="74" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Shorten svc</text>
+        <text x="400" y="92" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">× 3 · validates, assigns key</text>
+        <rect x="330" y="220" width="140" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="400" y="244" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Redirect svc</text>
+        <text x="400" y="262" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">× 20 · stateless, hot path</text>
+        <line x1="270" y1="148" x2="327" y2="84" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="272" y="110" font-size="9.5" fill="currentColor">POST</text>
+        <line x1="270" y1="176" x2="327" y2="240" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="272" y="222" font-size="9.5" fill="#D26A3F">GET /{code}</text>
+
+        <rect x="530" y="16" width="150" height="50" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="605" y="38" text-anchor="middle" font-size="11" fill="currentColor">Key gen service</text>
+        <text x="605" y="54" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">hands out id ranges</text>
+        <line x1="470" y1="64" x2="527" y2="46" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="476" y="46" font-size="8.5" fill="currentColor" opacity="0.75">block of 1k</text>
+
+        <path d="M740 110 a60 7 0 0 1 120 0 v64 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></path>
+        <path d="M740 110 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        <text x="800" y="140" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">URL DB</text>
+        <text x="800" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">sharded by code</text>
+        <text x="800" y="170" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">+ replicas</text>
+        <line x1="470" y1="84" x2="737" y2="130" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="600" y="100" font-size="9.5" fill="currentColor">INSERT code, url</text>
+
+        <path d="M540 214 a55 7 0 0 1 110 0 v40 a55 7 0 0 1 -110 0 z" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M540 214 a55 7 0 0 0 110 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="595" y="240" text-anchor="middle" font-size="11" fill="currentColor">Redis</text>
+        <text x="595" y="254" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">~95% hits</text>
+        <line x1="470" y1="236" x2="537" y2="236" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <path d="M470 252 C 620 300, 760 260, 796 184" fill="none" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <text x="700" y="260" font-size="9.5" fill="#D26A3F">miss → replica</text>
+
+        <rect x="330" y="296" width="120" height="20" rx="3" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="390" y="310" text-anchor="middle" font-size="9.5" fill="currentColor">Kafka · clicks</text>
+        <line x1="400" y1="276" x2="398" y2="293" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <rect x="560" y="290" width="150" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="635" y="307" text-anchor="middle" font-size="9.5" fill="currentColor">aggregator → ClickHouse</text>
+        <line x1="450" y1="306" x2="557" y2="304" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="760" y="307" font-size="9.5" fill="currentColor" opacity="0.8">← stats API reads here</text>
+      </svg>
+    </div>
+    <figcaption>The copper path is the only one users wait on: edge → LB → redirect → Redis → 302, about 5–10 ms inside the datacenter. The database sees only cache misses. Clicks are fire-and-forget into Kafka: if analytics is down, redirects don't notice.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Walk the write</h4><p>① <code>POST /v1/urls</code> reaches Shorten. ② Shorten validates the URL (scheme, length, blocklist) and takes the next id from its in-memory block, fetched from the key generation service 1,000 ids at a time. ③ It encodes the id as base62, inserts <code>(code, long_url, owner)</code>, and returns 201. It doesn't write to the cache; the first redirect warms it.</p></div>
+    <div class="card"><h4>Walk the read</h4><p>① <code>GET /Ab3xK9q</code> reaches Redirect. ② <code>GET url:Ab3xK9q</code> in Redis: on a hit, go to ④. ③ On a miss, read a DB replica and set the cache with a 24 h TTL (links are immutable). ④ Return 302 plus <code>Cache-Control: private, max-age=0</code>. ⑤ Publish a click event asynchronously, with ip hash, UA and referrer.</p></div>
+  </div>
+</section>
+<!-- decks/hld/12-design-url-shortener/04-key-generation.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: key generation">
+  <h2>Deep dive 1: unique 7-character codes without a coordination bottleneck</h2>
+  <p class="dek">This is the heart of the question. You need billions of unique, short, non-guessable codes, minted by many servers at once, with no global lock on the write path. There are three standard approaches, and the interviewer wants to hear why you rejected two of them.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Option A, hash: take the MD5 of the long URL, keep 41 bits, base62-encode to 7 characters, then check the database for a collision and retry with a salt if found. Option B, counter ranges: a key generation service hands each server a range of ids, such as 1,000,000 to 1,000,999 for server A; the server scrambles each id with a reversible permutation and base62-encodes it, for example id 11157 encodes to 2TX. Option C, pre-generated keys: an offline job fills a pool of random unused codes; servers claim batches, and there are no collisions at write time.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="150" y="20">A · Hash + truncate</text><text x="450" y="20">B · Counter ranges (chosen)</text><text x="750" y="20">C · Pre-generated pool</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="292"></line><line x1="600" y1="8" x2="600" y2="292"></line></g>
+
+        <!-- A -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="40" y="38" width="220" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="150" y="56" font-family="IBM Plex Mono, monospace">md5("https://…/very/long")</text>
+          <rect x="40" y="86" width="220" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="150" y="104">take 41 bits → base62 → 7 chars</text>
+          <rect x="40" y="134" width="220" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="150" y="152">exists in DB? (read on every write)</text>
+          <rect x="40" y="182" width="100" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="90" y="200">no → insert</text>
+          <rect x="160" y="182" width="100" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="210" y="200">yes → salt, retry</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="150" y1="66" x2="150" y2="83" marker-end="url(#arw)"></line><line x1="150" y1="114" x2="150" y2="131" marker-end="url(#arw)"></line><line x1="120" y1="162" x2="100" y2="179" marker-end="url(#arw)"></line><line x1="180" y1="162" x2="200" y2="179" marker-end="url(#arw)"></line></g>
+        <path d="M260 196 C 290 196, 290 52, 262 52" fill="none" stroke="#D26A3F" stroke-width="1.1" stroke-dasharray="3 3" marker-end="url(#arwA)"></path>
+        <g font-size="10" text-anchor="middle"><text x="150" y="240" fill="#3AA79B">✓ same URL → same code (dedupe)</text><text x="150" y="256" fill="#D26A3F">✗ collision check on every write</text><text x="150" y="272" fill="#D26A3F">✗ collisions grow as the table fills</text></g>
+
+        <!-- B -->
+        <rect x="380" y="34" width="140" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="50" text-anchor="middle" font-size="10" fill="currentColor">key gen service</text>
+        <text x="450" y="63" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">etcd / DB sequence</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="316" y="96" width="128" height="34" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="380" y="110">server A</text><text x="380" y="123">1,000,000–1,000,999</text>
+          <rect x="456" y="96" width="128" height="34" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="520" y="110">server B</text><text x="520" y="123">1,001,000–1,001,999</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="430" y1="70" x2="395" y2="93" marker-end="url(#arw)"></line><line x1="470" y1="70" x2="505" y2="93" marker-end="url(#arw)"></line></g>
+        <rect x="340" y="152" width="220" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="450" y="171" text-anchor="middle" font-size="9.5" fill="currentColor">scramble: reversible permutation of id</text>
+        <rect x="340" y="196" width="220" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="450" y="215" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">base62(11157) = "2TX"</text>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="450" y1="130" x2="450" y2="149" marker-end="url(#arw)"></line><line x1="450" y1="182" x2="450" y2="193" marker-end="url(#arw)"></line></g>
+        <g font-size="10" text-anchor="middle"><text x="450" y="244" fill="#3AA79B">✓ no collisions, no read before write</text><text x="450" y="260" fill="#3AA79B">✓ one KGS call per 1,000 links</text><text x="450" y="276" fill="#D26A3F">✗ a crash wastes the rest of a block (fine)</text></g>
+
+        <!-- C -->
+        <path d="M680 40 a70 7 0 0 1 140 0 v50 a70 7 0 0 1 -140 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M680 40 a70 7 0 0 0 140 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="750" y="68" text-anchor="middle" font-size="10" fill="currentColor">free_keys pool</text>
+        <text x="750" y="82" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">Qx81kAe, 0pLmZ2r, …</text>
+        <rect x="640" y="130" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="690" y="149" text-anchor="middle" font-size="9.5" fill="currentColor">offline filler</text>
+        <rect x="770" y="130" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="820" y="149" text-anchor="middle" font-size="9.5" fill="currentColor">server claims 1k</text>
+        <line x1="690" y1="130" x2="715" y2="99" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <line x1="790" y1="99" x2="815" y2="127" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="750" y="190" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">move batch free → used</text>
+        <text x="750" y="204" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">atomically</text>
+        <g font-size="10" text-anchor="middle"><text x="750" y="244" fill="#3AA79B">✓ truly random codes</text><text x="750" y="260" fill="#D26A3F">✗ another stateful store to run</text><text x="750" y="276" fill="#D26A3F">✗ must pre-generate billions</text></g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The answer to give</span>"Counter ranges. A small coordination service (a DB sequence or etcd) hands each Shorten instance a block of 1,000 ids, so the write path never waits on it. To stop people enumerating links, I pass the id through a reversible scramble, such as a keyed Feistel permutation over the 62⁷ space, before base62-encoding it. Codes look random and are still guaranteed unique. Custom aliases skip all this and use a conditional insert."</div>
+</section>
+<!-- decks/hld/12-design-url-shortener/05-the-redirect-path.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: the redirect path">
+  <h2>Deep dive 2: a redirect in under 10 ms, and clicks counted without slowing it</h2>
+  <p class="dek">The read path carries 99% of the traffic, and every millisecond is someone else's page-load time. Keep it to one memory lookup, keep the database off it, record clicks asynchronously, and decide deliberately what the browser and CDN are allowed to cache.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Sequence. The browser requests the short code from the edge, about 5 ms away. The edge forwards it to the redirect service. The redirect service reads Redis in about half a millisecond; on the rare miss it reads a database replica in about 3 ms and fills the cache. It returns 302 with the long URL, and the browser follows it. In parallel the service appends a click event to a local buffer that flushes to Kafka every few hundred milliseconds. Unknown codes are cached as not-found for a minute so random probes don't reach the database.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="16" y="14" width="100" height="30" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="66" y="34">Browser</text>
+          <rect x="166" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="216" y="34">Edge / LB</text>
+          <rect x="316" y="14" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="376" y="34">Redirect svc</text>
+          <rect x="486" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="536" y="34">Redis</text>
+          <rect x="636" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="686" y="34">DB replica</text>
+          <rect x="786" y="14" width="100" height="30" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="836" y="34">Kafka</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="66" y1="44" x2="66" y2="300"></line><line x1="216" y1="44" x2="216" y2="300"></line><line x1="376" y1="44" x2="376" y2="300"></line>
+          <line x1="536" y1="44" x2="536" y2="300"></line><line x1="686" y1="44" x2="686" y2="300"></line><line x1="836" y1="44" x2="836" y2="300"></line>
+        </g>
+        <line x1="66" y1="68" x2="212" y2="68" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="140" y="62" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">① GET /Ab3xK9q</text>
+        <line x1="216" y1="88" x2="372" y2="88" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="296" y="82" text-anchor="middle" font-size="9.5" fill="currentColor">② ~1 ms</text>
+        <line x1="376" y1="110" x2="532" y2="110" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="456" y="104" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">③ GET url:Ab3xK9q</text>
+        <line x1="536" y1="128" x2="380" y2="128" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="456" y="142" text-anchor="middle" font-size="9.5" fill="#D26A3F">hit (95%): 0.5 ms</text>
+        <line x1="376" y1="162" x2="682" y2="162" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="2 3" marker-end="url(#arw)"></line>
+        <text x="610" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">miss: SELECT (3 ms), then SET 24 h</text>
+        <line x1="376" y1="196" x2="220" y2="196" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <line x1="216" y1="212" x2="70" y2="212" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="296" y="190" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">④ 302 Location: …</text>
+        <text x="140" y="228" text-anchor="middle" font-size="9.5" fill="#D26A3F">total ≈ 5–10 ms + RTT</text>
+        <rect x="370" y="220" width="12" height="40" fill="#3AA79B" fill-opacity="0.3"></rect>
+        <text x="392" y="236" font-size="9" fill="#3AA79B">buffer click</text>
+        <line x1="382" y1="252" x2="832" y2="252" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="610" y="246" text-anchor="middle" font-size="9.5" fill="#3AA79B">⑤ async batch every 200 ms (never blocks the 302)</text>
+        <text x="450" y="290" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">unknown code → cache "NOT_FOUND" for 60 s; optional bloom filter of valid codes stops random probes early</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>What may be cached where</h4><p><b>Redis:</b> everything, with a long TTL (links are immutable; delete on expiry or takedown). <b>Browser/CDN:</b> only for links marked "no stats", via 301 or <code>max-age</code>. Tracked links use 302 + <code>no-store</code>, or the clicks would vanish into caches.</p></div>
+    <div class="card"><h4>Counting clicks at 20k/s</h4><p>Don't <code>UPDATE clicks = clicks + 1</code> per redirect. That's a hot-row write storm. Stream raw events, aggregate per code per minute in a consumer, and write the rollups to a columnar store. For a live counter, use Redis <code>INCR</code> on sharded keys, flushed periodically.</p></div>
+    <div class="card"><h4>Hot links</h4><p>A link shared by a celebrity can take 50k/s on one key, which means one Redis shard. Add a 1–5 s in-process cache in the redirect service (links never change, so staleness is harmless) or replicate hot keys. For "no stats" links, let the CDN absorb it entirely.</p></div>
+  </div>
+</section>
+<!-- decks/hld/12-design-url-shortener/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: trade-offs and follow-ups">
+  <h2>What breaks at 10×, what fails, and what interviewers ask next</h2>
+  <p class="dek">Finish by stress-testing your own design. Redirects must survive the loss of any single component, so each dependency on the read path needs a fallback. Growth pushes the design towards multi-region reads, but the write path can stay in one region, because links are immutable.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Scaled-out design across two regions. Global DNS sends users to the nearest region. Each region runs redirect services, a local Redis and a read replica of the URL database. Writes go only to the primary region; the database replicates to region 2 asynchronously within seconds, which is fine because links never change. Failure annotations: if Redis fails, reads go to the replicas, which are sized for it; if the key service fails, servers keep minting from their current block; if the primary region fails, redirects continue from region 2 and only link creation pauses.">
+        <rect x="360" y="10" width="180" height="32" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="31" text-anchor="middle" font-size="11" fill="currentColor">GeoDNS · nearest region</text>
+        <rect x="30" y="60" width="380" height="170" rx="10" fill="#D26A3F" fill-opacity="0.04" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="44" y="80" font-size="11" font-weight="600" fill="#D26A3F">Region 1 (primary)</text>
+        <rect x="490" y="60" width="380" height="170" rx="10" fill="currentColor" fill-opacity="0.02" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="504" y="80" font-size="11" font-weight="600" fill="currentColor">Region 2 (read)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="50" y="96" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="100" y="115">shorten svc</text>
+          <rect x="50" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="100" y="159">redirect × 20</text>
+          <rect x="170" y="140" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="210" y="159">Redis</text>
+          <rect x="170" y="96" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="210" y="115">KGS</text>
+          <rect x="510" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="560" y="159">redirect × 20</text>
+          <rect x="630" y="140" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="670" y="159">Redis</text>
+        </g>
+        <path d="M280 104 a50 6 0 0 1 100 0 v50 a50 6 0 0 1 -100 0 z" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M280 104 a50 6 0 0 0 100 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="330" y="132" text-anchor="middle" font-size="10" fill="currentColor">primary</text><text x="330" y="146" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">+ replicas</text>
+        <path d="M740 104 a50 6 0 0 1 100 0 v50 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></path>
+        <path d="M740 104 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        <text x="790" y="132" text-anchor="middle" font-size="10" fill="currentColor">replicas</text>
+        <line x1="380" y1="130" x2="737" y2="130" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arwB)"></line>
+        <text x="560" y="122" text-anchor="middle" font-size="9.5" fill="#3AA79B">async replication (seconds)</text>
+        <line x1="400" y1="42" x2="200" y2="57" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="500" y1="42" x2="700" y2="57" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <g font-size="9.5" fill="currentColor">
+          <text x="50" y="196">✕ Redis down → replicas absorb reads (sized for 2×)</text>
+          <text x="50" y="212">✕ KGS down → servers finish current blocks (minutes of headroom)</text>
+          <text x="510" y="196">✕ region 1 down → redirects continue here;</text>
+          <text x="528" y="212">only "create link" pauses until fail-over</text>
+        </g>
+        <text x="450" y="262" text-anchor="middle" font-size="10.5" fill="currentColor">redirect availability ≠ create availability: design and state SLOs for each separately</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>At 10× (200k redirects/s)</th><th>Response</th></tr></thead>
+        <tbody>
+          <tr><td>Redis shard hot</td><td>Redis Cluster plus an in-process cache for the top keys</td></tr>
+          <tr><td>DB storage (30 TB)</td><td>More shards; archive expired links; compress long URLs</td></tr>
+          <tr><td>Click stream volume</td><td>More Kafka partitions; pre-aggregate at the service</td></tr>
+          <tr><td>Global latency</td><td>More read regions; edge redirects for "no stats" links</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Follow-ups to expect</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Abuse:</b> phishing and malware links. Scan on create (Safe Browsing API), rate-limit creates per user and IP, and add a takedown flag checked on redirect.</li>
+        <li><b>Expiry:</b> a lazy check on redirect (410 Gone), plus a nightly sweeper that deletes expired rows and cache keys.</li>
+        <li><b>Custom domains:</b> the tenant becomes part of the key, <code>(domain, code)</code>.</li>
+        <li><b>Privacy:</b> hash IPs in click events, and set retention limits on raw events.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/01-requirements.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: requirements">
+  <h2>Design a distributed rate limiter for a public API</h2>
+  <p class="dek">Every request to the API must be checked against its caller's allowance, across dozens of gateway instances, adding almost no latency. The limiter must not become the outage it was meant to prevent. The core difficulties are shared, contended counters across machines, and deciding what happens when the counter store itself is unavailable.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million API requests per second at peak each need one limit check, so the counter store must do a million atomic operations a second; at about 100 thousand per Redis shard that is roughly 10 shards plus replicas. State: 10 million active keys times about 100 bytes for tokens, timestamp and key is about 1 gigabyte. Latency budget: the check must add under 1 to 2 milliseconds at p99.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M API req/s at peak</text>
+          <rect x="30" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="125">× 1 atomic check each</text>
+          <rect x="30" y="170" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="189">1 M ops/s ÷ ~100 k per shard</text><text x="140" y="206" font-weight="600">≈ 10 Redis shards + replicas</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">10 M active API keys</text>
+          <rect x="340" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="119">× ~100 B (key, tokens, ts)</text><text x="450" y="133" font-size="9.5" opacity="0.7">TTL-expired when idle</text>
+          <rect x="340" y="170" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="198" font-weight="600">≈ 1 GB of state: tiny</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">50 gateway instances</text>
+          <rect x="650" y="100" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="125">all share each key's counter</text>
+          <rect x="650" y="170" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="189">budget: +1–2 ms p99</text><text x="760" y="206" font-weight="600">a network hop, no more</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="97" marker-end="url(#arw)"></line><line x1="140" y1="140" x2="140" y2="167" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="97" marker-end="url(#arw)"></line><line x1="450" y1="140" x2="450" y2="167" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="97" marker-end="url(#arw)"></line><line x1="760" y1="140" x2="760" y2="167" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="242" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard part isn't size, it's contention: many machines updating one counter atomically</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Limit by API key, user, IP and endpoint, e.g. "100 req/s, bursts to 200" and "10k/day".</li>
+      <li>Return <code>429</code> with <code>Retry-After</code> and remaining-quota headers.</li>
+      <li>Change rules without a deploy, and per customer tier.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Adds &lt; 2 ms p99. Must not reduce API availability.</li>
+      <li>Accurate to within a few percent. Briefly exceeding a limit by 5% is fine.</li>
+      <li>Scales linearly with gateways and keys.</li>
+    </ul></div>
+    <div class="card"><h4>Ask about the purpose</h4><ul class="tight">
+      <li><b>Protective</b> (keep us up) → fail open if the limiter breaks.</li>
+      <li><b>Contractual</b> (billing tiers) → accuracy matters, and you may fail closed.</li>
+      <li>This one decision drives the failure design (deep dive 2).</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: API and data model">
+  <h2>Rules are configuration, counters are tiny keys with a TTL</h2>
+  <p class="dek">A rate limiter has two kinds of data with opposite profiles. <b>Rules</b> are small, rarely change, and are read on every request, so they're cached in every gateway. <b>Counters</b> are one small record per (rule, client), updated on every request, and expired when idle.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">rules (config store, pushed to gateways)</div>
+<pre><code class="language-yaml">- id: free-tier-default
+  match: { tier: free }
+  key: api_key
+  algorithm: token_bucket
+  rate: 10/s
+  burst: 20
+- id: pro-search
+  match: { tier: pro, route: "GET /v1/search" }
+  key: api_key
+  algorithm: token_bucket
+  rate: 100/s
+  burst: 200
+- id: login-per-ip
+  match: { route: "POST /v1/login" }
+  key: client_ip
+  algorithm: sliding_window
+  limit: 10/min</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">response on rejection</div>
+<pre><code class="language-http">HTTP/1.1 429 Too Many Requests
+Retry-After: 2
+RateLimit-Limit: 100
+RateLimit-Remaining: 0
+RateLimit-Reset: 2</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Rules live in a config store and are pushed to each gateway's in-memory rule cache. For each request the gateway matches a rule and builds a counter key such as rl:pro-search:key_7Fq2, which lives in Redis as a small hash with a token count and a last-refill timestamp and a TTL of a few minutes.">
+          <path d="M20 26 a60 7 0 0 1 120 0 v40 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+          <path d="M20 26 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+          <text x="80" y="52" text-anchor="middle" font-size="10.5" fill="currentColor">config store</text>
+          <text x="80" y="66" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">rules, versioned</text>
+          <rect x="220" y="20" width="180" height="64" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="310" y="40" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">gateway × 50</text>
+          <text x="310" y="56" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">in-memory rule cache</text>
+          <text x="310" y="70" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">match → build key</text>
+          <line x1="140" y1="46" x2="217" y2="46" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+          <text x="178" y="38" text-anchor="middle" font-size="8.5" fill="#3AA79B">push on change</text>
+
+          <rect x="40" y="140" width="340" height="150" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="210" y="160" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Redis Cluster: counters</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <rect x="54" y="172" width="312" height="48" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+            <text x="62" y="190">rl:pro-search:key_7Fq2</text>
+            <text x="62" y="208" opacity="0.85">{ tokens: 143.5, ts: 1727… }  TTL 120s</text>
+            <rect x="54" y="228" width="312" height="48" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+            <text x="62" y="246">rl:login-per-ip:203.0.113.9</text>
+            <text x="62" y="264" opacity="0.85">{ prev: 6, cur: 3, win: 1727… }  TTL 120s</text>
+          </g>
+          <line x1="310" y1="84" x2="290" y2="137" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+          <text x="304" y="116" font-size="8.5" fill="#D26A3F">1 atomic call</text>
+          <text x="210" y="312" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">key hashed to a shard; idle keys simply expire</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Rule evaluation is local</h4><p>Matching a request to its rules must not need a network call. Gateways hold the full rule set in memory, subscribe to changes, and stamp every decision with the rule version it used. That makes audits and debugging possible.</p></div>
+    <div class="card"><h4>Multiple rules per request</h4><p>A request can hit several rules at once: per key, per org, per endpoint, and global. Check them all in one round trip (a single Lua call over several keys, or a pipeline). Reject if any rule rejects, and report the tightest one in the headers.</p></div>
+    <div class="card"><h4>Shadow mode</h4><p>New or tightened rules first run in "log only" mode: count what would have been rejected, without rejecting. Promote a rule to enforcement once you've seen whom it would hit. This single feature prevents most rate-limit incidents.</p></div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: high-level design">
+  <h2>Limit at the edge in layers: coarse per IP first, precise per key at the gateway</h2>
+  <p class="dek">Rejecting a request is cheapest as early as possible. The CDN or WAF drops floods by IP before they reach you. The gateway enforces precise per-key and per-endpoint limits against a shared counter store. Services keep a last-line concurrency limit for their own expensive work.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Clients hit a CDN and WAF that applies coarse per-IP limits and bot rules. A load balancer spreads requests over 50 API gateway instances, each with a rate-limit filter holding the rules in memory. The filter makes one atomic call to a Redis cluster of 10 shards with replicas. Allowed requests continue to backend services, which also enforce concurrency limits; rejected requests get 429. Rules come from a config store pushed to gateways. Decisions are counted in metrics and streamed to Kafka for usage analytics and billing.">
+        <rect x="10" y="130" width="76" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="48" y="157" text-anchor="middle" font-size="10.5" fill="currentColor">Clients</text>
+        <rect x="104" y="124" width="92" height="56" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="150" y="146" text-anchor="middle" font-size="10.5" fill="currentColor">CDN / WAF</text>
+        <text x="150" y="162" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">per-IP floods,</text>
+        <text x="150" y="173" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">bots: ① coarse</text>
+        <rect x="214" y="130" width="56" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="242" y="157" text-anchor="middle" font-size="10.5" fill="currentColor">LB</text>
+        <line x1="86" y1="152" x2="101" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="196" y1="152" x2="211" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <rect x="296" y="80" width="200" height="150" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="396" y="100" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">API gateway × 50</text>
+        <rect x="312" y="112" width="168" height="60" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="396" y="130" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">② rate-limit filter</text>
+        <text x="396" y="146" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">rules in memory</text>
+        <text x="396" y="160" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">local fallback limiter</text>
+        <text x="396" y="192" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">auth first: limit by the</text>
+        <text x="396" y="205" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">verified key, not a header</text>
+        <line x1="270" y1="152" x2="293" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <g>
+          <path d="M540 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M540 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M650 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M650 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M760 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M760 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        </g>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle"><text x="585" y="50">shard 1</text><text x="695" y="50">shard 2</text><text x="805" y="50">… 10</text></g>
+        <text x="695" y="84" text-anchor="middle" font-size="10" fill="currentColor">Redis Cluster · counters · replica per shard</text>
+        <line x1="480" y1="120" x2="600" y2="66" stroke="#D26A3F" stroke-width="1.5" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+        <text x="530" y="112" font-size="9" fill="#D26A3F">~0.5 ms, Lua</text>
+
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="560" y="130" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="635" y="148">backend services</text><text x="635" y="162" font-size="8.5" opacity="0.75">③ concurrency limits</text>
+          <rect x="560" y="186" width="150" height="30" rx="5" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="635" y="205" fill="#D26A3F">429 + Retry-After</text>
+        </g>
+        <line x1="496" y1="152" x2="557" y2="150" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="526" y="144" text-anchor="middle" font-size="9" fill="currentColor">allowed</text>
+        <line x1="496" y1="190" x2="557" y2="200" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="526" y="210" text-anchor="middle" font-size="9" fill="currentColor">rejected</text>
+
+        <path d="M296 262 a55 6 0 0 1 110 0 v26 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M296 262 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="351" y="284" text-anchor="middle" font-size="9.5" fill="currentColor">config store</text>
+        <line x1="351" y1="256" x2="360" y2="233" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="290" y="248" text-anchor="end" font-size="8.5" fill="#3AA79B">rules push</text>
+        <rect x="560" y="256" width="130" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="625" y="273" text-anchor="middle" font-size="9.5" fill="currentColor">Kafka · decisions</text>
+        <line x1="470" y1="230" x2="557" y2="266" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <g font-size="9.5" fill="currentColor"><text x="710" y="266">→ usage &amp; billing</text><text x="710" y="280">→ 429 dashboards, alerts</text></g>
+      </svg>
+    </div>
+    <figcaption>Three layers, three jobs. ① The edge sheds abusive volume by IP before TLS reaches your fleet. ② The gateway enforces the contract (per key, per endpoint) against shared state. ③ Services protect themselves from expensive requests even when every caller is within its rate: ten report exports at once is a concurrency problem, not a rate problem.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Why at the gateway, not in each service</h4><p>One place to enforce and observe limits. The check happens before expensive work (auth, fan-out) and uses the authenticated identity. Services stay free of limit logic. The trade-off is that the gateway becomes critical, so the filter must be fast and have a failure mode.</p></div>
+    <div class="card"><h4>Why a shared store and not local counters</h4><p>With 50 gateways and a load balancer spreading requests, local counters each see about 1/50 of a key's traffic, so per-instance limits are wildly inaccurate for bursty clients. A shared atomic counter makes the limit exact, at the cost of about 0.5 ms and a dependency. Deep dive 2 shows the hybrids.</p></div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/04-atomic-token-bucket.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: atomic token bucket">
+  <h2>Deep dive 1: the check must be one atomic operation</h2>
+  <p class="dek">"Read the counter, decide, write it back" from 50 gateways is a textbook race. Two gateways read "1 token left", both allow, and the limit leaks under exactly the concurrent load it exists for. Make the whole refill-check-take step atomic on the shard that owns the key. In Redis that means a Lua script.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Left, the race: gateway 1 reads tokens equals 1, gateway 2 reads tokens equals 1, gateway 1 writes 0 and allows, gateway 2 writes 0 and allows; two requests pass on one token. Right, atomic: gateway 1 runs the Lua script, which refills, sees one token, takes it and returns allowed; gateway 2's script runs after it on the same single-threaded shard, sees zero and returns rejected with a retry-after.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Read-modify-write: a race</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="53">gateway 1</text>
+          <rect x="170" y="34" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="215" y="53">Redis</text>
+          <rect x="320" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="365" y="53">gateway 2</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="65" y1="62" x2="65" y2="240"></line><line x1="215" y1="62" x2="215" y2="240"></line><line x1="365" y1="62" x2="365" y2="240"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="65" y1="84" x2="211" y2="84" marker-end="url(#arw)"></line><line x1="365" y1="104" x2="219" y2="104" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="138" y="78" text-anchor="middle">GET → 1</text><text x="292" y="98" text-anchor="middle">GET → 1</text></g>
+        <g stroke="#D26A3F" stroke-width="1.4">
+          <line x1="65" y1="140" x2="211" y2="140" marker-end="url(#arwA)"></line><line x1="365" y1="160" x2="219" y2="160" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="9.5" fill="#D26A3F" font-family="IBM Plex Mono, monospace"><text x="138" y="134" text-anchor="middle">SET 0 · allow</text><text x="292" y="154" text-anchor="middle">SET 0 · allow</text></g>
+        <text x="215" y="206" text-anchor="middle" font-size="11" font-weight="600" fill="#D26A3F">2 requests passed on 1 token</text>
+        <text x="215" y="224" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">worse with 50 gateways and a bursty client</text>
+
+        <line x1="450" y1="14" x2="450" y2="244" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One Lua script: atomic on the shard</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="525" y="53">gateway 1</text>
+          <rect x="630" y="34" width="90" height="28" rx="5" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="675" y="53">Redis</text>
+          <rect x="780" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="825" y="53">gateway 2</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="525" y1="62" x2="525" y2="240"></line><line x1="675" y1="62" x2="675" y2="240"></line><line x1="825" y1="62" x2="825" y2="240"></line></g>
+        <line x1="525" y1="84" x2="671" y2="84" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <text x="598" y="78" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">EVAL take(1)</text>
+        <rect x="669" y="90" width="12" height="36" fill="#3AA79B" fill-opacity="0.3"></rect>
+        <text x="662" y="114" text-anchor="end" font-size="9" fill="currentColor">refill, 1 → 0</text>
+        <line x1="671" y1="130" x2="529" y2="130" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="598" y="144" text-anchor="middle" font-size="9.5" fill="#3AA79B">allowed</text>
+        <line x1="825" y1="98" x2="679" y2="98" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="752" y="92" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">EVAL take(1)</text>
+        <text x="760" y="124" font-size="9" fill="currentColor" opacity="0.75">queued behind #1</text>
+        <rect x="669" y="150" width="12" height="30" fill="#D26A3F" fill-opacity="0.3"></rect>
+        <line x1="679" y1="184" x2="821" y2="184" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="752" y="200" text-anchor="middle" font-size="9.5" fill="#D26A3F">rejected · retry in 100 ms</text>
+        <text x="675" y="230" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">scripts run one at a time per shard: no race</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">token_bucket.lua (runs inside Redis)</div>
+<pre><code class="language-lua">-- KEYS[1] = bucket key   ARGV = rate/s, burst, now_ms, cost
+local rate, burst, now, cost = tonumber(ARGV[1]), tonumber(ARGV[2]),
+                               tonumber(ARGV[3]), tonumber(ARGV[4])
+local b = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
+local tokens = tonumber(b[1]) or burst
+local ts     = tonumber(b[2]) or now
+tokens = math.min(burst, tokens + (now - ts) / 1000 * rate)   -- refill
+local allowed = tokens &gt;= cost
+if allowed then tokens = tokens - cost end
+redis.call('HSET', KEYS[1], 'tokens', tokens, 'ts', now)
+redis.call('PEXPIRE', KEYS[1], math.ceil(burst / rate * 1000) * 2)
+local wait = allowed and 0 or math.ceil((cost - tokens) / rate * 1000)
+return { allowed and 1 or 0, math.floor(tokens), wait }</code></pre>
+    </div>
+    <div class="panel">
+      <h3>Details that come up</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Whose clock?</b> Pass <code>now</code> from the gateway (NTP-synced), or read Redis <code>TIME</code> inside the script so every caller shares one clock.</li>
+        <li><b>Cost:</b> weight expensive endpoints (<code>cost = 10</code> for an export), so a limit reflects load, not just request count.</li>
+        <li><b>One round trip:</b> load the script once (<code>EVALSHA</code>). Check several rules in one call when their keys share a hash tag, so they land on the same shard.</li>
+        <li>The TTL lets idle keys vanish, so memory tracks active clients, not every client ever seen.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/05-distributed-and-failure-modes.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: distribution and failure">
+  <h2>Deep dive 2: trade accuracy against dependency, and decide how to fail</h2>
+  <p class="dek">A shared counter is exact but puts a network hop and a dependency in front of every request. Local counters are free but inaccurate. Real systems pick a point between the two, and then state what happens when Redis, or a whole region, is unreachable.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Three approaches. Central counter: every request makes one Redis call; exact, about half a millisecond, and dependent on Redis. Local only: each of 50 gateways enforces a fiftieth of the limit in memory; no dependency, but inaccurate when traffic is uneven or the fleet autoscales. Token leasing: each gateway leases a batch of tokens, say 10 percent of the limit, from Redis and spends them locally, renewing in the background; few Redis calls, and overshoot bounded by the lease size. Below: if Redis is unreachable, protective limits fail open to a local limiter at limit divided by instance count, while security and contractual limits such as login attempts fail closed.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="150" y="20">A · Central counter</text><text x="450" y="20">B · Local only</text><text x="750" y="20">C · Token leasing (hybrid)</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="220"></line><line x1="600" y1="8" x2="600" y2="220"></line><line x1="10" y1="226" x2="890" y2="226"></line></g>
+
+        <!-- A -->
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="40" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="57">gw 1</text>
+          <rect x="115" y="40" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="150" y="57">gw 2</text>
+          <rect x="200" y="40" width="70" height="26" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="235" y="57">gw 50</text>
+        </g>
+        <path d="M110 110 a40 6 0 0 1 80 0 v24 a40 6 0 0 1 -80 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M110 110 a40 6 0 0 0 80 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="150" y="130" text-anchor="middle" font-size="10" fill="currentColor">Redis</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="65" y1="66" x2="128" y2="104" marker-end="url(#arwA)"></line><line x1="150" y1="66" x2="150" y2="102" marker-end="url(#arwA)"></line><line x1="235" y1="66" x2="172" y2="104" marker-end="url(#arwA)"></line></g>
+        <text x="150" y="84" text-anchor="middle" font-size="8.5" fill="#D26A3F">every request</text>
+        <g font-size="10" text-anchor="middle"><text x="150" y="170" fill="#3AA79B">✓ exact, simple</text><text x="150" y="186" fill="#D26A3F">✗ +0.5 ms on every call</text><text x="150" y="202" fill="#D26A3F">✗ Redis is on the critical path</text></g>
+
+        <!-- B -->
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="330" y="40" width="70" height="46" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="365" y="58">gw 1</text><text x="365" y="74" font-size="8.5">2 req/s</text>
+          <rect x="415" y="40" width="70" height="46" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="450" y="58">gw 2</text><text x="450" y="74" font-size="8.5">2 req/s</text>
+          <rect x="500" y="40" width="70" height="46" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="535" y="58">gw 50</text><text x="535" y="74" font-size="8.5">2 req/s</text>
+        </g>
+        <text x="450" y="112" text-anchor="middle" font-size="9.5" fill="currentColor">limit 100/s ÷ 50 instances</text>
+        <text x="450" y="130" text-anchor="middle" font-size="9" fill="#D26A3F">a client whose requests all land on gw 1</text>
+        <text x="450" y="143" text-anchor="middle" font-size="9" fill="#D26A3F">is capped at 2/s, not 100/s</text>
+        <g font-size="10" text-anchor="middle"><text x="450" y="170" fill="#3AA79B">✓ zero dependency, zero latency</text><text x="450" y="186" fill="#D26A3F">✗ wrong under skew, sticky conns</text><text x="450" y="202" fill="#D26A3F">✗ changes as the fleet autoscales</text></g>
+
+        <!-- C -->
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="630" y="40" width="80" height="46" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="670" y="58">gw 1</text><text x="670" y="74" font-size="8.5">lease: 10 left</text>
+          <rect x="790" y="40" width="80" height="46" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="830" y="58">gw 2</text><text x="830" y="74" font-size="8.5">lease: 4 left</text>
+        </g>
+        <path d="M710 120 a40 6 0 0 1 80 0 v24 a40 6 0 0 1 -80 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M710 120 a40 6 0 0 0 80 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="750" y="140" text-anchor="middle" font-size="10" fill="currentColor">Redis</text>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3"><line x1="680" y1="86" x2="725" y2="114" marker-start="url(#arwB)" marker-end="url(#arwB)"></line><line x1="820" y1="86" x2="775" y2="114" marker-start="url(#arwB)" marker-end="url(#arwB)"></line></g>
+        <text x="750" y="100" text-anchor="middle" font-size="8.5" fill="#3AA79B">lease 10 tokens</text>
+        <g font-size="10" text-anchor="middle"><text x="750" y="170" fill="#3AA79B">✓ ~10× fewer Redis calls</text><text x="750" y="186" fill="#3AA79B">✓ survives brief Redis blips</text><text x="750" y="202" fill="#D26A3F">✗ overshoot ≤ outstanding leases</text></g>
+
+        <!-- failure strip -->
+        <text x="20" y="250" font-size="11.5" font-weight="600" fill="currentColor">When Redis is unreachable</text>
+        <rect x="230" y="236" width="300" height="60" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="380" y="256" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">protective limits: fail open</text>
+        <text x="380" y="272" text-anchor="middle" font-size="9.5" fill="currentColor">fall back to local limiter (limit ÷ N)</text>
+        <text x="380" y="286" text-anchor="middle" font-size="9.5" fill="currentColor">a limiter outage must not become an API outage</text>
+        <rect x="560" y="236" width="320" height="60" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="720" y="256" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">security / contractual limits: fail closed</text>
+        <text x="720" y="272" text-anchor="middle" font-size="9.5" fill="currentColor">login attempts, OTP sends, paid quotas:</text>
+        <text x="720" y="286" text-anchor="middle" font-size="9.5" fill="currentColor">reject (or strict local cap) rather than allow abuse</text>
+        <text x="20" y="274" font-size="9.5" fill="currentColor" opacity="0.8">timeout the check at ~5 ms;</text>
+        <text x="20" y="288" font-size="9.5" fill="currentColor" opacity="0.8">circuit-break Redis</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Multi-region</h4><p>A synchronous cross-region check on every request would add 60–150 ms, which is unacceptable. Give each region its own counters and a share of the global budget, e.g. split by that region's traffic share, and rebalance the shares every few seconds from an aggregated view. Global limits become approximately right, which is almost always fine.</p></div>
+    <div class="card"><h4>Say the default</h4><p>"Central Redis counter with an atomic Lua token bucket, since 0.5 ms is affordable. A 5 ms timeout with a circuit breaker around it. Fail open to a local limiter for protective rules and fail closed for login and OTP. Per-region counters with budget shares. Token leasing only if Redis load or latency becomes a problem."</p></div>
+  </div>
+</section>
+<!-- decks/hld/13-design-rate-limiter/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: trade-offs and follow-ups">
+  <h2>Limits are product decisions as well as defences</h2>
+  <p class="dek">A limiter that works technically can still fail its users. A partner who gets throttled with no warning, fair customers starved by one heavy customer, a limit change that locks out your biggest account. Wrap up with the operational and product sides, and with how the design grows.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Hierarchical limits for one request: the request is checked against the per-API-key limit, the per-organisation limit, the per-endpoint limit and a global safety limit; all must allow. Over time, a partner's usage approaches its limit: at 80 percent the partner is warned by headers and email; at 100 percent requests are throttled with 429 and Retry-After; an alert fires to account management if a top partner is throttled for more than five minutes.">
+        <text x="210" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Hierarchical limits: all must allow</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="36" width="360" height="30" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect><text x="210" y="56">global safety limit (protect the platform)</text>
+          <rect x="60" y="74" width="300" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="210" y="94">per organisation (contract tier)</text>
+          <rect x="90" y="112" width="240" height="30" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.7"></rect><text x="210" y="132">per API key (fairness inside the org)</text>
+          <rect x="120" y="150" width="180" height="30" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="210" y="170">per endpoint cost (exports ×10)</text>
+        </g>
+        <text x="210" y="208" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">one Lua call checks all four keys in one round trip</text>
+        <text x="210" y="224" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">(hash tags keep a client's keys on one shard)</text>
+
+        <line x1="440" y1="14" x2="440" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="665" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">A partner approaching its limit</text>
+        <line x1="470" y1="210" x2="880" y2="210" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="470" y1="210" x2="470" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="470" y1="70" x2="880" y2="70" stroke="#D26A3F" stroke-dasharray="5 4"></line>
+        <text x="876" y="64" text-anchor="end" font-size="9.5" fill="#D26A3F">100%: 429 + Retry-After</text>
+        <line x1="470" y1="98" x2="880" y2="98" stroke="#3AA79B" stroke-dasharray="5 4"></line>
+        <text x="876" y="92" text-anchor="end" font-size="9.5" fill="#3AA79B">80%: warn (headers, email)</text>
+        <polyline points="470,190 540,178 600,160 660,130 700,104 740,84 770,72 800,70 840,70 880,70" fill="none" stroke="currentColor" stroke-width="2" stroke-opacity="0.85"></polyline>
+        <circle cx="700" cy="98" r="4" fill="#3AA79B"></circle>
+        <rect x="770" y="72" width="110" height="138" fill="#D26A3F" fill-opacity="0.06"></rect>
+        <text x="825" y="150" text-anchor="middle" font-size="9.5" fill="#D26A3F">throttled</text>
+        <text x="825" y="164" text-anchor="middle" font-size="9.5" fill="#D26A3F">&gt; 5 min → alert</text>
+        <text x="825" y="178" text-anchor="middle" font-size="9.5" fill="#D26A3F">account team</text>
+        <text x="880" y="228" text-anchor="end" font-size="9.5" fill="currentColor" opacity="0.7">time →</text>
+        <text x="476" y="52" font-size="9.5" fill="currentColor" opacity="0.7">usage</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr><td>Redis hot shard (one huge client)</td><td>Shard that client's key with sub-keys, or give it a lease-based local budget</td></tr>
+          <tr><td>Limit change locks out a big customer</td><td>Shadow mode first, gradual rollout, per-customer overrides</td></tr>
+          <tr><td>Clients hammer after 429</td><td><code>Retry-After</code>, SDKs with backoff + jitter, stricter limits on repeated violators</td></tr>
+          <tr><td>Limiter adds latency</td><td>Keep Redis local to the region, pipeline multi-rule checks, lease tokens</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Follow-ups to expect</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>"Limit concurrent requests, not rate?" A semaphore per key: increment on start, decrement on finish, with a TTL for crashed requests.</li>
+        <li>"Daily quotas for billing?" A separate durable counter, since Redis alone isn't billing-grade. Reconcile from the decision stream.</li>
+        <li>"Distributed DDoS?" That's the edge/WAF layer: anycast, IP reputation, challenges. Not this service.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Rate-limiting algorithms" href="#hld/61">HLD · Rate-limiting algorithms</a><a data-deck="deck" data-slide="Gateway configuration" href="#deck/29">Deck · Gateway configuration</a></p>
+</section>
+<!-- decks/hld/14-design-chat/01-requirements.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: requirements">
+  <h2>Design a chat app: millions of open connections, and no lost or reordered messages</h2>
+  <p class="dek">Think WhatsApp or Messenger: 1:1 and group chat, delivered in real time when the recipient is online and on reconnect when they aren't, in order, never lost, and synced across devices. The defining constraints are the huge number of persistent connections and the need to route each message to whichever server the recipient happens to be connected to.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 500 million daily users times 40 messages is 20 billion messages a day, about 230 thousand a second, 700 thousand at peak. About 30 percent online at peak is 150 million concurrent connections; at about 500 thousand connections per gateway server that is roughly 300 gateway servers. Storage: 20 billion messages times about 200 bytes is 4 terabytes a day, about 1.5 petabytes a year before media.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="140" y="20" font-weight="600">Messages</text><text x="450" y="20" font-weight="600">Connections</text><text x="760" y="20" font-weight="600">Storage</text>
+          <rect x="30" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">500 M DAU × 40 msgs/day</text>
+          <rect x="30" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="115">20 B msgs/day</text>
+          <rect x="30" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="171">≈ 230 k msg/s avg</text><text x="140" y="188" font-weight="600">≈ 700 k/s peak</text>
+          <rect x="340" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">~30% online at peak</text>
+          <rect x="340" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="115">150 M open WebSockets</text>
+          <rect x="340" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="171">÷ ~500 k per server</text><text x="450" y="188" font-weight="600">≈ 300 gateway servers</text>
+          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">20 B × ~200 B (text + meta)</text>
+          <rect x="650" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="115">≈ 4 TB / day</text>
+          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.5 PB / year</text><text x="760" y="188" font-weight="600">wide-column, not SQL</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="68" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="128" x2="140" y2="149" marker-end="url(#arw)"></line>
+          <line x1="450" y1="68" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="128" x2="450" y2="149" marker-end="url(#arw)"></line>
+          <line x1="760" y1="68" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="128" x2="760" y2="149" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard dimensions: stateful connections (routing) and write volume (storage)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>1:1 and group chats (groups ≤ 256 members).</li>
+      <li>Sent / delivered / read receipts, and online presence.</li>
+      <li>Offline delivery on reconnect, plus a push notification.</li>
+      <li>History synced across a user's devices; images via upload.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Delivery p99 &lt; 300 ms when both users are online in-region.</li>
+      <li>Never lose an acknowledged message.</li>
+      <li>Messages ordered within a conversation.</li>
+      <li>Very high availability: chat is the product.</li>
+    </ul></div>
+    <div class="card"><h4>Scope it</h4><ul class="tight">
+      <li>End-to-end encryption: the server stores ciphertext only (mention it, don't design Signal).</li>
+      <li>Out of scope: voice and video calls, stories, payments.</li>
+      <li>Large broadcast channels (100k+) are a different fan-out problem. Flag it.</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/14-design-chat/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: API and data model">
+  <h2>A WebSocket protocol for live traffic, REST for history, and messages partitioned by conversation</h2>
+  <p class="dek">Live messages, receipts and presence flow over one persistent WebSocket per device. Fetching history, the conversation list and media uploads are ordinary REST calls that can be cached and retried. The store is modelled around the two hottest queries: "latest messages in conversation X" and "my conversations, newest first".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WebSocket frames (JSON or protobuf)</div>
+<pre><code class="language-json">// client → server
+{ "t": "send", "client_msg_id": "c-9f1…", "conv": "g-77", "body": "…" }
+{ "t": "ack",  "conv": "g-77", "seq": 1042 }        // delivered up to 1042
+{ "t": "read", "conv": "g-77", "seq": 1042 }
+
+// server → client
+{ "t": "sent", "client_msg_id": "c-9f1…", "seq": 1043 }  // persisted ✓
+{ "t": "msg",  "conv": "g-77", "seq": 1043, "from": "u-5", "body": "…", "ts": … }
+{ "t": "receipt", "conv": "g-77", "seq": 1043, "user": "u-9", "state": "read" }</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">REST</div>
+<pre><code class="language-http">GET  /v1/conversations?cursor=…                # my inbox, by last activity
+GET  /v1/conversations/g-77/messages?before=1043&amp;limit=50
+POST /v1/media/upload-url                      # presigned PUT for images</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Three tables in a wide-column store. messages: partition key conversation id plus a month bucket, clustering key sequence number descending, columns sender, body and timestamp. user_conversations: partition key user id, clustering by last activity descending, columns conversation id, last sequence and last read sequence. members: partition key conversation id, with user ids and roles. Separately, a session registry in Redis maps user to gateway and device.">
+          <rect x="10" y="10" width="400" height="104" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">messages</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="46" fill="#D26A3F">PK (conv_id, month)</text><text x="200" y="46" fill="#D26A3F">CK seq DESC</text>
+            <text x="20" y="64">sender_id · body (ciphertext)</text>
+            <text x="20" y="80">client_msg_id · ts · type</text>
+            <text x="20" y="100" opacity="0.7">"latest 50 of g-77" = one partition slice</text>
+          </g>
+          <rect x="10" y="126" width="400" height="84" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="144" font-size="11" font-weight="600" fill="currentColor">user_conversations  (the inbox)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="162">PK user_id · CK last_activity DESC</text>
+            <text x="20" y="178">conv_id · last_seq · last_read_seq</text>
+            <text x="20" y="196" opacity="0.7">unread = last_seq − last_read_seq</text>
+          </g>
+          <rect x="10" y="222" width="190" height="64" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="240" font-size="11" font-weight="600" fill="currentColor">members</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="258">PK conv_id</text><text x="20" y="274">user_id · role</text></g>
+          <rect x="220" y="222" width="190" height="64" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="230" y="240" font-size="11" font-weight="600" fill="currentColor">session registry</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="258">u-9 → [gw-17/ios,</text><text x="290" y="274">gw-203/web]</text></g>
+          <text x="210" y="310" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">Cassandra / ScyllaDB for the tables · Redis (TTL) for sessions</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Why a wide-column store</h4><p>The workload is write-heavy (700k/s), almost all reads are "latest N in one conversation", and there is a lot of data. That's exactly a partition-per-conversation, clustered-by-sequence table. The month bucket keeps very long-lived chats from growing one partition forever.</p></div>
+    <div class="card"><h4>Sequence numbers, not timestamps</h4><p>Each conversation gets a monotonically increasing <code>seq</code>, assigned by the server when the message is persisted. It orders messages, drives "give me everything after 1042" sync, and makes receipts one number: "read up to 1042".</p></div>
+    <div class="card"><h4>client_msg_id for idempotency</h4><p>Phones retry on flaky networks. The client generates an id per message, and the server dedupes on <code>(conv, client_msg_id)</code>, returning the existing <code>seq</code>. A resend never produces a duplicate bubble.</p></div>
+  </div>
+</section>
+<!-- decks/hld/14-design-chat/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: high-level design">
+  <h2>Stateful gateways hold connections; stateless services decide what to deliver where</h2>
+  <p class="dek">Separate the parts that must be stateful from those that needn't be. Gateways hold hundreds of thousands of WebSockets each and do almost nothing else. The chat service persists messages and assigns sequence numbers. Delivery workers look up where each recipient is connected, route the message there, and fall back to a push notification when the recipient is offline.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Clients hold WebSockets through an L4 load balancer to about 300 stateful WebSocket gateways, which register each connection in a session registry in Redis and send heartbeats to the presence service. A sent message goes from the gateway to the stateless chat service, which assigns the next sequence number for the conversation, writes the message to Cassandra, acknowledges the sender and publishes the message to Kafka, partitioned by conversation. Delivery workers consume it, look up each recipient's gateways in the session registry, and forward the message to those gateways, which push it down the open sockets. Recipients with no live connection get a push notification through APNs or FCM. Images go to object storage via presigned URLs and are served by a CDN.">
+        <rect x="10" y="130" width="80" height="50" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="50" y="152" text-anchor="middle" font-size="10.5" fill="currentColor">phones</text><text x="50" y="167" text-anchor="middle" font-size="10.5" fill="currentColor">web</text>
+        <rect x="108" y="130" width="56" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="136" y="152" text-anchor="middle" font-size="10" fill="currentColor">L4</text><text x="136" y="166" text-anchor="middle" font-size="10" fill="currentColor">LB</text>
+        <line x1="90" y1="155" x2="105" y2="155" stroke="#D26A3F" stroke-width="1.5" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+
+        <g>
+          <rect x="190" y="70" width="130" height="44" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <rect x="190" y="126" width="130" height="44" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <rect x="190" y="182" width="130" height="44" rx="5" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        </g>
+        <g font-size="10" fill="currentColor" text-anchor="middle"><text x="255" y="90">WS gateway 17</text><text x="255" y="104" font-size="8.5" opacity="0.7">~500k sockets</text><text x="255" y="146">WS gateway 203</text><text x="255" y="160" font-size="8.5" opacity="0.7">~500k sockets</text><text x="255" y="208">… × 300</text></g>
+        <line x1="164" y1="148" x2="187" y2="100" stroke="#D26A3F" stroke-width="1.3" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+        <line x1="164" y1="158" x2="187" y2="150" stroke="#D26A3F" stroke-width="1.3" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+
+        <path d="M190 264 a60 6 0 0 1 120 0 v30 a60 6 0 0 1 -120 0 z" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></path>
+        <path d="M190 264 a60 6 0 0 0 120 0" fill="none" stroke="#3AA79B" stroke-width="1.3"></path>
+        <text x="250" y="284" text-anchor="middle" font-size="9.5" fill="currentColor">session registry</text>
+        <text x="250" y="298" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">user → gateways</text>
+        <line x1="230" y1="226" x2="236" y2="256" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="186" y="246" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.75">register</text>
+        <rect x="330" y="262" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="380" y="280" text-anchor="middle" font-size="9.5" fill="currentColor">presence svc</text>
+        <text x="380" y="294" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">heartbeat TTL</text>
+        <line x1="300" y1="226" x2="350" y2="259" stroke="#8A94A3" stroke-width="1.1" stroke-dasharray="3 3" marker-end="url(#arw)"></line>
+
+        <rect x="380" y="60" width="140" height="60" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="450" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Chat service</text>
+        <text x="450" y="98" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">dedupe · assign seq</text>
+        <text x="450" y="110" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">persist · ack sender</text>
+        <line x1="320" y1="88" x2="377" y2="88" stroke="#D26A3F" stroke-width="1.5" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+        <text x="348" y="80" text-anchor="middle" font-size="8.5" fill="#D26A3F">send / sent</text>
+
+        <path d="M580 26 a60 7 0 0 1 120 0 v50 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></path>
+        <path d="M580 26 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        <text x="640" y="52" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Cassandra</text>
+        <text x="640" y="66" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">messages, inbox</text>
+        <line x1="520" y1="80" x2="577" y2="60" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="548" y="62" text-anchor="middle" font-size="8.5" fill="#D26A3F">write</text>
+
+        <rect x="390" y="160" width="160" height="28" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="470" y="178" text-anchor="middle" font-size="9.5" fill="currentColor">Kafka · key = conv_id</text>
+        <line x1="450" y1="120" x2="460" y2="157" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+
+        <rect x="600" y="150" width="140" height="50" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="670" y="172" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Delivery workers</text>
+        <text x="670" y="188" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">members → gateways</text>
+        <line x1="550" y1="174" x2="597" y2="174" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <path d="M600 190 C 480 250, 380 250, 312 274" fill="none" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></path>
+        <text x="470" y="240" font-size="8.5" fill="currentColor" opacity="0.8">where is u-9?</text>
+        <path d="M600 160 C 520 140, 380 150, 322 148" fill="none" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="560" y="140" font-size="8.5" fill="#3AA79B">forward to gw 203</text>
+
+        <rect x="780" y="150" width="110" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="835" y="172" text-anchor="middle" font-size="10" fill="currentColor">push svc</text>
+        <text x="835" y="188" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">if no live socket</text>
+        <line x1="740" y1="175" x2="777" y2="175" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <rect x="780" y="230" width="110" height="34" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect>
+        <text x="835" y="251" text-anchor="middle" font-size="9.5" fill="currentColor">APNs / FCM</text>
+        <line x1="835" y1="200" x2="835" y2="227" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+
+        <rect x="750" y="20" width="140" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="820" y="38" text-anchor="middle" font-size="9.5" fill="currentColor">object store + CDN</text>
+        <text x="820" y="52" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">images, voice notes</text>
+        <text x="820" y="84" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">(presigned upload,</text>
+        <text x="820" y="96" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">message carries the URL)</text>
+      </svg>
+    </div>
+    <figcaption>The sender's acknowledgement ("sent ✓") comes back as soon as the message is durable in Cassandra, before delivery. Everything after that is asynchronous and retryable. A slow recipient, a gateway restart or a push provider outage can delay delivery, but never loses the message.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why stateful gateways stay thin</h4><p>Gateways deploy slowly: every restart drops half a million sockets, and those clients must reconnect. So keep business logic out of them. They authenticate the socket, register it, relay frames, and push what delivery workers hand them.</p></div>
+    <div class="card"><h4>Routing to a connection</h4><p>The session registry maps user → {gateway, device}. Workers forward to that gateway over RPC, or to a per-gateway pub/sub channel. Entries have a TTL refreshed by heartbeats, so a crashed gateway's entries expire on their own.</p></div>
+    <div class="card"><h4>Sync covers every gap</h4><p>Real-time delivery is an optimisation. The source of truth is "messages with seq greater than my last acknowledged one". On every reconnect, each device asks for what it missed, which also repairs any delivery that was dropped.</p></div>
+  </div>
+</section>
+<!-- decks/hld/14-design-chat/04-delivery-and-ordering.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: delivery and ordering">
+  <h2>Deep dive 1: one message from Alice's phone to Bob's, with receipts</h2>
+  <p class="dek">Follow a single message through the system. The two properties to protect are <b>durability before acknowledgement</b> (the tick means it's safe) and <b>a single order per conversation</b> (every device shows the same sequence). Both come from one decision: the server assigns each message a per-conversation sequence number as it persists it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Alice sends message c-9f1 over her socket to gateway 17, which forwards it to the chat service. The chat service dedupes on client message id, takes the next sequence number, 1043, for the conversation and writes the message; then it returns sent with seq 1043, shown to Alice as one tick. It publishes the message to Kafka; a delivery worker finds Bob on gateway 203 and forwards it; Bob's app displays it and acknowledges 1043; the delivered receipt flows back to Alice as two ticks. When Bob opens the chat, a read receipt up to 1043 follows the same path.">
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="12" width="80" height="28" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="50" y="31">Alice</text>
+          <rect x="130" y="12" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="175" y="31">gw 17</text>
+          <rect x="255" y="12" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="300" y="31">chat svc</text>
+          <rect x="380" y="12" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="425" y="31">store</text>
+          <rect x="505" y="12" width="90" height="28" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="550" y="31">worker</text>
+          <rect x="630" y="12" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="675" y="31">gw 203</text>
+          <rect x="770" y="12" width="80" height="28" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="810" y="31">Bob</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="50" y1="40" x2="50" y2="312"></line><line x1="175" y1="40" x2="175" y2="312"></line><line x1="300" y1="40" x2="300" y2="312"></line>
+          <line x1="425" y1="40" x2="425" y2="312"></line><line x1="550" y1="40" x2="550" y2="312"></line><line x1="675" y1="40" x2="675" y2="312"></line><line x1="810" y1="40" x2="810" y2="312"></line>
+        </g>
+        <line x1="50" y1="62" x2="171" y2="62" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="112" y="56" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">① send c-9f1</text>
+        <line x1="175" y1="78" x2="296" y2="78" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="300" y1="96" x2="421" y2="96" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="362" y="90" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">② seq=1043, write</text>
+        <line x1="421" y1="112" x2="304" y2="112" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <line x1="296" y1="128" x2="179" y2="128" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <line x1="171" y1="142" x2="54" y2="142" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="112" y="156" text-anchor="middle" font-size="9.5" fill="#D26A3F">③ sent ✓ (1043)</text>
+        <line x1="300" y1="172" x2="546" y2="172" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="425" y="166" text-anchor="middle" font-size="9" fill="#3AA79B">④ Kafka (key g-77)</text>
+        <line x1="550" y1="192" x2="671" y2="192" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="612" y="186" text-anchor="middle" font-size="9" fill="#3AA79B">⑤ Bob → gw 203</text>
+        <line x1="675" y1="208" x2="806" y2="208" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <text x="742" y="202" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">⑥ msg 1043</text>
+        <line x1="810" y1="232" x2="679" y2="232" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="742" y="226" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">⑦ ack 1043</text>
+        <path d="M675 248 H179" fill="none" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        <text x="425" y="242" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">receipt event (same pipeline, reversed)</text>
+        <line x1="171" y1="264" x2="54" y2="264" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <text x="112" y="280" text-anchor="middle" font-size="9.5" fill="currentColor">⑧ delivered ✓✓</text>
+        <text x="620" y="290" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">Bob offline at ⑤? → push notification, and on reconnect</text>
+        <text x="620" y="303" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">his app asks "g-77 since seq 1038", receiving 1039 … 1043</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Assigning the sequence</h4><p>There must be exactly one writer of a conversation's counter. Options: a per-conversation Redis <code>INCR</code>, persisted with the message; a conditional update on the conversation row; or routing every send for a conversation through one Kafka partition, whose single consumer numbers the messages. Never use client clocks.</p></div>
+    <div class="card"><h4>Acks at every hop</h4><p>Client → server: "sent" only after the write is durable, and the client retries with the same <code>client_msg_id</code> until it arrives. Server → client: the device acknowledges the highest seq it has, and anything unacknowledged is redelivered or picked up by sync. So delivery is at-least-once, and display is deduped by seq.</p></div>
+    <div class="card"><h4>Multi-device</h4><p>Each device is a separate connection with its own "acknowledged up to" position. Alice's own messages are also delivered to her other devices. Read state is per user: reading on the phone clears the badge on the laptop via a receipt to self.</p></div>
+  </div>
+</section>
+<!-- decks/hld/14-design-chat/05-groups-and-presence.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: groups and presence">
+  <h2>Deep dive 2: fan-out to groups, and presence without a broadcast storm</h2>
+  <p class="dek">Groups multiply delivery work by the member count. Presence multiplies it by the number of contacts, on every status change. Both are managed the same way: store once, fan out only to the <em>live connections</em> that need it, batch per gateway, and compute everything else lazily when someone looks.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Group fan-out: a message to a six-member group is stored once. The delivery worker loads the cached member list, looks up live sessions, and groups recipients by gateway: gateway 17 gets one call for users 1 and 4, gateway 203 one call for user 2, gateway 88 one call for users 5 and 6; user 3 is offline and gets a push notification. Presence: each device heartbeats every 30 seconds, refreshing a Redis key with a 60-second TTL. Status changes are pushed only to users who currently have a chat with that person open; everyone else sees last seen, computed when they look.">
+        <text x="225" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Group message: store once, deliver per gateway</text>
+        <rect x="20" y="44" width="110" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="75" y="62" text-anchor="middle" font-size="9.5" fill="currentColor">msg to g-77</text>
+        <text x="75" y="76" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">stored once (seq 88)</text>
+        <rect x="160" y="40" width="130" height="48" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="225" y="60" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">delivery worker</text>
+        <text x="225" y="76" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">members (cached) → sessions</text>
+        <line x1="130" y1="64" x2="157" y2="64" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="75" y="160">gw 17</text><text x="75" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u1, u4]</text>
+          <rect x="150" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="205" y="160">gw 203</text><text x="205" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u2]</text>
+          <rect x="280" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="335" y="160">gw 88</text><text x="335" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u5, u6]</text>
+          <rect x="300" y="44" width="110" height="40" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="355" y="62">push: u3</text><text x="355" y="76" font-size="8.5" opacity="0.75">offline</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="200" y1="88" x2="90" y2="137" marker-end="url(#arwB)"></line><line x1="220" y1="88" x2="208" y2="137" marker-end="url(#arwB)"></line><line x1="240" y1="88" x2="320" y2="137" marker-end="url(#arwB)"></line><line x1="290" y1="64" x2="297" y2="64" marker-end="url(#arwB)"></line></g>
+        <text x="205" y="212" text-anchor="middle" font-size="9.5" fill="currentColor">3 RPCs for 6 members, not 6; each gateway</text>
+        <text x="205" y="226" text-anchor="middle" font-size="9.5" fill="currentColor">writes to its local sockets</text>
+        <rect x="20" y="244" width="380" height="54" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="210" y="262" text-anchor="middle" font-size="9.5" fill="currentColor">inbox update per member: last_seq = 88 (N tiny writes)</text>
+        <text x="210" y="278" text-anchor="middle" font-size="9.5" fill="currentColor">huge channels (100k+): skip per-member writes; members</text>
+        <text x="210" y="292" text-anchor="middle" font-size="9.5" fill="currentColor">pull on open (fan-out on read, like a feed)</text>
+
+        <line x1="450" y1="12" x2="450" y2="304" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Presence: heartbeat + TTL, subscribe on view</text>
+        <rect x="470" y="44" width="110" height="40" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="525" y="68" text-anchor="middle" font-size="10" fill="currentColor">Bob's phone</text>
+        <path d="M650 38 a55 6 0 0 1 110 0 v40 a55 6 0 0 1 -110 0 z" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></path>
+        <path d="M650 38 a55 6 0 0 0 110 0" fill="none" stroke="#3AA79B" stroke-width="1.3"></path>
+        <text x="705" y="60" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">presence:bob</text>
+        <text x="705" y="74" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">online · TTL 60 s</text>
+        <line x1="580" y1="62" x2="647" y2="58" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="614" y="50" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">every 30 s</text>
+        <text x="780" y="54" font-size="8.5" fill="currentColor" opacity="0.8">no heartbeat →</text>
+        <text x="780" y="66" font-size="8.5" fill="currentColor" opacity="0.8">key expires →</text>
+        <text x="780" y="78" font-size="8.5" fill="currentColor" opacity="0.8">"last seen 10:42"</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="150" width="140" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="550" y="168">Alice: chat with Bob</text><text x="550" y="182" font-size="8.5">open → subscribed</text>
+          <rect x="650" y="150" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect><text x="760" y="168">Bob's other 300 contacts</text><text x="760" y="182" font-size="8.5" opacity="0.75">not subscribed: nothing sent</text>
+        </g>
+        <line x1="690" y1="84" x2="570" y2="147" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="600" y="120" font-size="8.5" fill="#3AA79B">"online" pushed</text>
+        <text x="675" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">broadcasting to every contact costs</text>
+        <text x="675" y="242" text-anchor="middle" font-size="9.5" fill="currentColor">status changes × contacts: billions of messages a day</text>
+        <text x="675" y="266" text-anchor="middle" font-size="9.5" fill="#D26A3F">so push to open views only, and compute</text>
+        <text x="675" y="280" text-anchor="middle" font-size="9.5" fill="#D26A3F">"last seen" when someone opens the profile</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Storage layout</h4><p>Messages: partition <code>(conv_id, month)</code>, clustered by <code>seq DESC</code>, so "latest 50" and "before seq X" are single-partition slices. Media lives in object storage, and the message holds a URL, size and thumbnail hash. Old months move to cheaper storage tiers.</p></div>
+    <div class="card"><h4>Typing indicators and receipts</h4><p>These are ephemeral and high-volume. Deliver them best-effort over the socket and never persist them. Coalesce read receipts to the latest seq, and in big groups show aggregated counts ("read by 12"), not per-member events.</p></div>
+    <div class="card"><h4>Unread counts</h4><p>Store <code>last_seq</code> and <code>last_read_seq</code> per member and conversation. The badge is the difference, summed across conversations. Never count by scanning messages. Cache the total per user and adjust it on each message and read event.</p></div>
+  </div>
+</section>
+<!-- decks/hld/14-design-chat/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Chat" data-title="Chat: trade-offs and follow-ups">
+  <h2>Reconnect storms, regions and encryption are where chat designs get tested</h2>
+  <p class="dek">The steady state is easy to draw. Interviewers probe the transitions. What happens when a gateway holding 500k sockets dies, or a region fails? How do two users in different regions keep one order? And what changes when the server can't read the messages?</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: a gateway with 500 thousand connections crashes. Clients reconnect with jittered exponential backoff spread over about 30 seconds instead of all at once, land on other gateways via the load balancer, re-register and sync everything after their last acknowledged sequence. Right: two regions. Users connect to their nearest region. Each conversation has a home region that assigns sequence numbers and stores the messages; messages from a user in the other region are relayed to the home region over the backbone, and delivered locally in each region.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Gateway crash → reconnect storm</text>
+        <rect x="30" y="40" width="130" height="50" rx="6" fill="none" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="5 3"></rect>
+        <text x="95" y="62" text-anchor="middle" font-size="10.5" fill="currentColor">gw 17 ✕</text>
+        <text x="95" y="78" text-anchor="middle" font-size="8.5" fill="#D26A3F">500k sockets dropped</text>
+        <line x1="40" y1="200" x2="410" y2="200" stroke="currentColor" stroke-opacity="0.4"></line>
+        <text x="410" y="216" text-anchor="end" font-size="9" fill="currentColor" opacity="0.7">seconds after crash →</text>
+        <rect x="60" y="112" width="18" height="88" fill="#D26A3F" fill-opacity="0.6"></rect>
+        <text x="69" y="106" text-anchor="middle" font-size="8.5" fill="#D26A3F">naive</text>
+        <g fill="#3AA79B" fill-opacity="0.6">
+          <rect x="110" y="180" width="14" height="20"></rect><rect x="128" y="176" width="14" height="24"></rect><rect x="146" y="172" width="14" height="28"></rect><rect x="164" y="170" width="14" height="30"></rect>
+          <rect x="182" y="172" width="14" height="28"></rect><rect x="200" y="174" width="14" height="26"></rect><rect x="218" y="176" width="14" height="24"></rect><rect x="236" y="179" width="14" height="21"></rect>
+          <rect x="254" y="182" width="14" height="18"></rect><rect x="272" y="185" width="14" height="15"></rect><rect x="290" y="188" width="14" height="12"></rect><rect x="308" y="190" width="14" height="10"></rect>
+        </g>
+        <text x="220" y="160" text-anchor="middle" font-size="9" fill="#3AA79B">jittered backoff over ~30 s</text>
+        <g font-size="9.5" fill="currentColor"><text x="190" y="54">→ LB picks another gateway</text><text x="190" y="70">→ re-auth (resumption token)</text><text x="190" y="86">→ re-register in the registry</text><text x="190" y="102">→ sync after last acked seq</text></g>
+        <text x="215" y="246" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">drain gateways gracefully on deploys: stop accepting,</text>
+        <text x="215" y="260" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">then tell clients to reconnect, in batches</text>
+
+        <line x1="440" y1="12" x2="440" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Two regions, one order per conversation</text>
+        <rect x="460" y="40" width="190" height="150" rx="10" fill="#D26A3F" fill-opacity="0.05" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="472" y="58" font-size="10.5" font-weight="600" fill="#D26A3F">EU (home of g-77)</text>
+        <rect x="690" y="40" width="190" height="150" rx="10" fill="currentColor" fill-opacity="0.02" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="702" y="58" font-size="10.5" font-weight="600" fill="currentColor">US</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="476" y="70" width="80" height="26" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="516" y="87">Alice</text>
+          <rect x="476" y="110" width="158" height="30" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="555" y="129">chat svc: assigns seq</text>
+          <rect x="476" y="150" width="158" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="555" y="168">messages (g-77)</text>
+          <rect x="784" y="70" width="80" height="26" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="824" y="87">Bob</text>
+          <rect x="706" y="110" width="158" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="785" y="129">gateway + relay</text>
+        </g>
+        <line x1="516" y1="96" x2="530" y2="107" stroke="#D26A3F" stroke-width="1.2" marker-end="url(#arwA)"></line>
+        <line x1="555" y1="140" x2="555" y2="147" stroke="#D26A3F" stroke-width="1.2" marker-end="url(#arwA)"></line>
+        <line x1="824" y1="96" x2="810" y2="107" stroke="#D26A3F" stroke-width="1.2" marker-end="url(#arwA)"></line>
+        <path d="M706 118 C 680 110, 660 112, 637 118" fill="none" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></path>
+        <text x="670" y="104" text-anchor="middle" font-size="8.5" fill="#D26A3F">relay send</text>
+        <path d="M637 134 C 660 142, 680 142, 703 134" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></path>
+        <text x="670" y="158" text-anchor="middle" font-size="8.5" fill="#3AA79B">deliver</text>
+        <text x="670" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">each conversation has a home region that orders it;</text>
+        <text x="670" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">Bob's sends pay one cross-region hop (~80 ms)</text>
+        <text x="670" y="252" text-anchor="middle" font-size="9.5" fill="#D26A3F">home region down → fail over its conversations</text>
+        <text x="670" y="266" text-anchor="middle" font-size="9.5" fill="#D26A3F">to a replica region (async replicated: a small RPO)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>End-to-end encryption</td><td>Clients encrypt per recipient device (Signal protocol). The server stores and routes ciphertext and holds public prekeys. Search and moderation move to the client.</td></tr>
+          <tr><td>Edit / delete</td><td>A new event referencing the original seq; clients apply it. Deletes are tombstones, purged later.</td></tr>
+          <tr><td>Spam and abuse</td><td>Rate limits per sender, reputation scores, reports, and metadata-based detection, since content is encrypted.</td></tr>
+          <tr><td>Message search</td><td>Server-side index if not E2E; otherwise a local index on the device.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise the trade-offs</span>"We chose at-least-once delivery with seq-based dedup over exactly-once. Wide-column storage partitioned by conversation over a relational database. Stateful gateways kept thin, with state in a TTL'd registry. And a home region per conversation for ordering, accepting one cross-region hop for remote members."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Polling, SSE and WebSockets" href="#hld/28">HLD · Polling, SSE and WebSockets</a><a data-deck="hld" data-slide="Ordering and partition keys" href="#hld/56">HLD · Ordering and partition keys</a></p>
+</section>
+<!-- decks/hld/15-design-news-feed/01-requirements.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: requirements">
+  <h2>Design a news feed: cheap reads for everyone, including followers of celebrities</h2>
+  <p class="dek">Think of the Twitter/X home timeline, Instagram or Facebook. Users follow others and open a feed of their posts, newest or best first. It's read-heavy like the URL shortener, but each read gathers posts from hundreds of sources. So the central question is when to do that gathering: when a post is written, or when a feed is read.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Estimate. Reads: 300 million daily users opening the feed 10 times a day is 3 billion feed loads, about 35 thousand a second, 100 thousand at peak. Writes: 30 million posts a day is about 350 a second; with 300 followers on average, pushing each post into followers' feeds is 9 billion feed inserts a day, about 100 thousand a second. A celebrity with 100 million followers turns one post into 100 million inserts. Feed cache: 300 million users times 500 post ids times 8 bytes is about 1.2 terabytes of Redis.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="140" y="20" font-weight="600">Reads</text><text x="450" y="20" font-weight="600">Writes and fan-out</text><text x="760" y="20" font-weight="600">Feed cache</text>
+          <rect x="30" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">300 M DAU × 10 opens</text>
+          <rect x="30" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="115">3 B feed loads / day</text>
+          <rect x="30" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="171">≈ 35 k/s avg</text><text x="140" y="188" font-weight="600">≈ 100 k/s peak</text>
+          <rect x="340" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">30 M posts / day ≈ 350/s</text>
+          <rect x="340" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="115">× 300 followers (average)</text>
+          <rect x="340" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="171">9 B feed inserts / day</text><text x="450" y="188" font-weight="600">≈ 100 k/s of fan-out</text>
+          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">500 post ids per user</text>
+          <rect x="650" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="115">× 8 B × 300 M users</text>
+          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.2 TB of ids</text><text x="760" y="188" font-weight="600">a Redis cluster (ids only)</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="68" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="128" x2="140" y2="149" marker-end="url(#arw)"></line>
+          <line x1="450" y1="68" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="128" x2="450" y2="149" marker-end="url(#arw)"></line>
+          <line x1="760" y1="68" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="128" x2="760" y2="149" marker-end="url(#arw)"></line>
+        </g>
+        <rect x="250" y="214" width="400" height="32" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="450" y="235" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">celebrity: 1 post × 100 M followers = 100 M inserts</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Create posts (text plus media), follow and unfollow.</li>
+      <li>Home feed: posts from people you follow, ranked, with infinite scroll.</li>
+      <li>Like and comment counts shown on each post.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Feed load p99 &lt; 200 ms. This is the product's front page.</li>
+      <li>New posts visible to followers within seconds (eventual is fine).</li>
+      <li>Authors see their own post immediately (read-your-writes).</li>
+      <li>Handle extreme follower skew: 10 followers to 100 M.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Chronological or ranked? Ranked, but design so chronological is a special case.</li>
+      <li>Do we store the whole history? Feeds show the last ~800 items; older posts come from profile pages.</li>
+      <li>Out of scope: ads auction, notifications, and search.</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/15-design-news-feed/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: API and data model">
+  <h2>Posts are the truth; a feed is just a list of post ids</h2>
+  <p class="dek">Keep post content in one place, and keep feeds as lightweight lists of ids per user, fetched and then <b>hydrated</b> in a batch. A feed entry never copies the post body. That's what makes edits and deletes tractable, and it keeps the feed cache small enough to hold for every active user.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/posts                      { "text": "…", "media_ids": ["m-1"] }
+→ 201 { "post_id": "18446…", "created_at": … }
+
+GET  /v1/feed?cursor=eyJzIjo…&amp;limit=20
+→ 200 { "items": [ { "post": {…}, "author": {…},
+                     "likes": 1204, "liked_by_me": false } ],
+        "next_cursor": "eyJzIjo…" }      # opaque: (score, post_id)
+
+PUT    /v1/users/{id}/follow
+DELETE /v1/users/{id}/follow
+POST   /v1/posts/{id}/like              # idempotent per user</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Posts table keyed by a time-sortable post id with author, text, media URLs and created time, sharded by post id and cached. Follow graph stored twice: followers keyed by followee, and following keyed by follower. Feed cache per user in Redis: a sorted set of post ids scored by time or rank, capped at 800 entries. Counters for likes and comments kept separately and sharded.">
+          <rect x="10" y="10" width="200" height="104" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">posts</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="46" fill="#D26A3F">post_id  PK (snowflake)</text><text x="20" y="62">author_id · text</text><text x="20" y="78">media_urls · created_at</text><text x="20" y="100" opacity="0.7">shard by post_id; cached</text></g>
+          <rect x="220" y="10" width="190" height="104" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="230" y="28" font-size="11" font-weight="600" fill="currentColor">follow graph (×2)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="46">followers:</text><text x="242" y="62">PK followee · follower</text><text x="230" y="80">following:</text><text x="242" y="96">PK follower · followee</text></g>
+          <rect x="10" y="130" width="400" height="116" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="20" y="148" font-size="11" font-weight="600" fill="currentColor">feed cache (Redis sorted set per user)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="168">feed:u-42 → { 18446…901: score 1727…,</text>
+            <text x="112" y="184">18446…877: score 1727…, … }</text>
+            <text x="20" y="204">ZADD on fan-out · ZREVRANGE for reads</text>
+            <text x="20" y="220">ZREMRANGEBYRANK to cap at 800</text>
+            <text x="20" y="236" opacity="0.7">only for users active in the last 30 days</text>
+          </g>
+          <rect x="10" y="258" width="400" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="276" font-size="11" font-weight="600" fill="currentColor">counters (separate store)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="294">likes:post_id → sharded counter</text><text x="20" y="310">liked:(user, post) → set (idempotent)</text></g>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Why the graph is stored twice</h4><p>Fan-out asks "who follows X?" and the profile page asks "whom does Y follow?". Each question needs its own partition key. Write both rows on follow (async repair keeps them in sync), or use a graph service such as Facebook's TAO.</p></div>
+    <div class="card"><h4>Cursor, not offset</h4><p>Feeds change while you scroll. Offsets skip and duplicate items. An opaque cursor, <code>(score, post_id)</code> of the last item, resumes exactly, and lets the server change the ranking without breaking pages already loaded.</p></div>
+    <div class="card"><h4>Counters live apart</h4><p>A viral post takes 100k likes a minute. Incrementing a column on the post row makes it a hot row. Use sharded counters (N sub-keys summed on read), plus a per-user "liked" set so the like button is idempotent.</p></div>
+  </div>
+</section>
+<!-- decks/hld/15-design-news-feed/03-high-level-design.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: high-level design">
+  <h2>Precompute feeds on write, then assemble, hydrate and rank on read</h2>
+  <p class="dek">The write path stores a post and hands it to fan-out workers, which push its id into each follower's cached feed. The read path takes the precomputed ids, merges in posts from any celebrities the user follows, fetches the post bodies in one batch, ranks, and returns a page. The expensive work happens asynchronously, off the user's critical path.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Write path: the post service stores the post in the posts database, media in object storage behind a CDN, and publishes PostCreated to Kafka. Fan-out workers ask the social graph service for the author's followers, skipping inactive users and authors with huge follower counts, and add the post id to each follower's feed cache in Redis. Read path: the feed service reads the user's precomputed ids from the feed cache, pulls recent posts from any celebrities they follow, hydrates all ids with one multi-get from the post cache, asks the ranking service to score them, and returns the top page.">
+        <rect x="10" y="150" width="76" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="48" y="177" text-anchor="middle" font-size="10.5" fill="currentColor">Clients</text>
+        <rect x="104" y="140" width="80" height="64" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="144" y="168" text-anchor="middle" font-size="10" fill="currentColor">API</text><text x="144" y="182" text-anchor="middle" font-size="10" fill="currentColor">gateway</text>
+        <line x1="86" y1="172" x2="101" y2="172" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <rect x="220" y="36" width="130" height="50" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="285" y="58" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Post service</text>
+        <text x="285" y="74" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">write path · ~350/s</text>
+        <line x1="170" y1="140" x2="235" y2="89" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="176" y="112" font-size="9" fill="currentColor">POST</text>
+
+        <path d="M390 24 a50 6 0 0 1 100 0 v36 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M390 24 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="440" y="48" text-anchor="middle" font-size="10" fill="currentColor">posts DB</text>
+        <line x1="350" y1="52" x2="387" y2="46" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="390" y="100" width="130" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="455" y="117" text-anchor="middle" font-size="9.5" fill="currentColor">Kafka · PostCreated</text>
+        <line x1="350" y1="74" x2="398" y2="98" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+
+        <rect x="560" y="90" width="140" height="48" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="630" y="110" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Fan-out workers</text>
+        <text x="630" y="126" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">skip celebs &amp; inactive</text>
+        <line x1="520" y1="113" x2="557" y2="113" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <rect x="560" y="18" width="140" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="630" y="36" text-anchor="middle" font-size="10" fill="currentColor">Social graph svc</text>
+        <text x="630" y="50" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">followers of author</text>
+        <line x1="630" y1="90" x2="630" y2="61" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+
+        <path d="M760 150 a60 7 0 0 1 120 0 v48 a60 7 0 0 1 -120 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></path>
+        <path d="M760 150 a60 7 0 0 0 120 0" fill="none" stroke="#D26A3F" stroke-width="1.5"></path>
+        <text x="820" y="176" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Feed cache</text>
+        <text x="820" y="190" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">Redis ZSET / user</text>
+        <line x1="700" y1="124" x2="770" y2="146" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="738" y="124" font-size="8.5" fill="#3AA79B">ZADD × N</text>
+
+        <rect x="220" y="236" width="130" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="285" y="258" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Feed service</text>
+        <text x="285" y="274" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">read path · 100k/s</text>
+        <line x1="170" y1="204" x2="235" y2="233" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="172" y="232" font-size="9" fill="#D26A3F">GET /feed</text>
+        <path d="M350 246 C 500 220, 680 200, 757 186" fill="none" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></path>
+        <text x="520" y="214" font-size="9" fill="#D26A3F">① top 500 ids</text>
+
+        <path d="M760 262 a60 7 0 0 1 120 0 v40 a60 7 0 0 1 -120 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></path>
+        <path d="M760 262 a60 7 0 0 0 120 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        <text x="820" y="286" text-anchor="middle" font-size="10" fill="currentColor">Post cache</text>
+        <text x="820" y="300" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">bodies, authors</text>
+        <line x1="350" y1="276" x2="757" y2="282" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="520" y="274" font-size="9" fill="#D26A3F">③ multi-get hydrate</text>
+        <path d="M350 262 C 450 250, 500 90, 488 64" fill="none" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        <text x="468" y="170" font-size="8.5" fill="currentColor" opacity="0.8">② celeb posts</text>
+        <text x="468" y="181" font-size="8.5" fill="currentColor" opacity="0.8">(pull on read)</text>
+        <rect x="560" y="296" width="150" height="28" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="635" y="314" text-anchor="middle" font-size="9.5" fill="currentColor">④ Ranking service</text>
+        <path d="M330 292 C 380 316, 500 316, 557 310" fill="none" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></path>
+      </svg>
+    </div>
+    <figcaption>The fan-out workers are where the write amplification lives: 350 posts/s become 100k cache inserts/s. They are asynchronous, partitioned by author, and they scale on queue lag. The feed service does a fixed amount of work per request, whatever the account follows: one ZSET read, a few celebrity lookups, one multi-get, one ranking call.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Post → visible</h4><p>① Store the post (durable) and return 201. ② Publish PostCreated. ③ Fan-out workers page through the followers in batches of 1,000 and <code>ZADD</code> into each active follower's feed. A normal author's followers see the post in seconds.</p></div>
+    <div class="card"><h4>Open the feed</h4><p>① <code>ZREVRANGE feed:u 0 499</code>. ② Merge the latest posts of followed celebrities, cached per celebrity. ③ Multi-get post bodies, authors and counters. ④ Rank and filter (seen, blocked, deleted). ⑤ Return 20 items and a cursor.</p></div>
+    <div class="card"><h4>Cold and inactive users</h4><p>Skip fan-out for users inactive for 30 days: that saves most of the writes. When one returns, rebuild their feed on read (pull from followees), store it, then resume pushing. The first load is slower; every later load is fast.</p></div>
+  </div>
+</section>
+<!-- decks/hld/15-design-news-feed/04-fan-out-strategies.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: fan-out strategies">
+  <h2>Deep dive 1: push on write, pull on read, or both</h2>
+  <p class="dek">This is the question the interviewer is waiting for. <b>Push</b> (fan-out on write) does the work once per post per follower, so reads are one lookup. <b>Pull</b> (fan-out on read) does the work every time a feed opens. Follower counts are wildly skewed, so real systems use a <b>hybrid</b>: push for most authors, pull for the few with millions of followers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Push: an author's post is written into each follower's feed; with 300 followers that is 300 writes per post and one read per feed load, but a celebrity post means 100 million writes. Pull: the author writes only to their own timeline; each feed load reads the timelines of all followed accounts and merges them, 300 reads per load at 100 thousand loads a second. Hybrid: normal authors push into followers' feeds; the few celebrity accounts are not pushed, and each reader pulls their recent posts at read time and merges them with the precomputed feed.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="150" y="20">Push (fan-out on write)</text><text x="450" y="20">Pull (fan-out on read)</text><text x="750" y="20">Hybrid (chosen)</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="292"></line><line x1="600" y1="8" x2="600" y2="292"></line></g>
+
+        <!-- push -->
+        <rect x="100" y="36" width="100" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="150" y="55" text-anchor="middle" font-size="10" fill="currentColor">author posts</text>
+        <g fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B"><rect x="20" y="120" width="50" height="30" rx="4"></rect><rect x="80" y="120" width="50" height="30" rx="4"></rect><rect x="140" y="120" width="50" height="30" rx="4"></rect><rect x="200" y="120" width="50" height="30" rx="4"></rect></g>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle"><text x="45" y="139">feed A</text><text x="105" y="139">feed B</text><text x="165" y="139">feed C</text><text x="225" y="139">… ×300</text></g>
+        <g stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3"><line x1="130" y1="66" x2="50" y2="117" marker-end="url(#arwB)"></line><line x1="140" y1="66" x2="108" y2="117" marker-end="url(#arwB)"></line><line x1="160" y1="66" x2="165" y2="117" marker-end="url(#arwB)"></line><line x1="170" y1="66" x2="222" y2="117" marker-end="url(#arwB)"></line></g>
+        <rect x="80" y="186" width="80" height="28" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="120" y="204" text-anchor="middle" font-size="9.5" fill="currentColor">reader A</text>
+        <line x1="85" y1="186" x2="55" y2="153" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="185" y="204" font-size="9" fill="#D26A3F">1 read</text>
+        <g font-size="10" text-anchor="middle"><text x="150" y="240" fill="#3AA79B">✓ reads are one lookup</text><text x="150" y="256" fill="#D26A3F">✗ 300 writes per post</text><text x="150" y="272" fill="#D26A3F">✗ celebrity = 100 M writes, minutes of lag</text></g>
+
+        <!-- pull -->
+        <g font-size="8.5" fill="currentColor" text-anchor="middle">
+          <rect x="320" y="36" width="60" height="30" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="350" y="55">timeline 1</text>
+          <rect x="390" y="36" width="60" height="30" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="420" y="55">timeline 2</text>
+          <rect x="460" y="36" width="60" height="30" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="490" y="55">timeline 3</text>
+          <rect x="530" y="36" width="60" height="30" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="560" y="55">… ×300</text>
+        </g>
+        <rect x="400" y="120" width="100" height="36" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="450" y="136" text-anchor="middle" font-size="9.5" fill="currentColor">merge + sort</text><text x="450" y="149" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">at read time</text>
+        <g stroke="#D26A3F" stroke-width="1.2"><line x1="350" y1="66" x2="415" y2="117" marker-end="url(#arwA)"></line><line x1="420" y1="66" x2="440" y2="117" marker-end="url(#arwA)"></line><line x1="490" y1="66" x2="462" y2="117" marker-end="url(#arwA)"></line><line x1="560" y1="66" x2="487" y2="117" marker-end="url(#arwA)"></line></g>
+        <rect x="410" y="186" width="80" height="28" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="204" text-anchor="middle" font-size="9.5" fill="currentColor">reader A</text>
+        <line x1="450" y1="186" x2="450" y2="159" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="510" y="204" font-size="9" fill="#D26A3F">300 reads</text>
+        <g font-size="10" text-anchor="middle"><text x="450" y="240" fill="#3AA79B">✓ 1 write per post; always fresh</text><text x="450" y="256" fill="#D26A3F">✗ 300 reads × 100k loads/s</text><text x="450" y="272" fill="#D26A3F">✗ slow tail on every open</text></g>
+
+        <!-- hybrid -->
+        <rect x="620" y="36" width="110" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="675" y="55" text-anchor="middle" font-size="9.5" fill="currentColor">normal authors</text>
+        <rect x="770" y="36" width="110" height="30" rx="5" fill="none" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="4 3"></rect><text x="825" y="55" text-anchor="middle" font-size="9.5" fill="currentColor">celebrities (&gt;1M)</text>
+        <rect x="620" y="120" width="110" height="36" rx="5" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B"></rect><text x="675" y="136" text-anchor="middle" font-size="9.5" fill="currentColor">precomputed</text><text x="675" y="149" text-anchor="middle" font-size="9.5" fill="currentColor">feed (push)</text>
+        <rect x="770" y="120" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="825" y="136" text-anchor="middle" font-size="9.5" fill="currentColor">celeb timelines</text><text x="825" y="149" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">(cached, hot)</text>
+        <line x1="675" y1="66" x2="675" y2="117" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <line x1="825" y1="66" x2="825" y2="117" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="710" y="186" width="80" height="28" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="750" y="204" text-anchor="middle" font-size="9.5" fill="currentColor">reader A</text>
+        <line x1="730" y1="186" x2="690" y2="159" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="770" y1="186" x2="810" y2="159" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="798" y="204" font-size="8.5" fill="#D26A3F">1 + ~5 reads</text>
+        <g font-size="10" text-anchor="middle"><text x="750" y="240" fill="#3AA79B">✓ bounded writes and bounded reads</text><text x="750" y="256" fill="#3AA79B">✓ celebrity posts visible instantly</text><text x="750" y="272" fill="#D26A3F">✗ two code paths, a threshold to tune</text></g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Push</th><th>Pull</th><th>Hybrid</th></tr></thead>
+      <tbody>
+        <tr><td>Work per post</td><td>O(followers)</td><td>O(1)</td><td>O(followers) below the threshold, O(1) above</td></tr>
+        <tr><td>Work per feed load</td><td>O(1)</td><td>O(followees)</td><td>O(1) + O(celebrities followed)</td></tr>
+        <tr><td>Freshness</td><td>Seconds (lag grows with fan-out)</td><td>Immediate</td><td>Immediate for celebrities, seconds for the rest</td></tr>
+        <tr><td>Wasted work</td><td>Writes to feeds nobody opens</td><td>None</td><td>Small; inactive users skipped</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<!-- decks/hld/15-design-news-feed/05-ranking-and-hydration.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: ranking and hydration">
+  <h2>Deep dive 2: from 1,500 candidates to 20 ranked posts in under 200 ms</h2>
+  <p class="dek">A ranked feed is a funnel. Gather candidates cheaply, filter out what must never show, score what's left with a model, then fetch full content only for the handful you'll return. Each stage cuts the set by an order of magnitude, so the expensive stages see little data.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Funnel. Candidate generation: about 1,500 post ids from the precomputed feed, celebrity pulls and recommended posts, in about 10 ms. Filtering removes seen, deleted, blocked and muted posts, leaving about 500, in 5 ms. Light ranking with a cheap model keeps the top 100 in 20 ms. Heavy ranking with a full model on engagement, affinity and recency features orders those 100 in about 60 ms. Diversity rules and hydration by multi-get of the final 20 post bodies, authors and counters take 20 ms. Total about 120 ms, leaving headroom within the 200 ms budget.">
+        <g font-size="11" fill="currentColor">
+          <path d="M40 30 H860 L820 70 H80 Z" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></path>
+          <path d="M80 76 H820 L770 116 H130 Z" fill="currentColor" fill-opacity="0.09" stroke="currentColor" stroke-opacity="0.4"></path>
+          <path d="M130 122 H770 L710 162 H190 Z" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.8"></path>
+          <path d="M190 168 H710 L640 208 H260 Z" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.8"></path>
+          <path d="M260 214 H640 L580 254 H320 Z" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F"></path>
+        </g>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="450" y="48" font-weight="600">① candidates ≈ 1,500 ids</text><text x="450" y="63" font-size="9.5" opacity="0.8">feed cache + celebrity pulls + recommendations · ~10 ms</text>
+          <text x="450" y="94" font-weight="600">② filter ≈ 500</text><text x="450" y="109" font-size="9.5" opacity="0.8">seen, deleted (tombstones), blocked, muted, policy · ~5 ms</text>
+          <text x="450" y="140" font-weight="600">③ light ranker → top 100</text><text x="450" y="155" font-size="9.5" opacity="0.8">cheap model on cached features · ~20 ms</text>
+          <text x="450" y="186" font-weight="600">④ heavy ranker orders 100</text><text x="450" y="201" font-size="9.5" opacity="0.8">affinity · engagement prediction · recency · ~60 ms</text>
+          <text x="450" y="232" font-weight="600">⑤ diversity + hydrate 20</text><text x="450" y="247" font-size="9.5" opacity="0.8">multi-get bodies, authors, counters · ~20 ms</text>
+        </g>
+        <text x="450" y="280" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">≈ 120 ms server time: headroom inside a 200 ms p99</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Chronological is a special case</h4><p>Score = timestamp and skip ③ and ④. Designing the funnel anyway means switching between "latest" and "top" is a flag rather than a rewrite, and ads or recommendations slot in as just another candidate source.</p></div>
+    <div class="card"><h4>Features must be precomputed</h4><p>The ranker can't query ten services per candidate. Author–viewer affinity, post engagement velocity and user embeddings are computed by streaming jobs into a feature store, and read in batches (&lt; 10 ms) at ranking time.</p></div>
+    <div class="card"><h4>Stable pagination</h4><p>Rank the first page and cache the ordered candidate list for the session (say 10 minutes), so page two continues that snapshot. Re-ranking on every page would reshuffle items: duplicates, and posts that vanish between scrolls.</p></div>
+  </div>
+</section>
+<!-- decks/hld/15-design-news-feed/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · News feed" data-title="News feed: trade-offs and follow-ups">
+  <h2>Viral posts, degraded dependencies, and deletes that must stick</h2>
+  <p class="dek">A feed has many dependencies: graph, cache, ranker, counters, media. The page should get worse gracefully rather than fail when any one of them struggles. The other classic stress is a single viral post that every feed hydrates at once.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: a viral post. Millions of feed loads hydrate the same post id, concentrating on one post-cache shard. Mitigations: a one-to-five-second in-process cache in the feed service, the hot key replicated across shards, media served from the CDN, and like counts served from sharded counters displayed approximately. Right: a degradation ladder. If the ranking service fails, serve chronological order. If fan-out is lagging, pull recent posts from followees for that user. If the feed cache is lost, rebuild feeds on read under a rate limit. If counters are slow, show the post without counts.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One viral post, 50 M views an hour</text>
+        <g stroke="#D26A3F" stroke-width="1.1">
+          <line x1="20" y1="50" x2="160" y2="110" marker-end="url(#arwA)"></line><line x1="20" y1="80" x2="160" y2="116" marker-end="url(#arwA)"></line>
+          <line x1="20" y1="110" x2="160" y2="122" marker-end="url(#arwA)"></line><line x1="20" y1="140" x2="160" y2="128" marker-end="url(#arwA)"></line><line x1="20" y1="170" x2="160" y2="134" marker-end="url(#arwA)"></line>
+        </g>
+        <text x="30" y="200" font-size="9.5" fill="currentColor" opacity="0.8">every feed hydrates post 9…901</text>
+        <rect x="164" y="96" width="100" height="50" rx="6" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="214" y="118" text-anchor="middle" font-size="10" fill="currentColor">post-cache</text><text x="214" y="132" text-anchor="middle" font-size="10" fill="currentColor">shard 7 (hot)</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="290" y="40" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="59">in-process cache 1–5 s</text>
+          <rect x="290" y="80" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="99">replicate hot key × N</text>
+          <rect x="290" y="120" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="139">media via CDN only</text>
+          <rect x="290" y="160" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="179">sharded like counter</text>
+        </g>
+        <line x1="264" y1="121" x2="287" y2="121" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="215" y="234" text-anchor="middle" font-size="9.5" fill="currentColor">counts display as "1.2M" and update every few seconds:</text>
+        <text x="215" y="248" text-anchor="middle" font-size="9.5" fill="currentColor">exactness is not a user requirement here</text>
+
+        <line x1="450" y1="12" x2="450" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Degradation ladder: always return a feed</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="470" y="36" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="54" font-weight="600">ranker down / slow</text><text x="482" y="70" opacity="0.8">→ timeout at 60 ms, serve light-ranked or chronological order</text>
+          <rect x="470" y="86" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="104" font-weight="600">fan-out lagging (queue backlog)</text><text x="482" y="120" opacity="0.8">→ top up with a small pull from the user's most-followed accounts</text>
+          <rect x="470" y="136" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="154" font-weight="600">feed cache shard lost</text><text x="482" y="170" opacity="0.8">→ rebuild on read (pull) behind a concurrency limit; re-push later</text>
+          <rect x="470" y="186" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="204" font-weight="600">counters or media slow</text><text x="482" y="220" opacity="0.8">→ render posts without counts; lazy-load images</text>
+        </g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">each rung has a timeout and a metric, so degradation is visible</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Delete or edit a post</td><td>Mark it deleted in the posts store. Filter tombstones at hydrate time (the feed holds only ids), and lazily remove it from caches.</td></tr>
+          <tr><td>Unfollow</td><td>Stop future fan-out, and filter that author at read until the cached entries age out.</td></tr>
+          <tr><td>Author sees own post now</td><td>Merge the author's own recent posts at read time (read-your-writes), without waiting for fan-out.</td></tr>
+          <tr><td>New user, empty feed</td><td>Candidates come from recommendations and popular posts until the follow graph fills in.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">The trade-off sentence</span>"We trade write amplification and some staleness for fast, predictable reads. Push for the 99.9% of authors with modest follower counts, pull for the celebrity tail, skip inactive users, and treat the feed as ids hydrated at read time, so edits, deletes and counts stay correct without rewriting millions of feeds."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Hot keys and resharding" href="#hld/37">HLD · Hot keys and resharding</a><a data-deck="hld" data-slide="Cache failure modes" href="#hld/49">HLD · Cache failure modes</a></p>
 </section>
 </main>
 

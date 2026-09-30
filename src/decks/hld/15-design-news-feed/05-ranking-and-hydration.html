@@ -1,0 +1,32 @@
+<section class="slide" data-sec="Design · News feed" data-title="News feed: ranking and hydration">
+  <h2>Deep dive 2: from 1,500 candidates to 20 ranked posts in under 200 ms</h2>
+  <p class="dek">A ranked feed is a funnel. Gather candidates cheaply, filter out what must never show, score what's left with a model, then fetch full content only for the handful you'll return. Each stage cuts the set by an order of magnitude, so the expensive stages see little data.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Funnel. Candidate generation: about 1,500 post ids from the precomputed feed, celebrity pulls and recommended posts, in about 10 ms. Filtering removes seen, deleted, blocked and muted posts, leaving about 500, in 5 ms. Light ranking with a cheap model keeps the top 100 in 20 ms. Heavy ranking with a full model on engagement, affinity and recency features orders those 100 in about 60 ms. Diversity rules and hydration by multi-get of the final 20 post bodies, authors and counters take 20 ms. Total about 120 ms, leaving headroom within the 200 ms budget.">
+        <g font-size="11" fill="currentColor">
+          <path d="M40 30 H860 L820 70 H80 Z" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></path>
+          <path d="M80 76 H820 L770 116 H130 Z" fill="currentColor" fill-opacity="0.09" stroke="currentColor" stroke-opacity="0.4"></path>
+          <path d="M130 122 H770 L710 162 H190 Z" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-opacity="0.8"></path>
+          <path d="M190 168 H710 L640 208 H260 Z" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-opacity="0.8"></path>
+          <path d="M260 214 H640 L580 254 H320 Z" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F"></path>
+        </g>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="450" y="48" font-weight="600">① candidates ≈ 1,500 ids</text><text x="450" y="63" font-size="9.5" opacity="0.8">feed cache + celebrity pulls + recommendations · ~10 ms</text>
+          <text x="450" y="94" font-weight="600">② filter ≈ 500</text><text x="450" y="109" font-size="9.5" opacity="0.8">seen, deleted (tombstones), blocked, muted, policy · ~5 ms</text>
+          <text x="450" y="140" font-weight="600">③ light ranker → top 100</text><text x="450" y="155" font-size="9.5" opacity="0.8">cheap model on cached features · ~20 ms</text>
+          <text x="450" y="186" font-weight="600">④ heavy ranker orders 100</text><text x="450" y="201" font-size="9.5" opacity="0.8">affinity · engagement prediction · recency · ~60 ms</text>
+          <text x="450" y="232" font-weight="600">⑤ diversity + hydrate 20</text><text x="450" y="247" font-size="9.5" opacity="0.8">multi-get bodies, authors, counters · ~20 ms</text>
+        </g>
+        <text x="450" y="280" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">≈ 120 ms server time: headroom inside a 200 ms p99</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Chronological is a special case</h4><p>Score = timestamp and skip ③ and ④. Designing the funnel anyway means switching between "latest" and "top" is a flag rather than a rewrite, and ads or recommendations slot in as just another candidate source.</p></div>
+    <div class="card"><h4>Features must be precomputed</h4><p>The ranker can't query ten services per candidate. Author–viewer affinity, post engagement velocity and user embeddings are computed by streaming jobs into a feature store, and read in batches (&lt; 10 ms) at ranking time.</p></div>
+    <div class="card"><h4>Stable pagination</h4><p>Rank the first page and cache the ordered candidate list for the session (say 10 minutes), so page two continues that snapshot. Re-ranking on every page would reshuffle items: duplicates, and posts that vanish between scrolls.</p></div>
+  </div>
+</section>

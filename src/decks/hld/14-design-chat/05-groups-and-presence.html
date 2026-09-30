@@ -1,0 +1,63 @@
+<section class="slide" data-sec="Design · Chat" data-title="Chat: groups and presence">
+  <h2>Deep dive 2: fan-out to groups, and presence without a broadcast storm</h2>
+  <p class="dek">Groups multiply delivery work by the member count. Presence multiplies it by the number of contacts, on every status change. Both are managed the same way: store once, fan out only to the <em>live connections</em> that need it, batch per gateway, and compute everything else lazily when someone looks.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Group fan-out: a message to a six-member group is stored once. The delivery worker loads the cached member list, looks up live sessions, and groups recipients by gateway: gateway 17 gets one call for users 1 and 4, gateway 203 one call for user 2, gateway 88 one call for users 5 and 6; user 3 is offline and gets a push notification. Presence: each device heartbeats every 30 seconds, refreshing a Redis key with a 60-second TTL. Status changes are pushed only to users who currently have a chat with that person open; everyone else sees last seen, computed when they look.">
+        <text x="225" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Group message: store once, deliver per gateway</text>
+        <rect x="20" y="44" width="110" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="75" y="62" text-anchor="middle" font-size="9.5" fill="currentColor">msg to g-77</text>
+        <text x="75" y="76" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">stored once (seq 88)</text>
+        <rect x="160" y="40" width="130" height="48" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="225" y="60" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">delivery worker</text>
+        <text x="225" y="76" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">members (cached) → sessions</text>
+        <line x1="130" y1="64" x2="157" y2="64" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="75" y="160">gw 17</text><text x="75" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u1, u4]</text>
+          <rect x="150" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="205" y="160">gw 203</text><text x="205" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u2]</text>
+          <rect x="280" y="140" width="110" height="48" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="335" y="160">gw 88</text><text x="335" y="176" font-family="IBM Plex Mono, monospace" font-size="8.5">[u5, u6]</text>
+          <rect x="300" y="44" width="110" height="40" rx="5" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="355" y="62">push: u3</text><text x="355" y="76" font-size="8.5" opacity="0.75">offline</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3"><line x1="200" y1="88" x2="90" y2="137" marker-end="url(#arwB)"></line><line x1="220" y1="88" x2="208" y2="137" marker-end="url(#arwB)"></line><line x1="240" y1="88" x2="320" y2="137" marker-end="url(#arwB)"></line><line x1="290" y1="64" x2="297" y2="64" marker-end="url(#arwB)"></line></g>
+        <text x="205" y="212" text-anchor="middle" font-size="9.5" fill="currentColor">3 RPCs for 6 members, not 6; each gateway</text>
+        <text x="205" y="226" text-anchor="middle" font-size="9.5" fill="currentColor">writes to its local sockets</text>
+        <rect x="20" y="244" width="380" height="54" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="210" y="262" text-anchor="middle" font-size="9.5" fill="currentColor">inbox update per member: last_seq = 88 (N tiny writes)</text>
+        <text x="210" y="278" text-anchor="middle" font-size="9.5" fill="currentColor">huge channels (100k+): skip per-member writes; members</text>
+        <text x="210" y="292" text-anchor="middle" font-size="9.5" fill="currentColor">pull on open (fan-out on read, like a feed)</text>
+
+        <line x1="450" y1="12" x2="450" y2="304" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Presence: heartbeat + TTL, subscribe on view</text>
+        <rect x="470" y="44" width="110" height="40" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="525" y="68" text-anchor="middle" font-size="10" fill="currentColor">Bob's phone</text>
+        <path d="M650 38 a55 6 0 0 1 110 0 v40 a55 6 0 0 1 -110 0 z" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></path>
+        <path d="M650 38 a55 6 0 0 0 110 0" fill="none" stroke="#3AA79B" stroke-width="1.3"></path>
+        <text x="705" y="60" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">presence:bob</text>
+        <text x="705" y="74" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">online · TTL 60 s</text>
+        <line x1="580" y1="62" x2="647" y2="58" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="614" y="50" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">every 30 s</text>
+        <text x="780" y="54" font-size="8.5" fill="currentColor" opacity="0.8">no heartbeat →</text>
+        <text x="780" y="66" font-size="8.5" fill="currentColor" opacity="0.8">key expires →</text>
+        <text x="780" y="78" font-size="8.5" fill="currentColor" opacity="0.8">"last seen 10:42"</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="150" width="140" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="550" y="168">Alice: chat with Bob</text><text x="550" y="182" font-size="8.5">open → subscribed</text>
+          <rect x="650" y="150" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect><text x="760" y="168">Bob's other 300 contacts</text><text x="760" y="182" font-size="8.5" opacity="0.75">not subscribed: nothing sent</text>
+        </g>
+        <line x1="690" y1="84" x2="570" y2="147" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="600" y="120" font-size="8.5" fill="#3AA79B">"online" pushed</text>
+        <text x="675" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">broadcasting to every contact costs</text>
+        <text x="675" y="242" text-anchor="middle" font-size="9.5" fill="currentColor">status changes × contacts: billions of messages a day</text>
+        <text x="675" y="266" text-anchor="middle" font-size="9.5" fill="#D26A3F">so push to open views only, and compute</text>
+        <text x="675" y="280" text-anchor="middle" font-size="9.5" fill="#D26A3F">"last seen" when someone opens the profile</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Storage layout</h4><p>Messages: partition <code>(conv_id, month)</code>, clustered by <code>seq DESC</code>, so "latest 50" and "before seq X" are single-partition slices. Media lives in object storage, and the message holds a URL, size and thumbnail hash. Old months move to cheaper storage tiers.</p></div>
+    <div class="card"><h4>Typing indicators and receipts</h4><p>These are ephemeral and high-volume. Deliver them best-effort over the socket and never persist them. Coalesce read receipts to the latest seq, and in big groups show aggregated counts ("read by 12"), not per-member events.</p></div>
+    <div class="card"><h4>Unread counts</h4><p>Store <code>last_seq</code> and <code>last_read_seq</code> per member and conversation. The badge is the difference, summed across conversations. Never count by scanning messages. Cache the total per user and adjust it on each message and read event.</p></div>
+  </div>
+</section>

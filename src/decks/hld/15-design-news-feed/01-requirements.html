@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Design · News feed" data-title="News feed: requirements">
+  <h2>Design a news feed: cheap reads for everyone, including followers of celebrities</h2>
+  <p class="dek">Think of the Twitter/X home timeline, Instagram or Facebook. Users follow others and open a feed of their posts, newest or best first. It's read-heavy like the URL shortener, but each read gathers posts from hundreds of sources. So the central question is when to do that gathering: when a post is written, or when a feed is read.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Estimate. Reads: 300 million daily users opening the feed 10 times a day is 3 billion feed loads, about 35 thousand a second, 100 thousand at peak. Writes: 30 million posts a day is about 350 a second; with 300 followers on average, pushing each post into followers' feeds is 9 billion feed inserts a day, about 100 thousand a second. A celebrity with 100 million followers turns one post into 100 million inserts. Feed cache: 300 million users times 500 post ids times 8 bytes is about 1.2 terabytes of Redis.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="140" y="20" font-weight="600">Reads</text><text x="450" y="20" font-weight="600">Writes and fan-out</text><text x="760" y="20" font-weight="600">Feed cache</text>
+          <rect x="30" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">300 M DAU × 10 opens</text>
+          <rect x="30" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="115">3 B feed loads / day</text>
+          <rect x="30" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="171">≈ 35 k/s avg</text><text x="140" y="188" font-weight="600">≈ 100 k/s peak</text>
+          <rect x="340" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">30 M posts / day ≈ 350/s</text>
+          <rect x="340" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="115">× 300 followers (average)</text>
+          <rect x="340" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="171">9 B feed inserts / day</text><text x="450" y="188" font-weight="600">≈ 100 k/s of fan-out</text>
+          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">500 post ids per user</text>
+          <rect x="650" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="115">× 8 B × 300 M users</text>
+          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.2 TB of ids</text><text x="760" y="188" font-weight="600">a Redis cluster (ids only)</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="68" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="128" x2="140" y2="149" marker-end="url(#arw)"></line>
+          <line x1="450" y1="68" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="128" x2="450" y2="149" marker-end="url(#arw)"></line>
+          <line x1="760" y1="68" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="128" x2="760" y2="149" marker-end="url(#arw)"></line>
+        </g>
+        <rect x="250" y="214" width="400" height="32" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="450" y="235" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">celebrity: 1 post × 100 M followers = 100 M inserts</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Create posts (text plus media), follow and unfollow.</li>
+      <li>Home feed: posts from people you follow, ranked, with infinite scroll.</li>
+      <li>Like and comment counts shown on each post.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Feed load p99 &lt; 200 ms. This is the product's front page.</li>
+      <li>New posts visible to followers within seconds (eventual is fine).</li>
+      <li>Authors see their own post immediately (read-your-writes).</li>
+      <li>Handle extreme follower skew: 10 followers to 100 M.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Chronological or ranked? Ranked, but design so chronological is a special case.</li>
+      <li>Do we store the whole history? Feeds show the last ~800 items; older posts come from profile pages.</li>
+      <li>Out of scope: ads auction, notifications, and search.</li>
+    </ul></div>
+  </div>
+</section>

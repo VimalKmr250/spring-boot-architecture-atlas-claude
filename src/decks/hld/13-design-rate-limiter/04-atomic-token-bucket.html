@@ -1,0 +1,79 @@
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: atomic token bucket">
+  <h2>Deep dive 1: the check must be one atomic operation</h2>
+  <p class="dek">"Read the counter, decide, write it back" from 50 gateways is a textbook race. Two gateways read "1 token left", both allow, and the limit leaks under exactly the concurrent load it exists for. Make the whole refill-check-take step atomic on the shard that owns the key. In Redis that means a Lua script.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Left, the race: gateway 1 reads tokens equals 1, gateway 2 reads tokens equals 1, gateway 1 writes 0 and allows, gateway 2 writes 0 and allows; two requests pass on one token. Right, atomic: gateway 1 runs the Lua script, which refills, sees one token, takes it and returns allowed; gateway 2's script runs after it on the same single-threaded shard, sees zero and returns rejected with a retry-after.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Read-modify-write: a race</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="65" y="53">gateway 1</text>
+          <rect x="170" y="34" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="215" y="53">Redis</text>
+          <rect x="320" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="365" y="53">gateway 2</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="65" y1="62" x2="65" y2="240"></line><line x1="215" y1="62" x2="215" y2="240"></line><line x1="365" y1="62" x2="365" y2="240"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="65" y1="84" x2="211" y2="84" marker-end="url(#arw)"></line><line x1="365" y1="104" x2="219" y2="104" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="138" y="78" text-anchor="middle">GET → 1</text><text x="292" y="98" text-anchor="middle">GET → 1</text></g>
+        <g stroke="#D26A3F" stroke-width="1.4">
+          <line x1="65" y1="140" x2="211" y2="140" marker-end="url(#arwA)"></line><line x1="365" y1="160" x2="219" y2="160" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="9.5" fill="#D26A3F" font-family="IBM Plex Mono, monospace"><text x="138" y="134" text-anchor="middle">SET 0 · allow</text><text x="292" y="154" text-anchor="middle">SET 0 · allow</text></g>
+        <text x="215" y="206" text-anchor="middle" font-size="11" font-weight="600" fill="#D26A3F">2 requests passed on 1 token</text>
+        <text x="215" y="224" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">worse with 50 gateways and a bursty client</text>
+
+        <line x1="450" y1="14" x2="450" y2="244" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One Lua script: atomic on the shard</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="480" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="525" y="53">gateway 1</text>
+          <rect x="630" y="34" width="90" height="28" rx="5" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="675" y="53">Redis</text>
+          <rect x="780" y="34" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="825" y="53">gateway 2</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4"><line x1="525" y1="62" x2="525" y2="240"></line><line x1="675" y1="62" x2="675" y2="240"></line><line x1="825" y1="62" x2="825" y2="240"></line></g>
+        <line x1="525" y1="84" x2="671" y2="84" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <text x="598" y="78" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">EVAL take(1)</text>
+        <rect x="669" y="90" width="12" height="36" fill="#3AA79B" fill-opacity="0.3"></rect>
+        <text x="662" y="114" text-anchor="end" font-size="9" fill="currentColor">refill, 1 → 0</text>
+        <line x1="671" y1="130" x2="529" y2="130" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="598" y="144" text-anchor="middle" font-size="9.5" fill="#3AA79B">allowed</text>
+        <line x1="825" y1="98" x2="679" y2="98" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="752" y="92" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">EVAL take(1)</text>
+        <text x="760" y="124" font-size="9" fill="currentColor" opacity="0.75">queued behind #1</text>
+        <rect x="669" y="150" width="12" height="30" fill="#D26A3F" fill-opacity="0.3"></rect>
+        <line x1="679" y1="184" x2="821" y2="184" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="752" y="200" text-anchor="middle" font-size="9.5" fill="#D26A3F">rejected · retry in 100 ms</text>
+        <text x="675" y="230" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">scripts run one at a time per shard: no race</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">token_bucket.lua (runs inside Redis)</div>
+<pre><code class="language-lua">-- KEYS[1] = bucket key   ARGV = rate/s, burst, now_ms, cost
+local rate, burst, now, cost = tonumber(ARGV[1]), tonumber(ARGV[2]),
+                               tonumber(ARGV[3]), tonumber(ARGV[4])
+local b = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
+local tokens = tonumber(b[1]) or burst
+local ts     = tonumber(b[2]) or now
+tokens = math.min(burst, tokens + (now - ts) / 1000 * rate)   -- refill
+local allowed = tokens &gt;= cost
+if allowed then tokens = tokens - cost end
+redis.call('HSET', KEYS[1], 'tokens', tokens, 'ts', now)
+redis.call('PEXPIRE', KEYS[1], math.ceil(burst / rate * 1000) * 2)
+local wait = allowed and 0 or math.ceil((cost - tokens) / rate * 1000)
+return { allowed and 1 or 0, math.floor(tokens), wait }</code></pre>
+    </div>
+    <div class="panel">
+      <h3>Details that come up</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Whose clock?</b> Pass <code>now</code> from the gateway (NTP-synced), or read Redis <code>TIME</code> inside the script so every caller shares one clock.</li>
+        <li><b>Cost:</b> weight expensive endpoints (<code>cost = 10</code> for an export), so a limit reflects load, not just request count.</li>
+        <li><b>One round trip:</b> load the script once (<code>EVALSHA</code>). Check several rules in one call when their keys share a hash tag, so they land on the same shard.</li>
+        <li>The TTL lets idle keys vanish, so memory tracks active clients, not every client ever seen.</li>
+      </ul>
+    </div>
+  </div>
+</section>

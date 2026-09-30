@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Design · Chat" data-title="Chat: requirements">
+  <h2>Design a chat app: millions of open connections, and no lost or reordered messages</h2>
+  <p class="dek">Think WhatsApp or Messenger: 1:1 and group chat, delivered in real time when the recipient is online and on reconnect when they aren't, in order, never lost, and synced across devices. The defining constraints are the huge number of persistent connections and the need to route each message to whichever server the recipient happens to be connected to.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 500 million daily users times 40 messages is 20 billion messages a day, about 230 thousand a second, 700 thousand at peak. About 30 percent online at peak is 150 million concurrent connections; at about 500 thousand connections per gateway server that is roughly 300 gateway servers. Storage: 20 billion messages times about 200 bytes is 4 terabytes a day, about 1.5 petabytes a year before media.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="140" y="20" font-weight="600">Messages</text><text x="450" y="20" font-weight="600">Connections</text><text x="760" y="20" font-weight="600">Storage</text>
+          <rect x="30" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">500 M DAU × 40 msgs/day</text>
+          <rect x="30" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="115">20 B msgs/day</text>
+          <rect x="30" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="171">≈ 230 k msg/s avg</text><text x="140" y="188" font-weight="600">≈ 700 k/s peak</text>
+          <rect x="340" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">~30% online at peak</text>
+          <rect x="340" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="115">150 M open WebSockets</text>
+          <rect x="340" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="171">÷ ~500 k per server</text><text x="450" y="188" font-weight="600">≈ 300 gateway servers</text>
+          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">20 B × ~200 B (text + meta)</text>
+          <rect x="650" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="115">≈ 4 TB / day</text>
+          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.5 PB / year</text><text x="760" y="188" font-weight="600">wide-column, not SQL</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="68" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="128" x2="140" y2="149" marker-end="url(#arw)"></line>
+          <line x1="450" y1="68" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="128" x2="450" y2="149" marker-end="url(#arw)"></line>
+          <line x1="760" y1="68" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="128" x2="760" y2="149" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard dimensions: stateful connections (routing) and write volume (storage)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>1:1 and group chats (groups ≤ 256 members).</li>
+      <li>Sent / delivered / read receipts, and online presence.</li>
+      <li>Offline delivery on reconnect, plus a push notification.</li>
+      <li>History synced across a user's devices; images via upload.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Delivery p99 &lt; 300 ms when both users are online in-region.</li>
+      <li>Never lose an acknowledged message.</li>
+      <li>Messages ordered within a conversation.</li>
+      <li>Very high availability: chat is the product.</li>
+    </ul></div>
+    <div class="card"><h4>Scope it</h4><ul class="tight">
+      <li>End-to-end encryption: the server stores ciphertext only (mention it, don't design Signal).</li>
+      <li>Out of scope: voice and video calls, stories, payments.</li>
+      <li>Large broadcast channels (100k+) are a different fan-out problem. Flag it.</li>
+    </ul></div>
+  </div>
+</section>
