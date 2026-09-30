@@ -403,6 +403,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
         <li>Copper marks the path or hop under discussion; <span style="color:var(--async);font-weight:600">teal</span> always means an asynchronous channel.</li>
         <li>Code is real Spring Boot 4 / Framework 7 on Java 21, trimmed to the line that matters.</li>
         <li><b>Versions differ by tab, on purpose.</b> This deck is written against Boot 4.1; the <b>Spring Boot</b> tab targets 3.4/3.5 because that is what most enterprise codebases run today, with <span class="tag a">Boot 4</span> boxes marking the delta; the <b>Event-driven</b> tab is Boot 3.5 code with Boot 4 notes; the <b>Java streams</b> tab documents the JDK 25 API and tags everything added after Java 8 with its release. Build snippets are Gradle unless the slide says Maven.</li>
+        <li>The <b>System design</b> tab is a separate, interview-focused deck on high-level design: fundamentals, building blocks, architecture and cloud patterns, then twelve worked designs, with a diagram on nearly every slide.</li>
         <li>The <b>Interview prep</b> tab is a separate page: the same material rearranged as questions, scripts and numbers, with every answer linking back to the slides that go deeper.</li>
       </ul>
     </div>
@@ -19301,6 +19302,221 @@ replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
     <div class="note tip"><span class="lbl">Summarise</span>"A leaderless ring. Consistent hashing with vnodes places keys on N zone-aware replicas, and any node coordinates with tunable W and R. Hinted handoff keeps writes available, vector clocks or LWW settle conflicts, and read repair plus Merkle anti-entropy converge replicas. Each node is an LSM engine with a commit log. It is AP by default, and QUORUM on both sides gives read-your-latest-ack."</div>
   </div>
   <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Consistent hashing" href="#hld/36">HLD · Consistent hashing</a><a data-deck="hld" data-slide="Multi-leader and leaderless" href="#hld/34">HLD · Multi-leader and leaderless</a><a data-deck="hld" data-slide="Storage engines and indexes" href="#hld/32">HLD · Storage engines and indexes</a></p>
+</section>
+<!-- decks/hld/24-wrap-up/01-trade-offs-cheat-sheet.html -->
+<section class="slide" data-sec="Wrap-up" data-title="Trade-offs cheat sheet">
+  <h2>Every design decision is one of about a dozen trade-offs, so name it out loud</h2>
+  <p class="dek">Interviewers listen for trade-off language more than for any particular technology. When you make a choice, say which side of which trade-off you picked and why the requirements favour it. The right-hand column points to where each one was decisive in the worked designs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:760px">
+      <thead><tr><th>Trade-off</th><th>Lean left when…</th><th>Lean right when…</th><th>Decisive in</th></tr></thead>
+      <tbody>
+        <tr><td><b>Consistency ↔ availability</b></td><td>Money, stock, uniqueness: a wrong answer costs more than no answer.</td><td>Feeds, carts, presence: a stale answer beats an error.</td><td>E-commerce, KV store</td></tr>
+        <tr><td><b>Latency ↔ consistency</b> (PACELC)</td><td>Readers must see their own and others' latest writes.</td><td>p99 matters more than freshness; replicas far apart.</td><td>KV store, typeahead</td></tr>
+        <tr><td><b>Latency ↔ throughput</b></td><td>Interactive requests; small, immediate work.</td><td>Batch and pipelines: batch, buffer and compress.</td><td>Crawler, video</td></tr>
+        <tr><td><b>Sync ↔ async</b></td><td>The caller needs the result to continue.</td><td>Slow, retryable or fan-out work: queue it and return 202.</td><td>Notifications, video</td></tr>
+        <tr><td><b>Push ↔ pull</b> (fan-out on write vs read)</td><td>Few followers, many reads: precompute on write.</td><td>Celebrities and huge fan-out: merge on read.</td><td>News feed, chat</td></tr>
+        <tr><td><b>Normalise ↔ denormalise</b></td><td>Write-heavy with integrity rules; ad-hoc queries.</td><td>Read-heavy, known access patterns; one read per page.</td><td>News feed, e-commerce</td></tr>
+        <tr><td><b>SQL ↔ NoSQL</b></td><td>Relations, transactions, evolving queries.</td><td>Huge scale, simple key access, flexible schema.</td><td>URL shortener, KV store</td></tr>
+        <tr><td><b>Freshness ↔ cost</b> (caching, TTLs)</td><td>Data changes often and staleness is visible.</td><td>Read-mostly data; cache aggressively at the edge.</td><td>Typeahead, e-commerce</td></tr>
+        <tr><td><b>Exactly-once ↔ simplicity</b></td><td>Rarely worth it end to end across systems.</td><td>At-least-once plus idempotency keys: the default.</td><td>Notifications, checkout</td></tr>
+        <tr><td><b>Precompute ↔ compute on demand</b></td><td>Hot, bounded, predictable queries (top-k, feeds).</td><td>Long tail, rarely asked, or too many combinations.</td><td>Typeahead, video</td></tr>
+        <tr><td><b>Accuracy ↔ memory</b> (probabilistic)</td><td>Exact answers are required (billing).</td><td>Approximate is fine: Bloom filters, HyperLogLog, count-min.</td><td>Crawler, typeahead</td></tr>
+        <tr><td><b>Replication ↔ erasure coding</b></td><td>Hot data, fast repair, simple reads.</td><td>Cold bulk data where raw storage dominates cost.</td><td>File sync, video</td></tr>
+        <tr><td><b>Monolith ↔ microservices</b></td><td>Small team, unclear boundaries, early product.</td><td>Independent scaling, many teams, stable domains.</td><td>Architecture patterns</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The sentence to practise</span>"I'm choosing <em>X</em> over <em>Y</em> because the requirement is <em>Z</em>; the cost is <em>W</em>, and if <em>Z</em> changes I'd revisit it." Say it once per major decision and the interviewer never has to ask "why?".</div>
+</section>
+<!-- decks/hld/24-wrap-up/02-requirement-to-building-block.html -->
+<section class="slide" data-sec="Wrap-up" data-title="Requirement to building block">
+  <h2>Read the requirement, reach for the block: the map behind all twelve designs</h2>
+  <p class="dek">After a dozen designs a pattern shows. Each requirement phrase triggers a small set of building blocks, and the design is mostly a matter of composing them and justifying each one. Use this map to generate candidates fast. Then make the trade-off explicit before committing.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 350" role="img" aria-label="Map from requirements to building blocks. Read-heavy data maps to cache-aside and read replicas, as in the URL shortener and news feed. Global users and media map to a CDN and object storage, as in video and e-commerce. Write-heavy append-mostly data maps to LSM stores, logs and sharding, as in chat and the KV store. Spiky traffic and slow or retryable work both map to a queue with a worker pool, as in notifications, video and the crawler. Real-time updates map to WebSockets or SSE with a connection registry, as in chat and ride-hailing. Exact money or stock maps to transactions, guarded updates and sagas, as in e-commerce and ride-hailing. Retries and duplicates map to idempotency keys and a dedupe store. Large files map to presigned, resumable, chunked uploads and to object storage, as in file sync and video. Search maps to an inverted index or top-k trie. Near-me queries map to geohash, quadtree or H3 cells. Abuse and overload map to token buckets and load shedding, as in the rate limiter.">
+          <path d="M280 27 C 410 27, 410 32, 537 32" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 55 C 410 55, 410 62, 537 62" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 83 C 410 83, 410 92, 537 92" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 111 C 410 111, 410 122, 537 122" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"></path>
+          <path d="M280 139 C 410 139, 410 122, 537 122" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"></path>
+          <path d="M280 167 C 410 167, 410 152, 537 152" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 195 C 410 195, 410 182, 537 182" fill="none" stroke="#D26A3F" stroke-width="1.6"></path>
+          <path d="M280 223 C 410 223, 410 212, 537 212" fill="none" stroke="#D26A3F" stroke-width="1.6"></path>
+          <path d="M280 251 C 410 251, 410 242, 537 242" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 251 C 410 251, 410 62, 537 62" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 279 C 410 279, 410 272, 537 272" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 307 C 410 307, 410 302, 537 302" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+          <path d="M280 335 C 410 335, 410 332, 537 332" fill="none" stroke="#8A94A3" stroke-width="1.2"></path>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="20" y="16" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="31">read-heavy, the same data read repeatedly</text>
+          <rect x="20" y="44" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="59">global users, static or media content</text>
+          <rect x="20" y="72" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="87">write-heavy, append-mostly data</text>
+          <rect x="20" y="100" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="115">spiky or bursty traffic</text>
+          <rect x="20" y="128" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="143">slow, retryable or fan-out work</text>
+          <rect x="20" y="156" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="171">real-time updates to clients</text>
+          <rect x="20" y="184" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="199">money or stock must be exact</text>
+          <rect x="20" y="212" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="227">retries and duplicate requests</text>
+          <rect x="20" y="240" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="255">large files and blobs</text>
+          <rect x="20" y="268" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="283">full-text or prefix search</text>
+          <rect x="20" y="296" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="311">"near me" queries</text>
+          <rect x="20" y="324" width="260" height="22" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="30" y="339">abuse, overload, noisy neighbours</text>
+        </g>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="540" y="20" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="36">cache-aside + read replicas</text><text x="882" y="36" text-anchor="end" font-size="8.5" opacity="0.7">URL shortener, news feed</text>
+          <rect x="540" y="50" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="66">CDN + object storage</text><text x="882" y="66" text-anchor="end" font-size="8.5" opacity="0.7">video, e-commerce</text>
+          <rect x="540" y="80" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="96">LSM store, append-only log, sharding</text><text x="882" y="96" text-anchor="end" font-size="8.5" opacity="0.7">chat, KV store</text>
+          <rect x="540" y="110" width="350" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="550" y="126">queue + worker pool (load leveling)</text><text x="882" y="126" text-anchor="end" font-size="8.5" opacity="0.7">notifications, video, crawler</text>
+          <rect x="540" y="140" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="156">WebSocket / SSE + connection registry</text><text x="882" y="156" text-anchor="end" font-size="8.5" opacity="0.7">chat, ride-hailing</text>
+          <rect x="540" y="170" width="350" height="24" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="550" y="186">transaction, guarded update, saga</text><text x="882" y="186" text-anchor="end" font-size="8.5" opacity="0.7">e-commerce, ride-hailing</text>
+          <rect x="540" y="200" width="350" height="24" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="550" y="216">idempotency keys + dedupe store</text><text x="882" y="216" text-anchor="end" font-size="8.5" opacity="0.7">notifications, checkout</text>
+          <rect x="540" y="230" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="246">presigned, resumable, chunked upload</text><text x="882" y="246" text-anchor="end" font-size="8.5" opacity="0.7">file sync, video</text>
+          <rect x="540" y="260" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="276">inverted index / top-k trie</text><text x="882" y="276" text-anchor="end" font-size="8.5" opacity="0.7">typeahead, e-commerce</text>
+          <rect x="540" y="290" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="306">geohash / quadtree / H3 cells</text><text x="882" y="306" text-anchor="end" font-size="8.5" opacity="0.7">ride-hailing</text>
+          <rect x="540" y="320" width="350" height="24" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="550" y="336">token bucket + load shedding</text><text x="882" y="336" text-anchor="end" font-size="8.5" opacity="0.7">rate limiter</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Copper links are the correctness blocks: never skip them where money or stock is involved. Teal links are the asynchronous blocks, the usual answer to "what happens when load spikes or work is slow".</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Start from the verbs</h4><p>"Upload", "notify", "search", "match", "pay": each verb in the requirements usually becomes one service or one pipeline. Group verbs that share data and consistency needs, and split those that don't.</p></div>
+    <div class="card"><h4>Then from the numbers</h4><p>The estimate tells you which blocks are mandatory. Tens of Tbps of egress means a CDN. 250 k writes/s means an in-memory or LSM store. A 100:1 read ratio means a cache. The numbers also rule blocks out.</p></div>
+    <div class="card"><h4>Then from the failures</h4><p>For each block, ask what happens when it's slow, down or duplicated. The answers add the timeouts, retries with idempotency, queues, fallbacks and reconciliation jobs that separate a senior answer from a diagram.</p></div>
+  </div>
+</section>
+<!-- decks/hld/24-wrap-up/03-mistakes-and-red-flags.html -->
+<section class="slide" data-sec="Wrap-up" data-title="Common mistakes and red flags">
+  <h2>What sinks a system-design round, and what to say instead</h2>
+  <p class="dek">Most failed rounds don't fail on missing knowledge. They fail on process: skipping requirements, hiding the numbers, naming products instead of reasoning, or never discussing what breaks. Each row pairs a red flag interviewers write down with the behaviour that earns the opposite note.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:760px">
+      <thead><tr><th>Red flag</th><th>Why it hurts</th><th>Do this instead</th></tr></thead>
+      <tbody>
+        <tr><td><b>Drawing boxes in minute one</b></td><td>You design the wrong system, confidently.</td><td>Spend five minutes on functional and non-functional requirements; write them down and confirm.</td></tr>
+        <tr><td><b>No numbers</b></td><td>Every later choice is unjustified: why a cache, why sharding?</td><td>Estimate QPS, storage and bandwidth; circle the one number that shapes the design.</td></tr>
+        <tr><td><b>Buzzword soup</b> ("add Kafka, Redis, Kubernetes")</td><td>Products without reasons signal memorisation.</td><td>Name the property you need (durable ordered log), then the product that has it.</td></tr>
+        <tr><td><b>One database does everything</b></td><td>Ignores access patterns and the read/write mix.</td><td>Pick storage per access pattern and say what each one is the source of truth for.</td></tr>
+        <tr><td><b>Happy path only</b></td><td>Real systems are mostly failure handling.</td><td>For each hop: timeout, retry with idempotency, fallback, and what the user sees.</td></tr>
+        <tr><td><b>"Exactly-once" by assertion</b></td><td>Hand-waves the hardest part of distributed systems.</td><td>At-least-once delivery plus idempotent consumers, and say where the dedupe key lives.</td></tr>
+        <tr><td><b>Over-engineering day one</b></td><td>Microservices and multi-region for 1,000 users.</td><td>Design for 10× the stated load, then describe what changes at 100×.</td></tr>
+        <tr><td><b>Silent choices</b></td><td>The interviewer can't score reasoning they can't hear.</td><td>State the trade-off for every major decision (see the cheat sheet).</td></tr>
+        <tr><td><b>Losing the clock</b></td><td>No deep dives means no senior signal.</td><td>Keep the HLD simple enough to finish by minute 25, then go deep where the risk is.</td></tr>
+        <tr><td><b>Defending instead of adapting</b></td><td>New constraints are a test of flexibility.</td><td>"Good point: that breaks X, so I'd change Y." Treat hints as gifts.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">Sounds weak</span>"We'll just use NoSQL because it scales, and put a cache in front of everything. For consistency we'll use transactions."</div>
+    <div class="note good"><span class="lbl">Sounds senior</span>"Reads are 100× writes and a few seconds of staleness is fine, so a cache-aside layer with a 60 s TTL takes most of the load. Orders need atomic stock checks, so those go through a guarded update in PostgreSQL."</div>
+  </div>
+</section>
+<!-- decks/hld/24-wrap-up/04-answer-checklist.html -->
+<section class="slide" data-sec="Wrap-up" data-title="Answer checklist">
+  <h2>The same eight steps every time, run as a loop rather than a line</h2>
+  <p class="dek">The framework from the start of the deck, now as a checklist you can run in any round. It's a loop because good interviews are. When the interviewer adds a constraint ("now make it multi-region", "what if a celebrity posts?"), go back to requirements and numbers, re-derive, and say what changes.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Eight steps arranged in a loop: 1 clarify users, features, non-functional requirements and non-goals; 2 estimate QPS, storage, bandwidth and the key ratio; 3 API endpoints, idempotency and paging; 4 data model entities, access patterns and stores; 5 high-level design boxes with sync and async paths; 6 deep dives into the two riskiest components; 7 failures and scale, what breaks at 10 times and single points of failure; 8 trade-offs, decisions, costs and what comes next. From step 8 the loop returns to step 1 when a new constraint arrives. Steps 5 and 6 carry the most weight.">
+        <g><line x1="540.0" y1="50.7" x2="590.4" y2="57.7" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="709.0" y1="91.8" x2="752.1" y2="127.1" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="754.4" y1="171.0" x2="711.3" y2="206.3" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="593.3" y1="241.8" x2="543.0" y2="248.9" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="360.0" y1="249.3" x2="309.6" y2="242.3" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="191.0" y1="208.2" x2="147.9" y2="172.9" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="145.6" y1="129.0" x2="188.7" y2="93.7" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line><line x1="306.7" y1="58.2" x2="357.0" y2="51.1" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line></g>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="360.0" y="17.0" width="180" height="42" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="450.0" y="35.0" font-weight="600">1 Clarify</text><text x="450.0" y="50.0" font-size="8.5" opacity="0.85">users, features, NFRs, non-goals</text>
+          <rect x="593.3" y="49.8" width="180" height="42" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="683.3" y="67.8" font-weight="600">2 Estimate</text><text x="683.3" y="82.8" font-size="8.5" opacity="0.85">QPS, storage, bandwidth, key ratio</text>
+          <rect x="690.0" y="129.0" width="180" height="42" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="780.0" y="147.0" font-weight="600">3 API</text><text x="780.0" y="162.0" font-size="8.5" opacity="0.85">endpoints, idempotency, paging</text>
+          <rect x="593.3" y="208.2" width="180" height="42" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="683.3" y="226.2" font-weight="600">4 Data model</text><text x="683.3" y="241.2" font-size="8.5" opacity="0.85">entities, access patterns, stores</text>
+          <rect x="360.0" y="241.0" width="180" height="42" rx="6" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F"></rect><text x="450.0" y="259.0" font-weight="600">5 High-level design</text><text x="450.0" y="274.0" font-size="8.5" opacity="0.85">boxes; sync vs async paths</text>
+          <rect x="126.7" y="208.2" width="180" height="42" rx="6" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F"></rect><text x="216.7" y="226.2" font-weight="600">6 Deep dives</text><text x="216.7" y="241.2" font-size="8.5" opacity="0.85">the two riskiest components</text>
+          <rect x="30.0" y="129.0" width="180" height="42" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="120.0" y="147.0" font-weight="600">7 Failures + scale</text><text x="120.0" y="162.0" font-size="8.5" opacity="0.85">what breaks at 10×; SPOFs</text>
+          <rect x="126.7" y="49.8" width="180" height="42" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="216.7" y="67.8" font-weight="600">8 Trade-offs</text><text x="216.7" y="82.8" font-size="8.5" opacity="0.85">decisions, costs, what's next</text>
+        </g>
+        <text x="450" y="136" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">new constraint?</text>
+        <text x="450" y="154" text-anchor="middle" font-size="9.5" fill="currentColor">loop back to 1: re-clarify, re-estimate,</text>
+        <text x="450" y="170" text-anchor="middle" font-size="9.5" fill="currentColor">and say what changes and why</text>
+        <text x="450" y="200" text-anchor="middle" font-size="9.5" fill="#D26A3F">steps 5 and 6 are about half the round</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Before you draw a box</h3>
+      <ul class="checks" style="margin-top:10px">
+        <li>Written: 3–5 functional requirements and explicit non-goals.</li>
+        <li>Written: latency, availability, consistency and durability targets.</li>
+        <li>Numbers: peak QPS (reads and writes), storage over years, bandwidth.</li>
+        <li>The one ratio or number that shapes the design, circled.</li>
+        <li>API sketched: the write path carries an idempotency key.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Before you say "done"</h3>
+      <ul class="checks" style="margin-top:10px">
+        <li>Every store: what it is the source of truth for, and how it scales.</li>
+        <li>Every hop: timeout, retry, and what the user sees on failure.</li>
+        <li>No single point of failure left unnamed; a plan for the hot key.</li>
+        <li>Observability: the SLIs you'd alert on.</li>
+        <li>Three trade-offs stated, and what you'd do at 10× or with more time.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="The interview framework" href="#hld/4">HLD · The interview framework</a><a data-deck="hld" data-slide="The estimation method" href="#hld/17">HLD · The estimation method</a></p>
+</section>
+<!-- decks/hld/24-wrap-up/05-study-plan-and-reading.html -->
+<section class="slide" data-sec="Wrap-up" data-title="Study plan and further reading">
+  <h2>Four weeks from vocabulary to timed mocks, and where to go deeper</h2>
+  <p class="dek">Reading slides builds recognition, but interviews test recall under time pressure. The plan below alternates learning a section with producing something from memory, such as a diagram, an estimate or a spoken trade-off, and finishes with timed runs of the twelve designs. The reading list is short on purpose: a few sources, read properly.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:720px">
+      <thead><tr><th>Week</th><th>Study</th><th>Practise from memory</th></tr></thead>
+      <tbody>
+        <tr><td><b>1</b></td><td>Orientation, Fundamentals, Estimation, Networking &amp; edge</td><td>One estimate a day, out loud and in under 5 minutes. Explain CAP vs PACELC and L4 vs L7 to a rubber duck.</td></tr>
+        <tr><td><b>2</b></td><td>Data, Caching, Asynchronism</td><td>Redraw the hash ring, leader-follower lag, cache-aside and the outbox from a blank page. Pick a store for five made-up products.</td></tr>
+        <tr><td><b>3</b></td><td>Reliability, Operate &amp; secure, Architecture and cloud patterns</td><td>For three designs, walk every hop's failure: timeout, retry, fallback. Write SLOs and one burn-rate alert for each.</td></tr>
+        <tr><td><b>4</b></td><td>The twelve designs</td><td>Two a day, 45 minutes each on a whiteboard, <em>then</em> compare with the slides. Finish with at least two mock interviews with a peer.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="panel">
+      <h3>Books</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>DDIA</dt><dd>Kleppmann, <em>Designing Data-Intensive Applications</em>: the foundation for replication, partitioning, transactions and streams.</dd>
+        <dt>SDI 1 &amp; 2</dt><dd>Alex Xu, <em>System Design Interview</em>: many more worked designs in interview format.</dd>
+        <dt>SRE</dt><dd>Google, <em>Site Reliability Engineering</em>: SLOs, alerting, overload and incident practice.</dd>
+        <dt>DB internals</dt><dd>Petrov, <em>Database Internals</em>: B-trees, LSM trees and distributed consensus in depth.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>Online</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Roadmap</dt><dd><a href="https://roadmap.sh/system-design" target="_blank" rel="noopener">roadmap.sh/system-design</a>, the path this deck follows.</dd>
+        <dt>Primer</dt><dd><a href="https://github.com/donnemartin/system-design-primer" target="_blank" rel="noopener">System Design Primer</a>, a community-maintained overview with Anki decks.</dd>
+        <dt>Patterns</dt><dd><a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/" target="_blank" rel="noopener">Azure cloud design patterns</a>, the source for the patterns section.</dd>
+        <dt>Builders' Library</dt><dd><a href="https://aws.amazon.com/builders-library/" target="_blank" rel="noopener">AWS Builders' Library</a>: timeouts, retries, shuffle sharding and load shedding from practice.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>Papers worth an evening</h3>
+      <ul class="checks" style="margin-top:10px">
+        <li><b>Dynamo</b> (2007): the KV store design, from the source.</li>
+        <li><b>Bigtable</b> (2006) and <b>GFS</b> (2003): LSM and storage at scale.</li>
+        <li><b>Kafka</b> (2011): the log as a building block.</li>
+        <li><b>Raft</b> (2014): consensus you can explain.</li>
+        <li><b>Spanner</b> (2012): global consistency with TrueTime.</li>
+        <li><b>The Tail at Scale</b> (2013): why p99 dominates fan-out.</li>
+      </ul>
+    </div>
+  </div>
 </section>
 </main>
 
@@ -42005,7 +42221,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
         <p class="deeper"><b>Data:</b> PostgreSQL, schema per module, no cross-schema joins. <code>order_summary</code> read model for history, maintained by events. Redis for the price cache and rate limits. OpenSearch for search, fed by events. Partition the orders table by month once it passes tens of millions of rows.</p>
         <p class="deeper"><b>Scale the bottleneck:</b> "The bottleneck at 40× is the orders write path and the inventory hot rows." Queue the non-critical work; optimistic locking plus reservation TTL on inventory; scale workers separately from web; pre-warm and raise the cache TTL for the sale window; shed load at the gateway before the database gets there.</p>
         <p class="deeper"><b>Failure and ops:</b> Payment gateway down → circuit breaker, order accepted as <code>PAYMENT_PENDING</code> with a retry job, customer told honestly. WMS down → events queue, fulfilment lags, nothing lost. Kafka down → outbox rows accumulate, the database still serves checkout. SLO 99.9% on place-order with burn-rate alerts; trace id end to end; DLT depth and consumer lag alerted.</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="System context (C4 L1)" href="#deck/2">Deck · System context</a><a data-deck="deck" data-slide="The whole picture" href="#deck/67">Deck · The whole picture</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="System context (C4 L1)" href="#deck/2">Deck · System context</a><a data-deck="deck" data-slide="The whole picture" href="#deck/67">Deck · The whole picture</a><a data-deck="hld" data-slide="E-commerce: the checkout saga" href="#hld/136">HLD · The checkout saga</a></p>
       </div></div>
 
       <div class="q"><header><i>W2</i><h3>"We have a five-year-old monolith with 400 tables. Modernise it."</h3></header><div class="qb">
@@ -42027,7 +42243,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
         <p class="deeper"><b>Response:</b> <code>429 Too Many Requests</code> with <code>Retry-After</code>, plus remaining-quota headers (the common <code>X-RateLimit-*</code> convention, or the IETF RateLimit header fields draft), so well-behaved clients slow down before they hit the wall.</p>
         <p class="deeper"><b>Failure:</b> Decide deliberately what happens when Redis is down. For a protective limit, fail open to a coarse in-memory limiter on each instance (the limit divided by the instance count), so the limiter's store failing does not take the API down with it. For a contractual limit, you might fail closed. Across regions, give each region its share of the budget rather than making a synchronous cross-region check on every request.</p>
         <p class="deeper"><b>Operate it:</b> Keep limits in configuration, changeable without a deploy. Graph 429s per partner and alert when a top partner starts being limited, because that is often an incident on their side, or a bug on ours. Close with: "Partners should be able to see their own limits and usage. A rate limiter is part of the product, not only a defence."</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Gateway configuration" href="#deck/29">Deck · Gateway configuration</a><a data-deck="deck" data-slide="Resilience" href="#deck/31">Deck · Resilience</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Gateway configuration" href="#deck/29">Deck · Gateway configuration</a><a data-deck="deck" data-slide="Resilience" href="#deck/31">Deck · Resilience</a><a data-deck="hld" data-slide="Rate limiter: high-level design" href="#hld/98">HLD · Rate limiter design</a></p>
       </div></div>
 
       <div class="q"><header><i>W4</i><h3>"Design a flash sale: 10,000 units, 500,000 people, starting at noon"</h3></header><div class="qb">
@@ -42038,7 +42254,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
         <p class="deeper"><b>Idempotency and abuse:</b> A unique constraint on (customer, sale) and an idempotency key on the purchase request, so double clicks and retries cannot take two units. Limits per account and per device at the edge. Optionally, allow only accounts created before the sale was announced.</p>
         <p class="deeper"><b>Payment and failure:</b> Payment follows the reservation. If it fails or times out, the reservation is released back to the pool. When stock runs out, flip one flag that the CDN serves, so the sold-out page never touches the origin. Shed load at the gateway with a queue page rather than letting the database become the queue. Load-test at twice the forecast the week before, and have a kill switch.</p>
         <p class="deeper"><b>Close with the invariant:</b> "Every 'no' comes from the edge or from Redis in milliseconds. Only the ten thousand winners ever touch the database."</p>
-        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck/23">Deck · Concurrency and idempotency</a><a data-deck="deck" data-slide="Caching" href="#deck/36">Deck · Caching</a><a data-deck="sb" data-slide="Load testing" href="#springboot/54">Boot · Load testing</a></p>
+        <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Concurrency and idempotency" href="#deck/23">Deck · Concurrency and idempotency</a><a data-deck="deck" data-slide="Caching" href="#deck/36">Deck · Caching</a><a data-deck="sb" data-slide="Load testing" href="#springboot/54">Boot · Load testing</a><a data-deck="hld" data-slide="E-commerce: inventory without overselling" href="#hld/135">HLD · Inventory without overselling</a></p>
       </div></div>
 
       <div class="q"><header><i>W5</i><h3>"Checkout errors spiked ten minutes ago. You're on call. Talk me through it."</h3></header><div class="qb">
@@ -42118,6 +42334,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
           </tbody>
         </table>
       </div>
+      <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="hld" data-slide="Numbers to know" href="#hld/16">HLD · Numbers to know</a><a data-deck="hld" data-slide="The estimation method" href="#hld/17">HLD · The estimation method</a><a data-deck="hld" data-slide="Capacity rules of thumb" href="#hld/19">HLD · Capacity rules of thumb</a></p>
     </section>
 
 <!-- interview/015-stories.html -->
