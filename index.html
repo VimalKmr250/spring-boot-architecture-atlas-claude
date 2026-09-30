@@ -18601,6 +18601,707 @@ GET  /v1/rides/r_77  → status, driver, car, ETA   (+ push updates)</code></pre
   </div>
   <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Cells and deployment stamps" href="#hld/80">HLD · Cells and deployment stamps</a><a data-deck="hld" data-slide="Polling, SSE and WebSockets" href="#hld/28">HLD · Polling, SSE and WebSockets</a></p>
 </section>
+<!-- decks/hld/22-design-file-sync/01-requirements.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: requirements">
+  <h2>Design Dropbox: keep every device's folder identical, without re-sending what hasn't changed</h2>
+  <p class="dek">Users drop files into a folder, and the same folder appears on their other devices and on their collaborators' machines, with version history and offline edits. The estimate points at the key idea. Split files into content-addressed blocks so an edit re-sends only the changed block, and keep the small, transactional metadata completely separate from the enormous, immutable bytes.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 100 million daily users times 10 file changes is 1 billion changes a day, about 12 thousand a second, 35 thousand at peak, so metadata commits are the hot path. 500 million users times 10 gigabytes is about 5 exabytes logical; block-level dedup and compression save 30 percent or more, about 3 exabytes physical, in erasure-coded blob storage. A one-line edit to a 200 megabyte file uploads 200 megabytes naively, but only the changed 4 megabyte block with blocks, about 50 times less.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">100 M DAU × 10 changes</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">1 B changes/day ≈ 12 k/s</text><text x="140" y="125" font-size="9.5" opacity="0.75">(peak about 3×)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">~35 k commits/s peak</text><text x="140" y="190" font-weight="600">metadata is the hot path</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">500 M users × 10 GB</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 5 EB logical</text><text x="450" y="125" font-size="9.5" opacity="0.75">(dedup + compression save 30%+)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="173">≈ 3 EB physical</text><text x="450" y="190" font-weight="600">erasure-coded blob storage</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">1-line edit, 200 MB file</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">naive: re-upload 200 MB</text><text x="760" y="125" font-size="9.5" opacity="0.75">(slow on home uplinks)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">blocks: send one 4 MB block</text><text x="760" y="190" font-weight="600">≈ 50× less upload</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">small transactional metadata, separate from huge immutable content-addressed blocks</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Upload, download, and sync changes to all of a user's devices automatically.</li>
+      <li>Shared folders across users; version history and restore.</li>
+      <li>Work offline; sync when back online.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li><b>Never lose or corrupt data</b>: eleven nines of durability, with every block verified by hash.</li>
+      <li>Every device converges to the same state; changes propagate within seconds.</li>
+      <li>Frugal with bandwidth, battery and server storage.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Largest file size? (Tens of GB.) Mobile clients as well as desktop?</li>
+      <li>Real-time co-editing? No: that's a different design (OT or CRDTs).</li>
+      <li>How are conflicts handled: last writer wins, or keep both copies?</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/22-design-file-sync/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: API and data model">
+  <h2>A file is a list of block hashes; a change is an append to a per-namespace journal</h2>
+  <p class="dek">The client splits a file into blocks (about 4 MB) and hashes each one. It first asks which hashes the server lacks, uploads only those, then commits the new block list against the revision it started from. Every commit appends a row to an ordered journal for that namespace, a user's root or a shared folder. Other devices sync by reading the journal from their last cursor.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/blocks/check  { "hashes": ["a1f3…", "9c0e…", "77ab…"] }
+→ 200 { "missing": ["9c0e…"] }             # upload only what's new
+PUT  /v1/blocks/9c0e…   &lt;4 MB&gt;            # content-addressed, idempotent
+
+POST /v1/files/commit
+{ "ns": "ns_42", "path": "/docs/plan.key", "parentRev": 17,
+  "blocks": ["a1f3…", "9c0e…", "77ab…"], "size": 11534336 }
+→ 200 { "rev": 18 }
+→ 409 { "latestRev": 18 }                 # someone committed first
+
+GET  /v1/changes?ns=ns_42&amp;cursor=c_9912   → entries since cursor
+GET  /v1/notify?cursors=…                 # long-poll: "something changed"</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 340" role="img" aria-label="Data model. namespaces: namespace id, owner, kind user or shared. journal, append-only, keyed by namespace and sequence number: path, revision, deleted flag, block list of hashes, size, modification time and device. files_latest, keyed by namespace and path, holds the current revision and block list, materialised from the journal. blocks, keyed by SHA-256 hash: size, reference count and storage location. Blob storage holds 4 megabyte blocks addressed by hash. Each device keeps local state in SQLite: a cursor per namespace and, per path, the revision, block list and modification time.">
+          <rect x="10" y="14" width="190" height="62" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="32" font-size="10.5" font-weight="600" fill="currentColor">namespaces</text>
+          <line x1="10" y1="40" x2="200" y2="40" stroke="currentColor" stroke-opacity="0.25"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="56">ns_id PK · owner</text><text x="20" y="70">kind: user | shared</text></g>
+
+          <rect x="220" y="14" width="190" height="94" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="230" y="32" font-size="10.5" font-weight="600" fill="currentColor">journal (append-only)</text>
+          <line x1="220" y1="40" x2="410" y2="40" stroke="#D26A3F" stroke-opacity="0.4"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="56">(ns_id, seq) PK</text><text x="230" y="70">path · rev · deleted</text><text x="230" y="84">blocklist [h1, h2, …]</text><text x="230" y="98">size · mtime · device</text></g>
+
+          <rect x="10" y="100" width="190" height="62" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="118" font-size="10.5" font-weight="600" fill="currentColor">files_latest</text>
+          <line x1="10" y1="126" x2="200" y2="126" stroke="currentColor" stroke-opacity="0.25"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="142">(ns_id, path) PK</text><text x="20" y="156">rev · blocklist</text></g>
+
+          <rect x="220" y="134" width="190" height="62" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="230" y="152" font-size="10.5" font-weight="600" fill="currentColor">blocks</text>
+          <line x1="220" y1="160" x2="410" y2="160" stroke="currentColor" stroke-opacity="0.25"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="176">hash PK (SHA-256)</text><text x="230" y="190">size · refcount · location</text></g>
+
+          <path d="M250 232 a65 6 0 0 1 130 0 v44 a65 6 0 0 1 -130 0 z" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></path>
+          <path d="M250 232 a65 6 0 0 0 130 0" fill="none" stroke="#3AA79B"></path>
+          <text x="315" y="256" text-anchor="middle" font-size="10" fill="currentColor">blob storage</text><text x="315" y="270" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">4 MB blocks, by hash</text>
+
+          <rect x="10" y="200" width="200" height="76" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-dasharray="4 3"></rect>
+          <text x="20" y="218" font-size="10.5" font-weight="600" fill="currentColor">device (local SQLite)</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="238">cursor per namespace</text><text x="20" y="252">path → rev, blocklist,</text><text x="20" y="266">mtime, local hash</text></g>
+
+          <g stroke="#8A94A3" stroke-width="1.3"><line x1="200" y1="45" x2="217" y2="45" marker-end="url(#arw)"></line><line x1="220" y1="96" x2="203" y2="120" marker-end="url(#arw)"></line><line x1="315" y1="108" x2="315" y2="131" marker-end="url(#arw)"></line><line x1="315" y1="196" x2="315" y2="223" marker-end="url(#arw)"></line></g>
+          <g font-size="8.5" fill="currentColor" opacity="0.8"><text x="120" y="92">materialised</text><text x="322" y="124">references</text></g>
+          <text x="210" y="306" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">metadata: ~1 KB per file version, in sharded SQL;</text>
+          <text x="210" y="322" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">blocks: immutable, deduplicated, verified by hash on every read</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Content addressing</h4><p>A block's name is its hash, so uploads are idempotent (the same bytes give the same name), deduplication is automatic, and every read can be verified end to end. A version is just a new block list. Unchanged blocks are shared with the previous version at no cost.</p></div>
+    <div class="card"><h4>Blocks before commit</h4><p>Upload blocks first, then commit metadata. A commit that references a missing block is rejected. The journal therefore never points at bytes that don't exist, even when a client crashes halfway through an upload.</p></div>
+    <div class="card"><h4>Shard by namespace</h4><p>All journal rows for a namespace live on one shard, so a commit is a single-shard transaction and the sequence numbers are gap-free. Very large shared team folders are the hot keys to watch, and may need a dedicated shard.</p></div>
+  </div>
+</section>
+<!-- decks/hld/22-design-file-sync/03-high-level-design.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: high-level design">
+  <h2>Bytes through a block service, truth through a metadata service, and a poke to everyone else</h2>
+  <p class="dek">The client does much of the work: it watches the folder, chunks and hashes files, and keeps a local database of what it believes is synced. On the server, the block service stores immutable blocks in blob storage and the metadata service commits journal entries. A notification service tells other devices that a namespace changed. They then pull the changes and fetch any blocks they lack.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Device A runs a file watcher, a chunker and hasher, and a local state database. Step 1: it uploads missing blocks to the block service, which writes them to erasure-coded blob storage. Step 2: it commits the file's block list to the metadata service, which appends to the journal in the metadata database, sharded by namespace. Step 3: the metadata service publishes that the namespace changed to the notification service. Step 4: the notification service pokes other devices over held long-poll or WebSocket connections. Step 5: device B asks the metadata service for changes since its cursor. Step 6: it downloads the blocks it lacks from the block service.">
+        <rect x="20" y="96" width="130" height="118" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="85" y="116" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">device A</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="32" y="126" width="106" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect><text x="85" y="141">file watcher</text>
+          <rect x="32" y="154" width="106" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect><text x="85" y="169">chunk + hash</text>
+          <rect x="32" y="182" width="106" height="22" rx="3" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.7"></rect><text x="85" y="197">local state DB</text>
+        </g>
+
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="260" y="40" width="150" height="46" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="335" y="59" font-weight="600">metadata service</text><text x="335" y="74" font-size="8.5">check · commit · changes</text>
+          <rect x="260" y="220" width="150" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="335" y="239">block service</text><text x="335" y="254" font-size="8.5">put / get by hash</text>
+          <rect x="640" y="40" width="130" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="705" y="59">notification svc</text><text x="705" y="74" font-size="8.5" opacity="0.8">long-poll · WebSocket</text>
+          <rect x="760" y="150" width="120" height="54" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.45"></rect><text x="820" y="173" font-weight="600">device B</text><text x="820" y="189" font-size="8.5" opacity="0.75">and other devices</text>
+        </g>
+        <path d="M460 40 a55 6 0 0 1 110 0 v44 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M460 40 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="515" y="64" text-anchor="middle" font-size="10" fill="currentColor">metadata DB</text><text x="515" y="78" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">journal · by namespace</text>
+        <path d="M460 220 a55 6 0 0 1 110 0 v44 a55 6 0 0 1 -110 0 z" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></path>
+        <path d="M460 220 a55 6 0 0 0 110 0" fill="none" stroke="#3AA79B"></path>
+        <text x="515" y="244" text-anchor="middle" font-size="10" fill="currentColor">blob storage</text><text x="515" y="258" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">erasure-coded</text>
+
+        <g stroke="#D26A3F" stroke-width="1.6"><line x1="150" y1="200" x2="257" y2="238" marker-end="url(#arwA)"></line><line x1="150" y1="112" x2="257" y2="70" marker-end="url(#arwA)"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="410" y1="63" x2="457" y2="63" marker-end="url(#arw)"></line><line x1="410" y1="243" x2="457" y2="243" marker-end="url(#arw)"></line></g>
+        <path d="M335 40 V24 H705 V37" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="730" y1="86" x2="800" y2="147" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g stroke="#8A94A3" stroke-width="1.3" fill="none"><line x1="760" y1="170" x2="413" y2="84" marker-end="url(#arw)"></line><path d="M820 204 V298 H335 V269" marker-end="url(#arw)"></path></g>
+        <g font-size="9" fill="#D26A3F"><text x="150" y="246">1 upload missing</text><text x="150" y="258">blocks</text><text x="165" y="52">2 commit block list</text><text x="165" y="64">+ parentRev</text></g>
+        <text x="520" y="18" text-anchor="middle" font-size="9" fill="#3AA79B">3 "ns_42 changed" (pub/sub)</text>
+        <text x="772" y="112" font-size="9" fill="#3AA79B">4 poke</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="590" y="116">5 GET /changes?cursor</text><text x="600" y="292">6 download missing blocks</text></g>
+        <text x="810" y="238" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">LAN peers can serve</text><text x="810" y="250" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">blocks too (LAN sync)</text>
+      </svg>
+    </div>
+    <figcaption>The notification carries no data, only "namespace X changed". Every device then pulls from its own cursor, which makes sync idempotent and resumable: a device offline for a week catches up with exactly the same code path as one that missed a single poke.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>The client is half the system</h4><p>The watcher debounces bursts of events (an editor saving through a temp file and a rename). The local state database remembers the last synced revision and hash per path. That is how the client tells "I changed this" from "the server changed this", and how it avoids re-uploading after a restart.</p></div>
+    <div class="card"><h4>Notifications are cheap to hold</h4><p>Hundreds of millions of devices keep one long-poll or WebSocket open to the notification service, not to the metadata service. A commit publishes to a pub/sub channel per namespace, and only the notification servers holding subscribers wake up.</p></div>
+    <div class="card"><h4>Blocks and metadata scale apart</h4><p>Blob storage grows with bytes and is optimised for throughput and durability. The metadata tier grows with operations and is optimised for transactional commits. Different teams can scale, tune and fail over each one independently.</p></div>
+  </div>
+</section>
+<!-- decks/hld/22-design-file-sync/04-chunking-dedup-and-delta-sync.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: chunking, dedup and delta sync">
+  <h2>Deep dive 1: pick block boundaries so that an edit changes as few blocks as possible</h2>
+  <p class="dek">Delta sync works only if an edit leaves most block hashes untouched. Fixed 4 MB blocks manage that for in-place edits but fail badly on insertions, because every later boundary shifts. Content-defined chunking puts boundaries where the content itself has a certain pattern, so they move with the content and an insertion disturbs only the chunk it lands in.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Left, fixed-size blocks: version 1 is 8 blocks of 4 megabytes, h1 to h8. An edit inside block 4 changes only h4, so the server lacks only that block and the client uploads 4 megabytes rather than 32. But inserting one byte at the start shifts every boundary, and all 8 hashes change. Right, content-defined chunking: boundaries are placed where a rolling hash over the last 48 bytes matches a pattern, giving variable-size chunks c1 to c7. Inserting a byte at the start changes only c1; deleting a paragraph in chunk 5 changes only c5. Boundaries move with the content, so only the edited chunk changes.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Fixed-size blocks</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="20" y="36">v1: 8 × 4 MB</text><text x="20" y="92">edit inside block 4</text><text x="20" y="166">insert 1 byte at the start</text></g>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="20" y="42" width="50" height="24"></rect><rect x="70" y="42" width="50" height="24"></rect><rect x="120" y="42" width="50" height="24"></rect><rect x="170" y="42" width="50" height="24"></rect><rect x="220" y="42" width="50" height="24"></rect><rect x="270" y="42" width="50" height="24"></rect><rect x="320" y="42" width="50" height="24"></rect><rect x="370" y="42" width="50" height="24"></rect>
+        </g>
+        <g stroke="#3AA79B" stroke-opacity="0.6" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="20" y="98" width="50" height="24"></rect><rect x="70" y="98" width="50" height="24"></rect><rect x="120" y="98" width="50" height="24"></rect><rect x="220" y="98" width="50" height="24"></rect><rect x="270" y="98" width="50" height="24"></rect><rect x="320" y="98" width="50" height="24"></rect><rect x="370" y="98" width="50" height="24"></rect>
+        </g>
+        <rect x="170" y="98" width="50" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g stroke="#D26A3F" fill="#D26A3F" fill-opacity="0.35">
+          <rect x="20" y="172" width="50" height="24"></rect><rect x="70" y="172" width="50" height="24"></rect><rect x="120" y="172" width="50" height="24"></rect><rect x="170" y="172" width="50" height="24"></rect><rect x="220" y="172" width="50" height="24"></rect><rect x="270" y="172" width="50" height="24"></rect><rect x="320" y="172" width="50" height="24"></rect><rect x="370" y="172" width="50" height="24"></rect>
+        </g>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="45" y="58">h1</text><text x="95" y="58">h2</text><text x="145" y="58">h3</text><text x="195" y="58">h4</text><text x="245" y="58">h5</text><text x="295" y="58">h6</text><text x="345" y="58">h7</text><text x="395" y="58">h8</text>
+          <text x="45" y="114">h1</text><text x="95" y="114">h2</text><text x="145" y="114">h3</text><text x="195" y="114" font-weight="600">h4'</text><text x="245" y="114">h5</text><text x="295" y="114">h6</text><text x="345" y="114">h7</text><text x="395" y="114">h8</text>
+          <text x="45" y="188">h1'</text><text x="95" y="188">h2'</text><text x="145" y="188">h3'</text><text x="195" y="188">h4'</text><text x="245" y="188">h5'</text><text x="295" y="188">h6'</text><text x="345" y="188">h7'</text><text x="395" y="188">h8'</text>
+        </g>
+        <text x="220" y="144" text-anchor="middle" font-size="9.5" fill="currentColor">server lacks only h4' → upload 4 MB, not 32 MB</text>
+        <text x="220" y="218" text-anchor="middle" font-size="9.5" fill="#D26A3F">every boundary shifts, so every block looks new</text>
+        <text x="220" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">fine for in-place edits (databases, disk images)</text>
+
+        <line x1="450" y1="10" x2="450" y2="252" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Content-defined chunking</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="470" y="36">v1: cut where the content says so</text><text x="470" y="92">insert 1 byte at the start</text><text x="470" y="166">delete a paragraph in chunk 5</text></g>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="470" y="42" width="60" height="24"></rect><rect x="530" y="42" width="40" height="24"></rect><rect x="570" y="42" width="70" height="24"></rect><rect x="640" y="42" width="50" height="24"></rect><rect x="690" y="42" width="65" height="24"></rect><rect x="755" y="42" width="45" height="24"></rect><rect x="800" y="42" width="55" height="24"></rect>
+        </g>
+        <rect x="470" y="98" width="61" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g stroke="#3AA79B" stroke-opacity="0.6" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="531" y="98" width="40" height="24"></rect><rect x="571" y="98" width="70" height="24"></rect><rect x="641" y="98" width="50" height="24"></rect><rect x="691" y="98" width="65" height="24"></rect><rect x="756" y="98" width="45" height="24"></rect><rect x="801" y="98" width="55" height="24"></rect>
+          <rect x="470" y="172" width="60" height="24"></rect><rect x="530" y="172" width="40" height="24"></rect><rect x="570" y="172" width="70" height="24"></rect><rect x="640" y="172" width="50" height="24"></rect><rect x="730" y="172" width="45" height="24"></rect><rect x="775" y="172" width="55" height="24"></rect>
+        </g>
+        <rect x="690" y="172" width="40" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="500" y="58">c1</text><text x="550" y="58">c2</text><text x="605" y="58">c3</text><text x="665" y="58">c4</text><text x="722" y="58">c5</text><text x="777" y="58">c6</text><text x="827" y="58">c7</text>
+          <text x="500" y="114" font-weight="600">c1'</text><text x="551" y="114">c2</text><text x="606" y="114">c3</text><text x="666" y="114">c4</text><text x="723" y="114">c5</text><text x="778" y="114">c6</text><text x="828" y="114">c7</text>
+          <text x="500" y="188">c1</text><text x="550" y="188">c2</text><text x="605" y="188">c3</text><text x="665" y="188">c4</text><text x="710" y="188" font-weight="600">c5'</text><text x="752" y="188">c6</text><text x="802" y="188">c7</text>
+        </g>
+        <text x="675" y="144" text-anchor="middle" font-size="9.5" fill="currentColor">cut where a rolling hash of the last 48 bytes hits a pattern</text>
+        <text x="675" y="218" text-anchor="middle" font-size="9.5" fill="#D26A3F">boundaries move with the content: only the edited chunk changes</text>
+        <text x="675" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">Rabin or FastCDC; used by backup tools such as restic and borg</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Dedup, and its privacy catch</h4><p>Identical blocks are stored once, with a reference count, across files and versions. Deduplicating <em>across users</em> saves more but leaks information: if an upload is skipped, the file already exists somewhere. Many services therefore deduplicate only within an account or namespace.</p></div>
+    <div class="card"><h4>Pipeline the upload</h4><p>Hash, compress and upload blocks concurrently as a stream, rather than one file at a time. Progress is recorded in the local database, so a crash or reboot resumes where it stopped. A 20 GB file commits once, after its last block is stored.</p></div>
+    <div class="card"><h4>Delta on the way down, too</h4><p>A downloading device first checks which of the new version's hashes it already has, from the previous version or another file, and fetches only the rest. It assembles the new file in a temporary path and renames it atomically, so a half-written file never appears.</p></div>
+  </div>
+</section>
+<!-- decks/hld/22-design-file-sync/05-journal-conflicts-and-notifications.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: journal, conflicts and notifications">
+  <h2>Deep dive 2: an ordered journal and cursors for sync, parent revisions for conflicts</h2>
+  <p class="dek">Metadata consistency rests on one structure: an append-only, gap-free journal per namespace. A device is always "caught up to seq N". Being told something changed only prompts it to pull from its cursor. Concurrent edits are caught with optimistic concurrency. A commit names the revision it started from, and if that's no longer the latest, the server refuses and the client keeps both copies.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: the journal for one namespace holds entries 14 add a.txt, 15 edit b.md, 16 delete c.png, 17 edit plan.key, 18 edit plan.key, and a slot for 19. The laptop's cursor is at 18, the phone's at 15, so the phone pulls 16 to 18. A commit appends seq plus one in one transaction, and cursors make sync gap-free, resumable and idempotent. The phone holds a long-poll to the notification service asking about cursor 15, which returns as soon as the sequence passes 15; the poke carries no data. Right: laptop and phone both edit plan.key from revision 17. The laptop commits with parent 17 and gets revision 18. The phone commits with parent 17 and gets 409, latest is 18. The phone renames its local file to a conflicted copy, downloads revision 18, and commits the copy under its new path. Binary files cannot be merged, so never pick a winner silently.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">One ordered journal per namespace</text>
+        <g font-size="9" text-anchor="middle"><text x="119" y="32" fill="#3AA79B">phone</text><text x="317" y="32" fill="#D26A3F">laptop</text></g>
+        <line x1="119" y1="35" x2="119" y2="47" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <line x1="317" y1="35" x2="317" y2="47" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="20" y="50" width="66" height="46"></rect><rect x="86" y="50" width="66" height="46"></rect><rect x="152" y="50" width="66" height="46"></rect><rect x="218" y="50" width="66" height="46"></rect><rect x="284" y="50" width="66" height="46"></rect>
+        </g>
+        <rect x="350" y="50" width="66" height="46" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle">
+          <text x="53" y="66" font-weight="600">14</text><text x="53" y="79">add</text><text x="53" y="91">a.txt</text>
+          <text x="119" y="66" font-weight="600">15</text><text x="119" y="79">edit</text><text x="119" y="91">b.md</text>
+          <text x="185" y="66" font-weight="600">16</text><text x="185" y="79">delete</text><text x="185" y="91">c.png</text>
+          <text x="251" y="66" font-weight="600">17</text><text x="251" y="79">edit</text><text x="251" y="91">plan.key</text>
+          <text x="317" y="66" font-weight="600">18</text><text x="317" y="79">edit</text><text x="317" y="91">plan.key</text>
+          <text x="383" y="66" opacity="0.6">19</text><text x="383" y="84" opacity="0.6">next</text>
+        </g>
+        <path d="M154 102 V108 H348 V102" fill="none" stroke="#3AA79B" stroke-width="1.4"></path>
+        <text x="251" y="124" text-anchor="middle" font-size="9" fill="#3AA79B">phone pulls 16–18 from its cursor</text>
+        <text x="220" y="150" text-anchor="middle" font-size="9.5" fill="currentColor">commit = append (ns, seq + 1) in one transaction</text>
+        <text x="220" y="166" text-anchor="middle" font-size="9.5" fill="currentColor">cursors make sync gap-free, resumable and idempotent</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="192" width="80" height="34" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="60" y="213">phone</text>
+          <rect x="250" y="192" width="160" height="34" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="330" y="213">notification svc</text>
+        </g>
+        <line x1="100" y1="202" x2="247" y2="202" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="250" y1="218" x2="103" y2="218" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="175" y="197" text-anchor="middle" font-size="8.5" fill="currentColor" font-family="IBM Plex Mono, monospace">GET /notify?cursor=15</text>
+        <text x="175" y="238" text-anchor="middle" font-size="8.5" fill="#3AA79B">held ~60 s; returns once seq &gt; 15</text>
+        <text x="220" y="270" text-anchor="middle" font-size="9.5" fill="#D26A3F">the poke carries no data: every device pulls from its own cursor</text>
+
+        <line x1="450" y1="10" x2="450" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Concurrent edits: detect, keep both</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="475" y="28" width="90" height="24" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="520" y="44">laptop</text>
+          <rect x="630" y="28" width="90" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.3"></rect><text x="675" y="44">metadata svc</text>
+          <rect x="785" y="28" width="90" height="24" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="830" y="44">phone</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="3 3"><line x1="520" y1="52" x2="520" y2="236"></line><line x1="675" y1="52" x2="675" y2="236"></line><line x1="830" y1="52" x2="830" y2="236"></line></g>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="520" y1="76" x2="672" y2="76" marker-end="url(#arwA)"></line><line x1="830" y1="124" x2="678" y2="124" marker-end="url(#arwA)"></line><line x1="830" y1="226" x2="678" y2="226" marker-end="url(#arwA)"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="4 3"><line x1="675" y1="96" x2="523" y2="96" marker-end="url(#arw)"></line><line x1="675" y1="144" x2="827" y2="144" marker-end="url(#arw)"></line></g>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle">
+          <text x="597" y="71">commit plan.key, parent 17</text>
+          <text x="597" y="91">200 · rev 18</text>
+          <text x="752" y="119">commit plan.key, parent 17</text>
+          <text x="752" y="139" fill="#D26A3F" font-weight="600">409 · latest is 18</text>
+          <text x="752" y="221">commit the copy (new path)</text>
+        </g>
+        <rect x="696" y="156" width="192" height="50" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <g font-size="8.5" fill="currentColor"><text x="704" y="171">rename local file to</text><text x="704" y="184" font-family="IBM Plex Mono, monospace">plan (phone's conflicted copy).key</text><text x="704" y="198">then download rev 18</text></g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="currentColor">binary files can't be merged: never pick a winner silently</text>
+        <text x="675" y="274" text-anchor="middle" font-size="9.5" fill="#D26A3F">optimistic concurrency via parentRev; the user resolves</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why not last-writer-wins?</h4><p>LWW by timestamp silently discards someone's work, and device clocks disagree anyway. Revision numbers assigned by the server give a total order per file. <code>parentRev</code> detects the conflict exactly, and "keep both" guarantees nothing is lost. Text formats could be merged, but only by apps that understand them.</p></div>
+    <div class="card"><h4>Moves and deletes are edits too</h4><p>A rename is recorded as one journal entry (old path to new path), not a delete plus an add, so clients move the local file instead of re-downloading it. A delete keeps the old blocks for the retention window, which is what makes restore possible.</p></div>
+    <div class="card"><h4>Garbage-collect carefully</h4><p>When no version references a block any more, its refcount reaches zero, but don't delete it immediately: an in-flight commit may be about to reference it. Mark-and-sweep with a grace period (days) is the safe pattern. An accidental block deletion means permanent data loss.</p></div>
+  </div>
+</section>
+<!-- decks/hld/22-design-file-sync/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · File sync" data-title="File sync: trade-offs and follow-ups">
+  <h2>Pay for durability with erasure codes, and treat big shared folders as hot keys</h2>
+  <p class="dek">At exabyte scale, storage overhead dominates the budget: three full replicas cost more than twice the raw disk of an erasure-coded layout with better fault tolerance. On the metadata side, the sharp edge is fan-out. One busy team folder with tens of thousands of members turns every commit into tens of thousands of pokes, unless notifications are coalesced.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: durability. Three-times replication stores three full copies, 3.0 times raw storage, survives 2 losses and repairs cheaply; use it for new, hot blocks. Reed-Solomon 10 plus 4 erasure coding stores 10 data and 4 parity fragments across zones, 1.4 times raw storage, survives any 4 losses but repair reads 10 fragments; re-encode blocks after a few days. Right: a team folder with 50 thousand members receives 100 commits in 10 seconds. Poking every device per commit means 5 million pokes and 5 million change requests in 10 seconds. Coalescing to at most one poke per device every 2 seconds with jittered pulls needs about 250 thousand, because each pull returns many entries. Shard metadata by namespace and move the hottest namespaces to dedicated shards.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Replicate hot blocks, erasure-code the rest</text>
+        <text x="20" y="40" font-size="9" fill="currentColor" opacity="0.85">3× replication (new blocks)</text>
+        <g stroke="#D26A3F" fill="#D26A3F" fill-opacity="0.3"><rect x="20" y="46" width="34" height="26"></rect><rect x="60" y="46" width="34" height="26"></rect><rect x="100" y="46" width="34" height="26"></rect></g>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle"><text x="37" y="63">A</text><text x="77" y="63">A</text><text x="117" y="63">A</text></g>
+        <text x="150" y="63" font-size="9" fill="currentColor">3.0× raw · survives 2 losses · cheap repair</text>
+        <text x="20" y="98" font-size="9" fill="currentColor" opacity="0.85">erasure coding RS(10, 4), after a few days</text>
+        <g stroke="#3AA79B" fill="#3AA79B" fill-opacity="0.22">
+          <rect x="20" y="104" width="24" height="26"></rect><rect x="48" y="104" width="24" height="26"></rect><rect x="76" y="104" width="24" height="26"></rect><rect x="104" y="104" width="24" height="26"></rect><rect x="132" y="104" width="24" height="26"></rect><rect x="160" y="104" width="24" height="26"></rect><rect x="188" y="104" width="24" height="26"></rect><rect x="216" y="104" width="24" height="26"></rect><rect x="244" y="104" width="24" height="26"></rect><rect x="272" y="104" width="24" height="26"></rect>
+        </g>
+        <g stroke="#D26A3F" stroke-dasharray="3 2" fill="#D26A3F" fill-opacity="0.12"><rect x="300" y="104" width="24" height="26"></rect><rect x="328" y="104" width="24" height="26"></rect><rect x="356" y="104" width="24" height="26"></rect><rect x="384" y="104" width="24" height="26"></rect></g>
+        <g font-size="8" fill="currentColor" text-anchor="middle"><text x="32" y="121">d1</text><text x="284" y="121">d10</text><text x="312" y="121">p1</text><text x="396" y="121">p4</text></g>
+        <text x="20" y="150" font-size="9" fill="currentColor">1.4× raw · survives any 4 losses · repair reads 10 fragments</text>
+        <g font-size="9" fill="currentColor"><text x="20" y="188">replication</text><text x="20" y="212">RS(10, 4)</text></g>
+        <rect x="100" y="177" width="300" height="14" fill="#D26A3F" fill-opacity="0.5"></rect><text x="406" y="188" font-size="9" fill="currentColor">3.0×</text>
+        <rect x="100" y="201" width="140" height="14" fill="#3AA79B" fill-opacity="0.55"></rect><text x="246" y="212" font-size="9" fill="currentColor">1.4×</text>
+        <text x="220" y="244" text-anchor="middle" font-size="9.5" fill="#D26A3F">at exabytes, 3.0× vs 1.4× is most of the hardware bill</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">spread fragments across zones so a whole zone can fail</text>
+
+        <line x1="450" y1="10" x2="450" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Hot namespaces: coalesce the fan-out</text>
+        <rect x="560" y="30" width="230" height="42" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="675" y="47" text-anchor="middle" font-size="10" fill="currentColor">team folder · 50 k members</text><text x="675" y="62" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">100 commits in 10 s</text>
+        <line x1="675" y1="72" x2="675" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="470" y="106" font-size="9" fill="currentColor" opacity="0.85">naive: one poke per member per commit</text>
+        <rect x="470" y="112" width="410" height="22" fill="#D26A3F" fill-opacity="0.45"></rect>
+        <text x="480" y="127" font-size="9.5" fill="currentColor">5 M pokes → 5 M /changes calls in 10 s</text>
+        <text x="470" y="158" font-size="9" fill="currentColor" opacity="0.85">coalesce: ≤ 1 poke per device per 2 s, jittered pulls</text>
+        <rect x="470" y="164" width="21" height="22" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <text x="498" y="179" font-size="9.5" fill="currentColor" font-weight="600">≈ 250 k, each pull returns many entries</text>
+        <text x="675" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">cost now scales with devices, not with commits</text>
+        <text x="675" y="232" text-anchor="middle" font-size="9.5" fill="currentColor">shard metadata by namespace; isolate the hottest</text>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">big shared folders are the hot keys of file sync</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Smart / selective sync</td><td>Show placeholders for cloud-only files and fetch blocks on open; sync only the selected folders to small disks.</td></tr>
+          <tr><td>Encryption</td><td>At rest per block with keys in a KMS, TLS in transit. End-to-end encryption on the client disables server-side dedup, preview and search.</td></tr>
+          <tr><td>Version retention</td><td>Keep journal entries and blocks for 30–180 days by plan; restore is "commit an old block list as new".</td></tr>
+          <tr><td>Mobile</td><td>No constant background sync: upload the camera roll on Wi-Fi and charging; fetch on demand.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Clients chunk and hash files, upload only the blocks the server lacks, and commit a block list against a parent revision. Metadata is an append-only journal per namespace in sharded SQL, and devices sync from cursors after data-free pokes. Conflicts keep both copies. Blocks are content-addressed and deduplicated, replicated while hot and erasure-coded after that."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Object storage" href="#hld/41">HLD · Object storage</a><a data-deck="hld" data-slide="Hot keys and resharding" href="#hld/37">HLD · Hot keys and resharding</a></p>
+</section>
+<!-- decks/hld/23-design-kv-store/01-requirements.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: requirements">
+  <h2>Design a distributed key-value store: always writable, horizontally scalable, tunably consistent</h2>
+  <p class="dek">This is the question that tests the whole fundamentals section at once. Build <code>get</code> and <code>put</code> over hundreds of nodes, with no single point of failure, surviving node and network failures, and letting each caller trade consistency against latency. The standard answer is the Dynamo recipe, used in Cassandra, Riak and DynamoDB's ancestors: partition with consistent hashing, replicate N ways, coordinate with quorums, and repair in the background.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million operations a second, half reads and half writes: each write lands on 3 replicas and each quorum read touches 2, about 2.5 million replica operations a second, about 125 nodes at 20 thousand operations a second each. Ten billion keys of 1 kilobyte is 10 terabytes, times 3 replicas is 30 terabytes, plus compaction headroom about 50 terabytes of SSD, about 400 gigabytes per node. p99 under 10 milliseconds and always writable during a partition, as for a shopping cart, which means an AP design with tunable consistency: N, R and W per request.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M ops/s, half writes</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">writes × 3 replicas, reads × 2</text><text x="140" y="125" font-size="9.5" opacity="0.75">(≈ 2.5 M replica ops/s)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">÷ 20 k ops/s per node</text><text x="140" y="190" font-weight="600">≈ 125 nodes</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">10 B keys × 1 KB</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">10 TB × RF 3 = 30 TB</text><text x="450" y="125" font-size="9.5" opacity="0.75">(+ compaction headroom)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="173">≈ 50 TB of SSD</text><text x="450" y="190" font-weight="600">≈ 400 GB per node</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">p99 &lt; 10 ms</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">writable during a partition</text><text x="760" y="125" font-size="9.5" opacity="0.75">(shopping-cart style: AP)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">tunable consistency</text><text x="760" y="190" font-weight="600">N, R, W per request</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">partitioned, replicated, leaderless, self-healing: the Dynamo recipe</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li><code>get(key)</code>, <code>put(key, value)</code>, <code>delete(key)</code>; optional TTL.</li>
+      <li>Values are opaque bytes, up to about 1 MB.</li>
+      <li>Consistency chosen per request (ONE, QUORUM, ALL).</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>No single point of failure; add or remove nodes while serving.</li>
+      <li>Highly available for writes, even during partitions.</li>
+      <li>Durable once acknowledged; self-repairing replicas.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Is strong consistency ever needed, or is eventual with a quorum enough?</li>
+      <li>Range scans? If not, hash partitioning; if so, range partitioning.</li>
+      <li>One datacenter or several? LWW acceptable, or keep siblings?</li>
+    </ul></div>
+  </div>
+</section>
+<!-- decks/hld/23-design-kv-store/02-api-and-data-model.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: API and data model">
+  <h2>Three calls, and a hidden context that makes conflicts detectable</h2>
+  <p class="dek">The API is deliberately tiny. The subtle part is the <b>context</b>: a version (a vector clock) returned by <code>get</code> and passed back on <code>put</code>, so the store knows which version a write was based on. Placement is pure computation. Hash the key to a token, and the next N distinct nodes clockwise on the ring are its replicas. No lookup service is needed.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-python">get(key, consistency=QUORUM)
+    -> [(value, context), ...]      # >1 entry = concurrent siblings
+put(key, value, context=None, consistency=QUORUM, ttl=None)
+    -> context'                     # context from a prior get
+delete(key, context)                # writes a tombstone, not a hole
+
+# per request: ONE | QUORUM | ALL   (N fixed per keyspace, e.g. 3)</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">placement</div>
+<pre><code class="language-python">token = murmur3(key)                # 64-bit position on the ring
+replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Placement: the key user:42:cart is hashed with Murmur3 to a token on the ring. The ring has nodes A to F. Walking clockwise from the token, the first three distinct nodes, B, C and D, form the preference list and hold the replicas. Each replica stores the key, the value as opaque bytes up to 1 megabyte, a vector clock such as B 3 and C 1, a write timestamp and optional TTL, and a tombstone flag for deletes.">
+          <g font-size="9.5" fill="currentColor">
+            <rect x="10" y="14" width="200" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="20" y="33" font-family="IBM Plex Mono, monospace">key: user:42:cart</text>
+            <rect x="10" y="64" width="200" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="20" y="83" font-family="IBM Plex Mono, monospace">murmur3 → token 0x7a3f…</text>
+            <rect x="10" y="114" width="200" height="30" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.3"></rect><text x="20" y="133">preference list: B, C, D</text>
+          </g>
+          <g stroke="#8A94A3" stroke-width="1.2"><line x1="110" y1="44" x2="110" y2="61" marker-end="url(#arw)"></line><line x1="110" y1="94" x2="110" y2="111" marker-end="url(#arw)"></line></g>
+          <circle cx="315" cy="95" r="62" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5"></circle>
+          <circle cx="346" cy="41.3" r="4" fill="#D26A3F"></circle><text x="354" y="32" font-size="8.5" fill="#D26A3F" font-family="IBM Plex Mono, monospace">token</text>
+          <path d="M348 42.4 A62 62 0 0 1 325.8 156.1" fill="none" stroke="#D26A3F" stroke-width="2.5" stroke-opacity="0.5"></path>
+          <g font-size="10" text-anchor="middle" fill="currentColor">
+            <circle cx="315" cy="33" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="315" y="37">A</text>
+            <circle cx="368.7" cy="64" r="14" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.4"></circle><text x="368.7" y="68" font-weight="600">B</text>
+            <circle cx="368.7" cy="126" r="14" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.4"></circle><text x="368.7" y="130" font-weight="600">C</text>
+            <circle cx="315" cy="157" r="14" fill="#D26A3F" fill-opacity="0.22" stroke="#D26A3F" stroke-width="1.4"></circle><text x="315" y="161" font-weight="600">D</text>
+            <circle cx="261.3" cy="126" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="261.3" y="130">E</text>
+            <circle cx="261.3" cy="64" r="14" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="261.3" y="68">F</text>
+          </g>
+          <text x="315" y="99" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">clockwise</text>
+
+          <rect x="10" y="194" width="400" height="84" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="212" font-size="10.5" font-weight="600" fill="currentColor">stored on each replica</text>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="230">key · value (opaque bytes, ≤ 1 MB)</text><text x="20" y="244">vector clock [(B, 3), (C, 1)]</text><text x="20" y="258">write timestamp · TTL</text><text x="20" y="272">tombstone flag (deletes)</text></g>
+          <text x="210" y="302" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">any node can compute placement locally from the ring,</text>
+          <text x="210" y="318" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">which every node learns by gossip</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Virtual nodes</h4><p>Each physical node owns many small token ranges (vnodes, e.g. 16–256) scattered around the ring rather than one big arc. Load evens out, a joining node takes small slices from everyone, and a failed node's load spreads across the cluster instead of landing on one neighbour.</p></div>
+    <div class="card"><h4>Rack- and zone-aware replicas</h4><p>Walking clockwise, skip nodes in a rack or zone that already holds a replica. Three replicas in three availability zones means a whole zone can go down and every key still has two live copies, enough for QUORUM.</p></div>
+    <div class="card"><h4>Deletes are writes</h4><p>A delete writes a tombstone that replicates like any value. If replicas simply dropped the key, a replica that missed the delete would "resurrect" it during repair. Tombstones are purged after a grace period (for example 10 days) longer than any repair cycle.</p></div>
+  </div>
+</section>
+<!-- decks/hld/23-design-kv-store/03-high-level-design.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: high-level design">
+  <h2>A ring of identical nodes: any one coordinates, N replicate, W or R must answer</h2>
+  <p class="dek">There is no master. A client, or a partition-aware driver, sends a request to any node, and that node coordinates. It computes the key's replicas from the ring, forwards the request to all N, and replies as soon as W acknowledge a write or R answer a read. Every node runs the same stack, so the cluster grows by adding identical machines.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="A ring of eight nodes A to H. The client sends put of k and v to node G, which acts as coordinator. The key's token falls just after A, so its replicas are B, C and D. G forwards the write to B, C and D and acknowledges the client once 2 of them have acknowledged; D may be late. With N equal to 3, W equal to 2 and R equal to 2, W plus R is greater than N, so every read quorum overlaps the latest write quorum. Each node runs the same stack: a request coordinator, an LSM storage engine with commit log, memtable and SSTables, gossip with a failure detector, hinted handoff for replicas that are down, and anti-entropy repair with Merkle trees.">
+        <circle cx="330" cy="165" r="112" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5"></circle>
+        <path d="M373.8 61.9 A112 112 0 0 1 409.2 244.2" fill="none" stroke="#D26A3F" stroke-width="3" stroke-opacity="0.35"></path>
+        <circle cx="373.8" cy="61.9" r="4" fill="#D26A3F"></circle>
+        <text x="356" y="40" font-size="9" fill="#D26A3F" font-family="IBM Plex Mono, monospace">token(k)</text>
+
+        <g font-size="11" text-anchor="middle" fill="currentColor">
+          <circle cx="330" cy="53" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="330" y="57">A</text>
+          <circle cx="409.2" cy="85.8" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="409.2" y="89.8" font-weight="600">B</text>
+          <circle cx="442" cy="165" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="442" y="169" font-weight="600">C</text>
+          <circle cx="409.2" cy="244.2" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="409.2" y="248.2" font-weight="600">D</text>
+          <circle cx="330" cy="277" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="330" y="281">E</text>
+          <circle cx="250.8" cy="244.2" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="250.8" y="248.2">F</text>
+          <circle cx="218" cy="165" r="20" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.6"></circle><text x="218" y="169" font-weight="600">G</text>
+          <circle cx="250.8" cy="85.8" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="250.8" y="89.8">H</text>
+        </g>
+        <text x="218" y="200" text-anchor="middle" font-size="9" fill="#3AA79B">coordinator</text>
+
+        <rect x="20" y="142" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="162" text-anchor="middle" font-size="10" fill="currentColor">client</text><text x="65" y="176" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">or smart driver</text>
+        <line x1="110" y1="165" x2="195" y2="165" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="152" y="158" text-anchor="middle" font-size="9" fill="#D26A3F">1 put(k, v)</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="236" y1="156" x2="388" y2="94" marker-end="url(#arwA)"></line><line x1="238" y1="165" x2="419" y2="165" marker-end="url(#arwA)"></line></g>
+        <line x1="235" y1="175" x2="390" y2="236" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="322" y="150" font-size="9" fill="#D26A3F">2 write to B, C, D</text>
+        <g font-size="9" fill="currentColor"><text x="20" y="214" fill="#D26A3F">3 ack after W = 2</text><text x="20" y="228" opacity="0.75">(D may answer late: fine)</text></g>
+        <g font-size="9.5" fill="currentColor"><text x="20" y="266" font-weight="600">N = 3 · W = 2 · R = 2</text><text x="20" y="282">W + R &gt; N: each read quorum</text><text x="20" y="296">overlaps the last write quorum</text></g>
+
+        <line x1="462" y1="165" x2="597" y2="165" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3"></line>
+        <text x="530" y="158" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">inside every node</text>
+        <text x="745" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">the same stack on every node</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="600" y="30" width="290" height="46" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="612" y="49" font-weight="600">request coordinator</text><text x="612" y="65" font-size="8.5" opacity="0.85">route by ring, fan out to N, wait for W or R</text>
+          <rect x="600" y="84" width="290" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="612" y="103" font-weight="600">storage engine (LSM)</text><text x="612" y="119" font-size="8.5" opacity="0.85">commit log → memtable → SSTables</text>
+          <rect x="600" y="138" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="157" font-weight="600">gossip + failure detector</text><text x="612" y="173" font-size="8.5" opacity="0.85">membership and ring state; phi-accrual suspicion</text>
+          <rect x="600" y="192" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="211" font-weight="600">hinted handoff</text><text x="612" y="227" font-size="8.5" opacity="0.85">hold writes for a replica that is down, replay later</text>
+          <rect x="600" y="246" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="265" font-weight="600">anti-entropy repair</text><text x="612" y="281" font-size="8.5" opacity="0.85">Merkle trees find divergent key ranges</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The copper arc is the key's preference list: walk clockwise from its token and take the first N distinct nodes. The coordinator, G here, doesn't need to be a replica, but smart drivers usually send the request straight to one to save a hop.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Membership by gossip</h4><p>Every second, each node exchanges its view of the cluster (who's up, which tokens they own, their heartbeat counters) with a few random peers. Changes reach all nodes in O(log n) rounds, with no central registry to fail. Seed nodes only help new nodes join.</p></div>
+    <div class="card"><h4>Failure detection is a suspicion level</h4><p>Instead of a fixed timeout, a phi-accrual detector turns the heartbeat inter-arrival history into a suspicion level. That adapts to slow networks. A suspected node is routed around, and no data moves until an operator or a policy decides it is permanently gone.</p></div>
+    <div class="card"><h4>Adding a node</h4><p>A new node takes vnode ranges from existing owners and streams those ranges in the background while the old owners keep serving. Only about 1/n of the data moves (n nodes), which is the whole point of consistent hashing compared with <code>hash mod N</code>.</p></div>
+  </div>
+</section>
+<!-- decks/hld/23-design-kv-store/04-quorums-handoff-and-versions.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: quorums, handoff and versions">
+  <h2>Deep dive 1: overlapping quorums, writes that survive a down replica, and versions that expose conflicts</h2>
+  <p class="dek">Three mechanisms define how the store behaves under failure. Quorum overlap (W + R &gt; N) makes a read see the latest acknowledged write. A sloppy quorum with hinted handoff keeps writes available when a replica is down. Vector clocks tell "newer" apart from "concurrent", so the store never silently throws away one side of a conflict.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: quorum overlap. Replicas B and C acknowledged the write of v2, so W is 2; D still has v1. A read with R equal to 2 asks C and D. Because W plus R is greater than N, the sets share a node: C returns v2, the coordinator returns v2 and repairs D in the background. With W and R of 1 reads can be stale. Middle: sloppy quorum. Replica C is down, so the coordinator writes to B, D and E; E stores the write with a hint that it belongs to C. When C comes back, E replays the write and drops the hint. Writes stay available, but the quorum counted a non-owner. Right: vector clocks. From v1 with clock A 1, client 1 writes via A giving A 2, and client 2 writes via B giving A 1, B 1. Neither dominates, so they are siblings; a get returns both, the client merges them, for a cart the union of items, and writes v3 with clock A 2, B 1, C 1. Last-writer-wins would silently lose one.">
+        <text x="150" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Quorum overlap</text>
+        <rect x="38" y="64" width="146" height="72" rx="30" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="118" y="72" width="146" height="56" rx="26" fill="none" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4"></rect>
+        <g font-size="10" text-anchor="middle" fill="currentColor">
+          <circle cx="70" cy="100" r="22" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="70" y="97" font-weight="600">B</text><text x="70" y="110" font-size="8.5">v2</text>
+          <circle cx="150" cy="100" r="22" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="150" y="97" font-weight="600">C</text><text x="150" y="110" font-size="8.5">v2</text>
+          <circle cx="232" cy="100" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="232" y="97" font-weight="600">D</text><text x="232" y="110" font-size="8.5" opacity="0.7">v1</text>
+        </g>
+        <text x="100" y="54" text-anchor="middle" font-size="9" fill="#D26A3F">write acked: W = 2</text>
+        <text x="200" y="150" text-anchor="middle" font-size="9" fill="#3AA79B">read: R = 2</text>
+        <text x="150" y="182" text-anchor="middle" font-size="9.5" fill="currentColor">W + R &gt; N → the two sets share a node</text>
+        <text x="150" y="198" text-anchor="middle" font-size="9.5" fill="currentColor">C has v2, so the read returns v2</text>
+        <text x="150" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">and read-repairs D in the background</text>
+        <text x="150" y="244" text-anchor="middle" font-size="9.5" fill="#D26A3F">W = 1, R = 1: fastest, but reads can be stale</text>
+
+        <line x1="300" y1="10" x2="300" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="445" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Sloppy quorum + hinted handoff</text>
+        <circle cx="445" cy="40" r="6" fill="#3AA79B"></circle><text x="456" y="44" font-size="8.5" fill="#3AA79B">coordinator</text>
+        <g font-size="10" text-anchor="middle" fill="currentColor">
+          <circle cx="340" cy="104" r="20" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="340" y="108" font-weight="600">B</text>
+          <circle cx="410" cy="104" r="20" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="3 3"></circle><text x="410" y="108" opacity="0.55">C</text>
+          <circle cx="480" cy="104" r="20" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="480" y="108" font-weight="600">D</text>
+          <circle cx="550" cy="104" r="20" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.4"></circle><text x="550" y="108" font-weight="600">E</text>
+        </g>
+        <text x="410" y="119" text-anchor="middle" font-size="7.5" fill="currentColor" opacity="0.7">down</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="440" y1="45" x2="352" y2="87" marker-end="url(#arwA)"></line><line x1="448" y1="46" x2="474" y2="84" marker-end="url(#arwA)"></line><line x1="451" y1="44" x2="535" y2="89" marker-end="url(#arwA)"></line></g>
+        <line x1="443" y1="46" x2="418" y2="84" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3"></line>
+        <rect x="524" y="130" width="56" height="18" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect>
+        <text x="552" y="143" text-anchor="middle" font-size="8.5" fill="currentColor">hint: for C</text>
+        <path d="M548 148 C 540 186, 420 186, 412 127" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="480" y="198" text-anchor="middle" font-size="9" fill="#3AA79B">C back: E replays the write, drops the hint</text>
+        <text x="445" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">writes stay available while C is down</text>
+        <text x="445" y="250" text-anchor="middle" font-size="9.5" fill="#D26A3F">but the quorum counted a non-owner</text>
+
+        <line x1="600" y1="10" x2="600" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="745" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Vector clocks</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="690" y="30" width="110" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="745" y="47">v1 [A:1]</text>
+          <rect x="612" y="96" width="118" height="26" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="671" y="113">v2 [A:2]</text>
+          <rect x="760" y="96" width="126" height="26" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="823" y="113">v2' [A:1, B:1]</text>
+          <rect x="672" y="168" width="146" height="26" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect><text x="745" y="185">v3 [A:2, B:1, C:1]</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="725" y1="56" x2="680" y2="93" marker-end="url(#arw)"></line><line x1="765" y1="56" x2="815" y2="93" marker-end="url(#arw)"></line></g>
+        <g stroke="#3AA79B" stroke-width="1.3"><line x1="671" y1="122" x2="720" y2="165" marker-end="url(#arwB)"></line><line x1="823" y1="122" x2="772" y2="165" marker-end="url(#arwB)"></line></g>
+        <g font-size="8.5" fill="currentColor" opacity="0.8"><text x="690" y="78" text-anchor="end">client 1 via A</text><text x="798" y="78">client 2 via B</text></g>
+        <text x="745" y="214" text-anchor="middle" font-size="9.5" fill="#D26A3F" font-weight="600">v2, v2': neither dominates → siblings</text>
+        <text x="745" y="232" text-anchor="middle" font-size="9.5" fill="currentColor">get returns both; the client merges</text>
+        <text x="745" y="248" text-anchor="middle" font-size="9.5" fill="currentColor">(cart: union of items) and writes v3</text>
+        <text x="745" y="268" text-anchor="middle" font-size="9.5" fill="#D26A3F">LWW instead: simpler, silently loses one</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Quorums aren't linearizability</h4><p>Even with W + R &gt; N, edge cases remain: sloppy quorums, a write that failed after reaching one replica, and clock-based LWW. Don't promise strong consistency from quorums alone. If you truly need it for a key (a lock or a counter), use consensus (Raft or Paxos) or a lightweight transaction.</p></div>
+    <div class="card"><h4>Read repair</h4><p>When the replicas queried for a read disagree, the coordinator returns the newest version and writes it back to the stale replicas, synchronously or asynchronously. Frequently read keys stay consistent without any background job. Rarely read keys need anti-entropy.</p></div>
+    <div class="card"><h4>LWW or siblings?</h4><p>Cassandra chose last-writer-wins with timestamps: simple, but concurrent writes lose data and clock skew decides the winner. Dynamo and Riak chose vector clocks and siblings: nothing is lost, but clients must merge. CRDTs (counters, sets) merge automatically where the data type allows it.</p></div>
+  </div>
+</section>
+<!-- decks/hld/23-design-kv-store/05-storage-engine-and-repair.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: storage engine and repair">
+  <h2>Deep dive 2: an LSM tree makes writes sequential, and Merkle trees find divergence cheaply</h2>
+  <p class="dek">Inside each node, a log-structured merge tree turns random writes into sequential appends. A write goes to a commit log and a sorted in-memory table, which is flushed to immutable sorted files and compacted in the background. Between nodes, replicas drift apart (missed hints, dropped messages), and Merkle trees let two replicas locate the few key ranges that differ without comparing every key.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: LSM write path. A put appends to the commit log on disk for durability and inserts into the memtable, a sorted structure in memory. When full, the memtable is flushed to an immutable SSTable in level 0. Compaction merges sorted runs into larger levels L1 and L2, dropping overwritten versions and expired tombstones. A get checks the memtable, then each level's Bloom filter, skipping files that cannot contain the key, then a sparse index, then reads one block. Writes are sequential appends; reads pay for it. Right: anti-entropy between replicas C and D using a Merkle tree over a token range. The roots differ. The left child, keys 0 to 49, matches, so that subtree is skipped. The right child, keys 50 to 99, differs; of its leaves, 50 to 74 matches and 75 to 99 differs, so only that range is streamed. Replicas exchange about log n hashes, not the data.">
+        <text x="265" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">LSM tree: write path and read path</text>
+        <text x="20" y="66" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace" font-weight="600">put(k, v)</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="78" y1="56" x2="117" y2="44" marker-end="url(#arwA)"></line><line x1="78" y1="66" x2="117" y2="90" marker-end="url(#arwA)"></line></g>
+        <rect x="120" y="32" width="180" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <g stroke="currentColor" stroke-opacity="0.35"><line x1="240" y1="32" x2="240" y2="54"></line><line x1="260" y1="32" x2="260" y2="54"></line><line x1="280" y1="32" x2="280" y2="54"></line></g>
+        <text x="128" y="47" font-size="9" fill="currentColor">commit log</text>
+        <text x="308" y="47" font-size="8.5" fill="currentColor" opacity="0.8">disk · append · group fsync</text>
+        <rect x="120" y="74" width="180" height="34" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="210" y="89" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">memtable</text><text x="210" y="102" text-anchor="middle" font-size="8.5" fill="currentColor">sorted · in RAM</text>
+        <line x1="210" y1="108" x2="210" y2="135" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="218" y="126" font-size="8.5" fill="currentColor" opacity="0.8">flush when full</text>
+        <g font-size="9" fill="currentColor" text-anchor="end" font-weight="600"><text x="112" y="153">L0</text><text x="112" y="191">L1</text><text x="112" y="229">L2</text></g>
+        <g stroke="#3AA79B" stroke-opacity="0.7" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="120" y="140" width="54" height="20" rx="2"></rect><rect x="180" y="140" width="54" height="20" rx="2"></rect><rect x="240" y="140" width="54" height="20" rx="2"></rect>
+          <rect x="120" y="178" width="54" height="20" rx="2"></rect><rect x="178" y="178" width="54" height="20" rx="2"></rect><rect x="236" y="178" width="54" height="20" rx="2"></rect><rect x="294" y="178" width="54" height="20" rx="2"></rect><rect x="352" y="178" width="54" height="20" rx="2"></rect>
+          <rect x="120" y="216" width="46" height="20" rx="2"></rect><rect x="170" y="216" width="46" height="20" rx="2"></rect><rect x="220" y="216" width="46" height="20" rx="2"></rect><rect x="270" y="216" width="46" height="20" rx="2"></rect><rect x="320" y="216" width="46" height="20" rx="2"></rect><rect x="370" y="216" width="46" height="20" rx="2"></rect><rect x="420" y="216" width="46" height="20" rx="2"></rect>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="300" y1="152" x2="330" y2="175" marker-end="url(#arw)"></line><line x1="412" y1="190" x2="440" y2="213" marker-end="url(#arw)"></line></g>
+        <text x="312" y="146" font-size="8.5" fill="currentColor" opacity="0.85">compaction: merge sorted runs,</text>
+        <text x="412" y="175" font-size="8.5" fill="currentColor" opacity="0.85">drop old versions</text>
+        <text x="20" y="262" font-size="9.5" fill="currentColor"><tspan fill="#3AA79B" font-weight="600">get:</tspan> memtable → per-file Bloom filter (skip on "no") → sparse index → 1 block</text>
+        <text x="20" y="280" font-size="9.5" fill="#D26A3F">writes are sequential appends; reads and compaction pay for it</text>
+
+        <line x1="530" y1="10" x2="530" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="715" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Anti-entropy: Merkle trees</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="660" y="30" width="110" height="28" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.4"></rect><text x="715" y="48">root: C ≠ D</text>
+          <rect x="570" y="92" width="120" height="28" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="630" y="110">keys 0–49: equal</text>
+          <rect x="740" y="92" width="130" height="28" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="805" y="110">keys 50–99: differ</text>
+          <rect x="560" y="156" width="64" height="26" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></rect><text x="592" y="173" opacity="0.5">0–24</text>
+          <rect x="636" y="156" width="64" height="26" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></rect><text x="668" y="173" opacity="0.5">25–49</text>
+          <rect x="736" y="156" width="64" height="26" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="768" y="173">50–74 =</text>
+          <rect x="812" y="156" width="70" height="26" rx="4" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F" stroke-width="1.4"></rect><text x="847" y="173" font-weight="600">75–99 ≠</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="700" y1="58" x2="640" y2="89" marker-end="url(#arw)"></line><line x1="730" y1="58" x2="795" y2="89" marker-end="url(#arw)"></line><line x1="790" y1="120" x2="772" y2="153" marker-end="url(#arw)"></line><line x1="820" y1="120" x2="840" y2="153" marker-end="url(#arw)"></line></g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="3 3"><line x1="615" y1="120" x2="596" y2="156"></line><line x1="645" y1="120" x2="664" y2="156"></line></g>
+        <text x="600" y="198" font-size="8.5" fill="currentColor" opacity="0.7">skipped</text>
+        <text x="715" y="222" text-anchor="middle" font-size="9.5" fill="currentColor">compare roots; descend only where hashes differ</text>
+        <text x="715" y="240" text-anchor="middle" font-size="9.5" fill="currentColor">exchange ~log n hashes, then stream one range</text>
+        <text x="715" y="264" text-anchor="middle" font-size="9.5" fill="#D26A3F">run continuously per token range, throttled</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Durable before acknowledged</h4><p>A replica acknowledges only after the commit-log append, and the memtable is rebuilt from that log after a crash. Group commit (fsync every few milliseconds for a batch of writes) keeps throughput high. The coordinator's W then counts durable copies, not just copies in RAM.</p></div>
+    <div class="card"><h4>Three kinds of repair</h4><p><b>Hinted handoff</b> fixes short outages. <b>Read repair</b> fixes keys that are read. <b>Anti-entropy</b> with Merkle trees catches everything else, including long outages and bit rot. Each covers what the others miss, and together they make eventual consistency actually converge.</p></div>
+    <div class="card"><h4>Compaction is the hidden workload</h4><p>Merging SSTables rewrites data many times (write amplification), competing with foreground traffic for disk bandwidth. Rate-limit compaction, leave 30–50% of the disk free for it, and watch pending compactions: a growing backlog shows up next as slow reads.</p></div>
+  </div>
+</section>
+<!-- decks/hld/23-design-kv-store/06-trade-offs-and-follow-ups.html -->
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: trade-offs and follow-ups">
+  <h2>Every knob trades one thing for another: consistency levels per request, compaction per table</h2>
+  <p class="dek">The strength of this design is that it exposes its trade-offs as settings. Callers choose how many replicas to wait for, so they trade latency and availability against staleness on each request. Operators choose a compaction strategy per table, trading write amplification against read and space amplification. Close the interview by walking both dials.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Left: consistency levels with N equal to 3. ONE waits for 1 replica: lowest latency, survives 2 replicas down, reads may be stale. QUORUM waits for 2: medium latency, survives 1 down, reads see the latest acknowledged write when both reads and writes use QUORUM. ALL waits for 3: highest latency, set by the slowest replica, survives none down. LOCAL_QUORUM uses a quorum within the local datacenter and replicates to others asynchronously, the usual multi-datacenter choice. Right: compaction strategies. Size-tiered has low write amplification but high read amplification and up to 2 times space amplification. Leveled has about 10 times write amplification but low read amplification and about 1.1 times space. Use size-tiered for write-heavy, rarely read data, leveled for read-heavy data with updates, and time-window compaction for time series with TTL.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Consistency per request (N = 3)</text>
+        <g font-size="8.5" fill="currentColor" opacity="0.75"><text x="20" y="40">level</text><text x="110" y="40">waits for</text><text x="200" y="40">latency</text><text x="340" y="40">survives</text></g>
+        <g font-size="10" fill="currentColor">
+          <rect x="20" y="48" width="400" height="32" rx="4" fill="currentColor" fill-opacity="0.04"></rect><text x="28" y="68" font-weight="600">ONE</text><text x="110" y="68">1 replica</text><text x="340" y="68">2 down</text>
+          <rect x="20" y="88" width="400" height="32" rx="4" fill="#D26A3F" fill-opacity="0.08"></rect><text x="28" y="108" font-weight="600">QUORUM</text><text x="110" y="108">2 replicas</text><text x="340" y="108">1 down</text>
+          <rect x="20" y="128" width="400" height="32" rx="4" fill="currentColor" fill-opacity="0.04"></rect><text x="28" y="148" font-weight="600">ALL</text><text x="110" y="148">3 replicas</text><text x="340" y="148">0 down</text>
+        </g>
+        <rect x="200" y="58" width="30" height="12" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <rect x="200" y="98" width="65" height="12" fill="#D26A3F" fill-opacity="0.5"></rect>
+        <rect x="200" y="138" width="120" height="12" fill="#D26A3F" fill-opacity="0.8"></rect>
+        <text x="220" y="186" text-anchor="middle" font-size="9.5" fill="currentColor">ONE: may read stale · QUORUM + QUORUM: sees the last ack</text>
+        <text x="220" y="204" text-anchor="middle" font-size="9.5" fill="#D26A3F">ALL: the slowest replica sets your p99</text>
+        <rect x="20" y="220" width="400" height="36" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="30" y="236" font-size="9.5" fill="currentColor"><tspan font-weight="600">LOCAL_QUORUM</tspan>: quorum inside your datacenter,</text>
+        <text x="30" y="250" font-size="9.5" fill="currentColor">async to the others: the usual multi-DC setting</text>
+
+        <line x1="450" y1="10" x2="450" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Compaction strategy per table</text>
+        <g font-size="8.5" fill="currentColor"><rect x="560" y="28" width="10" height="10" fill="#3AA79B" fill-opacity="0.6"></rect><text x="574" y="37">size-tiered</text><rect x="660" y="28" width="10" height="10" fill="#D26A3F" fill-opacity="0.6"></rect><text x="674" y="37">leveled</text></g>
+        <g font-size="9.5" fill="currentColor" text-anchor="end"><text x="560" y="68">write amp.</text><text x="560" y="118">read amp.</text><text x="560" y="168">space amp.</text></g>
+        <rect x="570" y="54" width="40" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="616" y="64" font-size="8.5" fill="currentColor">low</text>
+        <rect x="570" y="70" width="170" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="746" y="80" font-size="8.5" fill="currentColor">~10× rewrites</text>
+        <rect x="570" y="104" width="150" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="726" y="114" font-size="8.5" fill="currentColor">many files per read</text>
+        <rect x="570" y="120" width="40" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="616" y="130" font-size="8.5" fill="currentColor">~1 file per level</text>
+        <rect x="570" y="154" width="130" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="706" y="164" font-size="8.5" fill="currentColor">up to 2× during merges</text>
+        <rect x="570" y="170" width="40" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="616" y="180" font-size="8.5" fill="currentColor">~1.1×</text>
+        <text x="675" y="212" text-anchor="middle" font-size="9.5" fill="currentColor">write-heavy, rarely read → size-tiered</text>
+        <text x="675" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">read-heavy with updates → leveled</text>
+        <text x="675" y="252" text-anchor="middle" font-size="9.5" fill="#D26A3F">time series with TTL → time-window compaction</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Hot key</td><td>Cache it at the client or coordinator, spread reads across all replicas, or split the key (<code>key#0..7</code>) and merge on read.</td></tr>
+          <tr><td>Large values</td><td>Store the blob in object storage and keep a pointer; large values stall compaction and repair streams.</td></tr>
+          <tr><td>Range queries</td><td>Hash partitioning can't do them. Use range partitioning (with hot-range splitting) or a separately maintained index table.</td></tr>
+          <tr><td>Compare-and-set</td><td>A per-partition consensus round (Paxos lightweight transactions), much slower, so use it only where it's needed.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"A leaderless ring. Consistent hashing with vnodes places keys on N zone-aware replicas, and any node coordinates with tunable W and R. Hinted handoff keeps writes available, vector clocks or LWW settle conflicts, and read repair plus Merkle anti-entropy converge replicas. Each node is an LSM engine with a commit log. It is AP by default, and QUORUM on both sides gives read-your-latest-ack."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Consistent hashing" href="#hld/36">HLD · Consistent hashing</a><a data-deck="hld" data-slide="Multi-leader and leaderless" href="#hld/34">HLD · Multi-leader and leaderless</a><a data-deck="hld" data-slide="Storage engines and indexes" href="#hld/32">HLD · Storage engines and indexes</a></p>
+</section>
 </main>
 
 

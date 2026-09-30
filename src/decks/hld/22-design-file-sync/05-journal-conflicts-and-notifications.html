@@ -1,0 +1,69 @@
+<section class="slide" data-sec="Design · File sync" data-title="File sync: journal, conflicts and notifications">
+  <h2>Deep dive 2: an ordered journal and cursors for sync, parent revisions for conflicts</h2>
+  <p class="dek">Metadata consistency rests on one structure: an append-only, gap-free journal per namespace. A device is always "caught up to seq N". Being told something changed only prompts it to pull from its cursor. Concurrent edits are caught with optimistic concurrency. A commit names the revision it started from, and if that's no longer the latest, the server refuses and the client keeps both copies.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: the journal for one namespace holds entries 14 add a.txt, 15 edit b.md, 16 delete c.png, 17 edit plan.key, 18 edit plan.key, and a slot for 19. The laptop's cursor is at 18, the phone's at 15, so the phone pulls 16 to 18. A commit appends seq plus one in one transaction, and cursors make sync gap-free, resumable and idempotent. The phone holds a long-poll to the notification service asking about cursor 15, which returns as soon as the sequence passes 15; the poke carries no data. Right: laptop and phone both edit plan.key from revision 17. The laptop commits with parent 17 and gets revision 18. The phone commits with parent 17 and gets 409, latest is 18. The phone renames its local file to a conflicted copy, downloads revision 18, and commits the copy under its new path. Binary files cannot be merged, so never pick a winner silently.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">One ordered journal per namespace</text>
+        <g font-size="9" text-anchor="middle"><text x="119" y="32" fill="#3AA79B">phone</text><text x="317" y="32" fill="#D26A3F">laptop</text></g>
+        <line x1="119" y1="35" x2="119" y2="47" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <line x1="317" y1="35" x2="317" y2="47" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="20" y="50" width="66" height="46"></rect><rect x="86" y="50" width="66" height="46"></rect><rect x="152" y="50" width="66" height="46"></rect><rect x="218" y="50" width="66" height="46"></rect><rect x="284" y="50" width="66" height="46"></rect>
+        </g>
+        <rect x="350" y="50" width="66" height="46" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle">
+          <text x="53" y="66" font-weight="600">14</text><text x="53" y="79">add</text><text x="53" y="91">a.txt</text>
+          <text x="119" y="66" font-weight="600">15</text><text x="119" y="79">edit</text><text x="119" y="91">b.md</text>
+          <text x="185" y="66" font-weight="600">16</text><text x="185" y="79">delete</text><text x="185" y="91">c.png</text>
+          <text x="251" y="66" font-weight="600">17</text><text x="251" y="79">edit</text><text x="251" y="91">plan.key</text>
+          <text x="317" y="66" font-weight="600">18</text><text x="317" y="79">edit</text><text x="317" y="91">plan.key</text>
+          <text x="383" y="66" opacity="0.6">19</text><text x="383" y="84" opacity="0.6">next</text>
+        </g>
+        <path d="M154 102 V108 H348 V102" fill="none" stroke="#3AA79B" stroke-width="1.4"></path>
+        <text x="251" y="124" text-anchor="middle" font-size="9" fill="#3AA79B">phone pulls 16–18 from its cursor</text>
+        <text x="220" y="150" text-anchor="middle" font-size="9.5" fill="currentColor">commit = append (ns, seq + 1) in one transaction</text>
+        <text x="220" y="166" text-anchor="middle" font-size="9.5" fill="currentColor">cursors make sync gap-free, resumable and idempotent</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="192" width="80" height="34" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="60" y="213">phone</text>
+          <rect x="250" y="192" width="160" height="34" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="330" y="213">notification svc</text>
+        </g>
+        <line x1="100" y1="202" x2="247" y2="202" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="250" y1="218" x2="103" y2="218" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="175" y="197" text-anchor="middle" font-size="8.5" fill="currentColor" font-family="IBM Plex Mono, monospace">GET /notify?cursor=15</text>
+        <text x="175" y="238" text-anchor="middle" font-size="8.5" fill="#3AA79B">held ~60 s; returns once seq &gt; 15</text>
+        <text x="220" y="270" text-anchor="middle" font-size="9.5" fill="#D26A3F">the poke carries no data: every device pulls from its own cursor</text>
+
+        <line x1="450" y1="10" x2="450" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Concurrent edits: detect, keep both</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="475" y="28" width="90" height="24" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="520" y="44">laptop</text>
+          <rect x="630" y="28" width="90" height="24" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.3"></rect><text x="675" y="44">metadata svc</text>
+          <rect x="785" y="28" width="90" height="24" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="830" y="44">phone</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="3 3"><line x1="520" y1="52" x2="520" y2="236"></line><line x1="675" y1="52" x2="675" y2="236"></line><line x1="830" y1="52" x2="830" y2="236"></line></g>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="520" y1="76" x2="672" y2="76" marker-end="url(#arwA)"></line><line x1="830" y1="124" x2="678" y2="124" marker-end="url(#arwA)"></line><line x1="830" y1="226" x2="678" y2="226" marker-end="url(#arwA)"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="4 3"><line x1="675" y1="96" x2="523" y2="96" marker-end="url(#arw)"></line><line x1="675" y1="144" x2="827" y2="144" marker-end="url(#arw)"></line></g>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle">
+          <text x="597" y="71">commit plan.key, parent 17</text>
+          <text x="597" y="91">200 · rev 18</text>
+          <text x="752" y="119">commit plan.key, parent 17</text>
+          <text x="752" y="139" fill="#D26A3F" font-weight="600">409 · latest is 18</text>
+          <text x="752" y="221">commit the copy (new path)</text>
+        </g>
+        <rect x="696" y="156" width="192" height="50" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <g font-size="8.5" fill="currentColor"><text x="704" y="171">rename local file to</text><text x="704" y="184" font-family="IBM Plex Mono, monospace">plan (phone's conflicted copy).key</text><text x="704" y="198">then download rev 18</text></g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="currentColor">binary files can't be merged: never pick a winner silently</text>
+        <text x="675" y="274" text-anchor="middle" font-size="9.5" fill="#D26A3F">optimistic concurrency via parentRev; the user resolves</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why not last-writer-wins?</h4><p>LWW by timestamp silently discards someone's work, and device clocks disagree anyway. Revision numbers assigned by the server give a total order per file. <code>parentRev</code> detects the conflict exactly, and "keep both" guarantees nothing is lost. Text formats could be merged, but only by apps that understand them.</p></div>
+    <div class="card"><h4>Moves and deletes are edits too</h4><p>A rename is recorded as one journal entry (old path to new path), not a delete plus an add, so clients move the local file instead of re-downloading it. A delete keeps the old blocks for the retention window, which is what makes restore possible.</p></div>
+    <div class="card"><h4>Garbage-collect carefully</h4><p>When no version references a block any more, its refcount reaches zero, but don't delete it immediately: an in-flight commit may be about to reference it. Mark-and-sweep with a grace period (days) is the safe pattern. An accidental block deletion means permanent data loss.</p></div>
+  </div>
+</section>

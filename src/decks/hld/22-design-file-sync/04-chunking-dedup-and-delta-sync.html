@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Design · File sync" data-title="File sync: chunking, dedup and delta sync">
+  <h2>Deep dive 1: pick block boundaries so that an edit changes as few blocks as possible</h2>
+  <p class="dek">Delta sync works only if an edit leaves most block hashes untouched. Fixed 4 MB blocks manage that for in-place edits but fail badly on insertions, because every later boundary shifts. Content-defined chunking puts boundaries where the content itself has a certain pattern, so they move with the content and an insertion disturbs only the chunk it lands in.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Left, fixed-size blocks: version 1 is 8 blocks of 4 megabytes, h1 to h8. An edit inside block 4 changes only h4, so the server lacks only that block and the client uploads 4 megabytes rather than 32. But inserting one byte at the start shifts every boundary, and all 8 hashes change. Right, content-defined chunking: boundaries are placed where a rolling hash over the last 48 bytes matches a pattern, giving variable-size chunks c1 to c7. Inserting a byte at the start changes only c1; deleting a paragraph in chunk 5 changes only c5. Boundaries move with the content, so only the edited chunk changes.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Fixed-size blocks</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="20" y="36">v1: 8 × 4 MB</text><text x="20" y="92">edit inside block 4</text><text x="20" y="166">insert 1 byte at the start</text></g>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="20" y="42" width="50" height="24"></rect><rect x="70" y="42" width="50" height="24"></rect><rect x="120" y="42" width="50" height="24"></rect><rect x="170" y="42" width="50" height="24"></rect><rect x="220" y="42" width="50" height="24"></rect><rect x="270" y="42" width="50" height="24"></rect><rect x="320" y="42" width="50" height="24"></rect><rect x="370" y="42" width="50" height="24"></rect>
+        </g>
+        <g stroke="#3AA79B" stroke-opacity="0.6" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="20" y="98" width="50" height="24"></rect><rect x="70" y="98" width="50" height="24"></rect><rect x="120" y="98" width="50" height="24"></rect><rect x="220" y="98" width="50" height="24"></rect><rect x="270" y="98" width="50" height="24"></rect><rect x="320" y="98" width="50" height="24"></rect><rect x="370" y="98" width="50" height="24"></rect>
+        </g>
+        <rect x="170" y="98" width="50" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g stroke="#D26A3F" fill="#D26A3F" fill-opacity="0.35">
+          <rect x="20" y="172" width="50" height="24"></rect><rect x="70" y="172" width="50" height="24"></rect><rect x="120" y="172" width="50" height="24"></rect><rect x="170" y="172" width="50" height="24"></rect><rect x="220" y="172" width="50" height="24"></rect><rect x="270" y="172" width="50" height="24"></rect><rect x="320" y="172" width="50" height="24"></rect><rect x="370" y="172" width="50" height="24"></rect>
+        </g>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="45" y="58">h1</text><text x="95" y="58">h2</text><text x="145" y="58">h3</text><text x="195" y="58">h4</text><text x="245" y="58">h5</text><text x="295" y="58">h6</text><text x="345" y="58">h7</text><text x="395" y="58">h8</text>
+          <text x="45" y="114">h1</text><text x="95" y="114">h2</text><text x="145" y="114">h3</text><text x="195" y="114" font-weight="600">h4'</text><text x="245" y="114">h5</text><text x="295" y="114">h6</text><text x="345" y="114">h7</text><text x="395" y="114">h8</text>
+          <text x="45" y="188">h1'</text><text x="95" y="188">h2'</text><text x="145" y="188">h3'</text><text x="195" y="188">h4'</text><text x="245" y="188">h5'</text><text x="295" y="188">h6'</text><text x="345" y="188">h7'</text><text x="395" y="188">h8'</text>
+        </g>
+        <text x="220" y="144" text-anchor="middle" font-size="9.5" fill="currentColor">server lacks only h4' → upload 4 MB, not 32 MB</text>
+        <text x="220" y="218" text-anchor="middle" font-size="9.5" fill="#D26A3F">every boundary shifts, so every block looks new</text>
+        <text x="220" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">fine for in-place edits (databases, disk images)</text>
+
+        <line x1="450" y1="10" x2="450" y2="252" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Content-defined chunking</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="470" y="36">v1: cut where the content says so</text><text x="470" y="92">insert 1 byte at the start</text><text x="470" y="166">delete a paragraph in chunk 5</text></g>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="currentColor" fill-opacity="0.05">
+          <rect x="470" y="42" width="60" height="24"></rect><rect x="530" y="42" width="40" height="24"></rect><rect x="570" y="42" width="70" height="24"></rect><rect x="640" y="42" width="50" height="24"></rect><rect x="690" y="42" width="65" height="24"></rect><rect x="755" y="42" width="45" height="24"></rect><rect x="800" y="42" width="55" height="24"></rect>
+        </g>
+        <rect x="470" y="98" width="61" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g stroke="#3AA79B" stroke-opacity="0.6" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="531" y="98" width="40" height="24"></rect><rect x="571" y="98" width="70" height="24"></rect><rect x="641" y="98" width="50" height="24"></rect><rect x="691" y="98" width="65" height="24"></rect><rect x="756" y="98" width="45" height="24"></rect><rect x="801" y="98" width="55" height="24"></rect>
+          <rect x="470" y="172" width="60" height="24"></rect><rect x="530" y="172" width="40" height="24"></rect><rect x="570" y="172" width="70" height="24"></rect><rect x="640" y="172" width="50" height="24"></rect><rect x="730" y="172" width="45" height="24"></rect><rect x="775" y="172" width="55" height="24"></rect>
+        </g>
+        <rect x="690" y="172" width="40" height="24" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="500" y="58">c1</text><text x="550" y="58">c2</text><text x="605" y="58">c3</text><text x="665" y="58">c4</text><text x="722" y="58">c5</text><text x="777" y="58">c6</text><text x="827" y="58">c7</text>
+          <text x="500" y="114" font-weight="600">c1'</text><text x="551" y="114">c2</text><text x="606" y="114">c3</text><text x="666" y="114">c4</text><text x="723" y="114">c5</text><text x="778" y="114">c6</text><text x="828" y="114">c7</text>
+          <text x="500" y="188">c1</text><text x="550" y="188">c2</text><text x="605" y="188">c3</text><text x="665" y="188">c4</text><text x="710" y="188" font-weight="600">c5'</text><text x="752" y="188">c6</text><text x="802" y="188">c7</text>
+        </g>
+        <text x="675" y="144" text-anchor="middle" font-size="9.5" fill="currentColor">cut where a rolling hash of the last 48 bytes hits a pattern</text>
+        <text x="675" y="218" text-anchor="middle" font-size="9.5" fill="#D26A3F">boundaries move with the content: only the edited chunk changes</text>
+        <text x="675" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">Rabin or FastCDC; used by backup tools such as restic and borg</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Dedup, and its privacy catch</h4><p>Identical blocks are stored once, with a reference count, across files and versions. Deduplicating <em>across users</em> saves more but leaks information: if an upload is skipped, the file already exists somewhere. Many services therefore deduplicate only within an account or namespace.</p></div>
+    <div class="card"><h4>Pipeline the upload</h4><p>Hash, compress and upload blocks concurrently as a stream, rather than one file at a time. Progress is recorded in the local database, so a crash or reboot resumes where it stopped. A 20 GB file commits once, after its last block is stored.</p></div>
+    <div class="card"><h4>Delta on the way down, too</h4><p>A downloading device first checks which of the new version's hashes it already has, from the previous version or another file, and fetches only the rest. It assembles the new file in a temporary path and renames it atomically, so a half-written file never appears.</p></div>
+  </div>
+</section>

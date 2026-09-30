@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Design · File sync" data-title="File sync: trade-offs and follow-ups">
+  <h2>Pay for durability with erasure codes, and treat big shared folders as hot keys</h2>
+  <p class="dek">At exabyte scale, storage overhead dominates the budget: three full replicas cost more than twice the raw disk of an erasure-coded layout with better fault tolerance. On the metadata side, the sharp edge is fan-out. One busy team folder with tens of thousands of members turns every commit into tens of thousands of pokes, unless notifications are coalesced.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: durability. Three-times replication stores three full copies, 3.0 times raw storage, survives 2 losses and repairs cheaply; use it for new, hot blocks. Reed-Solomon 10 plus 4 erasure coding stores 10 data and 4 parity fragments across zones, 1.4 times raw storage, survives any 4 losses but repair reads 10 fragments; re-encode blocks after a few days. Right: a team folder with 50 thousand members receives 100 commits in 10 seconds. Poking every device per commit means 5 million pokes and 5 million change requests in 10 seconds. Coalescing to at most one poke per device every 2 seconds with jittered pulls needs about 250 thousand, because each pull returns many entries. Shard metadata by namespace and move the hottest namespaces to dedicated shards.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Replicate hot blocks, erasure-code the rest</text>
+        <text x="20" y="40" font-size="9" fill="currentColor" opacity="0.85">3× replication (new blocks)</text>
+        <g stroke="#D26A3F" fill="#D26A3F" fill-opacity="0.3"><rect x="20" y="46" width="34" height="26"></rect><rect x="60" y="46" width="34" height="26"></rect><rect x="100" y="46" width="34" height="26"></rect></g>
+        <g font-size="8.5" fill="currentColor" text-anchor="middle"><text x="37" y="63">A</text><text x="77" y="63">A</text><text x="117" y="63">A</text></g>
+        <text x="150" y="63" font-size="9" fill="currentColor">3.0× raw · survives 2 losses · cheap repair</text>
+        <text x="20" y="98" font-size="9" fill="currentColor" opacity="0.85">erasure coding RS(10, 4), after a few days</text>
+        <g stroke="#3AA79B" fill="#3AA79B" fill-opacity="0.22">
+          <rect x="20" y="104" width="24" height="26"></rect><rect x="48" y="104" width="24" height="26"></rect><rect x="76" y="104" width="24" height="26"></rect><rect x="104" y="104" width="24" height="26"></rect><rect x="132" y="104" width="24" height="26"></rect><rect x="160" y="104" width="24" height="26"></rect><rect x="188" y="104" width="24" height="26"></rect><rect x="216" y="104" width="24" height="26"></rect><rect x="244" y="104" width="24" height="26"></rect><rect x="272" y="104" width="24" height="26"></rect>
+        </g>
+        <g stroke="#D26A3F" stroke-dasharray="3 2" fill="#D26A3F" fill-opacity="0.12"><rect x="300" y="104" width="24" height="26"></rect><rect x="328" y="104" width="24" height="26"></rect><rect x="356" y="104" width="24" height="26"></rect><rect x="384" y="104" width="24" height="26"></rect></g>
+        <g font-size="8" fill="currentColor" text-anchor="middle"><text x="32" y="121">d1</text><text x="284" y="121">d10</text><text x="312" y="121">p1</text><text x="396" y="121">p4</text></g>
+        <text x="20" y="150" font-size="9" fill="currentColor">1.4× raw · survives any 4 losses · repair reads 10 fragments</text>
+        <g font-size="9" fill="currentColor"><text x="20" y="188">replication</text><text x="20" y="212">RS(10, 4)</text></g>
+        <rect x="100" y="177" width="300" height="14" fill="#D26A3F" fill-opacity="0.5"></rect><text x="406" y="188" font-size="9" fill="currentColor">3.0×</text>
+        <rect x="100" y="201" width="140" height="14" fill="#3AA79B" fill-opacity="0.55"></rect><text x="246" y="212" font-size="9" fill="currentColor">1.4×</text>
+        <text x="220" y="244" text-anchor="middle" font-size="9.5" fill="#D26A3F">at exabytes, 3.0× vs 1.4× is most of the hardware bill</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">spread fragments across zones so a whole zone can fail</text>
+
+        <line x1="450" y1="10" x2="450" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Hot namespaces: coalesce the fan-out</text>
+        <rect x="560" y="30" width="230" height="42" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="675" y="47" text-anchor="middle" font-size="10" fill="currentColor">team folder · 50 k members</text><text x="675" y="62" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">100 commits in 10 s</text>
+        <line x1="675" y1="72" x2="675" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="470" y="106" font-size="9" fill="currentColor" opacity="0.85">naive: one poke per member per commit</text>
+        <rect x="470" y="112" width="410" height="22" fill="#D26A3F" fill-opacity="0.45"></rect>
+        <text x="480" y="127" font-size="9.5" fill="currentColor">5 M pokes → 5 M /changes calls in 10 s</text>
+        <text x="470" y="158" font-size="9" fill="currentColor" opacity="0.85">coalesce: ≤ 1 poke per device per 2 s, jittered pulls</text>
+        <rect x="470" y="164" width="21" height="22" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <text x="498" y="179" font-size="9.5" fill="currentColor" font-weight="600">≈ 250 k, each pull returns many entries</text>
+        <text x="675" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">cost now scales with devices, not with commits</text>
+        <text x="675" y="232" text-anchor="middle" font-size="9.5" fill="currentColor">shard metadata by namespace; isolate the hottest</text>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">big shared folders are the hot keys of file sync</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Smart / selective sync</td><td>Show placeholders for cloud-only files and fetch blocks on open; sync only the selected folders to small disks.</td></tr>
+          <tr><td>Encryption</td><td>At rest per block with keys in a KMS, TLS in transit. End-to-end encryption on the client disables server-side dedup, preview and search.</td></tr>
+          <tr><td>Version retention</td><td>Keep journal entries and blocks for 30–180 days by plan; restore is "commit an old block list as new".</td></tr>
+          <tr><td>Mobile</td><td>No constant background sync: upload the camera roll on Wi-Fi and charging; fetch on demand.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Clients chunk and hash files, upload only the blocks the server lacks, and commit a block list against a parent revision. Metadata is an append-only journal per namespace in sharded SQL, and devices sync from cursors after data-free pokes. Conflicts keep both copies. Blocks are content-addressed and deduplicated, replicated while hot and erasure-coded after that."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Object storage">HLD · Object storage</a><a data-deck="hld" data-slide="Hot keys and resharding">HLD · Hot keys and resharding</a></p>
+</section>

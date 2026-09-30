@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: storage engine and repair">
+  <h2>Deep dive 2: an LSM tree makes writes sequential, and Merkle trees find divergence cheaply</h2>
+  <p class="dek">Inside each node, a log-structured merge tree turns random writes into sequential appends. A write goes to a commit log and a sorted in-memory table, which is flushed to immutable sorted files and compacted in the background. Between nodes, replicas drift apart (missed hints, dropped messages), and Merkle trees let two replicas locate the few key ranges that differ without comparing every key.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: LSM write path. A put appends to the commit log on disk for durability and inserts into the memtable, a sorted structure in memory. When full, the memtable is flushed to an immutable SSTable in level 0. Compaction merges sorted runs into larger levels L1 and L2, dropping overwritten versions and expired tombstones. A get checks the memtable, then each level's Bloom filter, skipping files that cannot contain the key, then a sparse index, then reads one block. Writes are sequential appends; reads pay for it. Right: anti-entropy between replicas C and D using a Merkle tree over a token range. The roots differ. The left child, keys 0 to 49, matches, so that subtree is skipped. The right child, keys 50 to 99, differs; of its leaves, 50 to 74 matches and 75 to 99 differs, so only that range is streamed. Replicas exchange about log n hashes, not the data.">
+        <text x="265" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">LSM tree: write path and read path</text>
+        <text x="20" y="66" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace" font-weight="600">put(k, v)</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="78" y1="56" x2="117" y2="44" marker-end="url(#arwA)"></line><line x1="78" y1="66" x2="117" y2="90" marker-end="url(#arwA)"></line></g>
+        <rect x="120" y="32" width="180" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <g stroke="currentColor" stroke-opacity="0.35"><line x1="240" y1="32" x2="240" y2="54"></line><line x1="260" y1="32" x2="260" y2="54"></line><line x1="280" y1="32" x2="280" y2="54"></line></g>
+        <text x="128" y="47" font-size="9" fill="currentColor">commit log</text>
+        <text x="308" y="47" font-size="8.5" fill="currentColor" opacity="0.8">disk · append · group fsync</text>
+        <rect x="120" y="74" width="180" height="34" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="210" y="89" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">memtable</text><text x="210" y="102" text-anchor="middle" font-size="8.5" fill="currentColor">sorted · in RAM</text>
+        <line x1="210" y1="108" x2="210" y2="135" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="218" y="126" font-size="8.5" fill="currentColor" opacity="0.8">flush when full</text>
+        <g font-size="9" fill="currentColor" text-anchor="end" font-weight="600"><text x="112" y="153">L0</text><text x="112" y="191">L1</text><text x="112" y="229">L2</text></g>
+        <g stroke="#3AA79B" stroke-opacity="0.7" fill="#3AA79B" fill-opacity="0.12">
+          <rect x="120" y="140" width="54" height="20" rx="2"></rect><rect x="180" y="140" width="54" height="20" rx="2"></rect><rect x="240" y="140" width="54" height="20" rx="2"></rect>
+          <rect x="120" y="178" width="54" height="20" rx="2"></rect><rect x="178" y="178" width="54" height="20" rx="2"></rect><rect x="236" y="178" width="54" height="20" rx="2"></rect><rect x="294" y="178" width="54" height="20" rx="2"></rect><rect x="352" y="178" width="54" height="20" rx="2"></rect>
+          <rect x="120" y="216" width="46" height="20" rx="2"></rect><rect x="170" y="216" width="46" height="20" rx="2"></rect><rect x="220" y="216" width="46" height="20" rx="2"></rect><rect x="270" y="216" width="46" height="20" rx="2"></rect><rect x="320" y="216" width="46" height="20" rx="2"></rect><rect x="370" y="216" width="46" height="20" rx="2"></rect><rect x="420" y="216" width="46" height="20" rx="2"></rect>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="300" y1="152" x2="330" y2="175" marker-end="url(#arw)"></line><line x1="412" y1="190" x2="440" y2="213" marker-end="url(#arw)"></line></g>
+        <text x="312" y="146" font-size="8.5" fill="currentColor" opacity="0.85">compaction: merge sorted runs,</text>
+        <text x="412" y="175" font-size="8.5" fill="currentColor" opacity="0.85">drop old versions</text>
+        <text x="20" y="262" font-size="9.5" fill="currentColor"><tspan fill="#3AA79B" font-weight="600">get:</tspan> memtable → per-file Bloom filter (skip on "no") → sparse index → 1 block</text>
+        <text x="20" y="280" font-size="9.5" fill="#D26A3F">writes are sequential appends; reads and compaction pay for it</text>
+
+        <line x1="530" y1="10" x2="530" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="715" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Anti-entropy: Merkle trees</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="660" y="30" width="110" height="28" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.4"></rect><text x="715" y="48">root: C ≠ D</text>
+          <rect x="570" y="92" width="120" height="28" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="630" y="110">keys 0–49: equal</text>
+          <rect x="740" y="92" width="130" height="28" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="805" y="110">keys 50–99: differ</text>
+          <rect x="560" y="156" width="64" height="26" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></rect><text x="592" y="173" opacity="0.5">0–24</text>
+          <rect x="636" y="156" width="64" height="26" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"></rect><text x="668" y="173" opacity="0.5">25–49</text>
+          <rect x="736" y="156" width="64" height="26" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="768" y="173">50–74 =</text>
+          <rect x="812" y="156" width="70" height="26" rx="4" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F" stroke-width="1.4"></rect><text x="847" y="173" font-weight="600">75–99 ≠</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="700" y1="58" x2="640" y2="89" marker-end="url(#arw)"></line><line x1="730" y1="58" x2="795" y2="89" marker-end="url(#arw)"></line><line x1="790" y1="120" x2="772" y2="153" marker-end="url(#arw)"></line><line x1="820" y1="120" x2="840" y2="153" marker-end="url(#arw)"></line></g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="3 3"><line x1="615" y1="120" x2="596" y2="156"></line><line x1="645" y1="120" x2="664" y2="156"></line></g>
+        <text x="600" y="198" font-size="8.5" fill="currentColor" opacity="0.7">skipped</text>
+        <text x="715" y="222" text-anchor="middle" font-size="9.5" fill="currentColor">compare roots; descend only where hashes differ</text>
+        <text x="715" y="240" text-anchor="middle" font-size="9.5" fill="currentColor">exchange ~log n hashes, then stream one range</text>
+        <text x="715" y="264" text-anchor="middle" font-size="9.5" fill="#D26A3F">run continuously per token range, throttled</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Durable before acknowledged</h4><p>A replica acknowledges only after the commit-log append, and the memtable is rebuilt from that log after a crash. Group commit (fsync every few milliseconds for a batch of writes) keeps throughput high. The coordinator's W then counts durable copies, not just copies in RAM.</p></div>
+    <div class="card"><h4>Three kinds of repair</h4><p><b>Hinted handoff</b> fixes short outages. <b>Read repair</b> fixes keys that are read. <b>Anti-entropy</b> with Merkle trees catches everything else, including long outages and bit rot. Each covers what the others miss, and together they make eventual consistency actually converge.</p></div>
+    <div class="card"><h4>Compaction is the hidden workload</h4><p>Merging SSTables rewrites data many times (write amplification), competing with foreground traffic for disk bandwidth. Rate-limit compaction, leave 30–50% of the disk free for it, and watch pending compactions: a growing backlog shows up next as slow reads.</p></div>
+  </div>
+</section>

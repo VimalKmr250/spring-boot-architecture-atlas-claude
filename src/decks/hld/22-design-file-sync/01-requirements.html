@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · File sync" data-title="File sync: requirements">
+  <h2>Design Dropbox: keep every device's folder identical, without re-sending what hasn't changed</h2>
+  <p class="dek">Users drop files into a folder, and the same folder appears on their other devices and on their collaborators' machines, with version history and offline edits. The estimate points at the key idea. Split files into content-addressed blocks so an edit re-sends only the changed block, and keep the small, transactional metadata completely separate from the enormous, immutable bytes.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 100 million daily users times 10 file changes is 1 billion changes a day, about 12 thousand a second, 35 thousand at peak, so metadata commits are the hot path. 500 million users times 10 gigabytes is about 5 exabytes logical; block-level dedup and compression save 30 percent or more, about 3 exabytes physical, in erasure-coded blob storage. A one-line edit to a 200 megabyte file uploads 200 megabytes naively, but only the changed 4 megabyte block with blocks, about 50 times less.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">100 M DAU × 10 changes</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">1 B changes/day ≈ 12 k/s</text><text x="140" y="125" font-size="9.5" opacity="0.75">(peak about 3×)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">~35 k commits/s peak</text><text x="140" y="190" font-weight="600">metadata is the hot path</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">500 M users × 10 GB</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">≈ 5 EB logical</text><text x="450" y="125" font-size="9.5" opacity="0.75">(dedup + compression save 30%+)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="173">≈ 3 EB physical</text><text x="450" y="190" font-weight="600">erasure-coded blob storage</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">1-line edit, 200 MB file</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">naive: re-upload 200 MB</text><text x="760" y="125" font-size="9.5" opacity="0.75">(slow on home uplinks)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">blocks: send one 4 MB block</text><text x="760" y="190" font-weight="600">≈ 50× less upload</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">small transactional metadata, separate from huge immutable content-addressed blocks</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Upload, download, and sync changes to all of a user's devices automatically.</li>
+      <li>Shared folders across users; version history and restore.</li>
+      <li>Work offline; sync when back online.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li><b>Never lose or corrupt data</b>: eleven nines of durability, with every block verified by hash.</li>
+      <li>Every device converges to the same state; changes propagate within seconds.</li>
+      <li>Frugal with bandwidth, battery and server storage.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Largest file size? (Tens of GB.) Mobile clients as well as desktop?</li>
+      <li>Real-time co-editing? No: that's a different design (OT or CRDTs).</li>
+      <li>How are conflicts handled: last writer wins, or keep both copies?</li>
+    </ul></div>
+  </div>
+</section>

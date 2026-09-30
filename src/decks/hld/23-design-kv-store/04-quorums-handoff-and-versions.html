@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: quorums, handoff and versions">
+  <h2>Deep dive 1: overlapping quorums, writes that survive a down replica, and versions that expose conflicts</h2>
+  <p class="dek">Three mechanisms define how the store behaves under failure. Quorum overlap (W + R &gt; N) makes a read see the latest acknowledged write. A sloppy quorum with hinted handoff keeps writes available when a replica is down. Vector clocks tell "newer" apart from "concurrent", so the store never silently throws away one side of a conflict.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Left: quorum overlap. Replicas B and C acknowledged the write of v2, so W is 2; D still has v1. A read with R equal to 2 asks C and D. Because W plus R is greater than N, the sets share a node: C returns v2, the coordinator returns v2 and repairs D in the background. With W and R of 1 reads can be stale. Middle: sloppy quorum. Replica C is down, so the coordinator writes to B, D and E; E stores the write with a hint that it belongs to C. When C comes back, E replays the write and drops the hint. Writes stay available, but the quorum counted a non-owner. Right: vector clocks. From v1 with clock A 1, client 1 writes via A giving A 2, and client 2 writes via B giving A 1, B 1. Neither dominates, so they are siblings; a get returns both, the client merges them, for a cart the union of items, and writes v3 with clock A 2, B 1, C 1. Last-writer-wins would silently lose one.">
+        <text x="150" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Quorum overlap</text>
+        <rect x="38" y="64" width="146" height="72" rx="30" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <rect x="118" y="72" width="146" height="56" rx="26" fill="none" stroke="#3AA79B" stroke-width="1.6" stroke-dasharray="5 4"></rect>
+        <g font-size="10" text-anchor="middle" fill="currentColor">
+          <circle cx="70" cy="100" r="22" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="70" y="97" font-weight="600">B</text><text x="70" y="110" font-size="8.5">v2</text>
+          <circle cx="150" cy="100" r="22" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="150" y="97" font-weight="600">C</text><text x="150" y="110" font-size="8.5">v2</text>
+          <circle cx="232" cy="100" r="22" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="232" y="97" font-weight="600">D</text><text x="232" y="110" font-size="8.5" opacity="0.7">v1</text>
+        </g>
+        <text x="100" y="54" text-anchor="middle" font-size="9" fill="#D26A3F">write acked: W = 2</text>
+        <text x="200" y="150" text-anchor="middle" font-size="9" fill="#3AA79B">read: R = 2</text>
+        <text x="150" y="182" text-anchor="middle" font-size="9.5" fill="currentColor">W + R &gt; N → the two sets share a node</text>
+        <text x="150" y="198" text-anchor="middle" font-size="9.5" fill="currentColor">C has v2, so the read returns v2</text>
+        <text x="150" y="214" text-anchor="middle" font-size="9.5" fill="currentColor">and read-repairs D in the background</text>
+        <text x="150" y="244" text-anchor="middle" font-size="9.5" fill="#D26A3F">W = 1, R = 1: fastest, but reads can be stale</text>
+
+        <line x1="300" y1="10" x2="300" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="445" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Sloppy quorum + hinted handoff</text>
+        <circle cx="445" cy="40" r="6" fill="#3AA79B"></circle><text x="456" y="44" font-size="8.5" fill="#3AA79B">coordinator</text>
+        <g font-size="10" text-anchor="middle" fill="currentColor">
+          <circle cx="340" cy="104" r="20" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="340" y="108" font-weight="600">B</text>
+          <circle cx="410" cy="104" r="20" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="3 3"></circle><text x="410" y="108" opacity="0.55">C</text>
+          <circle cx="480" cy="104" r="20" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></circle><text x="480" y="108" font-weight="600">D</text>
+          <circle cx="550" cy="104" r="20" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.4"></circle><text x="550" y="108" font-weight="600">E</text>
+        </g>
+        <text x="410" y="119" text-anchor="middle" font-size="7.5" fill="currentColor" opacity="0.7">down</text>
+        <g stroke="#D26A3F" stroke-width="1.3"><line x1="440" y1="45" x2="352" y2="87" marker-end="url(#arwA)"></line><line x1="448" y1="46" x2="474" y2="84" marker-end="url(#arwA)"></line><line x1="451" y1="44" x2="535" y2="89" marker-end="url(#arwA)"></line></g>
+        <line x1="443" y1="46" x2="418" y2="84" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3"></line>
+        <rect x="524" y="130" width="56" height="18" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect>
+        <text x="552" y="143" text-anchor="middle" font-size="8.5" fill="currentColor">hint: for C</text>
+        <path d="M548 148 C 540 186, 420 186, 412 127" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <text x="480" y="198" text-anchor="middle" font-size="9" fill="#3AA79B">C back: E replays the write, drops the hint</text>
+        <text x="445" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">writes stay available while C is down</text>
+        <text x="445" y="250" text-anchor="middle" font-size="9.5" fill="#D26A3F">but the quorum counted a non-owner</text>
+
+        <line x1="600" y1="10" x2="600" y2="272" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="745" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Vector clocks</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="690" y="30" width="110" height="26" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="745" y="47">v1 [A:1]</text>
+          <rect x="612" y="96" width="118" height="26" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="671" y="113">v2 [A:2]</text>
+          <rect x="760" y="96" width="126" height="26" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="823" y="113">v2' [A:1, B:1]</text>
+          <rect x="672" y="168" width="146" height="26" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.3"></rect><text x="745" y="185">v3 [A:2, B:1, C:1]</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="725" y1="56" x2="680" y2="93" marker-end="url(#arw)"></line><line x1="765" y1="56" x2="815" y2="93" marker-end="url(#arw)"></line></g>
+        <g stroke="#3AA79B" stroke-width="1.3"><line x1="671" y1="122" x2="720" y2="165" marker-end="url(#arwB)"></line><line x1="823" y1="122" x2="772" y2="165" marker-end="url(#arwB)"></line></g>
+        <g font-size="8.5" fill="currentColor" opacity="0.8"><text x="690" y="78" text-anchor="end">client 1 via A</text><text x="798" y="78">client 2 via B</text></g>
+        <text x="745" y="214" text-anchor="middle" font-size="9.5" fill="#D26A3F" font-weight="600">v2, v2': neither dominates → siblings</text>
+        <text x="745" y="232" text-anchor="middle" font-size="9.5" fill="currentColor">get returns both; the client merges</text>
+        <text x="745" y="248" text-anchor="middle" font-size="9.5" fill="currentColor">(cart: union of items) and writes v3</text>
+        <text x="745" y="268" text-anchor="middle" font-size="9.5" fill="#D26A3F">LWW instead: simpler, silently loses one</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Quorums aren't linearizability</h4><p>Even with W + R &gt; N, edge cases remain: sloppy quorums, a write that failed after reaching one replica, and clock-based LWW. Don't promise strong consistency from quorums alone. If you truly need it for a key (a lock or a counter), use consensus (Raft or Paxos) or a lightweight transaction.</p></div>
+    <div class="card"><h4>Read repair</h4><p>When the replicas queried for a read disagree, the coordinator returns the newest version and writes it back to the stale replicas, synchronously or asynchronously. Frequently read keys stay consistent without any background job. Rarely read keys need anti-entropy.</p></div>
+    <div class="card"><h4>LWW or siblings?</h4><p>Cassandra chose last-writer-wins with timestamps: simple, but concurrent writes lose data and clock skew decides the winner. Dynamo and Riak chose vector clocks and siblings: nothing is lost, but clients must merge. CRDTs (counters, sets) merge automatically where the data type allows it.</p></div>
+  </div>
+</section>

@@ -1,0 +1,55 @@
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: high-level design">
+  <h2>A ring of identical nodes: any one coordinates, N replicate, W or R must answer</h2>
+  <p class="dek">There is no master. A client, or a partition-aware driver, sends a request to any node, and that node coordinates. It computes the key's replicas from the ring, forwards the request to all N, and replies as soon as W acknowledge a write or R answer a read. Every node runs the same stack, so the cluster grows by adding identical machines.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="A ring of eight nodes A to H. The client sends put of k and v to node G, which acts as coordinator. The key's token falls just after A, so its replicas are B, C and D. G forwards the write to B, C and D and acknowledges the client once 2 of them have acknowledged; D may be late. With N equal to 3, W equal to 2 and R equal to 2, W plus R is greater than N, so every read quorum overlaps the latest write quorum. Each node runs the same stack: a request coordinator, an LSM storage engine with commit log, memtable and SSTables, gossip with a failure detector, hinted handoff for replicas that are down, and anti-entropy repair with Merkle trees.">
+        <circle cx="330" cy="165" r="112" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5"></circle>
+        <path d="M373.8 61.9 A112 112 0 0 1 409.2 244.2" fill="none" stroke="#D26A3F" stroke-width="3" stroke-opacity="0.35"></path>
+        <circle cx="373.8" cy="61.9" r="4" fill="#D26A3F"></circle>
+        <text x="356" y="40" font-size="9" fill="#D26A3F" font-family="IBM Plex Mono, monospace">token(k)</text>
+
+        <g font-size="11" text-anchor="middle" fill="currentColor">
+          <circle cx="330" cy="53" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="330" y="57">A</text>
+          <circle cx="409.2" cy="85.8" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="409.2" y="89.8" font-weight="600">B</text>
+          <circle cx="442" cy="165" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="442" y="169" font-weight="600">C</text>
+          <circle cx="409.2" cy="244.2" r="20" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F" stroke-width="1.5"></circle><text x="409.2" y="248.2" font-weight="600">D</text>
+          <circle cx="330" cy="277" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="330" y="281">E</text>
+          <circle cx="250.8" cy="244.2" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="250.8" y="248.2">F</text>
+          <circle cx="218" cy="165" r="20" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.6"></circle><text x="218" y="169" font-weight="600">G</text>
+          <circle cx="250.8" cy="85.8" r="20" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></circle><text x="250.8" y="89.8">H</text>
+        </g>
+        <text x="218" y="200" text-anchor="middle" font-size="9" fill="#3AA79B">coordinator</text>
+
+        <rect x="20" y="142" width="90" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="162" text-anchor="middle" font-size="10" fill="currentColor">client</text><text x="65" y="176" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">or smart driver</text>
+        <line x1="110" y1="165" x2="195" y2="165" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <text x="152" y="158" text-anchor="middle" font-size="9" fill="#D26A3F">1 put(k, v)</text>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="236" y1="156" x2="388" y2="94" marker-end="url(#arwA)"></line><line x1="238" y1="165" x2="419" y2="165" marker-end="url(#arwA)"></line></g>
+        <line x1="235" y1="175" x2="390" y2="236" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="322" y="150" font-size="9" fill="#D26A3F">2 write to B, C, D</text>
+        <g font-size="9" fill="currentColor"><text x="20" y="214" fill="#D26A3F">3 ack after W = 2</text><text x="20" y="228" opacity="0.75">(D may answer late: fine)</text></g>
+        <g font-size="9.5" fill="currentColor"><text x="20" y="266" font-weight="600">N = 3 · W = 2 · R = 2</text><text x="20" y="282">W + R &gt; N: each read quorum</text><text x="20" y="296">overlaps the last write quorum</text></g>
+
+        <line x1="462" y1="165" x2="597" y2="165" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3"></line>
+        <text x="530" y="158" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">inside every node</text>
+        <text x="745" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">the same stack on every node</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="600" y="30" width="290" height="46" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="612" y="49" font-weight="600">request coordinator</text><text x="612" y="65" font-size="8.5" opacity="0.85">route by ring, fan out to N, wait for W or R</text>
+          <rect x="600" y="84" width="290" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="612" y="103" font-weight="600">storage engine (LSM)</text><text x="612" y="119" font-size="8.5" opacity="0.85">commit log → memtable → SSTables</text>
+          <rect x="600" y="138" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="157" font-weight="600">gossip + failure detector</text><text x="612" y="173" font-size="8.5" opacity="0.85">membership and ring state; phi-accrual suspicion</text>
+          <rect x="600" y="192" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="211" font-weight="600">hinted handoff</text><text x="612" y="227" font-size="8.5" opacity="0.85">hold writes for a replica that is down, replay later</text>
+          <rect x="600" y="246" width="290" height="46" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="612" y="265" font-weight="600">anti-entropy repair</text><text x="612" y="281" font-size="8.5" opacity="0.85">Merkle trees find divergent key ranges</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The copper arc is the key's preference list: walk clockwise from its token and take the first N distinct nodes. The coordinator, G here, doesn't need to be a replica, but smart drivers usually send the request straight to one to save a hop.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Membership by gossip</h4><p>Every second, each node exchanges its view of the cluster (who's up, which tokens they own, their heartbeat counters) with a few random peers. Changes reach all nodes in O(log n) rounds, with no central registry to fail. Seed nodes only help new nodes join.</p></div>
+    <div class="card"><h4>Failure detection is a suspicion level</h4><p>Instead of a fixed timeout, a phi-accrual detector turns the heartbeat inter-arrival history into a suspicion level. That adapts to slow networks. A suspected node is routed around, and no data moves until an operator or a policy decides it is permanently gone.</p></div>
+    <div class="card"><h4>Adding a node</h4><p>A new node takes vnode ranges from existing owners and streams those ranges in the background while the old owners keep serving. Only about 1/n of the data moves (n nodes), which is the whole point of consistent hashing compared with <code>hash mod N</code>.</p></div>
+  </div>
+</section>
