@@ -1,0 +1,37 @@
+<section class="slide" data-sec="Fundamentals" data-title="Terminology cheat sheet">
+  <h2>The vocabulary, one line each</h2>
+  <p class="dek">Use these words precisely. Interviewers notice when "consistent" or "partition" is used loosely, and each one below has a slide later in the deck.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Load and performance</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>QPS / RPS</dt><dd>Queries or requests per second. Always state average and peak (peak is usually 2–10× average).</dd>
+        <dt>DAU / MAU</dt><dd>Daily and monthly active users, the input to most estimates.</dd>
+        <dt>p50 / p99</dt><dd>Median and 99th-percentile latency. p99 is what your heaviest users feel.</dd>
+        <dt>Tail latency</dt><dd>The slow end of the distribution, which fan-out amplifies.</dd>
+        <dt>Throughput</dt><dd>Work completed per unit time, in requests, rows or bytes per second.</dd>
+        <dt>Hot spot / hot key</dt><dd>One partition or key getting a disproportionate share of traffic.</dd>
+        <dt>Fan-out</dt><dd>One request or event turning into many downstream calls or writes.</dd>
+        <dt>Back pressure</dt><dd>A slow consumer signalling upstream to slow down instead of drowning.</dd>
+        <dt>Thundering herd</dt><dd>Many clients hitting the same resource at once, e.g. after a cache expiry or a restart.</dd>
+        <dt>Head-of-line blocking</dt><dd>One slow item delaying everything queued behind it.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>Data and distribution</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Replication</dt><dd>The same data copied to several nodes, for availability and read scale.</dd>
+        <dt>Partitioning / sharding</dt><dd>Different data on different nodes, for write scale and size.</dd>
+        <dt>Network partition</dt><dd>Nodes that are up but can't reach each other. Not the same thing as a data partition.</dd>
+        <dt>Quorum</dt><dd>A majority, or R + W &gt; N, needed for an operation to count.</dd>
+        <dt>Linearizable</dt><dd>Behaves as if there were one copy. The precise meaning of "strongly consistent".</dd>
+        <dt>Eventual consistency</dt><dd>Replicas converge if writes stop; reads may be stale until then.</dd>
+        <dt>Idempotent</dt><dd>Doing it twice has the same effect as doing it once, which is what makes retries safe.</dd>
+        <dt>SPOF</dt><dd>Single point of failure: one component whose loss takes the system down.</dd>
+        <dt>Split brain</dt><dd>Two nodes both acting as the leader after a partition.</dd>
+        <dt>RPO / RTO</dt><dd>How much data you can lose, and how long you can be down.</dd>
+      </dl>
+    </div>
+  </div>
+</section>

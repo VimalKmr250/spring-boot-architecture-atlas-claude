@@ -1,0 +1,76 @@
+<section class="slide" data-sec="Fundamentals" data-title="Availability patterns">
+  <h2>Fail-over and replication: keep a second copy ready to take over</h2>
+  <p class="dek">There are two ways to survive losing a node. Keep a standby that takes over (active-passive), or have every node serve all the time (active-active). The first is simpler. The second uses all the hardware you pay for, but it needs a way to settle conflicting writes.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: active-passive. Clients reach a virtual IP pointing at the active node, which replicates to a passive standby and exchanges heartbeats with it; on failure the virtual IP moves to the standby. Right: active-active. A load balancer spreads clients over two active nodes that replicate to each other in both directions.">
+        <text x="215" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Active-passive (fail-over)</text>
+        <rect x="150" y="38" width="130" height="36" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="215" y="61" text-anchor="middle" font-size="11.5" fill="currentColor">clients</text>
+        <rect x="150" y="96" width="130" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="215" y="118" text-anchor="middle" font-size="11.5" fill="currentColor">virtual IP / DNS</text>
+        <line x1="215" y1="74" x2="215" y2="93" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="40" y="170" width="150" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="115" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Active</text>
+        <text x="115" y="212" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">serves all traffic</text>
+        <rect x="240" y="170" width="150" height="56" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="5 4"></rect>
+        <text x="315" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Passive</text>
+        <text x="315" y="212" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">idle standby</text>
+        <line x1="190" y1="130" x2="140" y2="167" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="240" y1="130" x2="290" y2="167" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="2 4"></line>
+        <text x="300" y="150" font-size="10" fill="currentColor" opacity="0.65">after fail-over</text>
+        <line x1="190" y1="188" x2="237" y2="188" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="215" y="248" text-anchor="middle" font-size="10.5" fill="#3AA79B">replication →</text>
+        <line x1="190" y1="210" x2="237" y2="210" stroke="#8A94A3" stroke-width="1" marker-start="url(#arw)" marker-end="url(#arw)"></line>
+        <text x="215" y="268" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">↔ heartbeat: silence triggers promotion</text>
+
+        <line x1="450" y1="20" x2="450" y2="280" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="680" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Active-active</text>
+        <rect x="615" y="38" width="130" height="36" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="680" y="61" text-anchor="middle" font-size="11.5" fill="currentColor">clients</text>
+        <rect x="615" y="96" width="130" height="34" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="680" y="118" text-anchor="middle" font-size="11.5" fill="currentColor">load balancer</text>
+        <line x1="680" y1="74" x2="680" y2="93" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <rect x="500" y="170" width="150" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="575" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Node A</text>
+        <text x="575" y="212" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">serves ~50%</text>
+        <rect x="710" y="170" width="150" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="785" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Node B</text>
+        <text x="785" y="212" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">serves ~50%</text>
+        <line x1="655" y1="130" x2="600" y2="167" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="705" y1="130" x2="760" y2="167" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="652" y1="198" x2="707" y2="198" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-start="url(#arwB)" marker-end="url(#arwB)"></line>
+        <text x="680" y="248" text-anchor="middle" font-size="10.5" fill="#3AA79B">replication both ways: conflicts possible</text>
+        <text x="680" y="268" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">run each at ≤ 50% so one can absorb the other's load</text>
+      </svg>
+    </div>
+    <figcaption>For stateless services, active-active is the default: identical replicas behind a load balancer. The hard version is active-active for <em>data</em>, because two nodes can accept conflicting writes. That calls for partitioned ownership (each key has one home), or conflict resolution such as last-write-wins or CRDTs.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:440px">
+        <thead><tr><th>Standby</th><th>State</th><th>Recovery (RTO)</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td>Cold</td><td>Backups only; provision on failure</td><td class="num">hours</td><td>lowest</td></tr>
+          <tr><td>Warm</td><td>Running, replicating, scaled down</td><td class="num">minutes</td><td>medium</td></tr>
+          <tr><td>Hot</td><td>Fully sized, in sync, auto-promoted</td><td class="num">seconds</td><td>≈ 2×</td></tr>
+          <tr><td>Active-active</td><td>Serving live traffic</td><td class="num">≈ 0 (reroute)</td><td>≈ 2×, plus conflict handling</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>What goes wrong in fail-over</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Split brain:</b> a network blip makes both nodes think they're the primary. Prevent it with a quorum or a lease, and fence the old primary.</li>
+        <li><b>Lost writes:</b> with async replication, writes the standby hadn't received are gone. That window is the RPO.</li>
+        <li><b>Flapping:</b> too-sensitive health checks fail over back and forth. Add hysteresis.</li>
+        <li><b>Untested standby:</b> a fail-over nobody has rehearsed usually fails. Run game days.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Multi-region">Deck · Multi-region</a><a data-deck="deck" data-slide="Disaster recovery">Deck · Disaster recovery</a></p>
+</section>

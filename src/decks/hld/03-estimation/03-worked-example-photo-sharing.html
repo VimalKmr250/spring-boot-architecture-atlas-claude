@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Estimation" data-title="Worked example: photo sharing">
+  <h2>Worked estimate: a photo-sharing app with 100 million daily users</h2>
+  <p class="dek">The assumptions, said out loud: 100 M daily active users. Each user views about 50 photos a day, and one user in five uploads one photo a day. An original photo compresses to about 500 KB, and its thumbnails add about 100 KB. A feed-sized image served to a phone is about 100 KB. Peak traffic is 3× the average.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Read path: 100 million users times 50 views is 5 billion views a day, about 58 thousand a second, about 175 thousand at peak; times 100 KB is about 46 gigabits per second out, so a CDN is mandatory. Write path: 100 million times 0.2 is 20 million uploads a day, about 230 a second; times 600 KB is 12 terabytes a day, about 4.4 petabytes a year, so blobs go to object storage and only 1 KB of metadata per photo goes to a database.">
+        <text x="225" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Reads</text>
+        <text x="675" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Writes</text>
+
+        <g font-size="11.5" fill="currentColor" text-anchor="middle">
+          <rect x="95" y="32" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="225" y="57">100 M DAU × 50 views = 5 B views/day</text>
+          <rect x="95" y="96" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="225" y="121">÷ 86,400 ≈ 58 k/s · peak ≈ 175 k/s</text>
+          <rect x="95" y="160" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="225" y="185">× 100 KB ≈ 5.8 GB/s ≈ 46 Gbps out</text>
+
+          <rect x="545" y="32" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="675" y="57">100 M × 0.2 = 20 M uploads/day</text>
+          <rect x="545" y="96" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="675" y="121">≈ 230/s · peak ≈ 700/s · in ≈ 1 Gbps</text>
+          <rect x="545" y="160" width="260" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="675" y="185">× 600 KB = 12 TB/day ≈ 4.4 PB/year</text>
+        </g>
+        <line x1="225" y1="72" x2="225" y2="93" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="225" y1="136" x2="225" y2="157" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="675" y1="72" x2="675" y2="93" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="675" y1="136" x2="675" y2="157" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+
+        <text x="450" y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#D26A3F">read : write</text>
+        <text x="450" y="130" text-anchor="middle" font-size="12" font-weight="600" fill="#D26A3F">≈ 250 : 1</text>
+
+        <line x1="225" y1="200" x2="225" y2="229" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="675" y1="200" x2="675" y2="229" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <rect x="40" y="232" width="370" height="84" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="225" y="254" font-weight="600">⇒ A CDN is mandatory; the origin must never see this</text>
+          <text x="225" y="274">⇒ Metadata cache: ~20% of 200 M hot photos × 1 KB ≈ 40 GB</text>
+          <text x="225" y="294">⇒ Feed reads are precomputed, not queried live</text>
+        </g>
+        <rect x="490" y="232" width="370" height="84" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <text x="675" y="254" font-weight="600">⇒ Blobs go to object storage (~22 PB in 5 years)</text>
+          <text x="675" y="274">⇒ Metadata: 20 M rows/day × 1 KB ≈ 7 TB/year → shard</text>
+          <text x="675" y="294">⇒ 700 writes/s is easy; the size is the problem</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Read the conclusions, not the arithmetic. The reads are a bandwidth problem, solved at the edge with a CDN. The writes are a storage-volume problem, solved by keeping blobs out of the database. Neither QPS figure is frightening once the right tier absorbs it. That conclusion is what the estimate is for.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The script, spoken</h3>
+      <p style="color:var(--text-2);font-size:14px;margin-top:8px">"100 million users times 50 views is 5 billion a day. Divided by about 10⁵ seconds, that's roughly 50 thousand a second, and about 150 thousand at peak. Each view is about 100 KB, so tens of gigabits per second leave the system. That has to come from a CDN. Uploads are 20 million a day, a few hundred a second, but at 600 KB each that's 12 terabytes a day. So photos go to object storage, and only metadata goes to a database."</p>
+    </div>
+    <div class="panel">
+      <h3>Sanity checks worth a sentence</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>Is 50 views a day plausible? It is for a scrolling feed. For a utility app, it might be 5.</li>
+        <li>Storage is often dominated by <b>derived</b> data: thumbnails, transcodes, indexes, replicas. Add it.</li>
+        <li>Retention changes everything: keep forever, or delete after 30 days?</li>
+        <li>Erasure coding (≈ 1.5×) instead of 3 full replicas saves a third of the raw storage at PB scale.</li>
+      </ul>
+    </div>
+  </div>
+</section>

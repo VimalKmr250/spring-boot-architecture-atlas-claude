@@ -1,0 +1,67 @@
+<section class="slide" data-sec="Estimation" data-title="Capacity rules of thumb">
+  <h2>What one well-tuned node can take, to an order of magnitude</h2>
+  <p class="dek">An estimate means nothing until it meets a capacity. These ranges are for a commodity cloud node (8–32 cores, SSD, 10 Gbps) doing simple operations. Real numbers depend heavily on payload size, query shape and tuning, so treat them as "which order of magnitude" guides and say so in the interview.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Operations per second per node on a log scale. App server with simple API: 1 to 10 thousand. OpenSearch node: 500 to 5 thousand queries. PostgreSQL primary indexed writes: 5 to 30 thousand. PostgreSQL indexed point reads: 10 to 100 thousand. Cassandra node writes: 10 to 50 thousand. L7 proxy: 10 to 100 thousand. Redis instance: 100 to 500 thousand. Kafka broker small messages: 100 thousand to 1 million.">
+        <g font-size="10" fill="currentColor" opacity="0.55" text-anchor="middle">
+          <text x="270" y="20">100</text><text x="386" y="20">1 k</text><text x="502" y="20">10 k</text><text x="618" y="20">100 k</text><text x="734" y="20">1 M</text><text x="850" y="20">10 M</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.12">
+          <line x1="270" y1="26" x2="270" y2="270"></line><line x1="386" y1="26" x2="386" y2="270"></line><line x1="502" y1="26" x2="502" y2="270"></line>
+          <line x1="618" y1="26" x2="618" y2="270"></line><line x1="734" y1="26" x2="734" y2="270"></line><line x1="850" y1="26" x2="850" y2="270"></line>
+        </g>
+        <g font-size="11" fill="currentColor" text-anchor="end">
+          <text x="258" y="48">OpenSearch node (queries)</text>
+          <text x="258" y="76">App server, simple JSON API</text>
+          <text x="258" y="104">PostgreSQL primary: writes</text>
+          <text x="258" y="132">Cassandra node: writes</text>
+          <text x="258" y="160">PostgreSQL: indexed reads</text>
+          <text x="258" y="188">L7 proxy (Nginx / Envoy)</text>
+          <text x="258" y="216">Redis instance</text>
+          <text x="258" y="244">Kafka broker, 1 KB messages</text>
+        </g>
+        <g>
+          <rect x="351" y="37" width="116" height="14" rx="7" fill="#8A94A3" fill-opacity="0.7"></rect>
+          <rect x="386" y="65" width="116" height="14" rx="7" fill="#8A94A3" fill-opacity="0.7"></rect>
+          <rect x="467" y="93" width="90" height="14" rx="7" fill="#D26A3F" fill-opacity="0.75"></rect>
+          <rect x="502" y="121" width="81" height="14" rx="7" fill="#8A94A3" fill-opacity="0.7"></rect>
+          <rect x="502" y="149" width="116" height="14" rx="7" fill="#8A94A3" fill-opacity="0.7"></rect>
+          <rect x="502" y="177" width="116" height="14" rx="7" fill="#8A94A3" fill-opacity="0.7"></rect>
+          <rect x="618" y="205" width="81" height="14" rx="7" fill="#3AA79B" fill-opacity="0.75"></rect>
+          <rect x="618" y="233" width="116" height="14" rx="7" fill="#3AA79B" fill-opacity="0.75"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="475" y="48">0.5–5 k/s</text>
+          <text x="510" y="76">1–10 k/s</text>
+          <text x="565" y="104">5–30 k/s</text>
+          <text x="591" y="132">10–50 k/s</text>
+          <text x="626" y="160">10–100 k/s</text>
+          <text x="626" y="188">10–100 k/s</text>
+          <text x="707" y="216">100–500 k/s</text>
+          <text x="742" y="244">0.1–1 M msg/s</text>
+        </g>
+        <text x="850" y="290" text-anchor="end" font-size="10.5" fill="currentColor" opacity="0.7">operations per second per node, log scale →</text>
+      </svg>
+    </div>
+    <figcaption>The copper bar is the usual first bottleneck: writes to a single relational primary. Teal bars are the components you put in front of it (a cache) or beside it (a log) so that it sees less of the load. When an estimate lands within 3× of a bar's upper end, plan the next step now: replicas, a cache, partitioning.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Other limits per node</th><th>Rough practical ceiling</th></tr></thead>
+        <tbody>
+          <tr><td>Relational DB size</td><td>1–10 TB before backups, vacuum and migrations get painful</td></tr>
+          <tr><td>Redis memory</td><td>25–100 GB per instance; cluster beyond</td></tr>
+          <tr><td>Concurrent WebSockets per server</td><td>100 k – 1 M, bounded by memory (~10–50 KB each)</td></tr>
+          <tr><td>Kafka partition write rate</td><td>~10 MB/s per partition is a safe planning figure</td></tr>
+          <tr><td>DB connections (PostgreSQL)</td><td>a few hundred active; put a pooler in front</td></tr>
+          <tr><td>Network per instance</td><td>10–25 Gbps; egress cost often binds first</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">How to use them</span>Say "roughly" and the order of magnitude: "About 3,000 writes a second at peak. A single PostgreSQL primary handles that with headroom, so I won't shard on day one, but I'll pick a partition key now so sharding later is a migration, not a redesign." Then move on. Nobody will argue about 5k versus 15k.</div>
+  </div>
+</section>
