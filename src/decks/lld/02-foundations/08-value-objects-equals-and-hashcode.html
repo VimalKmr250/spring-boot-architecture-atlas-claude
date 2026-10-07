@@ -1,0 +1,97 @@
+<section class="slide" data-sec="Foundations" data-title="Value objects, equals and hashCode">
+  <h2>Value objects are equal by value; entities are equal by identity</h2>
+  <p class="dek">A <b>value object</b> such as <code>Money</code>, <code>Seat</code> or <code>Position</code> has no identity: two with the same fields are the same value. Make it immutable, and a record gives you <code>equals</code> and <code>hashCode</code> for free. An <b>entity</b> such as <code>Member</code> or <code>Booking</code> keeps its identity while its fields change, so it is equal by its id alone.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ValueObjects.java · money, an entity, and the mutable-key trap</div>
+<pre><code class="language-java">import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+
+record Money(BigDecimal amount, Currency currency) {     // value object
+    Money {                                              // compact constructor:
+        Objects.requireNonNull(amount, "amount");        // validate, then
+        Objects.requireNonNull(currency, "currency");    // normalise the scale
+        amount = amount.setScale(currency.getDefaultFractionDigits(),
+                                 RoundingMode.HALF_EVEN);
+    }
+    static Money of(String amount, String code) {
+        return new Money(new BigDecimal(amount), Currency.getInstance(code));
+    }
+    Money plus(Money o) {
+        if (!currency.equals(o.currency))
+            throw new IllegalArgumentException("currency mismatch");
+        return new Money(amount.add(o.amount), currency);
+    }
+}
+
+final class Member {                                     // entity
+    private final String id;
+    private String email;                                // may change
+    Member(String id, String email) { this.id = id; this.email = email; }
+    void changeEmail(String email) { this.email = email; }
+    @Override public boolean equals(Object o) {
+        return o instanceof Member m &amp;&amp; id.equals(m.id);
+    }
+    @Override public int hashCode() { return id.hashCode(); }
+    @Override public String toString() { return id + "&lt;" + email + "&gt;"; }
+}
+
+final class MutablePoint {                               // the trap
+    int x, y;
+    MutablePoint(int x, int y) { this.x = x; this.y = y; }
+    @Override public boolean equals(Object o) {
+        return o instanceof MutablePoint p &amp;&amp; x == p.x &amp;&amp; y == p.y;
+    }
+    @Override public int hashCode() { return Objects.hash(x, y); }
+}
+
+public class ValueObjects {
+    public static void main(String[] args) {
+        System.out.println("double 0.1 + 0.2       = " + (0.1 + 0.2));
+        System.out.println("Money  0.10 + 0.20     = "
+                + Money.of("0.10", "USD").plus(Money.of("0.20", "USD")));
+        System.out.println("BigDecimal 10.5 vs 10.50: "
+                + new BigDecimal("10.5").equals(new BigDecimal("10.50")));
+        System.out.println("Money      10.5 vs 10.50: "
+                + Money.of("10.5", "USD").equals(Money.of("10.50", "USD")));
+
+        Set&lt;Member&gt; members = new HashSet&lt;&gt;();
+        Member ana = new Member("M-1", "ana@old.example");
+        members.add(ana);
+        ana.changeEmail("ana@new.example");
+        System.out.println("entity found after edit: " + members.contains(ana));
+
+        Set&lt;MutablePoint&gt; points = new HashSet&lt;&gt;();
+        MutablePoint p = new MutablePoint(1, 2);
+        points.add(p);
+        p.x = 5;                                          // hash changes
+        System.out.println("mutable key found:       " + points.contains(p)
+                + " (size " + points.size() + ")");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ValueObjects.java</div>
+<pre><code class="language-plaintext">double 0.1 + 0.2       = 0.30000000000000004
+Money  0.10 + 0.20     = Money[amount=0.30, currency=USD]
+BigDecimal 10.5 vs 10.50: false
+Money      10.5 vs 10.50: true
+entity found after edit: true
+mutable key found:       false (size 1)</code></pre>
+      </div>
+      <div class="panel">
+        <h3>The rules the demo shows</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Never use <code>double</code> for money.</b> Use <code>BigDecimal</code> with a fixed scale, or a <code>long</code> of minor units (cents).</li>
+          <li><b><code>BigDecimal.equals</code> compares scale too</b>, so 10.5 and 10.50 differ. Normalise the scale in the constructor, or compare with <code>compareTo</code>.</li>
+          <li><b>Validate in the compact constructor.</b> Then no invalid <code>Money</code> can exist anywhere in the program.</li>
+          <li><b>Base an entity's <code>equals</code> on its id only</b>, and make the id final. Editing an email must not change which member it is.</li>
+          <li><b>Never put a mutable object in a hash set or use it as a map key</b> if the fields in its <code>hashCode</code> can change. The object is still in the set, but <code>contains</code> looks in the wrong bucket and cannot find it.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>

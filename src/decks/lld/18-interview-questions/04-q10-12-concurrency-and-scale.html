@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q10–12 · Concurrency and scale">
+  <h2>Three questions that separate mid-level from senior answers</h2>
+  <p class="dek">These are the follow-ups asked once the design works. A strong answer names the shared state, the invariant and the atomic step before naming any tool, and says what changes when the design leaves a single JVM.</p>
+
+  <article class="q"><header><i>Q10</i><h3>Two users book the same seat at the same moment. What happens in your design?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Exactly one wins, because claiming a seat is a single atomic operation: <code>putIfAbsent</code> on the show's claim map, or an insert against a unique key in the database. A multi-seat hold claims seats in sorted order and releases everything on the first conflict, so there are no partial holds. Holds carry an expiry that is checked whenever someone wants the seat, so an abandoned hold frees itself.</div>
+    <p class="deeper"><b>Go deeper:</b> Cover the payment race. Charge first, then confirm under the booking's own lock only if the hold is still alive; if it expired during payment, refund. "Confirm" and "expire" cannot both succeed, because both go through that lock. For many servers, the same three steps are an insert on a unique key, a conditional update that takes over a dead hold, and a delete that releases only your own claim.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Movie booking · the model">Booking model</a><a data-deck="lld" data-slide="Movie booking · decisions and follow-ups">Booking decisions</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q11</i><h3>Design a thread-safe LRU cache.</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>A hash map from key to node for O(1) lookup, and a doubly linked list of nodes in recency order, with sentinel head and tail. <code>get</code> moves the node to the front; <code>put</code> adds at the front and evicts from the back when full. For thread safety, one lock around each operation, because <code>get</code> modifies the list. That also rules out a read-write lock.</div>
+    <p class="deeper"><b>Go deeper:</b> Offer the scaling options: striped segments (approximate LRU, less contention), or a concurrent map with buffered recency updates, which is Caffeine's approach and what you would use in production. Mention the loading-cache follow-up: never load while holding the lock, and use a map of in-flight futures so a hundred concurrent misses trigger one load.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="Thread-safe LRU cache: design">LRU design</a><a data-deck="lld" data-slide="Thread-safe LRU cache: code">LRU code</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q12</i><h3>Your design now runs on ten servers. What changes?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>The classes stay; their guardians move. In-memory maps become tables, and the database becomes the source of truth. Every check-then-act becomes a conditional write or a unique constraint, which enforces the invariant for all servers at once. Ids come from sequences or UUIDs, not an <code>AtomicInteger</code>. Retries need idempotency keys, and in-process events go through an outbox to a broker.</div>
+    <p class="deeper"><b>Go deeper:</b> Name the shard key: the aggregate no transaction crosses, such as the lot, the show or the group. Name what may be stale (seat maps, free-spot displays) and what may not (claims, debits). Say you would avoid distributed locks by making writes conditional, and if you needed one, use a lease with a fencing token. Finally, name the hot spot a shard cannot fix, such as a blockbuster's opening night, and put a waiting room in front of it.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="lld" data-slide="From one JVM to many">From one JVM to many</a><a data-deck="lld" data-slide="Idempotency and optimistic locking">Idempotency</a><a data-deck="lld" data-slide="Distributed locks and leases">Leases</a></p>
+  </div></article>
+</section>

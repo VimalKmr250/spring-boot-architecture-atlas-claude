@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Movie booking" data-title="Movie booking · requirements">
+  <h2>Movie booking: many users, one seat map, and a hold that must expire</h2>
+  <p class="dek">BookMyShow-style booking is the LLD problem where concurrency is the requirement, not a follow-up. Two people clicking the same seat at the same moment must not both get it. A user who selects seats and walks away must not block them forever. Payment takes time, and the hold can run out while it happens.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Functional requirements</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>A <b>show</b> is a movie on a screen at a start time. Its seats have a <b>category</b>: regular, premium or recliner.</li>
+        <li>A user selects one or more seats and gets a <b>hold</b> on all of them, or on none. A partial hold is never created.</li>
+        <li>A hold lasts <b>8 minutes</b>. After that the seats are free for anyone, without waiting for a cleanup job.</li>
+        <li>The price is the category's base price, <b>+25% on weekends</b>, and must be changeable.</li>
+        <li>Paying <b>confirms</b> the booking. If the hold expired while the payment was in progress, the payment is <b>refunded</b> and the booking fails.</li>
+        <li>A user can <b>cancel</b> a hold before paying; the seats are released at once.</li>
+        <li>Anyone can see the <b>seat map</b>: free, held or sold.</li>
+      </ol>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>Questions to ask first</h3>
+        <dl class="kv" style="margin-top:10px">
+          <dt>How many users on one show?</dt><dd>Hundreds at release time, all hitting the same seats. Design for contention.</dd>
+          <dt>Cities, theatres, search?</dt><dd>Catalogue browsing is out of scope; start from a show.</dd>
+          <dt>Cancelling a paid booking?</dt><dd>A follow-up, with a refund policy.</dd>
+          <dt>Payment provider?</dt><dd>Behind an interface; it can be slow or fail.</dd>
+          <dt>Seat rules (no single gaps)?</dt><dd>Not now. It is a good follow-up.</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Nouns, and what they become</h3>
+        <div class="tagrow" style="margin-top:10px">
+          <span class="tag a">BookingService · facade</span><span class="tag a">Show</span><span class="tag a">Booking</span>
+          <span class="tag s">Seat · record</span><span class="tag s">Movie · record</span><span class="tag s">SeatCategory · enum</span><span class="tag s">BookingStatus · enum</span>
+          <span class="tag">PricingStrategy</span><span class="tag">PaymentGateway</span>
+        </div>
+        <p style="color:var(--text-3);font-size:13px;margin-top:10px">Not classes here: <i>theatre</i>, <i>city</i>, <i>screen</i> (the seat layout is all the show needs), <i>user</i> (an id), <i>ticket</i> (a confirmed booking).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say the concurrency plan in the first ten minutes</span>"Each seat of a show is claimed atomically; a multi-seat hold claims them in a fixed order and rolls back on the first conflict. Expiry is checked when someone wants the seat, so no job is needed for correctness." Interviewers want to hear this before the class diagram.</div>
+</section>

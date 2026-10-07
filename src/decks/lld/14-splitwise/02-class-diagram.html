@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Splitwise" data-title="Splitwise · class diagram">
+  <h2>Splitwise: split rules compute shares, the ledger nets debts, the simplifier plans payments</h2>
+  <p class="dek">The split types differ in how they turn a total into shares, and in what they validate, so each is its own record behind a sealed interface. Three of them are the same weighted split with different weights. The ledger keeps one netted debt per pair of people. The simplifier is a pure function from net balances to payments: a pure fabrication in GRASP terms, since no domain object owns it.</p>
+
+  <div class="split">
+<div class="tree"><span class="h">«sealed interface» SplitRule</span>
+  + shares(total) : Map&lt;person, paise&gt;   <span class="c">sums to total</span>
+  ┄┄▷ «record» EqualSplit(people)        <span class="c">weights 1, 1, 1</span>
+  ┄┄▷ «record» ShareSplit(weights)       <span class="c">weights 1, 2</span>
+  ┄┄▷ «record» PercentSplit(percents)    <span class="c">weights must sum to 100</span>
+  ┄┄▷ «record» ExactSplit(amounts)       <span class="c">must sum to total</span>
+
+<span class="h">SplitRules</span>                         <span class="c">factory</span>
+  + of(type, people, values) : SplitRule
+  + byWeight(total, weights) : Map      <span class="c">shared rounding rule</span>
+
+<span class="h">Ledger</span>
+  - owes : Map&lt;debtor, Map&lt;creditor, paise&gt;&gt;  <span class="c">netted</span>
+  - expenses : List&lt;Expense&gt;
+  + add(payer, total, SplitRule) : Expense
+  + settle(from, to, paise)
+  + netBalances() : Map&lt;person, paise&gt;
+  + debts() : List&lt;Transfer&gt;
+  ◆── * Expense   ┄┄> SplitRule
+
+<span class="h">DebtSimplifier</span>                     <span class="c">pure function</span>
+  + simplify(netBalances) : List&lt;Transfer&gt;
+
+<span class="h">«record» Expense</span>   id, payer, total, shares
+<span class="h">«record» Transfer</span>  from, to, paise</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Owns the decision</th></tr></thead>
+          <tbody>
+            <tr><td>Each <code>SplitRule</code></td><td>Its validation, and how a total becomes shares</td></tr>
+            <tr><td><code>SplitRules</code></td><td>Which rule a command means; the rounding rule every weighted split shares</td></tr>
+            <tr><td><code>Ledger</code></td><td>Recording debts and netting them per pair</td></tr>
+            <tr><td><code>DebtSimplifier</code></td><td>Which payments settle a set of balances</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Strategy, sealed</span>Each split rule is a strategy, with one method. It is sealed because the set of split types is part of the product and the parser must handle all of them. A new type (split by nights stayed) is a new record, one factory case, and a compile error until both are written.</div>
+      <div class="note"><span class="lbl">Net per pair, or net per person?</span>The ledger keeps "bo owes ana 400" per pair, so the app can show each friendship. Per-person net balances are derived from it, and are all the simplifier needs. Storing both would mean two sources of truth that can drift apart.</div>
+    </div>
+  </div>
+</section>

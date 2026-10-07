@@ -1,0 +1,77 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Dependency inversion">
+  <h2>D · Business rules depend on interfaces they own, and never on the details</h2>
+  <p class="dek">The high-level class (<code>OrderService</code>) declares the interface it needs (<code>PaymentGateway</code>), and the low-level class (the vendor adapter) implements it. The source-code arrow now points from detail to policy, the reverse of the call direction. That is what lets you swap the vendor, or test with a fake, without editing the business rule.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DipDemo.java · the policy owns the interface</div>
+<pre><code class="language-java">import java.util.*;
+
+record Order(String id, long amountCents) {}
+record Charge(String orderId, long amountCents, String reference) {}
+
+interface PaymentGateway {                  // declared by the order module
+    Charge charge(String orderId, long amountCents);
+}
+
+final class OrderService {                  // high-level policy
+    private final PaymentGateway gateway;   // injected, never created here
+    OrderService(PaymentGateway gateway) {
+        this.gateway = Objects.requireNonNull(gateway);
+    }
+    String checkout(Order o) {
+        if (o.amountCents() &lt;= 0) throw new IllegalArgumentException("amount");
+        Charge c = gateway.charge(o.id(), o.amountCents());
+        return "order " + o.id() + " paid, ref " + c.reference();
+    }
+}
+
+final class FakeGateway implements PaymentGateway {        // tests, demos
+    final List&lt;Charge&gt; charges = new ArrayList&lt;&gt;();
+    public Charge charge(String id, long cents) {
+        var c = new Charge(id, cents, "FAKE-" + (charges.size() + 1));
+        charges.add(c);
+        return c;
+    }
+}
+
+final class CardNetworkGateway implements PaymentGateway { // the detail
+    public Charge charge(String id, long cents) {          // would wrap the
+        return new Charge(id, cents, "ch_" + id.toLowerCase()); // vendor SDK
+    }
+}
+
+public class DipDemo {
+    public static void main(String[] args) {               // composition root
+        var fake = new FakeGateway();
+        var underTest = new OrderService(fake);
+        System.out.println(underTest.checkout(new Order("A-1", 2500)));
+        System.out.println(underTest.checkout(new Order("A-2", 990)));
+        System.out.println("recorded: " + fake.charges.stream()
+                .map(Charge::reference).toList());
+
+        var live = new OrderService(new CardNetworkGateway());
+        System.out.println(live.checkout(new Order("B-7", 4200)));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · DipDemo.java</div>
+<pre><code class="language-plaintext">order A-1 paid, ref FAKE-1
+order A-2 paid, ref FAKE-2
+recorded: [FAKE-1, FAKE-2]
+order B-7 paid, ref ch_b-7</code></pre>
+      </div>
+<div class="tree"><span class="h">Call direction</span>
+  OrderService ──calls──> CardNetworkGateway
+
+<span class="h">Source dependency, inverted</span>
+  OrderService ──> «interface» PaymentGateway
+                              ▲
+                              ┆ implements
+                   CardNetworkGateway</div>
+      <div class="note"><span class="lbl">Inversion is not injection</span>Dependency <b>injection</b> is how the object arrives: through the constructor, from <code>main</code> or from Spring. Dependency <b>inversion</b> is who owns the interface. Injecting a concrete <code>CardNetworkGateway</code> is injection without inversion, and still couples the policy to the vendor.</div>
+    </div>
+  </div>
+</section>

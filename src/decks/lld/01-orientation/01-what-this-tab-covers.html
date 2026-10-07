@@ -1,0 +1,39 @@
+<section class="slide" data-sec="Orientation" data-title="What this tab covers">
+  <h2>Low-level design: from a one-line prompt to classes that run</h2>
+  <p class="lede">This tab prepares you for the low-level design round, sometimes called object-oriented design or machine coding. You get a prompt such as "design a parking lot" and turn it into requirements, a class diagram and working Java in under an hour. It starts with the principles and the 23 patterns, works seven classic problems end to end, and ends with concurrency, scale and the interview itself.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">7</span><p>problems solved in full: parking lot, library, ATM, chess, elevator, movie booking and Splitwise. Each has its requirements, a class diagram, runnable code and the follow-up questions interviewers ask.</p></div>
+    <div class="card lift"><span class="bignum">23</span><p>Gang of Four patterns. The common ones get a slide each with running code; the rest share slides. One slide shows which patterns are easy to confuse and how to tell them apart.</p></div>
+    <div class="card lift"><span class="bignum">21</span><p>JDK 21 is the baseline. Features added after Java 17 carry a <span class="tag a">since 21</span> tag, so you know which to avoid if your interview runs on an older JDK.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The eighteen sections</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Orientation</dt><dd>this slide, and the seven problems at a glance</dd>
+        <dt>Foundations</dt><dd>what LLD is, the OO pillars, class relationships, how to read the diagrams, value objects, the Java 21 toolkit</dd>
+        <dt>SOLID and friends</dt><dd>the five SOLID principles, DRY/KISS/YAGNI, coupling, cohesion, Demeter, GRASP</dd>
+        <dt>Design patterns</dt><dd>the catalogue, then creational, structural and behavioural patterns, with code</dd>
+        <dt>Seven problems</dt><dd>one section each, five or six slides, from requirements to follow-ups</dd>
+        <dt>Concurrency</dt><dd>locks, atomics, virtual threads, a thread-safe LRU cache, a token-bucket rate limiter</dd>
+        <dt>Scale and distribution</dt><dd>what changes when the objects live in more than one JVM</dd>
+        <dt>Interview strategy</dt><dd>the 45-minute plan, what is scored, the mistakes that sink candidates, a practice plan</dd>
+        <dt>Interview questions</dt><dd>twelve questions, each with a 30-second answer</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>How to use it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each problem is its own section.</li>
+          <li>New to LLD? Read Foundations and SOLID first. The problem sections assume you know the vocabulary.</li>
+          <li>Short on time? Read <a data-deck="lld" data-slide="The 45-minute plan">the 45-minute plan</a>, then do two problems with the code covered: write your own version, then compare.</li>
+          <li>Class diagrams are drawn as text, in the notation on <a data-deck="lld" data-slide="Reading the class diagrams">Reading the class diagrams</a>, because that is what you can draw in a shared editor.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">How the code is written</span>A code label that starts with a file name, such as <code>ParkingLot.java · 1 of 3</code>, is a complete Java file, or one numbered part of one. The parts join in slide order into a file that compiles with <code>javac --release 21 -Xlint:all</code> without warnings. The block labelled <b>Output on JDK 21</b> is what that file actually printed. Demos use a fixed clock and ordered maps, so they print the same thing on every run.</div>
+    </div>
+  </div>
+</section>

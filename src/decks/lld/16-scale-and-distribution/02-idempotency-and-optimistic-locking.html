@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Scale and distribution" data-title="Idempotency and optimistic locking">
+  <h2>Idempotency keys make retries safe; version columns make concurrent edits safe</h2>
+  <p class="dek">Across a network every call can time out without telling you whether it worked, so clients retry, and the server must treat a repeat as the same request. And two servers can read the same row and both write it back; the second write must fail rather than overwrite the first. These two techniques cover most of the correctness follow-ups in LLD.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Idempotency key · the client picks it, the server remembers it</div>
+<pre><code class="language-sql">-- client sends: POST /bookings/BK7/confirm   Idempotency-Key: 9f1c…
+CREATE TABLE idempotency (
+  key        VARCHAR(64) PRIMARY KEY,   -- unique: the second insert fails
+  response   TEXT,
+  created_at TIMESTAMP NOT NULL
+);
+
+-- in the same transaction as the real work:
+INSERT INTO idempotency(key, created_at) VALUES (:key, now());
+--   duplicate key?  return the stored response, do nothing else
+UPDATE booking SET status = 'CONFIRMED' WHERE id = :id AND status = 'HELD';
+UPDATE idempotency SET response = :json WHERE key = :key;</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Where it goes in the problems</span>Payment charges and refunds (the ATM's debit request id), booking confirmation (a payment webhook delivered twice), Splitwise expenses uploaded twice from a phone on a bad network. The ATM's <code>reverse</code> already works this way: a second reversal of the same id does nothing.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Optimistic locking · read the version, write only if unchanged</div>
+<pre><code class="language-sql">SELECT id, vehicle, version FROM parking_spot WHERE id = 'F1-M1';
+--   id=F1-M1 vehicle=NULL version=41
+
+UPDATE parking_spot
+   SET vehicle = 'CAR-A', version = version + 1
+ WHERE id = 'F1-M1' AND version = 41;
+--   1 row  → we won
+--   0 rows → someone else changed it: re-read, retry or pick another spot</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">The same thing in JPA</div>
+<pre><code class="language-java">@Entity
+class ParkingSpot {
+    @Id String id;
+    String vehicle;
+    @Version long version;   // Hibernate adds "AND version = ?" to every update,
+}                            // and throws OptimisticLockException on 0 rows</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Optimistic</th><th>Pessimistic</th></tr></thead>
+          <tbody>
+            <tr><td>How</td><td>Version check on write</td><td><code>SELECT … FOR UPDATE</code></td></tr>
+            <tr><td>Best when</td><td>Conflicts are rare</td><td>Conflicts are common and retries are costly</td></tr>
+            <tr><td>Cost</td><td>Retries on conflict</td><td>Blocked transactions; deadlock risk</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="note tip"><span class="lbl">More on both</span>The Event-driven tab treats idempotent consumers in depth on <a data-deck="ed" data-slide="Idempotency">Idempotency</a>, and the Spring Boot tab shows <code>@Version</code> with transactions on <a data-deck="sb" data-slide="Isolation levels">Isolation levels</a>.</div>
+</section>

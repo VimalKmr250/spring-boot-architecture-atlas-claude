@@ -1,0 +1,51 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Single responsibility">
+  <h2>S · A class should have one reason to change</h2>
+  <p class="dek">"One reason to change" means one group of people who would ask for the change. It does not mean one method. An invoice class that calculates tax, saves to a database and emails a PDF changes when finance changes a rule, when the DBA changes the schema, and when marketing changes the email. Three groups, so three classes.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Before · one class, three reasons to change</div>
+<pre><code class="language-java">class InvoiceService {
+    Invoice create(Order order) {
+        BigDecimal tax = order.subtotal()
+                .multiply(new BigDecimal("0.18"));        // finance rule
+        Invoice inv = new Invoice(order.id(), order.subtotal(), tax);
+        jdbc.update("INSERT INTO invoice VALUES (?,?,?)", // storage
+                inv.id(), inv.net(), inv.tax());
+        mail.send(order.email(), "Your invoice",          // delivery
+                pdf.render(inv));
+        return inv;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">After · each rule has one home</div>
+<pre><code class="language-java">final class TaxPolicy {                     // changes with finance
+    BigDecimal taxOn(BigDecimal net) { return net.multiply(RATE); }
+}
+interface InvoiceRepository { void save(Invoice inv); }   // with storage
+interface InvoiceNotifier { void issued(Invoice inv); }   // with delivery
+
+final class InvoiceService {                // only coordinates
+    private final TaxPolicy tax;
+    private final InvoiceRepository repo;
+    private final InvoiceNotifier notifier;
+    // constructor omitted
+
+    Invoice create(Order order) {
+        var inv = new Invoice(order.id(), order.subtotal(),
+                              tax.taxOn(order.subtotal()));
+        repo.save(inv);
+        notifier.issued(inv);
+        return inv;
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>How to spot a violation</h4><p>The class name ends in <code>Manager</code>, <code>Helper</code> or <code>Util</code>. It imports from three unrelated packages. Describing it needs the word "and". Its tests need a database <em>and</em> a mail server.</p></div>
+    <div class="card"><h4>How far to split</h4><p>Split by who asks for changes, not until every class has one method. <code>Invoice</code> can still compute its own total, because that is invoice logic. Ten classes of three lines each is its own smell.</p></div>
+    <div class="card"><h4>In the LLD round</h4><p>The usual violation is one <code>ParkingLotManager</code> that finds spots, prices tickets and prints receipts. Put the fit rule on <code>ParkingSpot</code>, the price in a <code>PricingStrategy</code>, and keep the service thin.</p></div>
+  </div>
+</section>

@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Creational patterns" data-title="Singleton: how it breaks">
+  <h2>How a singleton breaks, and why dependency injection replaced it</h2>
+  <p class="dek">A private constructor does not guarantee one instance. Reflection can call it, and deserialization creates a new object without calling it at all. Only the enum form survives both. The bigger problem is not a second instance, though. A singleton is hidden global state, and it makes the classes that use it hard to test.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SingletonBreak.java · reflection and serialization against three singletons</div>
+<pre><code class="language-java">import java.io.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
+final class Naive implements Serializable {
+    private static final long serialVersionUID = 1L;
+    static final Naive INSTANCE = new Naive();
+    private Naive() {}
+}
+
+final class Guarded implements Serializable {
+    private static final long serialVersionUID = 1L;
+    static final Guarded INSTANCE = new Guarded();
+    private Guarded() {
+        if (INSTANCE != null) throw new IllegalStateException("already created");
+    }
+    private Object readResolve() { return INSTANCE; }   // replace the copy
+}
+
+enum EnumSingleton { INSTANCE }
+
+public class SingletonBreak {
+    static String reflect(Class&lt;?&gt; type, Object one) {
+        try {
+            Constructor&lt;?&gt; c = type.isEnum()
+                    ? type.getDeclaredConstructor(String.class, int.class)
+                    : type.getDeclaredConstructor();
+            c.setAccessible(true);
+            Object copy = type.isEnum() ? c.newInstance("COPY", 1) : c.newInstance();
+            return copy == one ? "same instance" : "SECOND INSTANCE";
+        } catch (InvocationTargetException e) {
+            return "blocked: " + e.getCause().getMessage();
+        } catch (ReflectiveOperationException | IllegalArgumentException e) {
+            return "blocked: " + e.getMessage();
+        }
+    }
+
+    static String serialize(Object one) throws IOException, ClassNotFoundException {
+        var bytes = new ByteArrayOutputStream();
+        try (var out = new ObjectOutputStream(bytes)) { out.writeObject(one); }
+        try (var in = new ObjectInputStream(
+                new ByteArrayInputStream(bytes.toByteArray()))) {
+            return in.readObject() == one ? "same instance" : "SECOND INSTANCE";
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Object[][] cases = { { Naive.class, Naive.INSTANCE },
+                { Guarded.class, Guarded.INSTANCE },
+                { EnumSingleton.class, EnumSingleton.INSTANCE } };
+        for (Object[] c : cases) {
+            Class&lt;?&gt; type = (Class&lt;?&gt;) c[0];
+            System.out.printf("%-13s reflection: %s%n", type.getSimpleName(),
+                    reflect(type, c[1]));
+            System.out.printf("%-13s serialize:  %s%n", "", serialize(c[1]));
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · SingletonBreak.java</div>
+<pre><code class="language-plaintext">Naive         reflection: SECOND INSTANCE
+              serialize:  SECOND INSTANCE
+Guarded       reflection: blocked: already created
+              serialize:  same instance
+EnumSingleton reflection: blocked: Cannot reflectively create enum objects
+              serialize:  same instance</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Cost of a singleton</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Hard to test</td><td>A class that calls <code>PaymentGateway.getInstance()</code> cannot be given a fake.</td></tr>
+            <tr><td>Hidden dependency</td><td>The constructor does not show that the class needs the gateway.</td></tr>
+            <tr><td>State leaks between tests</td><td>One test's data is still there in the next.</td></tr>
+            <tr><td>One per class loader</td><td>Two web apps in one server each get their own "single" instance.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">What to say about the parking lot</span>"There is one <code>ParkingLot</code> in this program, but I'll create it in <code>main</code> and pass it in, not make it a singleton. Then a test can build a small lot with two spots." In Spring, a bean is a singleton by default (one per container), which gives you the single instance without the global access.</div>
+    </div>
+  </div>
+</section>

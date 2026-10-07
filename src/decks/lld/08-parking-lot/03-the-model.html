@@ -1,0 +1,111 @@
+<section class="slide" data-sec="Parking lot" data-title="Parking lot · the model">
+  <h2>Parking lot: the model, where each object guards its own state</h2>
+  <p class="dek">The spot refuses to be double-booked and refuses a vehicle that does not fit, so no caller can break those rules. The floor is the only class that touches its free lists, and both of its public methods are <code>synchronized</code>, so two entry gates cannot claim the same spot.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ParkingLotDemo.java · 1 of 3 · the model</div>
+<pre><code class="language-java">import java.time.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+enum SpotSize { SMALL, MEDIUM, LARGE }          // declared smallest first
+
+enum VehicleType {
+    MOTORBIKE(SpotSize.SMALL), CAR(SpotSize.MEDIUM), TRUCK(SpotSize.LARGE);
+    final SpotSize needs;
+    VehicleType(SpotSize needs) { this.needs = needs; }
+}
+
+record Vehicle(String plate, VehicleType type) {
+    Vehicle {
+        Objects.requireNonNull(type, "type");
+        if (plate == null || plate.isBlank()) throw new IllegalArgumentException("plate");
+    }
+}
+
+final class ParkingSpot {
+    private final String id;
+    private final SpotSize size;
+    private Vehicle vehicle;                    // null while free
+
+    ParkingSpot(String id, SpotSize size) { this.id = id; this.size = size; }
+    String id() { return id; }
+    SpotSize size() { return size; }
+
+    void occupy(Vehicle v) {
+        if (vehicle != null) throw new IllegalStateException(id + " is taken");
+        if (size.compareTo(v.type().needs) &lt; 0)
+            throw new IllegalArgumentException(v.type() + " does not fit " + id);
+        vehicle = v;
+    }
+    void vacate() {
+        if (vehicle == null) throw new IllegalStateException(id + " is already free");
+        vehicle = null;
+    }
+}
+
+final class ParkingFloor {
+    private final int number;
+    private final Map&lt;String, ParkingSpot&gt; spots = new HashMap&lt;&gt;();
+    private final Map&lt;SpotSize, Deque&lt;ParkingSpot&gt;&gt; free = new EnumMap&lt;&gt;(SpotSize.class);
+
+    ParkingFloor(int number, Map&lt;SpotSize, Integer&gt; layout) {
+        this.number = number;
+        for (SpotSize size : SpotSize.values()) {
+            Deque&lt;ParkingSpot&gt; queue = new ArrayDeque&lt;&gt;();
+            for (int i = 1; i &lt;= layout.getOrDefault(size, 0); i++) {
+                var spot = new ParkingSpot("F" + number + "-" + size.name().charAt(0) + i, size);
+                spots.put(spot.id(), spot);
+                queue.addLast(spot);
+            }
+            free.put(size, queue);
+        }
+    }
+
+    int number() { return number; }
+
+    synchronized Optional&lt;ParkingSpot&gt; claim(Vehicle v) {
+        for (SpotSize size : SpotSize.values()) {          // smallest that fits
+            if (size.compareTo(v.type().needs) &lt; 0) continue;
+            ParkingSpot spot = free.get(size).pollFirst();
+            if (spot != null) {
+                spot.occupy(v);
+                return Optional.of(spot);
+            }
+        }
+        return Optional.empty();
+    }
+
+    synchronized void release(String spotId) {
+        ParkingSpot spot = spots.get(spotId);
+        spot.vacate();
+        free.get(spot.size()).addFirst(spot);              // reuse near spots first
+    }
+
+    synchronized String freeSummary() {
+        StringBuilder s = new StringBuilder("F" + number + " free");
+        free.forEach((size, q) -&gt; s.append(' ').append(size).append('=').append(q.size()));
+        return s.toString();
+    }
+}
+
+record Ticket(String id, Vehicle vehicle, int floor, String spotId,
+              Instant entry, PricingStrategy pricing) {}
+
+record Receipt(String ticketId, String plate, String spotId, Duration stayed, long fee) {
+    @Override public String toString() {
+        return ticketId + " " + plate + " from " + spotId + ", "
+                + stayed.toMinutes() + " min, pays " + fee;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">Why the size check lives in the spot</span>Information expert: the spot has the size, so it answers "does this fit?". The floor uses the same ordering to pick which queue to poll, and the spot's check is the last line of defence if the floor ever gets it wrong.</div>
+      <div class="note"><span class="lbl">Why <code>SpotSize</code> relies on declaration order</span><code>compareTo</code> on an enum compares declaration order, so "fits" is one comparison and the claim loop tries sizes from smallest up. Put a comment on the enum, because reordering the constants would change behaviour silently. A <code>rank</code> field is the more defensive choice; say which you picked.</div>
+      <div class="note"><span class="lbl">Why the ticket is a record</span>A ticket never changes after it is issued. It stores the floor and spot <b>id</b>, not the spot object, so it can be printed, stored or sent to a gate device without dragging the model along. It does store the <code>PricingStrategy</code>, because the rate in force at entry is part of the deal with the customer.</div>
+      <div class="note warn"><span class="lbl">One lock per floor</span>Two gates claiming on different floors never wait for each other. A single lock for the whole lot would also be correct, and simpler; name the trade-off rather than picking silently. The <a data-deck="lld" data-slide="Parking lot · decisions and follow-ups">decisions slide</a> covers the race on the last spot.</div>
+    </div>
+  </div>
+</section>

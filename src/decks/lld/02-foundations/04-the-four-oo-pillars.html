@@ -1,0 +1,43 @@
+<section class="slide" data-sec="Foundations" data-title="The four OO pillars">
+  <h2>The four pillars, and how each one goes wrong</h2>
+  <p class="dek">Interviewers rarely ask for the definitions. They check whether your design uses the pillars: state that only its owner can change, callers that depend on what an object does rather than how, and behaviour that varies by type without a <code>switch</code> on the type.</p>
+
+  <div class="split">
+    <div class="grid2">
+      <div class="card"><h4>Encapsulation</h4><p>An object guards its own state, and the only way to change it is through methods that keep it valid.</p><p><b>Goes wrong as</b> a <code>setBalance</code> that lets any caller skip the overdraft rule.</p></div>
+      <div class="card"><h4>Abstraction</h4><p>Callers see what an object does and none of how. An interface is the cleanest form.</p><p><b>Goes wrong as</b> a <code>PaymentService</code> whose callers must know which gateway sits behind it.</p></div>
+      <div class="card"><h4>Inheritance</h4><p>A subtype reuses and specialises a supertype. It is the strongest coupling Java has: the child depends on its parent's internals.</p><p><b>Goes wrong as</b> <code>Square extends Rectangle</code>, or a hierarchy four levels deep.</p></div>
+      <div class="card"><h4>Polymorphism</h4><p>One call, many behaviours, chosen by the runtime type. It replaces conditionals on type.</p><p><b>Goes wrong as</b> <code>if (v instanceof Truck) … else if (v instanceof Car)</code> repeated in five classes.</p></div>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">All four in one listing</div>
+<pre><code class="language-java">interface Shape {                          // abstraction: what, not how
+    double area();
+}
+
+final class Circle implements Shape {      // polymorphism: its own area()
+    private final double r;                // encapsulation: private, final
+    Circle(double r) {
+        if (r &lt;= 0) throw new IllegalArgumentException("radius");
+        this.r = r;                        // valid from construction on
+    }
+    public double area() { return Math.PI * r * r; }
+}
+
+abstract class Account {                   // inheritance: shared rule
+    private long balanceCents;             // no setter: change goes through
+    void withdraw(long cents) {            // a method that keeps it valid
+        if (cents &gt; balanceCents + overdraftLimit())
+            throw new IllegalStateException("insufficient funds");
+        balanceCents -= cents;
+    }
+    abstract long overdraftLimit();        // the part subtypes specialise
+}
+
+double total = shapes.stream().mapToDouble(Shape::area).sum();
+// no switch on type: a new Shape needs no change here</code></pre>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The test interviewers apply</span>Add a new type. If the new class is the only file you touch, polymorphism is doing its job. If you also have to edit a <code>switch</code> somewhere else, you have found the design's weak point, so say so before the interviewer does.</div>
+</section>

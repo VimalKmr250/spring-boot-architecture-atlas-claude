@@ -1,0 +1,55 @@
+<section class="slide" data-sec="Foundations" data-title="Reading the class diagrams">
+  <h2>The text notation every class diagram in this tab uses</h2>
+  <p class="dek">In an interview you draw in a shared editor or on a whiteboard, so the diagrams here are plain text in a small subset of UML. Use the same notation in the interview, and say what an arrow means the first time you draw one.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Legend</div>
+<div class="tree"><span class="h">Stereotypes</span>
+  «interface»  «abstract»  «enum»  «record»  «sealed»
+
+<span class="h">Visibility</span>
+  + public    - private    # protected    ~ package-private
+
+<span class="h">Relationships</span>             <span class="c">read left to right</span>
+  A ──▷ B     A extends B              <span class="c">inheritance</span>
+  A ┄┄▷ B     A implements B           <span class="c">realisation</span>
+  A ◆── B     A owns B; B dies with A  <span class="c">composition</span>
+  A ◇── B     A has B; B lives on      <span class="c">aggregation</span>
+  A ──> B     A holds a reference to B <span class="c">association</span>
+  A ┄┄> B     A uses B in a method     <span class="c">dependency</span>
+
+<span class="h">Multiplicity</span>              <span class="c">written at the far end</span>
+  1   exactly one      0..1  optional
+  *   zero or more     1..*  at least one</div>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">An example, read aloud underneath</div>
+<div class="tree"><span class="h">ParkingLot</span>
+  - floors : List&lt;ParkingFloor&gt;
+  - pricing : PricingStrategy
+  + park(Vehicle) : Ticket
+  + leave(Ticket, Instant) : Receipt
+  ◆── 1..* ParkingFloor
+  ──> 1    PricingStrategy
+
+<span class="h">ParkingFloor</span>
+  ◆── 1..* ParkingSpot
+
+<span class="h">«interface» PricingStrategy</span>
+  + fee(Ticket, Instant) : Money
+  ┄┄▷ HourlyPricing
+  ┄┄▷ FlatWeekendPricing
+
+<span class="c">"A lot owns one or more floors; each floor owns</span>
+<span class="c"> one or more spots. The lot holds exactly one</span>
+<span class="c"> pricing strategy, and there are two kinds."</span></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Draw less</h4><p>Leave out getters, setters, constructors and <code>toString</code>. Show the fields that carry the design and the methods that do the work.</p></div>
+    <div class="card"><h4>Arrows point at the dependency</h4><p><code>A ──&gt; B</code> means A knows B, and B does not know A. If the arrow goes both ways, ask whether it has to: two-way links are where bugs hide.</p></div>
+    <div class="card"><h4>Mark the variation points</h4><p>Every «interface» on the diagram should answer "what might change?" If you cannot say what a second implementation would be, you probably do not need the interface.</p></div>
+  </div>
+</section>

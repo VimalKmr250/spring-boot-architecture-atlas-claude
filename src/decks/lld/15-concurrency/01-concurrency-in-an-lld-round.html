@@ -1,0 +1,26 @@
+<section class="slide" data-sec="Concurrency" data-title="Concurrency in an LLD round">
+  <h2>Concurrency in an LLD round: three questions, asked about every piece of shared state</h2>
+  <p class="dek">"Make it thread-safe" is the most common follow-up in LLD, and the weakest answer is <code>synchronized</code> on every method. The strong answer starts by naming what is shared, the invariant that must hold, and the smallest set of changes that must happen together. Pick the tool after that.</p>
+
+  <div class="grid3">
+    <div class="card"><h4>1 · What is shared?</h4><p>Which objects can two threads reach at once? A parking floor's free lists, a show's seat claims, a bank account. Objects confined to one thread, and immutable objects, need nothing.</p></div>
+    <div class="card"><h4>2 · What is the invariant?</h4><p>The rule that must never be seen broken: a spot has at most one vehicle; a seat has at most one live hold; a balance never goes negative.</p></div>
+    <div class="card"><h4>3 · What must be atomic?</h4><p>The smallest group of reads and writes that keeps the invariant: "find a free spot and occupy it"; "check the balance and debit it". That group is your critical section.</p></div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Problem</th><th>Shared state</th><th>Invariant</th><th>What this tab used</th></tr></thead>
+      <tbody>
+        <tr><td><a data-deck="lld" data-slide="Parking lot · the model">Parking lot</a></td><td>Free-spot queues per floor</td><td>A spot is handed to one vehicle</td><td><code>synchronized</code> per floor; atomic <code>Set.add</code> for plates; <code>ConcurrentHashMap.remove</code> for tickets</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Library · services and demo">Library</a></td><td>Copies, members, waiting lists</td><td>Loan counts match loans; a copy has one borrower</td><td>One lock on the service: low traffic, many objects per operation</td></tr>
+        <tr><td><a data-deck="lld" data-slide="ATM · the model">ATM</a></td><td>Accounts in the bank</td><td>A balance never goes below zero</td><td><code>synchronized</code> bank methods; the ATM itself is single-user</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Movie booking · the model">Movie booking</a></td><td>Seat claims per show</td><td>A seat has one live hold or one sale</td><td>Lock-free: <code>putIfAbsent</code>, <code>replace</code>, <code>remove(k, v)</code>; a small lock per booking</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Elevator · services and demo">Elevator</a></td><td>Cars and their stops</td><td>A car is never given a stop mid-step</td><td>One lock on the controller</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Splitwise · services and demo">Splitwise</a></td><td>The pairwise debt map</td><td>Debts net to zero across everyone</td><td><code>synchronized</code> ledger methods</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">Coarse first, then justify going finer</span>One lock around the whole service is always a correct first answer, and often the right final one. Go finer (per floor, per seat, lock-free) only for a reason you can state: "a release-day show has 500 users on one seat map, and one lock would serialise them all". Every step finer adds a way to get it wrong.</div>
+</section>

@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Concurrency" data-title="Thread-safe LRU cache: design">
+  <h2>LRU cache: a hash map for O(1) lookup, a linked list for O(1) recency</h2>
+  <p class="dek">"Design an LRU cache" is asked as a coding question and as an LLD question. Both want <code>get</code> and <code>put</code> in O(1), with the least recently used entry evicted when the cache is full. The LLD version adds "and make it thread-safe", which has a trap: in an LRU cache, <code>get</code> is a write.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">HashMap&lt;K, Node&gt;</span>  finds a node in O(1)
+<span class="h">Doubly linked list</span>  orders nodes by recency
+
+  head ⇄ [d] ⇄ [a] ⇄ [c] ⇄ tail
+         <span class="c">most recent       least recent</span>
+
+  <span class="h">get(a)</span>   index → node a; unlink; add after head
+  <span class="h">put(e)</span>   full? unlink tail.prev (c), remove from index
+           add [e] after head, put in index
+
+<span class="c">head and tail are sentinel nodes: no null checks</span>
+<span class="c">at the ends, so unlink and add are four lines each</span></div>
+      <div class="codewrap">
+        <div class="codelabel">The two-minute version, when allowed</div>
+<pre><code class="language-java">class LruMap&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+    private final int capacity;
+    LruMap(int capacity) {
+        super(16, 0.75f, true);            // accessOrder = true
+        this.capacity = capacity;
+    }
+    @Override protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; e) {
+        return size() &gt; capacity;          // evict after each put
+    }
+}
+// thread-safe: Collections.synchronizedMap(new LruMap&lt;&gt;(100))</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Thread-safety option</th><th>Trade-off</th></tr></thead>
+          <tbody>
+            <tr><td>One lock around every operation</td><td>Correct and simple. All threads contend on one lock; fine up to moderate load. The next slide builds this.</td></tr>
+            <tr><td>Read-write lock</td><td><b>Wrong.</b> <code>get</code> moves the node, so two readers under a shared read lock corrupt the list.</td></tr>
+            <tr><td>Striped: N independent LRU segments by key hash</td><td>N times less contention. Eviction is per segment, so it is only approximately LRU overall.</td></tr>
+            <tr><td><code>ConcurrentHashMap</code> + buffered recency</td><td>Record reads in a lock-free buffer and apply them to the order in batches. This is how Caffeine works; near-LRU at very high throughput.</td></tr>
+            <tr><td>Use a library</td><td>In production, Caffeine. Say so; then build the simple version, because that is the question.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">The trap, stated once</span>If an interviewer offers "use a read-write lock, since reads are common", the right answer is to decline and explain that an LRU read changes the order. It is one of the most reliable ways to show you understand what your lock protects.</div>
+      <div class="note tip"><span class="lbl">Related variants</span>LFU (least frequently used) adds a frequency per node and a list per frequency, still O(1). TTL expiry adds a timestamp per node and a check in <code>get</code>. Both reuse this structure.</div>
+    </div>
+  </div>
+</section>

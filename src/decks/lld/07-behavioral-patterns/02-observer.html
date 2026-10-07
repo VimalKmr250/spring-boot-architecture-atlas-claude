@@ -1,0 +1,88 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Observer">
+  <h2>Observer: tell the interested parties, without knowing who they are</h2>
+  <p class="dek">A subject keeps a list of listeners and calls them when something happens. The subject depends only on the listener interface, so adding a new reaction (an email, a metric, a display update) is a new subscriber, not an edit to the subject. The real design work is in the details: ordering, a listener that throws, and unsubscribing.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ObserverDemo.java · a small typed event bus</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+
+record BookReturned(String isbn, String title) {}
+
+final class EventBus&lt;E&gt; {
+    private final List&lt;Consumer&lt;? super E&gt;&gt; listeners = new CopyOnWriteArrayList&lt;&gt;();
+
+    AutoCloseable subscribe(Consumer&lt;? super E&gt; listener) {
+        listeners.add(listener);
+        return () -&gt; listeners.remove(listener);  // handle to unsubscribe
+    }
+
+    void publish(E event) {
+        for (var l : listeners) {                 // snapshot: safe even if a
+            try {                                 // listener unsubscribes
+                l.accept(event);
+            } catch (RuntimeException ex) {       // one bad listener must not
+                System.out.println("  listener failed: " + ex.getMessage());
+            }                                     // starve the others
+        }
+    }
+}
+
+final class Catalogue {                           // the subject
+    private final EventBus&lt;BookReturned&gt; returned;
+    Catalogue(EventBus&lt;BookReturned&gt; returned) { this.returned = returned; }
+    void giveBack(String isbn, String title) {
+        System.out.println("returned " + title);
+        returned.publish(new BookReturned(isbn, title));
+    }
+}
+
+public class ObserverDemo {
+    public static void main(String[] args) throws Exception {
+        var bus = new EventBus&lt;BookReturned&gt;();
+        var waiting = new ArrayDeque&lt;&gt;(List.of("ana", "bo"));
+        int[] returns = {0};
+
+        bus.subscribe(e -&gt; System.out.println("  notify " + waiting.poll()
+                + ": '" + e.title() + "' is ready"));
+        bus.subscribe(e -&gt; returns[0]++);
+        AutoCloseable flaky = bus.subscribe(e -&gt; {
+            throw new IllegalStateException("SMS gateway down");
+        });
+
+        var catalogue = new Catalogue(bus);
+        catalogue.giveBack("978-0134685991", "Effective Java");
+        flaky.close();                            // unsubscribe
+        catalogue.giveBack("978-0201633610", "Design Patterns");
+        System.out.println("returns counted: " + returns[0]);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ObserverDemo.java</div>
+<pre><code class="language-plaintext">returned Effective Java
+  notify ana: 'Effective Java' is ready
+  listener failed: SMS gateway down
+returned Design Patterns
+  notify bo: 'Design Patterns' is ready
+returns counted: 2</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Decision</th><th>Choices to state</th></tr></thead>
+          <tbody>
+            <tr><td>Push or pull</td><td>Send the event data (push, as here), or just "changed" and let listeners query (pull).</td></tr>
+            <tr><td>Sync or async</td><td>Synchronous is simple and ordered, but a slow listener slows the subject. Async needs an executor and loses ordering.</td></tr>
+            <tr><td>Failure</td><td>Isolate each listener, as here. Never let one exception stop the loop.</td></tr>
+            <tr><td>Lifetime</td><td>Listeners that are never removed leak memory. Return an unsubscribe handle.</td></tr>
+            <tr><td>Thread safety</td><td><code>CopyOnWriteArrayList</code> suits lists that are read often and changed rarely.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Across services</span>Between processes the same idea becomes a message broker, with delivery guarantees to think about. See the <a data-deck="ed" data-slide="Delivery semantics">Event-driven</a> tab. In Spring, <code>ApplicationEventPublisher</code> and <code>@EventListener</code> are an in-process observer.</div>
+    </div>
+  </div>
+</section>

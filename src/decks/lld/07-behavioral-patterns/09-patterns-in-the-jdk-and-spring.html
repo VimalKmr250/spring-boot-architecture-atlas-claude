@@ -1,0 +1,30 @@
+<section class="slide" data-sec="Behavioral patterns" data-title="Patterns in the JDK and Spring">
+  <h2>Where you have already used every pattern, in the JDK and in Spring</h2>
+  <p class="dek">Pointing at a real example is the quickest way to show you understand a pattern, and it answers "have you used it in practice?" without a made-up story. Every row below is an API you can name in the interview.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Pattern</th><th>In the JDK</th><th>In Spring</th></tr></thead>
+      <tbody>
+        <tr><td>Singleton</td><td><code>Runtime.getRuntime()</code></td><td>Singleton-scoped beans: one per container, not per JVM</td></tr>
+        <tr><td>Factory method</td><td><code>List.of</code>, <code>Calendar.getInstance</code>, <code>NumberFormat.getInstance</code></td><td><code>FactoryBean</code>, <code>@Bean</code> methods</td></tr>
+        <tr><td>Abstract factory</td><td><code>DocumentBuilderFactory</code>, <code>XPathFactory</code></td><td><code>BeanFactory</code></td></tr>
+        <tr><td>Builder</td><td><code>StringBuilder</code>, <code>HttpRequest.newBuilder()</code>, <code>Stream.builder()</code></td><td><code>UriComponentsBuilder</code>, <code>RestClient.builder()</code>, <code>MockMvc</code> request builders</td></tr>
+        <tr><td>Prototype</td><td><code>Object.clone</code>, <code>ArrayList</code>'s copy constructor</td><td>Prototype-scoped beans</td></tr>
+        <tr><td>Adapter</td><td><code>Arrays.asList</code>, <code>InputStreamReader</code></td><td><code>HandlerAdapter</code> in Spring MVC</td></tr>
+        <tr><td>Decorator</td><td><code>BufferedInputStream</code>, <code>Collections.unmodifiableList</code></td><td><code>TransactionAwareDataSourceProxy</code>, <code>HttpServletRequestWrapper</code></td></tr>
+        <tr><td>Proxy</td><td><code>java.lang.reflect.Proxy</code></td><td>AOP proxies behind <code>@Transactional</code>, <code>@Cacheable</code>, <code>@Async</code></td></tr>
+        <tr><td>Facade</td><td><code>java.net.http.HttpClient</code> over sockets, TLS and HTTP/2</td><td><code>JdbcTemplate</code> over JDBC</td></tr>
+        <tr><td>Composite</td><td>AWT <code>Container</code></td><td><code>CompositePropertySource</code>, <code>CompositeCacheManager</code></td></tr>
+        <tr><td>Flyweight</td><td><code>Integer.valueOf</code> cache, string interning</td><td>Shared, stateless singleton beans</td></tr>
+        <tr><td>Strategy</td><td><code>Comparator</code>, <code>ThreadPoolExecutor</code>'s <code>RejectedExecutionHandler</code></td><td><code>PasswordEncoder</code>, <code>ResourceLoader</code>, <code>TaskExecutor</code></td></tr>
+        <tr><td>Template method</td><td><code>AbstractList.get</code> with the rest built on it; <code>InputStream.read(byte[])</code></td><td><code>JdbcTemplate</code> with callbacks, <code>AbstractController</code></td></tr>
+        <tr><td>Observer</td><td><code>PropertyChangeListener</code>, <code>Flow.Subscriber</code></td><td><code>ApplicationEventPublisher</code> and <code>@EventListener</code></td></tr>
+        <tr><td>Command</td><td><code>Runnable</code>, <code>Callable</code> submitted to an executor</td><td>Spring Batch steps, <code>TaskScheduler</code> jobs</td></tr>
+        <tr><td>Chain of responsibility</td><td><code>java.util.logging.Logger</code> passing records to parent handlers</td><td>Servlet filter chain, Spring Security's <code>SecurityFilterChain</code>, <code>HandlerInterceptor</code>s</td></tr>
+        <tr><td>Iterator</td><td><code>Iterator</code>, <code>Spliterator</code></td><td><code>ItemReader</code> in Spring Batch</td></tr>
+        <tr><td>Visitor</td><td><code>FileVisitor</code> with <code>Files.walkFileTree</code></td><td><code>BeanDefinitionVisitor</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

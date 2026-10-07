@@ -1,0 +1,127 @@
+<section class="slide" data-sec="Splitwise" data-title="Splitwise · the model">
+  <h2>Splitwise: four split rules, one rounding rule, and a factory that parses them</h2>
+  <p class="dek">Equal, share and percent splits are all "divide by weight": give each person the floor of their share, then hand the leftover paise out one at a time in the order listed. Writing that once, in <code>byWeight</code>, means every split type rounds the same way and every result adds up exactly. Each record checks its own input in its compact constructor, so an invalid split cannot be created.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SplitwiseDemo.java · 1 of 3 · split rules and the factory</div>
+<pre><code class="language-java">import java.math.BigDecimal;
+import java.util.*;
+
+sealed interface SplitRule permits EqualSplit, ShareSplit, PercentSplit, ExactSplit {
+    Map&lt;String, Long&gt; shares(long total);           // person -&gt; paise, sums to total
+}
+
+record EqualSplit(List&lt;String&gt; people) implements SplitRule {
+    EqualSplit {
+        if (people.isEmpty()) throw new IllegalArgumentException("nobody to split with");
+        people = List.copyOf(people);
+    }
+    public Map&lt;String, Long&gt; shares(long total) {
+        Map&lt;String, Long&gt; ones = new LinkedHashMap&lt;&gt;();
+        people.forEach(p -&gt; ones.put(p, 1L));
+        return SplitRules.byWeight(total, ones);
+    }
+}
+
+record ShareSplit(Map&lt;String, Long&gt; weights) implements SplitRule {
+    ShareSplit { weights = SplitRules.positive(weights); }
+    public Map&lt;String, Long&gt; shares(long total) { return SplitRules.byWeight(total, weights); }
+}
+
+record PercentSplit(Map&lt;String, Long&gt; percents) implements SplitRule {
+    PercentSplit {
+        percents = SplitRules.positive(percents);
+        long sum = percents.values().stream().mapToLong(Long::longValue).sum();
+        if (sum != 100) throw new IllegalArgumentException("percents add up to " + sum);
+    }
+    public Map&lt;String, Long&gt; shares(long total) { return SplitRules.byWeight(total, percents); }
+}
+
+record ExactSplit(Map&lt;String, Long&gt; amounts) implements SplitRule {
+    ExactSplit { amounts = SplitRules.positive(amounts); }
+    public Map&lt;String, Long&gt; shares(long total) {
+        long sum = amounts.values().stream().mapToLong(Long::longValue).sum();
+        if (sum != total)                           // needs the total, so checked here
+            throw new IllegalArgumentException("exact amounts add up to "
+                    + Money.format(sum) + ", not " + Money.format(total));
+        return amounts;
+    }
+}
+
+final class SplitRules {                            // factory + shared rounding
+    private SplitRules() {}
+
+    static SplitRule of(String type, List&lt;String&gt; people, List&lt;Long&gt; values) {
+        return switch (type) {
+            case "EQUAL"   -&gt; new EqualSplit(people);
+            case "SHARES"  -&gt; new ShareSplit(zip(people, values));
+            case "PERCENT" -&gt; new PercentSplit(zip(people, values));
+            case "EXACT"   -&gt; new ExactSplit(zip(people, values));
+            default -&gt; throw new IllegalArgumentException("unknown split " + type);
+        };
+    }
+
+    static Map&lt;String, Long&gt; byWeight(long total, Map&lt;String, Long&gt; weights) {
+        long sum = weights.values().stream().mapToLong(Long::longValue).sum();
+        Map&lt;String, Long&gt; out = new LinkedHashMap&lt;&gt;();
+        long given = 0;
+        for (var e : weights.entrySet()) {
+            long share = Math.multiplyExact(total, e.getValue()) / sum;   // floor
+            out.put(e.getKey(), share);
+            given += share;
+        }
+        for (var e : out.entrySet()) {              // leftover paise, in order
+            if (given == total) break;
+            e.setValue(e.getValue() + 1);
+            given++;
+        }
+        return Collections.unmodifiableMap(out);
+    }
+
+    static Map&lt;String, Long&gt; positive(Map&lt;String, Long&gt; m) {
+        if (m.isEmpty() || m.values().stream().anyMatch(v -&gt; v &lt;= 0))
+            throw new IllegalArgumentException("values must be positive");
+        return Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(m));
+    }
+
+    private static Map&lt;String, Long&gt; zip(List&lt;String&gt; people, List&lt;Long&gt; values) {
+        if (values.size() != people.size())
+            throw new IllegalArgumentException("every person needs a value");
+        Map&lt;String, Long&gt; m = new LinkedHashMap&lt;&gt;();
+        for (int i = 0; i &lt; people.size(); i++)
+            if (m.put(people.get(i), values.get(i)) != null)
+                throw new IllegalArgumentException(people.get(i) + " listed twice");
+        return m;
+    }
+}
+
+final class Money {
+    private Money() {}
+    static long parse(String rupees) {              // "999.99" -&gt; 99999
+        return new BigDecimal(rupees).movePointRight(2).longValueExact();
+    }
+    static String format(long paise) { return BigDecimal.valueOf(paise, 2).toPlainString(); }
+}
+
+record Expense(String id, String payer, long total, Map&lt;String, Long&gt; shares) {}
+record Transfer(String from, String to, long amount) {
+    @Override public String toString() { return from + " pays " + to + " " + Money.format(amount); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+<div class="tree"><span class="h">byWeight(10000, {ana:1, bo:1, dee:1})</span>
+  floor(10000 × 1 / 3) = 3333  for each
+  given 9999, one paisa left
+  ana 3334   bo 3333   dee 3333    <span class="g">sum 10000</span>
+
+<span class="h">byWeight(99999, {ana:50, dee:50})</span>
+  floor(99999 × 50 / 100) = 49999  for each
+  given 99998, one paisa left
+  ana 50000   dee 49999            <span class="g">sum 99999</span></div>
+      <div class="note"><span class="lbl">Why the leftover goes in listed order</span>Any fixed rule is fine, as long as the result adds up and the same input always gives the same output. "Leftover paise to the first people listed" is easy to explain and to test. The largest-remainder method is fairer for percentages; say so if asked, and note that it is a change to one method.</div>
+      <div class="note"><span class="lbl">Where validation lives</span>Percent totals are checked in the constructor, because the percentages alone decide validity. Exact amounts can only be checked against the expense total, so <code>ExactSplit.shares</code> checks it. Both reject input before the ledger changes.</div>
+      <div class="note tip"><span class="lbl">The factory is the parser's only link</span><code>SplitRules.of</code> maps the command word to a record. A new split type is a record plus one line here, and the exhaustive <code>switch</code> in any reporting code tells you what else to update.</div>
+    </div>
+  </div>
+</section>

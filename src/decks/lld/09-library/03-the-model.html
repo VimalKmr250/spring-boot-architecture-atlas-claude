@@ -1,0 +1,107 @@
+<section class="slide" data-sec="Library" data-title="Library · the model">
+  <h2>Library: the model, with the copy guarding its status and the member guarding its limits</h2>
+  <p class="dek"><code>Copy.lendTo</code> is the only way a copy goes out, and it enforces every status rule in one <code>switch</code>, including "on hold for someone else". <code>Member.checkCanBorrow</code> enforces the tier limit and the fines rule. The library service calls both before it changes anything.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LibraryDemo.java · 1 of 3 · the model</div>
+<pre><code class="language-java">import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Supplier;
+
+record Book(String isbn, String title, List&lt;String&gt; authors) {
+    Book { authors = List.copyOf(authors); }
+    boolean matches(String text) {
+        String q = text.toLowerCase(Locale.ROOT);
+        return title.toLowerCase(Locale.ROOT).contains(q)
+            || authors.stream().anyMatch(a -&gt; a.toLowerCase(Locale.ROOT).contains(q));
+    }
+}
+
+enum CopyStatus { AVAILABLE, ON_LOAN, ON_HOLD, REFERENCE_ONLY }
+
+final class Copy {
+    private final String barcode;
+    private final Book book;
+    private CopyStatus status;
+    private String heldFor;                        // member id, while ON_HOLD
+    private LocalDate holdUntil;
+
+    Copy(String barcode, Book book, boolean referenceOnly) {
+        this.barcode = barcode;
+        this.book = book;
+        this.status = referenceOnly ? CopyStatus.REFERENCE_ONLY : CopyStatus.AVAILABLE;
+    }
+    String barcode() { return barcode; }
+    Book book() { return book; }
+    CopyStatus status() { return status; }
+
+    void lendTo(String memberId) {                 // every status rule, once
+        switch (status) {
+            case AVAILABLE -&gt; { }
+            case ON_HOLD -&gt; {
+                if (!memberId.equals(heldFor))
+                    throw new IllegalStateException(barcode + " is on hold for " + heldFor);
+            }
+            case ON_LOAN -&gt; throw new IllegalStateException(barcode + " is on loan");
+            case REFERENCE_ONLY -&gt; throw new IllegalStateException(barcode + " is reference only");
+        }
+        status = CopyStatus.ON_LOAN;
+        heldFor = null;
+        holdUntil = null;
+    }
+
+    void returned() {
+        if (status != CopyStatus.ON_LOAN) throw new IllegalStateException(barcode + " is not on loan");
+        status = CopyStatus.AVAILABLE;
+    }
+
+    void holdFor(String memberId, LocalDate until) {
+        if (status != CopyStatus.AVAILABLE) throw new IllegalStateException(barcode + " is not free");
+        status = CopyStatus.ON_HOLD;
+        heldFor = memberId;
+        holdUntil = until;                         // read by the expiry job
+    }
+}
+
+enum Tier {
+    STANDARD(3, 14), PREMIUM(5, 28);
+    final int maxLoans, loanDays;
+    Tier(int maxLoans, int loanDays) { this.maxLoans = maxLoans; this.loanDays = loanDays; }
+}
+
+final class Member {
+    private final String id;
+    private final Tier tier;
+    private int onLoan;
+    private long finesDue;
+
+    Member(String id, Tier tier) { this.id = id; this.tier = tier; }
+    String id() { return id; }
+    Tier tier() { return tier; }
+
+    void checkCanBorrow() {
+        if (finesDue &gt; 0) throw new IllegalStateException(id + " owes " + finesDue);
+        if (onLoan &gt;= tier.maxLoans)
+            throw new IllegalStateException(id + " is at the " + tier + " limit of " + tier.maxLoans);
+    }
+    void loanStarted() { onLoan++; }
+    void loanEnded(long fine) { onLoan--; finesDue += fine; }
+    void payFines() { finesDue = 0; }
+}
+
+record Loan(String barcode, String memberId, LocalDate borrowed, LocalDate due) {}
+
+@FunctionalInterface interface FinePolicy { long fineFor(long daysLate); }
+
+@FunctionalInterface interface LibraryListener { void holdReady(Member m, Book b, LocalDate until); }</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">Status as an enum, not state classes</span>The copy has four statuses and two events, and only <code>lendTo</code> branches on status. That is small enough for an exhaustive <code>switch</code>. If each status grew its own data and several methods started switching, <a data-deck="lld" data-slide="State">State</a> classes would pay off, as they do in the ATM.</div>
+      <div class="note"><span class="lbl">Tier as an enum with data</span>Standard and premium differ in two numbers, so each constant carries them. If tiers became configurable at runtime (a "student" tier added by staff), they would move to a table and <code>Tier</code> would become a record loaded at start-up.</div>
+      <div class="note"><span class="lbl">Why <code>Member</code> is not a record</span>A member is an entity: its loan count and fines change while its identity does not. Records suit values such as <code>Book</code> and <code>Loan</code>. Equality for <code>Member</code> would be by id, as on <a data-deck="lld" data-slide="Value objects, equals and hashCode">Value objects, equals and hashCode</a>; the demo never compares members, so it is left out here.</div>
+      <div class="note warn"><span class="lbl">Validate before you mutate</span>If <code>checkCanBorrow</code> ran after <code>lendTo</code>, a member over the limit would leave a copy marked on loan with no loan behind it. The service calls every check that can throw first, then makes the changes.</div>
+    </div>
+  </div>
+</section>

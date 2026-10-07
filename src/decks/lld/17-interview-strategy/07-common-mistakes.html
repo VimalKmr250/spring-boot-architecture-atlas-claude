@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Interview strategy" data-title="Common mistakes">
+  <h2>Common mistakes, and the fix for each that you can apply mid-interview</h2>
+  <p class="dek">Most of these are recoverable if you notice them yourself. Saying "this manager class is getting too big; let me move the fee rule out" costs thirty seconds and turns a mistake into a demonstration of judgement.</p>
+
+  <div class="grid2">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Modelling mistakes</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>A <code>…Manager</code> or <code>…System</code> class with every method</td><td>Move each rule to the object that owns its data</td></tr>
+          <tr><td>Classes with only getters and setters</td><td>Replace setters with intent-named methods that enforce rules</td></tr>
+          <tr><td>Inheritance for code reuse (<code>Car extends Vehicle extends ParkingThing</code>)</td><td>Enum or composition; inheritance only for real "is-a"</td></tr>
+          <tr><td>A subclass per value (<code>RedCar</code>, <code>SmallSpot</code>)</td><td>A field or an enum</td></tr>
+          <tr><td>One class where two lifecycles exist (book and copy)</td><td>Split by identity: what gets borrowed versus what gets searched</td></tr>
+          <tr><td>Bidirectional references everywhere</td><td>Keep the direction the use cases need; look the other way up by id</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Process and code mistakes</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>Patterns announced before requirements</td><td>Introduce each pattern when a requirement needs it</td></tr>
+          <tr><td>Twenty minutes on the diagram</td><td>Time-box it; the diagram is a sketch, the code is the answer</td></tr>
+          <tr><td><code>double</code> for money</td><td><code>long</code> minor units or <code>BigDecimal</code></td></tr>
+          <tr><td><code>LocalDateTime.now()</code> inside the logic</td><td>Inject a <code>Clock</code></td></tr>
+          <tr><td>Check-then-act on shared maps</td><td><code>putIfAbsent</code>, <code>compute</code>, or one lock around both</td></tr>
+          <tr><td>Singletons for the main service</td><td>Create it in <code>main</code> and pass it in</td></tr>
+          <tr><td>Never running the code</td><td>A <code>main</code> with the happy path and two edge cases</td></tr>
+          <tr><td>Arguing when challenged</td><td>"Good point. The trade-off is… Here is what I'd change."</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

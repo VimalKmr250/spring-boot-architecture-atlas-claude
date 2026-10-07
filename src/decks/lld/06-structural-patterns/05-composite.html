@@ -1,0 +1,88 @@
+<section class="slide" data-sec="Structural patterns" data-title="Composite">
+  <h2>Composite: treat one item and a whole tree of items the same way</h2>
+  <p class="dek">A directory's size is the sum of its children's sizes, and a child can be a file or another directory. A composite gives leaves and containers one interface, so <code>size()</code>, <code>print()</code> or <code>find()</code> work on any node, and the recursion is in the data structure rather than in every caller. It is the standard answer to "design a file system".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CompositeDemo.java · a file tree with a sealed node type</div>
+<pre><code class="language-java">import java.util.*;
+
+sealed interface Node permits FileNode, Dir {
+    String name();
+    long size();
+}
+
+record FileNode(String name, long size) implements Node {}
+
+final class Dir implements Node {
+    private final String name;
+    private final List&lt;Node&gt; children = new ArrayList&lt;&gt;();
+    Dir(String name) { this.name = name; }
+    Dir add(Node child) { children.add(child); return this; }
+    public String name() { return name; }
+    public long size() {                          // recursion lives here
+        return children.stream().mapToLong(Node::size).sum();
+    }
+    List&lt;Node&gt; children() { return Collections.unmodifiableList(children); }
+}
+
+public class CompositeDemo {
+    static void print(Node n, String indent) {
+        switch (n) {                              // pattern switch, sealed
+            case FileNode f -&gt; System.out.printf("%s%s (%d)%n", indent, f.name(), f.size());
+            case Dir d -&gt; {
+                System.out.printf("%s%s/ (%d)%n", indent, d.name(), d.size());
+                d.children().forEach(c -&gt; print(c, indent + "  "));
+            }
+        }
+    }
+
+    static Optional&lt;Node&gt; find(Node n, String name) {
+        if (n.name().equals(name)) return Optional.of(n);
+        if (n instanceof Dir d)
+            for (Node c : d.children()) {
+                Optional&lt;Node&gt; hit = find(c, name);
+                if (hit.isPresent()) return hit;
+            }
+        return Optional.empty();
+    }
+
+    public static void main(String[] args) {
+        Dir root = new Dir("root")
+            .add(new FileNode("notes.txt", 120))
+            .add(new Dir("src")
+                .add(new FileNode("Main.java", 2_400))
+                .add(new Dir("util").add(new FileNode("Ids.java", 800))))
+            .add(new Dir("empty"));
+        print(root, "");
+        System.out.println("src size: " + find(root, "src").map(Node::size).orElse(-1L));
+        System.out.println("missing:  " + find(root, "nope").isPresent());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · CompositeDemo.java</div>
+<pre><code class="language-plaintext">root/ (3320)
+  notes.txt (120)
+  src/ (3200)
+    Main.java (2400)
+    util/ (800)
+      Ids.java (800)
+  empty/ (0)
+src size: 3200
+missing:  false</code></pre>
+      </div>
+<div class="tree"><span class="h">«sealed interface» Node</span>
+  + name() : String
+  + size() : long
+  ┄┄▷ FileNode   <span class="c">«record», a leaf</span>
+  ┄┄▷ Dir        <span class="c">the composite</span>
+
+<span class="h">Dir</span>
+  ◆── * Node     <span class="c">children: files or dirs</span></div>
+      <div class="note"><span class="lbl">Where the add method goes</span>The classic GoF version puts <code>add</code> on the shared interface, so a file has an <code>add</code> that throws. That breaks <a data-deck="lld" data-slide="Interface segregation">ISP</a>. Putting <code>add</code> only on <code>Dir</code>, as here, is the safer choice; callers who build trees know they are holding a directory.</div>
+      <div class="note tip"><span class="lbl">Other composites</span>Menus and sub-menus, an org chart, a UI component tree, a pricing rule made of sub-rules, and group expenses in Splitwise, where a group can contain sub-groups.</div>
+    </div>
+  </div>
+</section>

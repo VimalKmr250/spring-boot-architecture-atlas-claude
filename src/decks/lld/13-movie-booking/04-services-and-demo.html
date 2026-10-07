@@ -1,0 +1,184 @@
+<section class="slide" data-sec="Movie booking" data-title="Movie booking · services and demo">
+  <h2>Movie booking: all-or-nothing holds, a race of 100 users, and a payment that outlives its hold</h2>
+  <p class="dek"><code>hold</code> registers the booking, then claims each seat in order, taking seats from dead bookings with a compare-and-swap. The first live conflict releases everything claimed so far. <code>confirm</code> charges first and confirms second, because confirming is instant and charging is not. If the hold ran out in between, it refunds.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">BookingDemo.java · 2 of 3 · pricing, payment and the booking service</div>
+<pre><code class="language-java">interface PricingStrategy { long price(Show show, Seat seat); }
+
+final class WeekendPricing implements PricingStrategy {
+    public long price(Show show, Seat seat) {
+        DayOfWeek d = show.start().getDayOfWeek();
+        boolean weekend = d == DayOfWeek.SATURDAY || d == DayOfWeek.SUNDAY;
+        return weekend ? seat.category().basePrice * 125 / 100 : seat.category().basePrice;
+    }
+}
+
+interface PaymentGateway {
+    String charge(String user, long amount);
+    void refund(String ref);
+}
+
+final class BookingService {
+    private static final Duration HOLD = Duration.ofMinutes(8);
+    private final ConcurrentMap&lt;String, Booking&gt; bookings = new ConcurrentHashMap&lt;&gt;();
+    private final AtomicInteger nextId = new AtomicInteger(1);
+    private final PricingStrategy pricing;
+    private final PaymentGateway payments;
+    private final Clock clock;
+
+    BookingService(PricingStrategy pricing, PaymentGateway payments, Clock clock) {
+        this.pricing = pricing; this.payments = payments; this.clock = clock;
+    }
+
+    Optional&lt;Booking&gt; hold(String user, Show show, List&lt;String&gt; labels) {
+        List&lt;Seat&gt; seats = labels.stream().map(show::seat).distinct().sorted().toList();
+        long amount = seats.stream().mapToLong(s -&gt; pricing.price(show, s)).sum();
+        var b = new Booking("BK" + nextId.getAndIncrement(), user, show, seats,
+                            amount, clock.instant().plus(HOLD));
+        bookings.put(b.id(), b);                  // visible before it claims
+        List&lt;Seat&gt; claimed = new ArrayList&lt;&gt;();
+        for (Seat s : seats) {
+            if (!claimSeat(show, s, b.id())) {    // all or nothing
+                claimed.forEach(c -&gt; show.release(c, b.id()));
+                b.cancel();
+                bookings.remove(b.id());
+                return Optional.empty();
+            }
+            claimed.add(s);
+        }
+        return Optional.of(b);
+    }
+
+    private boolean claimSeat(Show show, Seat seat, String id) {
+        while (true) {
+            if (show.claim(seat, id)) return true;               // it was free
+            String holder = show.claimant(seat);
+            if (holder == null) continue;                        // freed: retry
+            Booking other = bookings.get(holder);
+            if (other != null &amp;&amp; !other.tryExpire(clock.instant()))
+                return false;                                    // live hold, or sold
+            if (show.reclaim(seat, holder, id)) return true;     // CAS from the dead
+        }
+    }
+
+    Booking confirm(String bookingId) {
+        Booking b = get(bookingId);
+        if (b.status() != BookingStatus.HELD) throw new IllegalStateException(b.id() + " is " + b.status());
+        String ref = payments.charge(b.user(), b.amount());      // slow, may throw
+        if (!b.tryConfirm(clock.instant(), ref)) {
+            payments.refund(ref);
+            throw new IllegalStateException("hold expired during payment, refunded " + ref);
+        }
+        return b;
+    }
+
+    void cancel(String bookingId) {
+        Booking b = get(bookingId);
+        if (b.cancel()) b.seats().forEach(s -&gt; b.show().release(s, b.id()));
+    }
+
+    String seatMap(Show show) {
+        StringBuilder out = new StringBuilder();
+        char row = 0;
+        for (Seat s : show.seats()) {
+            if (s.row() != row) { out.append(row == 0 ? "" : "\n").append(s.row()).append(' '); row = s.row(); }
+            String holder = show.claimant(s);
+            Booking b = holder == null ? null : bookings.get(holder);
+            out.append(b == null ? '.'
+                     : b.status() == BookingStatus.CONFIRMED ? 'X'
+                     : b.isLive(clock.instant()) ? 'h' : '.');
+        }
+        return out.toString();
+    }
+
+    private Booking get(String id) {
+        Booking b = bookings.get(id);
+        if (b == null) throw new IllegalArgumentException("no booking " + id);
+        return b;
+    }
+}
+
+final class MutableClock extends Clock {
+    private volatile Instant now;
+    MutableClock(Instant start) { now = start; }
+    void advance(Duration d) { now = now.plus(d); }
+    @Override public Instant instant() { return now; }
+    @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+    @Override public Clock withZone(ZoneId zone) { throw new UnsupportedOperationException(); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">BookingDemo.java · 3 of 3 · the demo</div>
+<pre><code class="language-java">public class BookingDemo {
+    public static void main(String[] args) throws Exception {
+        var clock = new MutableClock(Instant.parse("2026-10-03T13:00:00Z"));
+        Duration[] slowNext = { Duration.ZERO };
+        int[] refs = { 0 };
+        PaymentGateway gateway = new PaymentGateway() {
+            public String charge(String user, long amount) {
+                clock.advance(slowNext[0]);               // a slow payment
+                slowNext[0] = Duration.ZERO;
+                return "PAY" + ++refs[0];
+            }
+            public void refund(String ref) { System.out.println("  refund " + ref); }
+        };
+        var service = new BookingService(new WeekendPricing(), gateway, clock);
+        var show = new Show("S1", new Movie("Dune: Part Two", 166),
+                LocalDateTime.of(2026, 10, 3, 19, 30),       // a Saturday
+                new TreeMap&lt;&gt;(Map.of('A', SeatCategory.REGULAR, 'B', SeatCategory.PREMIUM,
+                        'C', SeatCategory.RECLINER)), 5);
+
+        Booking ana = service.hold("ana", show, List.of("A3", "A4")).orElseThrow();
+        System.out.println("hold  " + ana);
+        System.out.println("hold  bo A4,A5: " + service.hold("bo", show, List.of("A4", "A5"))
+                .map(Booking::toString).orElse("refused, and A5 stays free"));
+
+        var winners = new AtomicInteger();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 100; i++) {
+                String user = "fan" + i;
+                pool.submit(() -&gt; service.hold(user, show, List.of("B2", "B1"))
+                                         .ifPresent(b -&gt; winners.incrementAndGet()));
+            }
+        }
+        System.out.println("race  100 users for B1,B2: " + winners.get() + " hold");
+        System.out.println(service.seatMap(show));
+
+        System.out.println("pay   " + service.confirm(ana.id()));
+        Booking cy = service.hold("cy", show, List.of("C1")).orElseThrow();
+        clock.advance(Duration.ofMinutes(9));             // cy walks away
+        System.out.println("hold  dee C1 after cy's hold ran out: "
+                + service.hold("dee", show, List.of("C1")).map(Booking::toString).orElse("refused"));
+        System.out.println("      cy's booking is now " + cy.status());
+
+        Booking eve = service.hold("eve", show, List.of("C3")).orElseThrow();
+        slowNext[0] = Duration.ofMinutes(10);
+        try { service.confirm(eve.id()); }
+        catch (IllegalStateException e) { System.out.println("pay   eve: " + e.getMessage()); }
+        System.out.println(service.seatMap(show));
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · BookingDemo.java</div>
+<pre><code class="language-plaintext">hold  BK1 ana [A3, A4] 500 HELD
+hold  bo A4,A5: refused, and A5 stays free
+race  100 users for B1,B2: 1 hold
+A ..hh.
+B hh...
+C .....
+pay   BK1 ana [A3, A4] 500 CONFIRMED PAY1
+hold  dee C1 after cy's hold ran out: BK104 dee [C1] 750 HELD
+      cy's booking is now EXPIRED
+  refund PAY2
+pay   eve: hold expired during payment, refunded PAY2
+A ..XX.
+B .....
+C .....</code></pre>
+      </div>
+    </div>
+  </div>
+</section>

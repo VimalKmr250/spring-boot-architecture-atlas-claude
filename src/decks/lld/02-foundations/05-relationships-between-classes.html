@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Foundations" data-title="Relationships between classes">
+  <h2>Six relationships, and the one question that separates them: who owns the lifetime?</h2>
+  <p class="dek">Each relationship is a different amount of coupling. Pick the weakest one that works. In Java, several of them look identical in code (a field), so the difference is in who creates the object, who else can hold it, and whether it outlives its holder.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Relationship</th><th>Means</th><th>Java shape</th><th>Lifetime</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>Dependency <code>┄┄&gt;</code></td><td>Uses it briefly</td><td>A parameter or a local variable</td><td>Only for the call</td><td><code>FeeCalculator</code> uses a <code>Ticket</code> passed to <code>fee(ticket)</code></td></tr>
+        <tr><td>Association <code>──&gt;</code></td><td>Knows about it</td><td>A field, set from outside</td><td>Independent</td><td>A <code>Loan</code> refers to a <code>Member</code></td></tr>
+        <tr><td>Aggregation <code>◇──</code></td><td>Has it, as a part that can exist alone</td><td>A collection field, filled from outside</td><td>The part outlives the whole</td><td>A <code>Group</code> has <code>User</code>s; deleting the group keeps the users</td></tr>
+        <tr><td>Composition <code>◆──</code></td><td>Owns it, as a part that cannot exist alone</td><td>A field the owner creates and never hands out</td><td>The part dies with the whole</td><td>A <code>ParkingFloor</code> owns its <code>ParkingSpot</code>s</td></tr>
+        <tr><td>Inheritance <code>──▷</code></td><td>Is a kind of it</td><td><code>extends</code></td><td>One object</td><td><code>Bishop</code> extends <code>Piece</code></td></tr>
+        <tr><td>Realisation <code>┄┄▷</code></td><td>Fulfils its contract</td><td><code>implements</code></td><td>One object</td><td><code>HourlyPricing</code> implements <code>PricingStrategy</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">The same field, three relationships</div>
+<pre><code class="language-java">final class ParkingFloor {                 // composition: creates its spots,
+    private final List&lt;ParkingSpot&gt; spots; // never exposes the list
+    ParkingFloor(int n) {
+        spots = IntStream.range(0, n).mapToObj(ParkingSpot::new).toList();
+    }
+}
+
+final class Group {                        // aggregation: users come from
+    private final Set&lt;User&gt; members = new LinkedHashSet&lt;&gt;();
+    void add(User u) { members.add(u); }   // outside and outlive the group
+}
+
+final class Loan {                         // association: one reference
+    private final Member member;           // to an independent object
+    Loan(Member member) { this.member = member; }
+}</code></pre>
+    </div>
+    <div class="note"><span class="lbl">Why interviewers ask</span>"Is that composition or aggregation?" is really "who deletes it, and can anyone else change it?" Answer with the lifecycle: "The floor creates its spots and never hands the list out, so it is composition. When a floor is closed, its spots go with it." Nobody will mark you down for the diamond's colour; they will for a spot that two floors can both mutate.</div>
+  </div>
+</section>

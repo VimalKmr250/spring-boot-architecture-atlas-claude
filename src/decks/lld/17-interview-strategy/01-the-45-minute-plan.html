@@ -1,0 +1,24 @@
+<section class="slide" data-sec="Interview strategy" data-title="The 45-minute plan">
+  <h2>The 45-minute plan: requirements, model, code, then change</h2>
+  <p class="dek">Most failed LLD rounds fail on time, not on knowledge: twenty minutes on a perfect class diagram and no code, or code from minute two with the wrong model. Fix the time box before the round and say it at the start: "I'll spend five minutes on requirements, ten on the design, and most of the rest on code." Interviewers like a candidate who manages the clock.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Minutes</th><th>Phase</th><th>What you produce</th><th>What the interviewer is checking</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0–5</td><td>Clarify</td><td>A short list of in-scope use cases, out-of-scope items and assumptions, written where both can see it</td><td>Do you ask before you build? Do you scope, or try to build everything?</td></tr>
+        <tr><td class="num">5–10</td><td>Entities</td><td>Nouns to classes, enums and value objects; the one or two points of variation</td><td>Is the model right? Title versus copy, spot versus vehicle</td></tr>
+        <tr><td class="num">10–15</td><td>Class diagram</td><td>Classes, key fields and methods, relationships, interfaces. Text is fine.</td><td>Responsibilities: who owns each decision</td></tr>
+        <tr><td class="num">15–35</td><td>Code</td><td>Model first, then the service, then a demo or test for the main flow</td><td>Clean, working code; naming; validation; no god class</td></tr>
+        <tr><td class="num">35–40</td><td>Run it</td><td>The happy path and two edge cases, run or walked through</td><td>Do you test your own code, unprompted?</td></tr>
+        <tr><td class="num">40–45</td><td>Extend</td><td>Their change request, done or described class by class; concurrency if asked</td><td>Does the design bend, or break?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Machine-coding rounds (90–120 min)</h4><p>Same phases, longer code phase. The output must run. Budget 15 minutes at the end for the demo, the input parser they specified, and reading your own code for bugs.</p></div>
+    <div class="card"><h4>If you are behind at minute 25</h4><p>Say so, and cut: "I'll finish the main use case and describe the reservation flow rather than code it." A working core beats three half-built features.</p></div>
+    <div class="card"><h4>If you are ahead</h4><p>Offer the follow-up before they ask: thread safety, a second strategy, or a test for the edge case you noticed. Raising your own design's weak spot is the strongest senior signal.</p></div>
+  </div>
+</section>

@@ -1,0 +1,22 @@
+<section class="slide" data-sec="SOLID and friends" data-title="Principles cheat sheet">
+  <h2>Every principle as a smell, a fix, and a sentence to say</h2>
+  <p class="dek">You will not be asked to recite these. You will be asked why you made a class or an interface, and the answer is usually one of these rows. Learn the smell column: it is how you notice the problem in your own code while the interviewer watches.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Principle</th><th>Smell in your code</th><th>Fix</th><th>Say it like this</th></tr></thead>
+      <tbody>
+        <tr><td><a data-deck="lld" data-slide="Single responsibility">SRP</a></td><td>A <code>…Manager</code> with methods for three concerns</td><td>Split by who asks for the change</td><td>"Pricing changes for business reasons, so it gets its own class."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Open/closed">OCP</a></td><td>A <code>switch</code> on a type or mode that grows every month</td><td>An interface at the point of variation</td><td>"A new rule is a new class; nothing that works gets edited."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Liskov substitution">LSP</a></td><td>An override that throws, or ignores its input</td><td>Reshape the hierarchy; prefer immutability</td><td>"If a subtype has to refuse a method, it isn't that type."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Interface segregation">ISP</a></td><td><code>UnsupportedOperationException</code> in an implementation</td><td>Split the interface by client</td><td>"The customer screen never sees the maintenance methods."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Dependency inversion">DIP</a></td><td><code>new VendorClient()</code> inside a business class</td><td>The policy declares an interface; inject the detail</td><td>"I can test booking with a fake payment gateway."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="DRY, KISS, YAGNI">DRY</a></td><td>The same rule in two places, changed in one</td><td>One home for each piece of knowledge</td><td>"The late-fee rule lives in one class."</td></tr>
+        <tr><td>KISS · YAGNI</td><td>Interfaces with one implementation and no reason for a second</td><td>Inline them; add the seam when the need appears</td><td>"I'll add a strategy when a second rule arrives."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Coupling, cohesion, Demeter and GRASP">Demeter</a></td><td><code>a.getB().getC().doIt()</code></td><td>Tell, don't ask: move the behaviour to <code>a</code></td><td>"The ticket computes its own fee."</td></tr>
+        <tr><td>Information expert</td><td>A service that reads every field of an object to decide something</td><td>Move the method to the object that owns the data</td><td>"The spot knows whether a vehicle fits."</td></tr>
+        <tr><td><a data-deck="lld" data-slide="Composition over inheritance; interface or abstract class">Composition</a></td><td>Inheriting only to reuse code</td><td>Hold the helper as a field</td><td>"I'd rather have a strategy than be one."</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,84 @@
+<section class="slide" data-sec="Concurrency" data-title="Producer-consumer and deadlock">
+  <h2>Producer-consumer with a bounded queue, and the lock ordering that prevents deadlock</h2>
+  <p class="dek">Many LLD systems hand work between threads: orders to a fulfilment worker, notifications to a sender. A bounded <code>BlockingQueue</code> makes producers wait when consumers fall behind (back-pressure), and a poison pill per consumer shuts them down cleanly. The other classic is deadlock. Two transfers lock the same two accounts in opposite orders, and each waits for the other forever.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProducerConsumer.java · three producers, two consumers, clean shutdown</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+
+public class ProducerConsumer {
+    record Order(int id, long amount) {}
+    static final Order POISON = new Order(-1, 0);       // a sentinel, compared by ==
+
+    public static void main(String[] args) throws Exception {
+        BlockingQueue&lt;Order&gt; queue = new ArrayBlockingQueue&lt;&gt;(10);   // bounded
+        int producers = 3, consumers = 2, perProducer = 1_000;
+        var processed = new AtomicInteger();
+        var total = new LongAdder();
+
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            List&lt;Future&lt;?&gt;&gt; made = new ArrayList&lt;&gt;();
+            for (int p = 0; p &lt; producers; p++) {
+                int base = p * perProducer;
+                made.add(pool.submit(() -&gt; {
+                    for (int i = 1; i &lt;= perProducer; i++)
+                        queue.put(new Order(base + i, i));   // blocks when full
+                    return null;
+                }));
+            }
+            for (int c = 0; c &lt; consumers; c++) {
+                pool.submit(() -&gt; {
+                    while (true) {
+                        Order o = queue.take();              // blocks when empty
+                        if (o == POISON) return null;
+                        processed.incrementAndGet();
+                        total.add(o.amount());
+                    }
+                });
+            }
+            for (Future&lt;?&gt; f : made) f.get();                // all produced
+            for (int c = 0; c &lt; consumers; c++) queue.put(POISON);
+        }                                                    // all consumed
+        System.out.println("processed " + processed.get() + " orders, total " + total.sum());
+        System.out.println("queue empty: " + queue.isEmpty());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 21 · ProducerConsumer.java</div>
+<pre><code class="language-plaintext">processed 3000 orders, total 1501500
+queue empty: true</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Deadlock, and the fix: always lock in a global order</div>
+<pre><code class="language-java">// Thread 1: transfer(a, b)  locks a, then waits for b
+// Thread 2: transfer(b, a)  locks b, then waits for a   → both wait forever
+void transfer(Account from, Account to, long amount) {
+    Account first  = from.id() &lt; to.id() ? from : to;   // same order for
+    Account second = from.id() &lt; to.id() ? to : from;   // every caller
+    synchronized (first) {
+        synchronized (second) {
+            from.debit(amount);
+            to.credit(amount);
+        }
+    }
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Deadlock needs all four</th><th>Break it by</th></tr></thead>
+          <tbody>
+            <tr><td>Mutual exclusion</td><td>Lock-free structures, or immutable data</td></tr>
+            <tr><td>Hold and wait</td><td>Take every lock at once, or <code>tryLock</code> and back off</td></tr>
+            <tr><td>No preemption</td><td><code>tryLock(timeout)</code>: give up and retry</td></tr>
+            <tr><td>Circular wait</td><td>A global lock order, as above. The usual answer.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
