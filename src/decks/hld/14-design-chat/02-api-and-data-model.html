@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Design · Chat" data-title="Chat: API and data model">
+  <h2>A WebSocket protocol for live traffic, REST for history, and messages partitioned by conversation</h2>
+  <p class="dek">Live messages, receipts and presence flow over one persistent WebSocket per device. Fetching history, the conversation list and media uploads are ordinary REST calls that can be cached and retried. The store is modelled around the two hottest queries: "latest messages in conversation X" and "my conversations, newest first".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WebSocket frames (JSON or protobuf)</div>
+<pre><code class="language-json">// client → server
+{ "t": "send", "client_msg_id": "c-9f1…", "conv": "g-77", "body": "…" }
+{ "t": "ack",  "conv": "g-77", "seq": 1042 }        // delivered up to 1042
+{ "t": "read", "conv": "g-77", "seq": 1042 }
+
+// server → client
+{ "t": "sent", "client_msg_id": "c-9f1…", "seq": 1043 }  // persisted ✓
+{ "t": "msg",  "conv": "g-77", "seq": 1043, "from": "u-5", "body": "…", "ts": … }
+{ "t": "receipt", "conv": "g-77", "seq": 1043, "user": "u-9", "state": "read" }</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">REST</div>
+<pre><code class="language-http">GET  /v1/conversations?cursor=…                # my inbox, by last activity
+GET  /v1/conversations/g-77/messages?before=1043&amp;limit=50
+POST /v1/media/upload-url                      # presigned PUT for images</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Three tables in a wide-column store. messages: partition key conversation id plus a month bucket, clustering key sequence number descending, columns sender, body and timestamp. user_conversations: partition key user id, clustering by last activity descending, columns conversation id, last sequence and last read sequence. members: partition key conversation id, with user ids and roles. Separately, a session registry in Redis maps user to gateway and device.">
+          <rect x="10" y="10" width="400" height="104" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">messages</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="46" fill="#D26A3F">PK (conv_id, month)</text><text x="200" y="46" fill="#D26A3F">CK seq DESC</text>
+            <text x="20" y="64">sender_id · body (ciphertext)</text>
+            <text x="20" y="80">client_msg_id · ts · type</text>
+            <text x="20" y="100" opacity="0.7">"latest 50 of g-77" = one partition slice</text>
+          </g>
+          <rect x="10" y="126" width="400" height="84" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="144" font-size="11" font-weight="600" fill="currentColor">user_conversations  (the inbox)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="162">PK user_id · CK last_activity DESC</text>
+            <text x="20" y="178">conv_id · last_seq · last_read_seq</text>
+            <text x="20" y="196" opacity="0.7">unread = last_seq − last_read_seq</text>
+          </g>
+          <rect x="10" y="222" width="190" height="64" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="240" font-size="11" font-weight="600" fill="currentColor">members</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="258">PK conv_id</text><text x="20" y="274">user_id · role</text></g>
+          <rect x="220" y="222" width="190" height="64" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="230" y="240" font-size="11" font-weight="600" fill="currentColor">session registry</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="258">u-9 → [gw-17/ios,</text><text x="290" y="274">gw-203/web]</text></g>
+          <text x="210" y="310" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">Cassandra / ScyllaDB for the tables · Redis (TTL) for sessions</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Why a wide-column store</h4><p>The workload is write-heavy (700k/s), almost all reads are "latest N in one conversation", and there is a lot of data. That's exactly a partition-per-conversation, clustered-by-sequence table. The month bucket keeps very long-lived chats from growing one partition forever.</p></div>
+    <div class="card"><h4>Sequence numbers, not timestamps</h4><p>Each conversation gets a monotonically increasing <code>seq</code>, assigned by the server when the message is persisted. It orders messages, drives "give me everything after 1042" sync, and makes receipts one number: "read up to 1042".</p></div>
+    <div class="card"><h4>client_msg_id for idempotency</h4><p>Phones retry on flaky networks. The client generates an id per message, and the server dedupes on <code>(conv, client_msg_id)</code>, returning the existing <code>seq</code>. A resend never produces a duplicate bubble.</p></div>
+  </div>
+</section>

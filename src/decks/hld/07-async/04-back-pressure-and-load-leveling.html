@@ -1,0 +1,39 @@
+<section class="slide" data-sec="Asynchronism" data-title="Back pressure and load leveling">
+  <h2>A queue turns a traffic spike into a backlog you work through at your own pace</h2>
+  <p class="dek">Without a buffer, the downstream service has to be sized for the peak. With a queue between them, it only has to be sized above the <em>average</em>. Bursts become queue depth, workers drain it at a steady rate, and the database behind the workers never sees the spike. That is <b>queue-based load leveling</b>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Over 60 seconds, incoming messages run at 1,000 a second with bursts to 5,000 between seconds 8 and 14 and to 4,000 between 38 and 42. Workers process at up to 2,500 a second, a flat line during each burst. The queue depth rises to 15,000 during the first burst and drains to zero by second 24, then rises to 6,000 and drains by second 46.">
+        <line x1="60" y1="170" x2="866" y2="170" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="60" y1="170" x2="60" y2="30" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">
+          <text x="54" y="44">5k/s</text><text x="54" y="109">2.5k</text><text x="54" y="148">1k</text>
+        </g>
+        <line x1="60" y1="105" x2="866" y2="105" stroke="#3AA79B" stroke-opacity="0.35" stroke-dasharray="3 4"></line>
+        <text x="862" y="99" text-anchor="end" font-size="10" fill="#3AA79B">worker capacity</text>
+        <path d="M60 144 H166.7 V40 H246.7 V144 H566.7 V66 H620 V144 H860" fill="none" stroke="#D26A3F" stroke-width="2.2"></path>
+        <path d="M60 146 H166.7 V107 H380 V146 H566.7 V107 H673.3 V146 H860" fill="none" stroke="#3AA79B" stroke-width="2.2" stroke-dasharray="6 3"></path>
+        <text x="256" y="52" font-size="10.5" fill="#D26A3F">incoming: bursts to 5k/s</text>
+        <text x="390" y="124" font-size="10.5" fill="#3AA79B">processed: never above 2.5k/s</text>
+
+        <line x1="60" y1="260" x2="866" y2="260" stroke="currentColor" stroke-opacity="0.45"></line>
+        <text x="54" y="204" text-anchor="end" font-size="10" fill="currentColor" opacity="0.6">15k</text>
+        <text x="54" y="262" text-anchor="end" font-size="10" fill="currentColor" opacity="0.6">0</text>
+        <polygon points="166.7,260 246.7,200 380,260" fill="#8A94A3" fill-opacity="0.45"></polygon>
+        <polygon points="566.7,260 620,236 673.3,260" fill="#8A94A3" fill-opacity="0.45"></polygon>
+        <text x="250" y="192" font-size="10.5" fill="currentColor">queue depth peaks at 15k, drained by t=24 s</text>
+        <text x="630" y="228" font-size="10.5" fill="currentColor" opacity="0.85">6k, drained in 4 s</text>
+        <g font-size="10" fill="currentColor" opacity="0.6" text-anchor="middle"><text x="60" y="280">0 s</text><text x="326.7" y="280">20</text><text x="593.3" y="280">40</text><text x="860" y="280">60 s</text></g>
+      </svg>
+    </div>
+    <figcaption>What matters is the <b>age</b> of the oldest message, not the depth. Alert when the backlog would take longer to drain than the business can wait. A queue holding 5 minutes of email is fine. A queue holding 5 minutes of payment confirmations is an incident.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Back pressure: say "slow down"</h4><p>When a buffer fills, push back instead of growing without limit. Use bounded in-memory queues, <code>429</code> or <code>503</code> with <code>Retry-After</code> at the edge, consumers that pull at their own rate, and demand signalling in reactive streams. An unbounded queue just moves the out-of-memory crash somewhere else.</p></div>
+    <div class="card"><h4>Queues are not infinite</h4><p>Set a maximum depth or a message TTL, and decide in advance what happens when it's reached: reject new work, shed low-priority work, or spill to cheaper storage. Watch for a queue whose drain rate is below its arrival rate on average. It will never catch up.</p></div>
+    <div class="card"><h4>Scale consumers on lag</h4><p>Autoscale workers on queue depth or age rather than CPU (KEDA does this on Kubernetes). But cap the workers at what the <em>downstream</em> can handle: fifty workers hammering one database only moves the bottleneck.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="ed" data-slide="Backpressure">Events · Backpressure</a><a data-deck="ed" data-slide="Diagnosing lag">Events · Diagnosing lag</a></p>
+</section>

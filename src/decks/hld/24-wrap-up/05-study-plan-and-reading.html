@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Wrap-up" data-title="Study plan and further reading">
+  <h2>Four weeks from vocabulary to timed mocks, and where to go deeper</h2>
+  <p class="dek">Reading slides builds recognition, but interviews test recall under time pressure. The plan below alternates learning a section with producing something from memory, such as a diagram, an estimate or a spoken trade-off, and finishes with timed runs of the twelve designs. The reading list is short on purpose: a few sources, read properly.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:720px">
+      <thead><tr><th>Week</th><th>Study</th><th>Practise from memory</th></tr></thead>
+      <tbody>
+        <tr><td><b>1</b></td><td>Orientation, Fundamentals, Estimation, Networking &amp; edge</td><td>One estimate a day, out loud and in under 5 minutes. Explain CAP vs PACELC and L4 vs L7 to a rubber duck.</td></tr>
+        <tr><td><b>2</b></td><td>Data, Caching, Asynchronism</td><td>Redraw the hash ring, leader-follower lag, cache-aside and the outbox from a blank page. Pick a store for five made-up products.</td></tr>
+        <tr><td><b>3</b></td><td>Reliability, Operate &amp; secure, Architecture and cloud patterns</td><td>For three designs, walk every hop's failure: timeout, retry, fallback. Write SLOs and one burn-rate alert for each.</td></tr>
+        <tr><td><b>4</b></td><td>The twelve designs</td><td>Two a day, 45 minutes each on a whiteboard, <em>then</em> compare with the slides. Finish with at least two mock interviews with a peer.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="panel">
+      <h3>Books</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>DDIA</dt><dd>Kleppmann, <em>Designing Data-Intensive Applications</em>: the foundation for replication, partitioning, transactions and streams.</dd>
+        <dt>SDI 1 &amp; 2</dt><dd>Alex Xu, <em>System Design Interview</em>: many more worked designs in interview format.</dd>
+        <dt>SRE</dt><dd>Google, <em>Site Reliability Engineering</em>: SLOs, alerting, overload and incident practice.</dd>
+        <dt>DB internals</dt><dd>Petrov, <em>Database Internals</em>: B-trees, LSM trees and distributed consensus in depth.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>Online</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Roadmap</dt><dd><a href="https://roadmap.sh/system-design" target="_blank" rel="noopener">roadmap.sh/system-design</a>, the path this deck follows.</dd>
+        <dt>Primer</dt><dd><a href="https://github.com/donnemartin/system-design-primer" target="_blank" rel="noopener">System Design Primer</a>, a community-maintained overview with Anki decks.</dd>
+        <dt>Patterns</dt><dd><a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/" target="_blank" rel="noopener">Azure cloud design patterns</a>, the source for the patterns section.</dd>
+        <dt>Builders' Library</dt><dd><a href="https://aws.amazon.com/builders-library/" target="_blank" rel="noopener">AWS Builders' Library</a>: timeouts, retries, shuffle sharding and load shedding from practice.</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h3>Papers worth an evening</h3>
+      <ul class="checks" style="margin-top:10px">
+        <li><b>Dynamo</b> (2007): the KV store design, from the source.</li>
+        <li><b>Bigtable</b> (2006) and <b>GFS</b> (2003): LSM and storage at scale.</li>
+        <li><b>Kafka</b> (2011): the log as a building block.</li>
+        <li><b>Raft</b> (2014): consensus you can explain.</li>
+        <li><b>Spanner</b> (2012): global consistency with TrueTime.</li>
+        <li><b>The Tail at Scale</b> (2013): why p99 dominates fan-out.</li>
+      </ul>
+    </div>
+  </div>
+</section>

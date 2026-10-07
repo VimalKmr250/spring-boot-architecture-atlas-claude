@@ -1,0 +1,56 @@
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: key generation">
+  <h2>Deep dive 1: unique 7-character codes without a coordination bottleneck</h2>
+  <p class="dek">This is the heart of the question. You need billions of unique, short, non-guessable codes, minted by many servers at once, with no global lock on the write path. There are three standard approaches, and the interviewer wants to hear why you rejected two of them.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Option A, hash: take the MD5 of the long URL, keep 41 bits, base62-encode to 7 characters, then check the database for a collision and retry with a salt if found. Option B, counter ranges: a key generation service hands each server a range of ids, such as 1,000,000 to 1,000,999 for server A; the server scrambles each id with a reversible permutation and base62-encodes it, for example id 11157 encodes to 2TX. Option C, pre-generated keys: an offline job fills a pool of random unused codes; servers claim batches, and there are no collisions at write time.">
+        <g font-size="12.5" font-weight="600" fill="currentColor" text-anchor="middle"><text x="150" y="20">A · Hash + truncate</text><text x="450" y="20">B · Counter ranges (chosen)</text><text x="750" y="20">C · Pre-generated pool</text></g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="300" y1="8" x2="300" y2="292"></line><line x1="600" y1="8" x2="600" y2="292"></line></g>
+
+        <!-- A -->
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="40" y="38" width="220" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="150" y="56" font-family="IBM Plex Mono, monospace">md5("https://…/very/long")</text>
+          <rect x="40" y="86" width="220" height="28" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="150" y="104">take 41 bits → base62 → 7 chars</text>
+          <rect x="40" y="134" width="220" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="150" y="152">exists in DB? (read on every write)</text>
+          <rect x="40" y="182" width="100" height="28" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="90" y="200">no → insert</text>
+          <rect x="160" y="182" width="100" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="210" y="200">yes → salt, retry</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="150" y1="66" x2="150" y2="83" marker-end="url(#arw)"></line><line x1="150" y1="114" x2="150" y2="131" marker-end="url(#arw)"></line><line x1="120" y1="162" x2="100" y2="179" marker-end="url(#arw)"></line><line x1="180" y1="162" x2="200" y2="179" marker-end="url(#arw)"></line></g>
+        <path d="M260 196 C 290 196, 290 52, 262 52" fill="none" stroke="#D26A3F" stroke-width="1.1" stroke-dasharray="3 3" marker-end="url(#arwA)"></path>
+        <g font-size="10" text-anchor="middle"><text x="150" y="240" fill="#3AA79B">✓ same URL → same code (dedupe)</text><text x="150" y="256" fill="#D26A3F">✗ collision check on every write</text><text x="150" y="272" fill="#D26A3F">✗ collisions grow as the table fills</text></g>
+
+        <!-- B -->
+        <rect x="380" y="34" width="140" height="36" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="50" text-anchor="middle" font-size="10" fill="currentColor">key gen service</text>
+        <text x="450" y="63" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7">etcd / DB sequence</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="316" y="96" width="128" height="34" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="380" y="110">server A</text><text x="380" y="123">1,000,000–1,000,999</text>
+          <rect x="456" y="96" width="128" height="34" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="520" y="110">server B</text><text x="520" y="123">1,001,000–1,001,999</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="430" y1="70" x2="395" y2="93" marker-end="url(#arw)"></line><line x1="470" y1="70" x2="505" y2="93" marker-end="url(#arw)"></line></g>
+        <rect x="340" y="152" width="220" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="450" y="171" text-anchor="middle" font-size="9.5" fill="currentColor">scramble: reversible permutation of id</text>
+        <rect x="340" y="196" width="220" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect>
+        <text x="450" y="215" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">base62(11157) = "2TX"</text>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="450" y1="130" x2="450" y2="149" marker-end="url(#arw)"></line><line x1="450" y1="182" x2="450" y2="193" marker-end="url(#arw)"></line></g>
+        <g font-size="10" text-anchor="middle"><text x="450" y="244" fill="#3AA79B">✓ no collisions, no read before write</text><text x="450" y="260" fill="#3AA79B">✓ one KGS call per 1,000 links</text><text x="450" y="276" fill="#D26A3F">✗ a crash wastes the rest of a block (fine)</text></g>
+
+        <!-- C -->
+        <path d="M680 40 a70 7 0 0 1 140 0 v50 a70 7 0 0 1 -140 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M680 40 a70 7 0 0 0 140 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="750" y="68" text-anchor="middle" font-size="10" fill="currentColor">free_keys pool</text>
+        <text x="750" y="82" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">Qx81kAe, 0pLmZ2r, …</text>
+        <rect x="640" y="130" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="690" y="149" text-anchor="middle" font-size="9.5" fill="currentColor">offline filler</text>
+        <rect x="770" y="130" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="820" y="149" text-anchor="middle" font-size="9.5" fill="currentColor">server claims 1k</text>
+        <line x1="690" y1="130" x2="715" y2="99" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <line x1="790" y1="99" x2="815" y2="127" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="750" y="190" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">move batch free → used</text>
+        <text x="750" y="204" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">atomically</text>
+        <g font-size="10" text-anchor="middle"><text x="750" y="244" fill="#3AA79B">✓ truly random codes</text><text x="750" y="260" fill="#D26A3F">✗ another stateful store to run</text><text x="750" y="276" fill="#D26A3F">✗ must pre-generate billions</text></g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="note tip"><span class="lbl">The answer to give</span>"Counter ranges. A small coordination service (a DB sequence or etcd) hands each Shorten instance a block of 1,000 ids, so the write path never waits on it. To stop people enumerating links, I pass the id through a reversible scramble, such as a keyed Feistel permutation over the 62⁷ space, before base62-encoding it. Codes look random and are still guaranteed unique. Custom aliases skip all this and use a conditional insert."</div>
+</section>

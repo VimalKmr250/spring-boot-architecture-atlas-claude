@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: freshness and sharding">
+  <h2>Deep dive 2: fresh enough for breaking news, balanced enough for "s"</h2>
+  <p class="dek">A daily rebuild is too slow when something happens in the news: people type it within minutes. Rebuilding the whole trie every minute is too expensive. The answer is layers: a stable base, a periodic delta, and a small real-time trending layer, merged when the query is served. Separately, prefix traffic is very uneven, so shard boundaries follow measured load, not the alphabet.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: three layers merged at query time. The base snapshot is rebuilt daily from 90 days of decayed counts and is stable. The hourly delta applies counts from the last few hours. The trending overlay is computed every minute by a streaming job using a count-min sketch and heavy-hitter tracking per short prefix, and holds only fast-rising queries. A query for a prefix merges the three lists, dedupes, re-scores and returns the top 8. Right: traffic by first letter is very uneven, with s, c, a and m heavy and x, q and z light; shard boundaries are cut so each shard carries about the same load, for example a to b, c, d to h, i to m, n to r, s, t to z.">
+        <text x="220" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Three layers, merged per request</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="20" y="40" width="250" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="30" y="58" font-weight="600">base snapshot · daily</text><text x="30" y="74" opacity="0.8" font-size="9">90 days, decayed · stable · largest</text>
+          <rect x="20" y="96" width="250" height="44" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="30" y="114" font-weight="600">hourly delta</text><text x="30" y="130" opacity="0.8" font-size="9">last hours' counts, added to base scores</text>
+          <rect x="20" y="152" width="250" height="44" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="30" y="170" font-weight="600">trending overlay · every minute</text><text x="30" y="186" opacity="0.8" font-size="9">count-min sketch + heavy hitters, short prefixes</text>
+        </g>
+        <rect x="310" y="96" width="120" height="44" rx="6" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="370" y="114" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">merge</text>
+        <text x="370" y="130" text-anchor="middle" font-size="8.5" fill="currentColor">dedupe · re-score</text>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="270" y1="62" x2="307" y2="108" marker-end="url(#arw)"></line><line x1="270" y1="118" x2="307" y2="118" marker-end="url(#arw)"></line></g>
+        <line x1="270" y1="174" x2="307" y2="130" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="370" y="170" text-anchor="middle" font-size="9.5" fill="currentColor">→ top 8</text>
+        <text x="220" y="224" text-anchor="middle" font-size="9.5" fill="currentColor">a new query can surface in about a minute via the overlay,</text>
+        <text x="220" y="238" text-anchor="middle" font-size="9.5" fill="currentColor">while the big structures change only hourly or daily</text>
+        <text x="220" y="262" text-anchor="middle" font-size="9.5" fill="#D26A3F">trending passes the same blocklist and safety filters</text>
+
+        <line x1="450" y1="12" x2="450" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Shard by measured load, not by letter</text>
+        <line x1="470" y1="200" x2="885" y2="200" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g fill="#8A94A3" fill-opacity="0.55">
+          <rect x="474" y="130" width="12" height="70"></rect><rect x="489" y="170" width="12" height="30"></rect><rect x="504" y="110" width="12" height="90"></rect><rect x="519" y="160" width="12" height="40"></rect>
+          <rect x="534" y="180" width="12" height="20"></rect><rect x="549" y="170" width="12" height="30"></rect><rect x="564" y="168" width="12" height="32"></rect><rect x="579" y="172" width="12" height="28"></rect>
+          <rect x="594" y="175" width="12" height="25"></rect><rect x="609" y="185" width="12" height="15"></rect><rect x="624" y="180" width="12" height="20"></rect><rect x="639" y="160" width="12" height="40"></rect>
+          <rect x="654" y="130" width="12" height="70"></rect><rect x="669" y="172" width="12" height="28"></rect><rect x="684" y="186" width="12" height="14"></rect><rect x="699" y="140" width="12" height="60"></rect>
+          <rect x="714" y="194" width="12" height="6"></rect><rect x="729" y="160" width="12" height="40"></rect>
+        </g>
+        <rect x="744" y="80" width="12" height="120" fill="#D26A3F" fill-opacity="0.7"></rect>
+        <g fill="#8A94A3" fill-opacity="0.55">
+          <rect x="759" y="150" width="12" height="50"></rect><rect x="774" y="176" width="12" height="24"></rect><rect x="789" y="170" width="12" height="30"></rect><rect x="804" y="176" width="12" height="24"></rect>
+          <rect x="819" y="196" width="12" height="4"></rect><rect x="834" y="186" width="12" height="14"></rect><rect x="849" y="196" width="12" height="4"></rect>
+        </g>
+        <g font-size="8" fill="currentColor" text-anchor="middle" opacity="0.7"><text x="480" y="212">a</text><text x="510" y="212">c</text><text x="660" y="212">m</text><text x="705" y="212">p</text><text x="750" y="212" fill="#D26A3F" opacity="1">s</text><text x="855" y="212">z</text></g>
+        <g stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="3 3"><line x1="502" y1="60" x2="502" y2="220"></line><line x1="517" y1="60" x2="517" y2="220"></line><line x1="592" y1="60" x2="592" y2="220"></line><line x1="667" y1="60" x2="667" y2="220"></line><line x1="742" y1="60" x2="742" y2="220"></line><line x1="757" y1="60" x2="757" y2="220"></line></g>
+        <g font-size="8.5" fill="#D26A3F" text-anchor="middle"><text x="486" y="56">a–b</text><text x="510" y="56">c</text><text x="555" y="56">d–h</text><text x="630" y="56">i–m</text><text x="705" y="56">n–r</text><text x="750" y="56">s</text><text x="820" y="56">t–z</text></g>
+        <text x="675" y="240" text-anchor="middle" font-size="9.5" fill="currentColor">uneven ranges, even load; "s" alone may need</text>
+        <text x="675" y="254" text-anchor="middle" font-size="9.5" fill="currentColor">its own shard (or split by two letters: "sa"–"sm", …)</text>
+        <text x="675" y="276" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">recompute boundaries at each build from last week's traffic</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Trending, cheaply</h4><p>A streaming job counts query frequency per minute with a count-min sketch (small, approximate) and tracks heavy hitters per short prefix. It emits queries whose rate is far above their baseline. The overlay is tiny: a few thousand entries, replicated to every server.</p></div>
+    <div class="card"><h4>Safety at every layer</h4><p>Autocomplete can put words in users' mouths, so it's a trust and legal surface. The blocklist and classifier run in the builder <em>and</em> on the overlay, and a manual kill list is applied at serve time for emergencies, taking effect in seconds.</p></div>
+    <div class="card"><h4>Personalisation as a blend</h4><p>Keep a small per-user list of recent searches (on the device or in a KV store) and blend it with the global results: "your recent" first, then global. That needs no per-user trie, just a merge of two short lists.</p></div>
+  </div>
+</section>

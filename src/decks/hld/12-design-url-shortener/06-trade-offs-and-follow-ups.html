@@ -1,0 +1,65 @@
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: trade-offs and follow-ups">
+  <h2>What breaks at 10×, what fails, and what interviewers ask next</h2>
+  <p class="dek">Finish by stress-testing your own design. Redirects must survive the loss of any single component, so each dependency on the read path needs a fallback. Growth pushes the design towards multi-region reads, but the write path can stay in one region, because links are immutable.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Scaled-out design across two regions. Global DNS sends users to the nearest region. Each region runs redirect services, a local Redis and a read replica of the URL database. Writes go only to the primary region; the database replicates to region 2 asynchronously within seconds, which is fine because links never change. Failure annotations: if Redis fails, reads go to the replicas, which are sized for it; if the key service fails, servers keep minting from their current block; if the primary region fails, redirects continue from region 2 and only link creation pauses.">
+        <rect x="360" y="10" width="180" height="32" rx="6" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="31" text-anchor="middle" font-size="11" fill="currentColor">GeoDNS · nearest region</text>
+        <rect x="30" y="60" width="380" height="170" rx="10" fill="#D26A3F" fill-opacity="0.04" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="44" y="80" font-size="11" font-weight="600" fill="#D26A3F">Region 1 (primary)</text>
+        <rect x="490" y="60" width="380" height="170" rx="10" fill="currentColor" fill-opacity="0.02" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="504" y="80" font-size="11" font-weight="600" fill="currentColor">Region 2 (read)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="50" y="96" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="100" y="115">shorten svc</text>
+          <rect x="50" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="100" y="159">redirect × 20</text>
+          <rect x="170" y="140" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="210" y="159">Redis</text>
+          <rect x="170" y="96" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="210" y="115">KGS</text>
+          <rect x="510" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="560" y="159">redirect × 20</text>
+          <rect x="630" y="140" width="80" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="670" y="159">Redis</text>
+        </g>
+        <path d="M280 104 a50 6 0 0 1 100 0 v50 a50 6 0 0 1 -100 0 z" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></path>
+        <path d="M280 104 a50 6 0 0 0 100 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        <text x="330" y="132" text-anchor="middle" font-size="10" fill="currentColor">primary</text><text x="330" y="146" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">+ replicas</text>
+        <path d="M740 104 a50 6 0 0 1 100 0 v50 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></path>
+        <path d="M740 104 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.5"></path>
+        <text x="790" y="132" text-anchor="middle" font-size="10" fill="currentColor">replicas</text>
+        <line x1="380" y1="130" x2="737" y2="130" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arwB)"></line>
+        <text x="560" y="122" text-anchor="middle" font-size="9.5" fill="#3AA79B">async replication (seconds)</text>
+        <line x1="400" y1="42" x2="200" y2="57" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="500" y1="42" x2="700" y2="57" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <g font-size="9.5" fill="currentColor">
+          <text x="50" y="196">✕ Redis down → replicas absorb reads (sized for 2×)</text>
+          <text x="50" y="212">✕ KGS down → servers finish current blocks (minutes of headroom)</text>
+          <text x="510" y="196">✕ region 1 down → redirects continue here;</text>
+          <text x="528" y="212">only "create link" pauses until fail-over</text>
+        </g>
+        <text x="450" y="262" text-anchor="middle" font-size="10.5" fill="currentColor">redirect availability ≠ create availability: design and state SLOs for each separately</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>At 10× (200k redirects/s)</th><th>Response</th></tr></thead>
+        <tbody>
+          <tr><td>Redis shard hot</td><td>Redis Cluster plus an in-process cache for the top keys</td></tr>
+          <tr><td>DB storage (30 TB)</td><td>More shards; archive expired links; compress long URLs</td></tr>
+          <tr><td>Click stream volume</td><td>More Kafka partitions; pre-aggregate at the service</td></tr>
+          <tr><td>Global latency</td><td>More read regions; edge redirects for "no stats" links</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Follow-ups to expect</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Abuse:</b> phishing and malware links. Scan on create (Safe Browsing API), rate-limit creates per user and IP, and add a takedown flag checked on redirect.</li>
+        <li><b>Expiry:</b> a lazy check on redirect (410 Gone), plus a nightly sweeper that deletes expired rows and cache keys.</li>
+        <li><b>Custom domains:</b> the tenant becomes part of the key, <code>(domain, code)</code>.</li>
+        <li><b>Privacy:</b> hash IPs in click events, and set retention limits on raw events.</li>
+      </ul>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,61 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Layered (n-tier)">
+  <h2>Layers separate concerns in the code; tiers separate them onto machines</h2>
+  <p class="dek">The oldest and still the most common style. A <b>layer</b> is a logical grouping in the codebase: presentation, business logic, data access. Each layer depends only on the one below it. A <b>tier</b> is a physical deployment boundary: browser, application servers, database. Nearly every system in this deck is a 3-tier system at heart, whatever else it adds.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: logical layers in one application: presentation with controllers and views, application or business with use cases and domain rules, data access with repositories, and the database below; each layer calls only the one beneath. Right: physical tiers: a client tier of browsers and apps, an application tier of stateless servers behind a load balancer, and a data tier of a primary database with a replica. The layers deploy into the application tier.">
+        <text x="200" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Logical layers (inside one codebase)</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="60" y="36" width="280" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="56" font-weight="600">Presentation</text><text x="200" y="71" font-size="9.5" opacity="0.7">controllers · views · request validation</text>
+          <rect x="60" y="96" width="280" height="44" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect><text x="200" y="116" font-weight="600">Application / business</text><text x="200" y="131" font-size="9.5" opacity="0.7">use cases · domain rules · transactions</text>
+          <rect x="60" y="156" width="280" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="200" y="176" font-weight="600">Data access</text><text x="200" y="191" font-size="9.5" opacity="0.7">repositories · ORM · external clients</text>
+        </g>
+        <path d="M150 216 a50 6 0 0 1 100 0 v28 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M150 216 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="200" y="238" text-anchor="middle" font-size="10.5" fill="currentColor">database</text>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="200" y1="80" x2="200" y2="93" marker-end="url(#arw)"></line><line x1="200" y1="140" x2="200" y2="153" marker-end="url(#arw)"></line><line x1="200" y1="200" x2="200" y2="208" marker-end="url(#arw)"></line></g>
+        <text x="350" y="122" font-size="9.5" fill="currentColor" opacity="0.75">depends only</text>
+        <text x="350" y="136" font-size="9.5" fill="currentColor" opacity="0.75">downward</text>
+        <text x="200" y="278" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">hexagonal / clean variant: the domain sits in the middle, and the DB and web are adapters</text>
+
+        <line x1="440" y1="14" x2="440" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Physical tiers (deployment)</text>
+        <rect x="470" y="34" width="400" height="56" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="5 4"></rect>
+        <text x="482" y="52" font-size="10" fill="currentColor" opacity="0.7">client tier</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="560" y="46" width="90" height="34" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="605" y="67">browser</text>
+          <rect x="670" y="46" width="90" height="34" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="715" y="67">mobile app</text>
+        </g>
+        <rect x="470" y="110" width="400" height="80" rx="8" fill="#D26A3F" fill-opacity="0.04" stroke="#D26A3F" stroke-opacity="0.6" stroke-dasharray="5 4"></rect>
+        <text x="482" y="128" font-size="10" fill="#D26A3F">application tier</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="490" y="140" width="70" height="34" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="525" y="161">LB</text>
+          <rect x="590" y="136" width="80" height="42" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="630" y="161">app</text>
+          <rect x="680" y="136" width="80" height="42" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="720" y="161">app</text>
+          <rect x="770" y="136" width="80" height="42" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="810" y="161">app</text>
+        </g>
+        <line x1="560" y1="157" x2="587" y2="157" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="470" y="210" width="400" height="70" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="5 4"></rect>
+        <text x="482" y="228" font-size="10" fill="currentColor" opacity="0.7">data tier</text>
+        <path d="M600 230 a45 6 0 0 1 90 0 v30 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M600 230 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="645" y="254" text-anchor="middle" font-size="10" fill="currentColor">primary</text>
+        <path d="M730 230 a45 6 0 0 1 90 0 v30 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M730 230 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="775" y="254" text-anchor="middle" font-size="10" fill="currentColor">replica</text>
+        <line x1="660" y1="90" x2="660" y2="107" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="700" y1="190" x2="660" y2="220" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="690" y1="248" x2="727" y2="248" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why it lasts</h4><p>It's easy to understand, easy to staff and easy to test layer by layer, and each tier scales independently: stateless app servers out, the database up. Most CRUD-heavy business applications never need anything more.</p></div>
+    <div class="card"><h4>Where it hurts</h4><p>Layers slice by technical concern, so a single feature touches every layer. In a large codebase every team edits the same layers, which becomes a "big ball of mud" without module boundaries <em>inside</em> each layer. The database becomes the integration point.</p></div>
+    <div class="card"><h4>The modern refinement</h4><p>Keep the tiers, but slice the code by <b>business capability</b> first (modules) and by layer within each module. Put the domain at the centre with ports and adapters, so the database and frameworks are details. That becomes the modular monolith on the next slide.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Layering inside a module">Deck · Layering inside a module</a><a data-deck="deck" data-slide="Port and adapter in code">Deck · Port and adapter in code</a></p>
+</section>

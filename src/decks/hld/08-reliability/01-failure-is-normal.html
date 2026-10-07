@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Reliability" data-title="Failure is normal">
+  <h2>At scale, something is always broken, so design for partial failure</h2>
+  <p class="dek">With 1,000 servers that each fail once every three years, you lose about one a day. Networks drop, delay and reorder packets. A dependency can be up but ten times slower than usual. Reliability doesn't mean preventing failure. It means containing it: one component's failure should degrade one feature, not take down the system.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 280" role="img" aria-label="Two services connected over a network, surrounded by the eight fallacies of distributed computing: the network is reliable, latency is zero, bandwidth is infinite, the network is secure, topology doesn't change, there is one administrator, transport cost is zero, the network is homogeneous. Below, the failure kinds: crash, omission, timing where a node is slow, and gray failure where it is partly working.">
+        <rect x="300" y="104" width="120" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="360" y="137" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Service A</text>
+        <rect x="480" y="104" width="120" height="56" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="540" y="137" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Service B</text>
+        <path d="M420 132 C 440 118, 460 146, 478 132" fill="none" stroke="#D26A3F" stroke-width="1.8" stroke-dasharray="6 3" marker-end="url(#arwA)"></path>
+        <text x="450" y="112" text-anchor="middle" font-size="10" fill="#D26A3F">network</text>
+        <g font-size="10.5" fill="currentColor">
+          <text x="30" y="40">✗ "the network is reliable"</text>
+          <text x="30" y="66">✗ "latency is zero"</text>
+          <text x="30" y="92">✗ "bandwidth is infinite"</text>
+          <text x="30" y="118">✗ "the network is secure"</text>
+          <text x="660" y="40">✗ "topology doesn't change"</text>
+          <text x="660" y="66">✗ "there is one administrator"</text>
+          <text x="660" y="92">✗ "transport cost is zero"</text>
+          <text x="660" y="118">✗ "the network is homogeneous"</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.2"><line x1="200" y1="60" x2="300" y2="112"></line><line x1="200" y1="112" x2="300" y2="128"></line><line x1="655" y1="60" x2="600" y2="112"></line><line x1="655" y1="112" x2="600" y2="128"></line></g>
+        <text x="450" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">The fallacies of distributed computing</text>
+
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="40" y="196" width="190" height="62" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="135" y="218" font-weight="600">Crash</text><text x="135" y="236" opacity="0.8">node stops; easy to detect</text><text x="135" y="250" opacity="0.8">if you check</text>
+          <rect x="250" y="196" width="190" height="62" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="345" y="218" font-weight="600">Omission</text><text x="345" y="236" opacity="0.8">messages lost; request or</text><text x="345" y="250" opacity="0.8">response, you can't tell which</text>
+          <rect x="460" y="196" width="190" height="62" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="555" y="218" font-weight="600">Timing (slow)</text><text x="555" y="236" opacity="0.8">works, but 10× slower:</text><text x="555" y="250" opacity="0.8">the most damaging kind</text>
+          <rect x="670" y="196" width="190" height="62" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+          <text x="765" y="218" font-weight="600">Gray failure</text><text x="765" y="236" opacity="0.8">health check passes,</text><text x="765" y="250" opacity="0.8">real requests fail</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>A dead dependency is easy: calls fail fast and you fall back. A slow dependency is the killer. Every caller's threads and connections pile up waiting on it until the callers die too. Most of this section is about stopping that pile-up.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Timeouts on every remote call</h4><p>No call waits forever. Set timeouts from the dependency's p99.9 and the caller's own deadline, not from library defaults, some of which are infinite. A missing timeout is how one slow service cascades into a full outage.</p></div>
+    <div class="card"><h4>Redundancy, and no shared fate</h4><p>At least two of everything, across failure domains (hosts, zones, regions). Watch for hidden shared fate: the same config push, deploy, certificate, DNS provider or quota can take down all the replicas at once.</p></div>
+    <div class="card"><h4>Degrade gracefully</h4><p>Decide in advance what each feature does when a dependency is down. Recommendations disappear, prices come from a cache, reviews show "unavailable", and checkout still works. Write it down as a dependency matrix and test it.</p></div>
+  </div>
+</section>

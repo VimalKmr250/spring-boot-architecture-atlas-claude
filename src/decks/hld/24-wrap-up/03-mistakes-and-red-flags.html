@@ -1,0 +1,27 @@
+<section class="slide" data-sec="Wrap-up" data-title="Common mistakes and red flags">
+  <h2>What sinks a system-design round, and what to say instead</h2>
+  <p class="dek">Most failed rounds don't fail on missing knowledge. They fail on process: skipping requirements, hiding the numbers, naming products instead of reasoning, or never discussing what breaks. Each row pairs a red flag interviewers write down with the behaviour that earns the opposite note.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:760px">
+      <thead><tr><th>Red flag</th><th>Why it hurts</th><th>Do this instead</th></tr></thead>
+      <tbody>
+        <tr><td><b>Drawing boxes in minute one</b></td><td>You design the wrong system, confidently.</td><td>Spend five minutes on functional and non-functional requirements; write them down and confirm.</td></tr>
+        <tr><td><b>No numbers</b></td><td>Every later choice is unjustified: why a cache, why sharding?</td><td>Estimate QPS, storage and bandwidth; circle the one number that shapes the design.</td></tr>
+        <tr><td><b>Buzzword soup</b> ("add Kafka, Redis, Kubernetes")</td><td>Products without reasons signal memorisation.</td><td>Name the property you need (durable ordered log), then the product that has it.</td></tr>
+        <tr><td><b>One database does everything</b></td><td>Ignores access patterns and the read/write mix.</td><td>Pick storage per access pattern and say what each one is the source of truth for.</td></tr>
+        <tr><td><b>Happy path only</b></td><td>Real systems are mostly failure handling.</td><td>For each hop: timeout, retry with idempotency, fallback, and what the user sees.</td></tr>
+        <tr><td><b>"Exactly-once" by assertion</b></td><td>Hand-waves the hardest part of distributed systems.</td><td>At-least-once delivery plus idempotent consumers, and say where the dedupe key lives.</td></tr>
+        <tr><td><b>Over-engineering day one</b></td><td>Microservices and multi-region for 1,000 users.</td><td>Design for 10× the stated load, then describe what changes at 100×.</td></tr>
+        <tr><td><b>Silent choices</b></td><td>The interviewer can't score reasoning they can't hear.</td><td>State the trade-off for every major decision (see the cheat sheet).</td></tr>
+        <tr><td><b>Losing the clock</b></td><td>No deep dives means no senior signal.</td><td>Keep the HLD simple enough to finish by minute 25, then go deep where the risk is.</td></tr>
+        <tr><td><b>Defending instead of adapting</b></td><td>New constraints are a test of flexibility.</td><td>"Good point: that breaks X, so I'd change Y." Treat hints as gifts.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">Sounds weak</span>"We'll just use NoSQL because it scales, and put a cache in front of everything. For consistency we'll use transactions."</div>
+    <div class="note good"><span class="lbl">Sounds senior</span>"Reads are 100× writes and a few seconds of staleness is fine, so a cache-aside layer with a 60 s TTL takes most of the load. Orders need atomic stock checks, so those go through a guarded update in PostgreSQL."</div>
+  </div>
+</section>

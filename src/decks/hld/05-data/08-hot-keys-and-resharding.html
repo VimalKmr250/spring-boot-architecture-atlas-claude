@@ -1,0 +1,66 @@
+<section class="slide" data-sec="Data" data-title="Hot keys and resharding">
+  <h2>Even perfect hashing can't spread one very popular key</h2>
+  <p class="dek">Hashing spreads <em>keys</em> evenly, not <em>traffic</em>. A celebrity's profile, a viral post or a flash-sale SKU can send 1,000× the average load to one key, and so to one shard. Detect hot keys, then split them: spread writes across sub-keys, and spread reads across copies.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Left: load per shard; shard 3 is saturated because it holds the hot key post:viral. Right: three fixes. Salting writes: the like counter is split into ten sub-keys, post:viral#0 to #9, spread across shards, and reads sum them. Replicating reads: the hot key is copied into an in-process or cache tier so reads never reach the shard. Splitting: logical shards are remapped so the hot range gets its own node.">
+        <text x="190" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">The symptom</text>
+        <line x1="40" y1="240" x2="340" y2="240" stroke="currentColor" stroke-opacity="0.5"></line>
+        <line x1="40" y1="84" x2="340" y2="84" stroke="#D26A3F" stroke-dasharray="5 4" stroke-opacity="0.8"></line>
+        <text x="340" y="78" text-anchor="end" font-size="10" fill="#D26A3F">shard capacity</text>
+        <g>
+          <rect x="60" y="196" width="50" height="44" fill="#8A94A3" fill-opacity="0.6"></rect>
+          <rect x="125" y="190" width="50" height="50" fill="#8A94A3" fill-opacity="0.6"></rect>
+          <rect x="190" y="52" width="50" height="188" fill="#D26A3F" fill-opacity="0.7"></rect>
+          <rect x="255" y="200" width="50" height="40" fill="#8A94A3" fill-opacity="0.6"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="85" y="256">s1</text><text x="150" y="256">s2</text><text x="215" y="256">s3</text><text x="280" y="256">s4</text></g>
+        <text x="215" y="44" text-anchor="middle" font-size="10" fill="#D26A3F" font-family="IBM Plex Mono, monospace">post:viral</text>
+        <text x="190" y="284" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">p99 on s3 explodes; the others sit idle</text>
+
+        <line x1="380" y1="14" x2="380" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="640" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Three fixes</text>
+        <rect x="400" y="36" width="480" height="76" rx="8" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-opacity="0.6"></rect>
+        <text x="412" y="56" font-size="11" font-weight="600" fill="currentColor">① Salt the writes</text>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="412" y="66" width="70" height="20" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="418" y="80">likes#0</text>
+          <rect x="488" y="66" width="70" height="20" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="494" y="80">likes#1</text>
+          <rect x="564" y="66" width="70" height="20" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="570" y="80">likes#2</text>
+          <text x="642" y="80">… #9</text>
+        </g>
+        <text x="412" y="102" font-size="10" fill="currentColor" opacity="0.8">INCR a random sub-key → 10 shards share it; reads sum 10 keys (cache the sum)</text>
+
+        <rect x="400" y="122" width="480" height="76" rx="8" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-opacity="0.6"></rect>
+        <text x="412" y="142" font-size="11" font-weight="600" fill="currentColor">② Replicate the reads</text>
+        <rect x="412" y="152" width="90" height="26" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="457" y="169" text-anchor="middle" font-size="9.5" fill="currentColor">app local cache</text>
+        <rect x="520" y="152" width="90" height="26" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="565" y="169" text-anchor="middle" font-size="9.5" fill="currentColor">cache replicas</text>
+        <rect x="628" y="152" width="90" height="26" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="673" y="169" text-anchor="middle" font-size="9.5" fill="currentColor">CDN (if public)</text>
+        <text x="412" y="190" font-size="10" fill="currentColor" opacity="0.8">a 1-second in-process cache in front of the hot key cuts its load by orders of magnitude</text>
+
+        <rect x="400" y="208" width="480" height="76" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="412" y="228" font-size="11" font-weight="600" fill="currentColor">③ Split and move</text>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="412" y="238" width="36" height="22" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="430" y="253">L0</text>
+          <rect x="452" y="238" width="36" height="22" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="470" y="253">L1</text>
+          <rect x="492" y="238" width="36" height="22" rx="3" fill="#D26A3F" fill-opacity="0.3"></rect><text x="510" y="253">L2</text>
+          <rect x="532" y="238" width="36" height="22" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="550" y="253">…</text>
+          <text x="590" y="253" font-size="12">→</text>
+          <rect x="612" y="238" width="80" height="22" rx="3" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="652" y="253">node 1: L0 L1</text>
+          <rect x="700" y="238" width="80" height="22" rx="3" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="740" y="253">node 2: L2</text>
+        </g>
+        <text x="412" y="276" font-size="10" fill="currentColor" opacity="0.8">pre-split into many logical shards (e.g. 1,024); move whole logical shards between nodes</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Detect before it pages you</h4><p>Track per-key request counts, e.g. top-K sampling in the proxy or <code>redis-cli --hotkeys</code>, alongside per-shard CPU and latency. A shard at 90% while its siblings sit at 20% is a hot key until proven otherwise.</p></div>
+    <div class="card"><h4>Reshard without downtime</h4><p>Choose many <b>logical</b> shards up front and map them to fewer physical nodes, so resharding means moving a logical shard rather than rehashing everything. To move one: copy a snapshot, stream the ongoing changes, cut over reads and writes briefly, then verify. Vitess, Citus and DynamoDB automate this.</p></div>
+    <div class="card"><h4>Design the key for skew</h4><p>If you know a few entities will be huge (celebrities, big tenants, famous products), treat them differently from day one: a separate code path, dedicated shards, or precomputed fan-out. The news feed design (§15) does exactly this.</p></div>
+  </div>
+</section>

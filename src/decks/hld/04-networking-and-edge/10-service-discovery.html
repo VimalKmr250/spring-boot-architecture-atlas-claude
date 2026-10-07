@@ -1,0 +1,67 @@
+<section class="slide" data-sec="Networking & edge" data-title="Service discovery">
+  <h2>Instances come and go, so callers look them up rather than hard-coding them</h2>
+  <p class="dek">With autoscaling and rolling deploys, the set of healthy instances behind a service changes by the minute. Service discovery is a registry of what's healthy right now, plus a way for callers to use it: either the client asks the registry and picks an instance, or a load balancer does that on the client's behalf.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Client-side discovery: instances of service B register and heartbeat with a registry such as Consul or Eureka; service A's client library queries the registry, caches the list and calls an instance directly, balancing itself. Server-side discovery: service A calls a stable name; a load balancer or kube-proxy, fed by the registry that the orchestrator keeps up to date, forwards to a healthy instance.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Client-side discovery</text>
+        <rect x="20" y="110" width="120" height="60" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="80" y="136" text-anchor="middle" font-size="11.5" fill="currentColor">Service A</text>
+        <text x="80" y="152" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">+ discovery client</text>
+        <rect x="160" y="36" width="130" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="225" y="56" text-anchor="middle" font-size="11.5" fill="currentColor">Registry</text>
+        <text x="225" y="71" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">Consul · Eureka · etcd</text>
+        <g>
+          <rect x="320" y="100" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="320" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <rect x="320" y="180" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="370" y="119">B · 10.0.1.4</text><text x="370" y="159">B · 10.0.2.7</text><text x="370" y="199">B · 10.0.3.2</text></g>
+        <line x1="80" y1="108" x2="160" y2="66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="132" y="100" font-size="10" fill="currentColor">① where is B?</text>
+        <line x1="140" y1="155" x2="317" y2="155" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="228" y="148" text-anchor="middle" font-size="10" fill="currentColor">② call directly</text>
+        <line x1="370" y1="98" x2="292" y2="66" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="352" y="74" font-size="9.5" fill="#3AA79B">register</text>
+        <text x="352" y="86" font-size="9.5" fill="#3AA79B">+ heartbeat</text>
+        <text x="215" y="244" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">no extra hop; the client caches the list and balances itself</text>
+        <text x="215" y="260" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">but every language needs the library</text>
+
+        <line x1="450" y1="14" x2="450" y2="280" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="680" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Server-side discovery</text>
+        <rect x="470" y="110" width="110" height="60" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="525" y="136" text-anchor="middle" font-size="11.5" fill="currentColor">Service A</text>
+        <text x="525" y="152" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">calls b.svc:80</text>
+        <rect x="620" y="110" width="110" height="60" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="675" y="134" text-anchor="middle" font-size="11.5" fill="currentColor">LB / kube-proxy</text>
+        <text x="675" y="150" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">or mesh sidecar</text>
+        <rect x="610" y="36" width="130" height="44" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="675" y="56" text-anchor="middle" font-size="11.5" fill="currentColor">Registry</text>
+        <text x="675" y="71" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">K8s endpoints · DNS</text>
+        <g>
+          <rect x="775" y="100" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="775" y="140" width="100" height="30" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <rect x="775" y="180" width="100" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="825" y="119">B pod</text><text x="825" y="159">B pod</text><text x="825" y="199">B pod</text></g>
+        <line x1="580" y1="140" x2="617" y2="140" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="730" y1="155" x2="772" y2="155" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="675" y1="80" x2="675" y2="107" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="825" y1="98" x2="742" y2="62" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="800" y="70" font-size="9.5" fill="#3AA79B">orchestrator</text>
+        <text x="800" y="82" font-size="9.5" fill="#3AA79B">updates it</text>
+        <text x="680" y="244" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">callers stay simple: any language, one stable name</text>
+        <text x="680" y="260" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">at the cost of a proxy hop (or a sidecar)</text>
+      </svg>
+    </div>
+    <figcaption>On Kubernetes you get server-side discovery for free: a <code>Service</code> has a stable DNS name, and its endpoints are kept in sync with healthy pods by readiness probes. Client-side discovery reappears inside gRPC clients and service meshes, where the "client" is a local sidecar.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Health decides membership</h4><p>An instance should enter the registry only when it is <b>ready</b> (warmed caches, connections open) and leave the moment it starts draining. Liveness ("restart me") and readiness ("send me traffic") are different probes. Mixing them up causes restart loops.</p></div>
+    <div class="card"><h4>The registry is critical infrastructure</h4><p>If the registry goes down, nothing can find anything. Registries are replicated consensus clusters (etcd, Consul). Clients cache the last known list, so a registry outage freezes membership instead of breaking calls.</p></div>
+    <div class="card"><h4>DNS-based discovery caveats</h4><p>DNS is universal, but clients cache answers, sometimes past the TTL (the JVM's own DNS cache is a classic example), and DNS carries no load information. That is fine for coarse routing. Use a proxy or a client-side balancer for per-request balancing.</p></div>
+  </div>
+</section>

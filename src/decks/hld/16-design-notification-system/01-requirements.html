@@ -1,0 +1,52 @@
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: requirements">
+  <h2>Design a notification system: many producers, four channels, and users who must not be spammed</h2>
+  <p class="dek">Every product team wants to notify users: order shipped, a login from a new device, "you have 3 new followers", a marketing campaign. A central notification platform gives them one API and handles channels (push, SMS, email, in-app), user preferences, templates, rate limits, retries and delivery tracking. The difficulties are wildly mixed urgency and volume, unreliable third-party providers, and not annoying people.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 1 billion notifications a day is about 12 thousand a second on average, with campaigns spiking to 100 thousand a second. By channel: push about 70 percent, email 20 percent, in-app 8 percent and SMS 2 percent, which is 20 million SMS a day and the most expensive channel. Latency classes: one-time passwords and security alerts within 5 seconds at p99; transactional within a minute; marketing within hours. The notification log is 1 billion rows at about 500 bytes, 500 gigabytes a day, kept 90 days.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="49">1 B notifications / day</text><text x="140" y="65" font-size="9.5" opacity="0.75">≈ 12 k/s avg</text>
+          <rect x="30" y="96" width="220" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="115">campaign spikes</text><text x="140" y="131" font-weight="600">≈ 100 k/s</text>
+          <rect x="30" y="162" width="220" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="181">log: 500 GB/day</text><text x="140" y="197" font-size="9.5" opacity="0.75">90-day retention</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="140" y1="74" x2="140" y2="93" marker-end="url(#arw)"></line></g>
+        <text x="450" y="26" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">By channel</text>
+        <g>
+          <rect x="310" y="40" width="252" height="26" fill="#3AA79B" fill-opacity="0.5"></rect>
+          <rect x="310" y="72" width="72" height="26" fill="#8A94A3" fill-opacity="0.6"></rect>
+          <rect x="310" y="104" width="29" height="26" fill="#8A94A3" fill-opacity="0.45"></rect>
+          <rect x="310" y="136" width="7" height="26" fill="#D26A3F" fill-opacity="0.8"></rect>
+        </g>
+        <g font-size="10" fill="currentColor"><text x="570" y="58">push 70%</text><text x="390" y="90">email 20%</text><text x="346" y="122">in-app 8%</text><text x="324" y="154" fill="#D26A3F">SMS 2% = 20 M/day, $$$</text></g>
+        <text x="760" y="26" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Latency classes</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="660" y="38" width="200" height="40" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="760" y="55" font-weight="600">critical: OTP, security</text><text x="760" y="70">p99 &lt; 5 s</text>
+          <rect x="660" y="88" width="200" height="40" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect><text x="760" y="105" font-weight="600">transactional: order shipped</text><text x="760" y="120">&lt; 1 min</text>
+          <rect x="660" y="138" width="200" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="760" y="155" font-weight="600">bulk: marketing, digests</text><text x="760" y="170">hours; throttled</text>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">the hard part: a campaign must never delay an OTP, and flaky providers must not lose either</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>One API for all producers: send to a user, a list, or a segment, now or scheduled.</li>
+      <li>Channels: iOS/Android push, email, SMS, in-app inbox.</li>
+      <li>Templates with localisation; user preferences per category and channel.</li>
+      <li>Delivery status: sent, delivered, opened, failed.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Never lose a notification; never double-send an SMS or OTP.</li>
+      <li>Priority isolation between critical and bulk traffic.</li>
+      <li>Survive a provider outage (fail over to a secondary).</li>
+      <li>Per-user caps and quiet hours enforced centrally.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Who owns the content? Producers pick a template; the platform renders it.</li>
+      <li>Can users unsubscribe per category? Yes, and that's a legal requirement for marketing.</li>
+      <li>Out of scope: campaign authoring UI and A/B testing.</li>
+    </ul></div>
+  </div>
+</section>

@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: trade-offs and follow-ups">
+  <h2>Every knob trades one thing for another: consistency levels per request, compaction per table</h2>
+  <p class="dek">The strength of this design is that it exposes its trade-offs as settings. Callers choose how many replicas to wait for, so they trade latency and availability against staleness on each request. Operators choose a compaction strategy per table, trading write amplification against read and space amplification. Close the interview by walking both dials.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Left: consistency levels with N equal to 3. ONE waits for 1 replica: lowest latency, survives 2 replicas down, reads may be stale. QUORUM waits for 2: medium latency, survives 1 down, reads see the latest acknowledged write when both reads and writes use QUORUM. ALL waits for 3: highest latency, set by the slowest replica, survives none down. LOCAL_QUORUM uses a quorum within the local datacenter and replicates to others asynchronously, the usual multi-datacenter choice. Right: compaction strategies. Size-tiered has low write amplification but high read amplification and up to 2 times space amplification. Leveled has about 10 times write amplification but low read amplification and about 1.1 times space. Use size-tiered for write-heavy, rarely read data, leveled for read-heavy data with updates, and time-window compaction for time series with TTL.">
+        <text x="220" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Consistency per request (N = 3)</text>
+        <g font-size="8.5" fill="currentColor" opacity="0.75"><text x="20" y="40">level</text><text x="110" y="40">waits for</text><text x="200" y="40">latency</text><text x="340" y="40">survives</text></g>
+        <g font-size="10" fill="currentColor">
+          <rect x="20" y="48" width="400" height="32" rx="4" fill="currentColor" fill-opacity="0.04"></rect><text x="28" y="68" font-weight="600">ONE</text><text x="110" y="68">1 replica</text><text x="340" y="68">2 down</text>
+          <rect x="20" y="88" width="400" height="32" rx="4" fill="#D26A3F" fill-opacity="0.08"></rect><text x="28" y="108" font-weight="600">QUORUM</text><text x="110" y="108">2 replicas</text><text x="340" y="108">1 down</text>
+          <rect x="20" y="128" width="400" height="32" rx="4" fill="currentColor" fill-opacity="0.04"></rect><text x="28" y="148" font-weight="600">ALL</text><text x="110" y="148">3 replicas</text><text x="340" y="148">0 down</text>
+        </g>
+        <rect x="200" y="58" width="30" height="12" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <rect x="200" y="98" width="65" height="12" fill="#D26A3F" fill-opacity="0.5"></rect>
+        <rect x="200" y="138" width="120" height="12" fill="#D26A3F" fill-opacity="0.8"></rect>
+        <text x="220" y="186" text-anchor="middle" font-size="9.5" fill="currentColor">ONE: may read stale · QUORUM + QUORUM: sees the last ack</text>
+        <text x="220" y="204" text-anchor="middle" font-size="9.5" fill="#D26A3F">ALL: the slowest replica sets your p99</text>
+        <rect x="20" y="220" width="400" height="36" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <text x="30" y="236" font-size="9.5" fill="currentColor"><tspan font-weight="600">LOCAL_QUORUM</tspan>: quorum inside your datacenter,</text>
+        <text x="30" y="250" font-size="9.5" fill="currentColor">async to the others: the usual multi-DC setting</text>
+
+        <line x1="450" y1="10" x2="450" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="16" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Compaction strategy per table</text>
+        <g font-size="8.5" fill="currentColor"><rect x="560" y="28" width="10" height="10" fill="#3AA79B" fill-opacity="0.6"></rect><text x="574" y="37">size-tiered</text><rect x="660" y="28" width="10" height="10" fill="#D26A3F" fill-opacity="0.6"></rect><text x="674" y="37">leveled</text></g>
+        <g font-size="9.5" fill="currentColor" text-anchor="end"><text x="560" y="68">write amp.</text><text x="560" y="118">read amp.</text><text x="560" y="168">space amp.</text></g>
+        <rect x="570" y="54" width="40" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="616" y="64" font-size="8.5" fill="currentColor">low</text>
+        <rect x="570" y="70" width="170" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="746" y="80" font-size="8.5" fill="currentColor">~10× rewrites</text>
+        <rect x="570" y="104" width="150" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="726" y="114" font-size="8.5" fill="currentColor">many files per read</text>
+        <rect x="570" y="120" width="40" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="616" y="130" font-size="8.5" fill="currentColor">~1 file per level</text>
+        <rect x="570" y="154" width="130" height="12" fill="#3AA79B" fill-opacity="0.6"></rect><text x="706" y="164" font-size="8.5" fill="currentColor">up to 2× during merges</text>
+        <rect x="570" y="170" width="40" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><text x="616" y="180" font-size="8.5" fill="currentColor">~1.1×</text>
+        <text x="675" y="212" text-anchor="middle" font-size="9.5" fill="currentColor">write-heavy, rarely read → size-tiered</text>
+        <text x="675" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">read-heavy with updates → leveled</text>
+        <text x="675" y="252" text-anchor="middle" font-size="9.5" fill="#D26A3F">time series with TTL → time-window compaction</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Hot key</td><td>Cache it at the client or coordinator, spread reads across all replicas, or split the key (<code>key#0..7</code>) and merge on read.</td></tr>
+          <tr><td>Large values</td><td>Store the blob in object storage and keep a pointer; large values stall compaction and repair streams.</td></tr>
+          <tr><td>Range queries</td><td>Hash partitioning can't do them. Use range partitioning (with hot-range splitting) or a separately maintained index table.</td></tr>
+          <tr><td>Compare-and-set</td><td>A per-partition consensus round (Paxos lightweight transactions), much slower, so use it only where it's needed.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"A leaderless ring. Consistent hashing with vnodes places keys on N zone-aware replicas, and any node coordinates with tunable W and R. Hinted handoff keeps writes available, vector clocks or LWW settle conflicts, and read repair plus Merkle anti-entropy converge replicas. Each node is an LSM engine with a commit log. It is AP by default, and QUORUM on both sides gives read-your-latest-ack."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Consistent hashing">HLD · Consistent hashing</a><a data-deck="hld" data-slide="Multi-leader and leaderless">HLD · Multi-leader and leaderless</a><a data-deck="hld" data-slide="Storage engines and indexes">HLD · Storage engines and indexes</a></p>
+</section>

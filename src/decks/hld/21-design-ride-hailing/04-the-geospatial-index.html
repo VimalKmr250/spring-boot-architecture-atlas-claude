@@ -1,0 +1,71 @@
+<section class="slide" data-sec="Design · Ride-hailing" data-title="Ride-hailing: the geospatial index">
+  <h2>Deep dive 1: turn "drivers near this point" into "drivers in these few cells"</h2>
+  <p class="dek">A database scan over latitude and longitude doesn't scale to a million moving points. Instead, divide the map into cells, keep a set of driver ids per cell, and answer "nearby" by reading the rider's cell and its neighbours. The three common cell schemes trade simplicity, adaptiveness and uniform distances.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Three cell schemes. Geohash: a square grid where each cell has a base-32 string such as 9q8yy, and longer strings are smaller cells; a rider and a driver can be metres apart but in cells with different prefixes, so always search the cell and its 8 neighbours. Six characters is about 1.2 by 0.6 kilometres, seven about 150 metres. Quadtree: split a cell into four whenever it holds more than N drivers, so downtown has small leaves and suburbs large ones; it adapts to density but is costlier to update. H3 hexagons: every neighbour of a hexagon is the same distance away; kRing of radius 1 is 7 cells, widened if too few drivers are found; Uber uses H3 for matching and surge.">
+        <text x="155" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Geohash grid</text>
+        <g stroke="currentColor" stroke-opacity="0.3" fill="none">
+          <rect x="60" y="36" width="180" height="180"></rect>
+          <line x1="96" y1="36" x2="96" y2="216"></line><line x1="132" y1="36" x2="132" y2="216"></line><line x1="168" y1="36" x2="168" y2="216"></line><line x1="204" y1="36" x2="204" y2="216"></line>
+          <line x1="60" y1="72" x2="240" y2="72"></line><line x1="60" y1="108" x2="240" y2="108"></line><line x1="60" y1="144" x2="240" y2="144"></line><line x1="60" y1="180" x2="240" y2="180"></line>
+        </g>
+        <rect x="96" y="72" width="108" height="108" fill="#3AA79B" fill-opacity="0.16"></rect>
+        <rect x="132" y="108" width="36" height="36" fill="#D26A3F" fill-opacity="0.30" stroke="#D26A3F"></rect>
+        <text x="150" y="140" text-anchor="middle" font-size="8" fill="currentColor" font-family="IBM Plex Mono, monospace">9q8yy</text>
+        <circle cx="162" cy="115" r="4" fill="#D26A3F"></circle>
+        <circle cx="173" cy="104" r="4" fill="currentColor" fill-opacity="0.7"></circle>
+        <circle cx="110" cy="160" r="4" fill="currentColor" fill-opacity="0.7"></circle>
+        <circle cx="222" cy="52" r="4" fill="currentColor" fill-opacity="0.35"></circle>
+        <text x="150" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">neighbours can have different prefixes:</text>
+        <text x="150" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">search the cell and its 8 neighbours</text>
+        <text x="150" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">6 chars ≈ 1.2 × 0.6 km · 7 chars ≈ 150 m</text>
+
+        <line x1="300" y1="10" x2="300" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="450" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Quadtree</text>
+        <rect x="360" y="36" width="90" height="90" fill="#D26A3F" fill-opacity="0.10"></rect>
+        <g stroke="currentColor" stroke-opacity="0.35" fill="none">
+          <rect x="360" y="36" width="180" height="180"></rect>
+          <line x1="450" y1="36" x2="450" y2="216"></line><line x1="360" y1="126" x2="540" y2="126"></line>
+          <line x1="405" y1="36" x2="405" y2="126"></line><line x1="360" y1="81" x2="450" y2="81"></line>
+          <line x1="427.5" y1="81" x2="427.5" y2="126"></line><line x1="405" y1="103.5" x2="450" y2="103.5"></line>
+        </g>
+        <g fill="currentColor" fill-opacity="0.7">
+          <circle cx="412" cy="88" r="2.5"></circle><circle cx="419" cy="96" r="2.5"></circle><circle cx="434" cy="90" r="2.5"></circle><circle cx="442" cy="97" r="2.5"></circle>
+          <circle cx="411" cy="111" r="2.5"></circle><circle cx="420" cy="119" r="2.5"></circle><circle cx="433" cy="112" r="2.5"></circle><circle cx="444" cy="120" r="2.5"></circle>
+          <circle cx="416" cy="108" r="2.5"></circle><circle cx="438" cy="84" r="2.5"></circle><circle cx="398" cy="60" r="2.5"></circle><circle cx="380" cy="100" r="2.5"></circle><circle cx="425" cy="50" r="2.5"></circle>
+          <circle cx="500" cy="70" r="2.5"></circle><circle cx="480" cy="180" r="2.5"></circle><circle cx="520" cy="160" r="2.5"></circle><circle cx="390" cy="190" r="2.5"></circle>
+        </g>
+        <text x="450" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">split a cell when it holds &gt; N drivers</text>
+        <text x="450" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">downtown: small leaves · suburbs: big ones</text>
+        <text x="450" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">adapts to density; costlier to update</text>
+
+        <line x1="600" y1="10" x2="600" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="750" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">H3 hexagons</text>
+        <g stroke="#3AA79B" stroke-opacity="0.8" fill="#3AA79B" fill-opacity="0.14">
+          <polygon points="802.0,98.0 827.9,113.0 827.9,143.0 802.0,158.0 776.0,143.0 776.0,113.0"></polygon>
+          <polygon points="776.0,143.0 802.0,158.0 802.0,188.0 776.0,203.0 750.0,188.0 750.0,158.0"></polygon>
+          <polygon points="724.0,143.0 750.0,158.0 750.0,188.0 724.0,203.0 698.0,188.0 698.0,158.0"></polygon>
+          <polygon points="698.0,98.0 724.0,113.0 724.0,143.0 698.0,158.0 672.1,143.0 672.1,113.0"></polygon>
+          <polygon points="724.0,53.0 750.0,68.0 750.0,98.0 724.0,113.0 698.0,98.0 698.0,68.0"></polygon>
+          <polygon points="776.0,53.0 802.0,68.0 802.0,98.0 776.0,113.0 750.0,98.0 750.0,68.0"></polygon>
+        </g>
+        <polygon points="750.0,98.0 776.0,113.0 776.0,143.0 750.0,158.0 724.0,143.0 724.0,113.0" fill="#D26A3F" fill-opacity="0.30" stroke="#D26A3F" stroke-width="1.4"></polygon>
+        <circle cx="750" cy="128" r="4" fill="#D26A3F"></circle>
+        <g stroke="#8A94A3" stroke-width="1" stroke-dasharray="3 2"><line x1="750" y1="128" x2="802" y2="128"></line><line x1="750" y1="128" x2="724" y2="173"></line><line x1="750" y1="128" x2="776" y2="83"></line></g>
+        <text x="750" y="236" text-anchor="middle" font-size="9.5" fill="currentColor">every neighbour is the same distance away</text>
+        <text x="750" y="252" text-anchor="middle" font-size="9.5" fill="currentColor">kRing(cell, 1) = 7 cells; widen k if too few</text>
+        <text x="750" y="272" text-anchor="middle" font-size="9.5" fill="#D26A3F">used for matching and surge alike</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Redis GEO, or your own index</h4><p><code>GEOADD</code> and <code>GEOSEARCH</code> store points in a sorted set scored by a 52-bit geohash. That's simple and fast per city. At larger scale, matching services keep an in-process map of cell → drivers for their shard of cells, fed directly from the location stream.</p></div>
+    <div class="card"><h4>250 k writes/s is mostly overwrites</h4><p>A driver changes cell only every few updates. Update the position in place, and move the id between cell sets only when the cell changes. Shard by city, then by cell range within big cities, so no single node sees more than tens of thousands of writes a second.</p></div>
+    <div class="card"><h4>"Cars near me" is a cache</h4><p>Riders browsing the map don't need an exact live query. Publish a per-cell snapshot every 2–5 s, including jittered positions for driver privacy, and serve it from a cache. A million reads a second become cheap cache hits.</p></div>
+  </div>
+</section>

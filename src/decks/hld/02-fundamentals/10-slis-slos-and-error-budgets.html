@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Fundamentals" data-title="SLIs, SLOs and error budgets">
+  <h2>An SLO turns "highly available" into a number you can spend</h2>
+  <p class="dek">An <b>SLI</b> is a measurement, e.g. the share of requests served successfully within 300 ms. An <b>SLO</b> is the target for it: 99.9% over 30 days. An <b>SLA</b> is the contract with a penalty, set looser than the SLO so you breach the SLO internally before you owe anyone money. The gap between 100% and the SLO is the <b>error budget</b>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Error budget remaining over a 30-day window. A steady burn line runs from 100 percent to 0 at day 30. The actual line burns slowly for twelve days, drops sharply during an incident on day 12 to below the 25 percent release-freeze threshold, then burns slowly to 12 percent remaining at day 30.">
+        <line x1="70" y1="225" x2="860" y2="225" stroke="currentColor" stroke-opacity="0.5"></line>
+        <line x1="70" y1="225" x2="70" y2="35" stroke="currentColor" stroke-opacity="0.5"></line>
+        <text x="60" y="44" text-anchor="end" font-size="10.5" fill="currentColor" opacity="0.7">100%</text>
+        <text x="60" y="229" text-anchor="end" font-size="10.5" fill="currentColor" opacity="0.7">0%</text>
+        <text x="30" y="135" font-size="10.5" fill="currentColor" opacity="0.7" transform="rotate(-90 30 135)" text-anchor="middle">budget left</text>
+        <g font-size="10" fill="currentColor" opacity="0.6" text-anchor="middle">
+          <text x="70" y="244">day 0</text><text x="330" y="244">10</text><text x="590" y="244">20</text><text x="850" y="244">30</text>
+        </g>
+        <text x="850" y="262" text-anchor="end" font-size="10.5" fill="currentColor" opacity="0.7">rolling 30-day window →</text>
+
+        <rect x="70" y="180" width="790" height="45" fill="#D26A3F" fill-opacity="0.07"></rect>
+        <line x1="70" y1="180" x2="860" y2="180" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="5 4"></line>
+        <text x="80" y="173" font-size="10.5" fill="#D26A3F">&lt; 25% left: freeze risky releases, fund reliability work</text>
+
+        <line x1="70" y1="40" x2="850" y2="225" stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="3 4"></line>
+        <text x="520" y="126" font-size="10.5" fill="currentColor" opacity="0.7">steady burn: exactly on the SLO</text>
+
+        <polyline points="70,40 200,55 382,95 392,182 500,187 650,195 850,203" fill="none" stroke="#3AA79B" stroke-width="2.4"></polyline>
+        <text x="376" y="136" text-anchor="end" font-size="11" fill="currentColor">incident on day 12:</text>
+        <text x="376" y="151" text-anchor="end" font-size="11" fill="currentColor">~20 min of errors spends ~46%</text>
+        <text x="200" y="45" font-size="10.5" fill="#3AA79B">actual</text>
+      </svg>
+    </div>
+    <figcaption>At 99.9% over 30 days the budget is 43.2 minutes of full outage, or 0.1% of requests (1 million failures in a billion). One bad deploy can spend half of it. A budget policy agreed in advance, e.g. "below 25% we pause feature launches", is what turns the SLO from a dashboard into a decision.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Good SLIs are user-shaped</h4><p>Measure at the edge, where the user feels it: the success ratio and latency of real requests to a journey ("place order", "load feed"). CPU and memory are causes, not SLIs.</p></div>
+    <div class="card"><h4>Pick targets you can defend</h4><p>A target stricter than your dependencies is fiction: you can't be 99.99% on top of a 99.9% database without redundancy. Start from what users tolerate and what you achieve today, then tighten.</p></div>
+    <div class="card"><h4>Budgets make trade-offs explicit</h4><p>Budget left over means you can ship faster and run experiments. Budget exhausted means reliability comes first. Product and engineering argue about data instead of opinions.</p></div>
+  </div>
+
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="SLOs and alerting">Deck · SLOs and alerting</a></p>
+</section>

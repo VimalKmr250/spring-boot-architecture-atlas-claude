@@ -1,0 +1,54 @@
+<section class="slide" data-sec="Fundamentals" data-title="CAP theorem">
+  <h2>During a network partition, choose: refuse to answer, or answer possibly wrong</h2>
+  <p class="dek">CAP says a distributed data store cannot be both <b>C</b>onsistent (every read sees the latest write, i.e. linearizable) and <b>A</b>vailable (every request to a live node gets a non-error answer) while a <b>P</b>artition splits the network. Networks do partition, so P is not optional. The real choice is what each node does when it can't reach the others.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Two replicas N1 and N2 both hold x equals 1. The link between them is cut. Client A writes x equals 2 to N1. Client B reads x from N2. A CP system makes N2 return an error or time out; an AP system makes N2 return the stale value 1 and reconcile after the partition heals.">
+        <rect x="20" y="40" width="120" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="80" y="68" text-anchor="middle" font-size="12" fill="currentColor">Client A</text>
+        <rect x="220" y="30" width="160" height="66" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="300" y="56" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Replica N1</text>
+        <text x="300" y="78" text-anchor="middle" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, monospace">x = 1 → 2</text>
+        <rect x="520" y="30" width="160" height="66" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="600" y="56" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Replica N2</text>
+        <text x="600" y="78" text-anchor="middle" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, monospace">x = 1</text>
+        <rect x="760" y="40" width="120" height="46" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="820" y="68" text-anchor="middle" font-size="12" fill="currentColor">Client B</text>
+
+        <line x1="140" y1="63" x2="217" y2="63" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="178" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">write x=2</text>
+        <line x1="760" y1="63" x2="683" y2="63" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="722" y="55" text-anchor="middle" font-size="10.5" fill="currentColor">read x</text>
+
+        <line x1="380" y1="63" x2="432" y2="63" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4"></line>
+        <line x1="468" y1="63" x2="520" y2="63" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4"></line>
+        <path d="M440 48 L460 78 M460 48 L440 78" stroke="#D26A3F" stroke-width="2.5"></path>
+        <text x="450" y="22" text-anchor="middle" font-size="11" fill="#D26A3F">partition: link down</text>
+
+        <line x1="560" y1="96" x2="300" y2="176" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="640" y1="96" x2="660" y2="176" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+
+        <rect x="120" y="180" width="340" height="112" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="290" y="204" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Choose consistency (CP)</text>
+        <text x="290" y="228" text-anchor="middle" font-size="11" fill="currentColor">N2 can't prove it has the latest value,</text>
+        <text x="290" y="246" text-anchor="middle" font-size="11" fill="currentColor">so it returns an error or times out.</text>
+        <text x="290" y="272" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">correct but unavailable on the minority side</text>
+
+        <rect x="490" y="180" width="340" height="112" rx="8" fill="#3AA79B" fill-opacity="0.07" stroke="#3AA79B" stroke-opacity="0.7"></rect>
+        <text x="660" y="204" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Choose availability (AP)</text>
+        <text x="660" y="228" text-anchor="middle" font-size="11" fill="currentColor">N2 answers x = 1, the stale value, and</text>
+        <text x="660" y="246" text-anchor="middle" font-size="11" fill="currentColor">the replicas reconcile after the link heals.</text>
+        <text x="660" y="272" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">always answers, sometimes wrong for a while</text>
+      </svg>
+    </div>
+    <figcaption>"CA" is not a real option for a distributed store: without partitions you don't have to choose, and with them you must. When people call a single-node relational database "CA", they mean it isn't distributed.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>CP: correctness over uptime</h4><p>Use it where a wrong answer costs money or trust: balances, inventory counts at checkout, seat and room bookings, leader election, locks, configuration. <span class="tag">etcd</span> <span class="tag">ZooKeeper</span> <span class="tag">Spanner</span> <span class="tag">HBase</span> <span class="tag">MongoDB (majority)</span></p></div>
+    <div class="card"><h4>AP: uptime over freshness</h4><p>Use it where stale is fine and down is not: timelines, likes, product views, shopping carts, presence, metrics. You need conflict resolution: last-write-wins, CRDTs, or merging in the application. <span class="tag">Cassandra</span> <span class="tag">DynamoDB</span> <span class="tag">Riak</span> <span class="tag">CouchDB</span></p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">The mature answer</span>Choose per operation, not per system. An e-commerce site can be AP for browsing and the cart, and CP for "decrement stock and take payment". Many stores let you tune this per request, for example Cassandra's <code>QUORUM</code> vs <code>ONE</code>, or DynamoDB's strongly consistent reads.</div>
+</section>

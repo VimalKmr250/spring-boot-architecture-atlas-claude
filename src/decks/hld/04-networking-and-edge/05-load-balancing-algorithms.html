@@ -1,0 +1,94 @@
+<section class="slide" data-sec="Networking & edge" data-title="Load-balancing algorithms">
+  <h2>How the balancer picks a server decides whether load actually evens out</h2>
+  <p class="dek">If requests cost roughly the same and the servers are identical, the simplest algorithm is fine. Once request costs vary (one search takes 5 ms, another 2 s) or servers differ, you want an algorithm that looks at current load. If a server holds state for a key, such as a cache shard or a WebSocket, you want one that sends that key to the same place every time.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Five algorithms. Round robin sends requests 1 to 6 to A, B, C, A, B, C. Least connections sends a new request to B, which has 3 active connections against 12 and 8. Weighted sends 75 percent to a large server and 25 percent to a small one. Hashing always sends user 42 to B and user 7 to A. Power of two choices samples two servers at random and picks the less loaded.">
+        <g font-size="11.5" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="94" y="20">Round robin</text><text x="272" y="20">Least connections</text><text x="450" y="20">Weighted</text>
+          <text x="628" y="20">Hash (IP / key)</text><text x="806" y="20">Power of two choices</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.15">
+          <line x1="183" y1="10" x2="183" y2="240"></line><line x1="361" y1="10" x2="361" y2="240"></line>
+          <line x1="539" y1="10" x2="539" y2="240"></line><line x1="717" y1="10" x2="717" y2="240"></line>
+        </g>
+        <g fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4">
+          <rect x="64" y="36" width="60" height="26" rx="4"></rect><rect x="242" y="36" width="60" height="26" rx="4"></rect>
+          <rect x="420" y="36" width="60" height="26" rx="4"></rect><rect x="598" y="36" width="60" height="26" rx="4"></rect><rect x="776" y="36" width="60" height="26" rx="4"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <text x="94" y="53">LB</text><text x="272" y="53">LB</text><text x="450" y="53">LB</text><text x="628" y="53">LB</text><text x="806" y="53">LB</text>
+        </g>
+
+        <!-- round robin -->
+        <g fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35">
+          <rect x="16" y="110" width="48" height="60" rx="4"></rect><rect x="70" y="110" width="48" height="60" rx="4"></rect><rect x="124" y="110" width="48" height="60" rx="4"></rect>
+        </g>
+        <g font-size="11" fill="currentColor" text-anchor="middle"><text x="40" y="128">A</text><text x="94" y="128">B</text><text x="148" y="128">C</text></g>
+        <g font-size="10.5" fill="#D26A3F" text-anchor="middle" font-family="IBM Plex Mono, monospace"><text x="40" y="150">1 4</text><text x="94" y="150">2 5</text><text x="148" y="150">3 6</text></g>
+        <line x1="94" y1="62" x2="40" y2="107" stroke="#8A94A3" stroke-width="1.1" marker-end="url(#arw)"></line>
+        <line x1="94" y1="62" x2="94" y2="107" stroke="#8A94A3" stroke-width="1.1" marker-end="url(#arw)"></line>
+        <line x1="94" y1="62" x2="148" y2="107" stroke="#8A94A3" stroke-width="1.1" marker-end="url(#arw)"></line>
+        <text x="94" y="196" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">in turn, ignoring load</text>
+
+        <!-- least connections -->
+        <rect x="194" y="110" width="48" height="60" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="248" y="110" width="48" height="60" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <rect x="302" y="110" width="48" height="60" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <g font-size="11" fill="currentColor" text-anchor="middle"><text x="218" y="128">A</text><text x="272" y="128">B</text><text x="326" y="128">C</text></g>
+        <g font-size="10" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace"><text x="218" y="150">12</text><text x="272" y="150">3</text><text x="326" y="150">8</text></g>
+        <line x1="272" y1="62" x2="272" y2="107" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="272" y="196" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">fewest in-flight wins</text>
+
+        <!-- weighted -->
+        <rect x="380" y="100" width="84" height="80" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <rect x="474" y="130" width="46" height="40" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle"><text x="422" y="136">A · 32 cores</text><text x="422" y="156" fill="#D26A3F">w=3 · 75%</text><text x="497" y="148">B</text><text x="497" y="162" fill="#D26A3F" font-size="9.5">25%</text></g>
+        <line x1="440" y1="62" x2="422" y2="97" stroke="#8A94A3" stroke-width="2.4" marker-end="url(#arw)"></line>
+        <line x1="462" y1="62" x2="494" y2="127" stroke="#8A94A3" stroke-width="1" marker-end="url(#arw)"></line>
+        <text x="450" y="206" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">mixed sizes, canaries</text>
+
+        <!-- hash -->
+        <g fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35">
+          <rect x="550" y="130" width="48" height="50" rx="4"></rect><rect x="658" y="130" width="48" height="50" rx="4"></rect>
+        </g>
+        <rect x="604" y="130" width="48" height="50" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <g font-size="11" fill="currentColor" text-anchor="middle"><text x="574" y="160">A</text><text x="628" y="160">B</text><text x="682" y="160">C</text></g>
+        <text x="628" y="84" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">hash(user 42) % 3 = 1</text>
+        <line x1="628" y1="90" x2="628" y2="127" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <text x="628" y="206" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">same key → same server,</text>
+        <text x="628" y="220" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">every time (cache locality)</text>
+
+        <!-- p2c -->
+        <g fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35">
+          <rect x="726" y="130" width="38" height="50" rx="4"></rect><rect x="810" y="130" width="38" height="50" rx="4"></rect>
+        </g>
+        <rect x="768" y="130" width="38" height="50" rx="4" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <rect x="852" y="130" width="38" height="50" rx="4" fill="none" stroke="#D26A3F" stroke-dasharray="3 3"></rect>
+        <g font-size="10" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="745" y="160">7</text><text x="787" y="160">5</text><text x="829" y="160">11</text><text x="871" y="160">9</text>
+        </g>
+        <text x="806" y="90" text-anchor="middle" font-size="9.5" fill="currentColor">sample 2 at random,</text>
+        <text x="806" y="103" text-anchor="middle" font-size="9.5" fill="currentColor">pick the less loaded</text>
+        <line x1="790" y1="108" x2="787" y2="127" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="806" y="206" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">near least-loaded quality,</text>
+        <text x="806" y="220" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">no global view needed</text>
+      </svg>
+    </div>
+    <figcaption>Plain modulo hashing (<code>hash % N</code>) remaps almost every key when N changes, so key-affine routing to caches uses consistent hashing instead (§05). Power of two choices is what many modern proxies default to: it avoids the herding you get when every balancer sends new work to the same "least loaded" server.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Algorithm</th><th>Use when</th><th>Weakness</th></tr></thead>
+      <tbody>
+        <tr><td>Round robin</td><td>Identical servers, uniform short requests</td><td>Blind to slow requests and slow servers</td></tr>
+        <tr><td>Least connections / least request</td><td>Variable request cost, long-lived connections</td><td>Needs per-server state; a fresh server gets flooded (use slow-start)</td></tr>
+        <tr><td>Weighted (RR or LC)</td><td>Mixed instance sizes; shifting 5% of traffic to a canary</td><td>Weights must be maintained by hand or automation</td></tr>
+        <tr><td>IP / key hash, consistent hash</td><td>Cache shards, session affinity, stateful connections</td><td>Hot keys overload one server; client IPs behind NAT cluster together</td></tr>
+        <tr><td>Power of two choices</td><td>Large fleets, many independent balancers</td><td>Slightly worse than a perfect global view, which doesn't exist anyway</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,75 @@
+<section class="slide" data-sec="Reliability" data-title="Rate-limiting algorithms">
+  <h2>Four ways to count requests, each with a different view of bursts</h2>
+  <p class="dek">A rate limiter answers one question per request: is this caller over their allowance? The algorithms differ in how much state they keep, how they treat a burst, and how they behave at window boundaries. Pick the one whose burst behaviour matches the contract: "100 per second, bursts to 200" is a token bucket in plain English.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Token bucket: a bucket holds up to 10 tokens and refills at 5 per second; each request takes a token, so bursts up to the capacity pass and an empty bucket returns 429. Leaky bucket: requests queue and drain at a constant 5 per second; overflow is dropped, so output is perfectly smooth. Fixed window: a counter per minute; 100 requests at 12:00:59 and 100 more at 12:01:00 all pass, 200 in two seconds. Sliding window counter: the estimate is the current window's count plus the previous window's count weighted by overlap, for example 30 plus 80 times 0.75 equals 90, under the limit of 100.">
+        <g font-size="12" font-weight="600" fill="currentColor" text-anchor="middle">
+          <text x="112" y="18">Token bucket</text><text x="337" y="18">Leaky bucket</text><text x="562" y="18">Fixed window</text><text x="787" y="18">Sliding window counter</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.15"><line x1="225" y1="8" x2="225" y2="292"></line><line x1="450" y1="8" x2="450" y2="292"></line><line x1="675" y1="8" x2="675" y2="292"></line></g>
+
+        <!-- token bucket -->
+        <path d="M60 70 L72 170 H152 L164 70" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-width="1.5"></path>
+        <g fill="#3AA79B" fill-opacity="0.8"><circle cx="90" cy="158" r="7"></circle><circle cx="108" cy="158" r="7"></circle><circle cx="126" cy="158" r="7"></circle><circle cx="144" cy="158" r="7"></circle><circle cx="99" cy="142" r="7"></circle><circle cx="117" cy="142" r="7"></circle><circle cx="135" cy="142" r="7"></circle></g>
+        <text x="112" y="46" text-anchor="middle" font-size="9.5" fill="#3AA79B">+5 tokens / s</text>
+        <line x1="112" y1="50" x2="112" y2="68" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="175" y="110" font-size="9.5" fill="currentColor" opacity="0.8">cap 10</text>
+        <line x1="20" y1="200" x2="92" y2="176" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="20" y="214" font-size="9.5" fill="currentColor">request takes 1</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle"><text x="112" y="244">bursts up to capacity,</text><text x="112" y="258">then the refill rate</text><text x="112" y="276" fill="#D26A3F">empty → 429</text></g>
+
+        <!-- leaky bucket -->
+        <path d="M290 60 L300 150 H374 L384 60" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5"></path>
+        <g fill="#D26A3F" fill-opacity="0.7"><rect x="306" y="128" width="62" height="18" rx="2"></rect><rect x="306" y="108" width="62" height="18" rx="2"></rect><rect x="306" y="88" width="62" height="18" rx="2"></rect></g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="250" y1="40" x2="300" y2="74" marker-end="url(#arw)"></line><line x1="262" y1="34" x2="310" y2="70" marker-end="url(#arw)"></line><line x1="274" y1="28" x2="318" y2="66" marker-end="url(#arw)"></line></g>
+        <text x="250" y="24" font-size="9.5" fill="currentColor" opacity="0.8">bursty in</text>
+        <line x1="337" y1="150" x2="337" y2="190" stroke="#3AA79B" stroke-width="2" marker-end="url(#arwB)"></line>
+        <text x="345" y="178" font-size="9.5" fill="#3AA79B">5 / s, steady</text>
+        <path d="M384 64 L410 64" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></path>
+        <text x="392" y="56" font-size="9.5" fill="#D26A3F">overflow</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle"><text x="337" y="244">perfectly smooth output;</text><text x="337" y="258">bursts wait or drop</text><text x="337" y="276" opacity="0.7">(adds queueing delay)</text></g>
+
+        <!-- fixed window -->
+        <line x1="470" y1="170" x2="660" y2="170" stroke="currentColor" stroke-opacity="0.5"></line>
+        <line x1="565" y1="50" x2="565" y2="178" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="3 3"></line>
+        <text x="517" y="190" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">12:00 window</text>
+        <text x="612" y="190" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">12:01 window</text>
+        <line x1="470" y1="80" x2="660" y2="80" stroke="#D26A3F" stroke-dasharray="4 3" stroke-opacity="0.8"></line>
+        <text x="472" y="74" font-size="9" fill="#D26A3F">limit 100</text>
+        <rect x="545" y="80" width="18" height="90" fill="#D26A3F" fill-opacity="0.6"></rect>
+        <rect x="567" y="80" width="18" height="90" fill="#D26A3F" fill-opacity="0.6"></rect>
+        <text x="565" y="60" text-anchor="middle" font-size="9.5" fill="#D26A3F">200 in 2 s</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle"><text x="562" y="244">one counter per window:</text><text x="562" y="258">cheap and simple</text><text x="562" y="276" fill="#D26A3F">2× limit across a boundary</text></g>
+
+        <!-- sliding window counter -->
+        <line x1="690" y1="170" x2="885" y2="170" stroke="currentColor" stroke-opacity="0.5"></line>
+        <line x1="787" y1="50" x2="787" y2="178" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="3 3"></line>
+        <rect x="700" y="102" width="80" height="68" fill="#8A94A3" fill-opacity="0.45"></rect>
+        <text x="740" y="98" text-anchor="middle" font-size="9.5" fill="currentColor">prev: 80</text>
+        <rect x="792" y="144" width="20" height="26" fill="#3AA79B" fill-opacity="0.7"></rect>
+        <text x="820" y="140" font-size="9.5" fill="currentColor">cur: 30</text>
+        <rect x="714" y="60" width="98" height="120" fill="none" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3"></rect>
+        <text x="763" y="54" text-anchor="middle" font-size="9.5" fill="#D26A3F">last 60 s, 25% into now</text>
+        <text x="787" y="200" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">30 + 80 × 0.75 = 90</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle"><text x="787" y="244">two counters, weighted</text><text x="787" y="258">smooth, near-exact</text><text x="787" y="276" fill="#3AA79B">≤ 100 → allow</text></g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Algorithm</th><th>State per key</th><th>Bursts</th><th>Accuracy</th><th>Typical use</th></tr></thead>
+      <tbody>
+        <tr><td>Token bucket</td><td>tokens + last refill time</td><td>Allowed up to capacity</td><td>Exact</td><td>API rate limits with a burst allowance (AWS, Stripe, most gateways)</td></tr>
+        <tr><td>Leaky bucket</td><td>queue (or level + time)</td><td>Smoothed, delayed or dropped</td><td>Exact</td><td>Shaping outbound traffic to a fragile dependency</td></tr>
+        <tr><td>Fixed window</td><td>1 counter</td><td>Up to 2× at boundaries</td><td>Approximate</td><td>Coarse quotas (per day), where simplicity wins</td></tr>
+        <tr><td>Sliding window log</td><td>A timestamp per request</td><td>None beyond the limit</td><td>Exact</td><td>Low-volume, high-value limits (login attempts)</td></tr>
+        <tr><td>Sliding window counter</td><td>2 counters</td><td>Smooth</td><td>~99%, assuming an even spread</td><td>High-volume per-user limits (Cloudflare's approach)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">Where it runs</span>Put a limit at the edge (gateway, per API key or IP) to protect everything, plus per-service concurrency limits on expensive endpoints. The distributed version, with state in Redis updated atomically by a Lua script, and what to do when Redis is down, is worked through in the rate-limiter design (§13).</div>
+</section>

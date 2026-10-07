@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Design · E-commerce" data-title="E-commerce: the checkout saga">
+  <h2>Deep dive 2: checkout is a saga, with reversible steps first and an idempotency key on every hop</h2>
+  <p class="dek">Stock, orders and payments live in different services, and one of them is an external provider, so there is no single transaction to wrap it all in. The order service runs a persisted state machine. It reserves, authorises and confirms, and each step has a compensation if a later one fails. Retries are safe because every call carries a key the receiver deduplicates on.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 340" role="img" aria-label="Sequence. 1: the client posts checkout with an idempotency key to the order service. 2: the order service writes the order as PENDING with an outbox row in one transaction and returns 202. 3: it asks inventory to reserve the lines; 4: inventory replies held until an expiry time. 5: it asks the payment service to authorise the amount with a key; 6: the payment service sends the authorisation to the payment provider with the same key; 7: the provider replies authorised; 8: the payment service reports PaymentAuthorized. 9: the order service tells inventory to commit the hold. 10: it marks the order CONFIRMED and publishes OrderConfirmed through the outbox to Kafka. Failure: if step 7 is declined, release the hold and cancel the order, compensating in reverse. If step 6 times out, the status is unknown: query the provider by idempotency key before retrying, never re-charge blindly.">
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="12" width="100" height="28" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="60" y="30">client</text>
+          <rect x="160" y="12" width="100" height="28" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="210" y="30" font-weight="600">order svc</text>
+          <rect x="320" y="12" width="100" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="370" y="30">inventory</text>
+          <rect x="480" y="12" width="100" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="530" y="30">payment svc</text>
+          <rect x="640" y="12" width="100" height="28" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></rect><text x="690" y="30">PSP</text>
+          <rect x="790" y="12" width="100" height="28" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="840" y="30">Kafka</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.25" stroke-dasharray="3 3"><line x1="60" y1="40" x2="60" y2="282"></line><line x1="210" y1="40" x2="210" y2="282"></line><line x1="370" y1="40" x2="370" y2="282"></line><line x1="530" y1="40" x2="530" y2="282"></line><line x1="690" y1="40" x2="690" y2="282"></line><line x1="840" y1="40" x2="840" y2="282"></line></g>
+
+        <g stroke="#D26A3F" stroke-width="1.5">
+          <line x1="60" y1="64" x2="207" y2="64" marker-end="url(#arwA)"></line>
+          <line x1="210" y1="112" x2="367" y2="112" marker-end="url(#arwA)"></line>
+          <line x1="210" y1="160" x2="527" y2="160" marker-end="url(#arwA)"></line>
+          <line x1="530" y1="182" x2="687" y2="182" marker-end="url(#arwA)"></line>
+          <line x1="210" y1="250" x2="367" y2="250" marker-end="url(#arwA)"></line>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3" stroke-dasharray="4 3">
+          <line x1="210" y1="86" x2="63" y2="86" marker-end="url(#arw)"></line>
+          <line x1="370" y1="134" x2="213" y2="134" marker-end="url(#arw)"></line>
+          <line x1="690" y1="204" x2="533" y2="204" marker-end="url(#arw)"></line>
+          <line x1="530" y1="226" x2="213" y2="226" marker-end="url(#arw)"></line>
+        </g>
+        <line x1="210" y1="274" x2="837" y2="274" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <text x="135" y="59">1 POST /checkout + key</text>
+          <text x="135" y="81">2 202 · order PENDING</text>
+          <text x="290" y="107">3 reserve lines</text>
+          <text x="290" y="129">4 held until 12:15</text>
+          <text x="450" y="155">5 authorise(amount, key)</text>
+          <text x="610" y="177">6 auth, same key</text>
+          <text x="610" y="199">7 authorised</text>
+          <text x="450" y="221">8 PaymentAuthorized</text>
+          <text x="290" y="245">9 commit hold</text>
+          <text x="765" y="269" fill="#3AA79B">10 OrderConfirmed</text>
+        </g>
+        <text x="135" y="104" text-anchor="middle" font-size="8.5" fill="#D26A3F">(order + outbox row: 1 tx)</text>
+        <text x="100" y="140" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">client polls or</text>
+        <text x="100" y="152" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">gets a push</text>
+
+        <rect x="20" y="290" width="860" height="44" rx="5" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-dasharray="5 4"></rect>
+        <text x="32" y="307" font-size="9.5" fill="currentColor"><tspan font-weight="600" fill="#D26A3F">7 declined:</tspan> release the hold (undo 3) and mark the order CANCELLED: compensate in reverse order.</text>
+        <text x="32" y="324" font-size="9.5" fill="currentColor"><tspan font-weight="600" fill="#D26A3F">6 times out:</tspan> status unknown. Ask the PSP by idempotency key before retrying; never re-charge blindly.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Orchestrate this one</h4><p>Checkout has a strict order, compensations and a customer waiting on the result, which suits an explicit orchestrator (the order service, or a workflow engine such as Temporal). Persist the saga state after every step so a crashed instance resumes where it stopped instead of starting over.</p></div>
+    <div class="card"><h4>Authorise, then capture</h4><p>At checkout, only <em>authorise</em>: the funds are held, not taken. <em>Capture</em> when the order ships. Cancelling before shipment then means voiding an authorisation rather than refunding a charge, which is cheaper, instant, and has no fees.</p></div>
+    <div class="card"><h4>Trust, but reconcile</h4><p>Providers also report outcomes by webhook, and webhooks can arrive late, twice or out of order. Handle them idempotently by provider reference. A daily job compares your payments table with the provider's settlement report and flags any mismatch.</p></div>
+  </div>
+</section>

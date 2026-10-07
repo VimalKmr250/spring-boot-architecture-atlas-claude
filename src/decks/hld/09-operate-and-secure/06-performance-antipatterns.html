@@ -1,0 +1,84 @@
+<section class="slide" data-sec="Operate & secure" data-title="Performance antipatterns">
+  <h2>Ten performance antipatterns and the fix for each</h2>
+  <p class="dek">The roadmap's list of performance antipatterns is worth knowing by name. Each is a design smell that works at small scale and fails under load, and each has a standard fix you have already met in this deck. In an interview, spotting one in your own design before the interviewer does is a strong signal.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Ten tiles. Busy database: logic in heavy SQL saturates the database; move work to the app tier or replicas. Busy front end: the request thread does heavy work; offload to background workers. Chatty I/O: many small calls; batch them. Extraneous fetching: 10,000 rows fetched to use 10; project, filter and paginate in the query. Improper instantiation: a new client or connection per request; reuse pooled instances. Monolithic persistence: one database for every kind of data; use the right store for each. No caching: the same query a thousand times; cache-aside. Noisy neighbor: one tenant hogs shared capacity; quotas and bulkheads. Retry storm: synchronized retries; backoff, jitter and budgets. Synchronous I/O: threads blocked waiting; async or non-blocking I/O.">
+        <g stroke="currentColor" stroke-opacity="0.15">
+          <line x1="180" y1="6" x2="180" y2="294"></line><line x1="360" y1="6" x2="360" y2="294"></line><line x1="540" y1="6" x2="540" y2="294"></line><line x1="720" y1="6" x2="720" y2="294"></line>
+          <line x1="6" y1="150" x2="894" y2="150"></line>
+        </g>
+        <g font-size="11" font-weight="600" fill="currentColor">
+          <text x="12" y="22">1 · Busy database</text><text x="192" y="22">2 · Busy front end</text><text x="372" y="22">3 · Chatty I/O</text><text x="552" y="22">4 · Extraneous fetching</text><text x="732" y="22">5 · Improper instantiation</text>
+          <text x="12" y="172">6 · Monolithic persistence</text><text x="192" y="172">7 · No caching</text><text x="372" y="172">8 · Noisy neighbor</text><text x="552" y="172">9 · Retry storm</text><text x="732" y="172">10 · Synchronous I/O</text>
+        </g>
+        <g font-size="9.5" fill="#3AA79B">
+          <text x="12" y="122">→ move logic to the app tier;</text><text x="12" y="136">reads to replicas</text>
+          <text x="192" y="122">→ offload to queues and</text><text x="192" y="136">background workers</text>
+          <text x="372" y="122">→ batch, bulk APIs, fewer</text><text x="372" y="136">and bigger round trips</text>
+          <text x="552" y="122">→ select columns, filter</text><text x="552" y="136">and paginate in the query</text>
+          <text x="732" y="122">→ reuse pooled clients and</text><text x="732" y="136">connections (singletons)</text>
+          <text x="12" y="272">→ the right store for each</text><text x="12" y="286">data type (§05)</text>
+          <text x="192" y="272">→ cache-aside with TTL</text><text x="192" y="286">and invalidation (§06)</text>
+          <text x="372" y="272">→ per-tenant quotas, bulk-</text><text x="372" y="286">heads, cells (§08, §10)</text>
+          <text x="552" y="272">→ backoff + jitter, retry</text><text x="552" y="286">budgets, breakers (§08)</text>
+          <text x="732" y="272">→ async / non-blocking I/O,</text><text x="732" y="286">virtual threads, queues</text>
+        </g>
+
+        <!-- 1 busy db -->
+        <rect x="20" y="50" width="50" height="30" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="45" y="69" text-anchor="middle" font-size="9.5" fill="currentColor">app</text>
+        <line x1="70" y1="65" x2="98" y2="65" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="100" y="42" width="66" height="46" rx="4" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F"></rect><text x="133" y="62" text-anchor="middle" font-size="9.5" fill="currentColor">DB</text><text x="133" y="78" text-anchor="middle" font-size="9" fill="#D26A3F">CPU 95%</text>
+        <!-- 2 busy front end -->
+        <rect x="196" y="50" width="44" height="30" rx="10" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="218" y="69" text-anchor="middle" font-size="9.5" fill="currentColor">req</text>
+        <line x1="240" y1="65" x2="264" y2="65" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <rect x="266" y="40" width="84" height="50" rx="4" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F"></rect><text x="308" y="60" text-anchor="middle" font-size="9" fill="currentColor">web thread</text><text x="308" y="76" text-anchor="middle" font-size="9" fill="#D26A3F">render PDF 4 s</text>
+        <!-- 3 chatty -->
+        <rect x="378" y="42" width="40" height="46" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="398" y="69" text-anchor="middle" font-size="9.5" fill="currentColor">A</text>
+        <rect x="490" y="42" width="40" height="46" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="510" y="69" text-anchor="middle" font-size="9.5" fill="currentColor">B</text>
+        <g stroke="#D26A3F" stroke-width="1"><line x1="418" y1="48" x2="488" y2="48" marker-end="url(#arwA)"></line><line x1="418" y1="56" x2="488" y2="56" marker-end="url(#arwA)"></line><line x1="418" y1="64" x2="488" y2="64" marker-end="url(#arwA)"></line><line x1="418" y1="72" x2="488" y2="72" marker-end="url(#arwA)"></line><line x1="418" y1="80" x2="488" y2="80" marker-end="url(#arwA)"></line></g>
+        <text x="453" y="102" text-anchor="middle" font-size="9" fill="#D26A3F">50 calls × 2 ms RTT</text>
+        <!-- 4 extraneous -->
+        <rect x="560" y="44" width="40" height="42" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="580" y="69" text-anchor="middle" font-size="9.5" fill="currentColor">DB</text>
+        <rect x="606" y="50" width="70" height="30" rx="2" fill="#D26A3F" fill-opacity="0.35"></rect><text x="641" y="69" text-anchor="middle" font-size="9" fill="currentColor">10,000 rows</text>
+        <line x1="676" y1="65" x2="690" y2="65" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="703" y="62" text-anchor="middle" font-size="9" fill="currentColor">use</text><text x="703" y="74" text-anchor="middle" font-size="9" fill="currentColor">10</text>
+        <!-- 5 improper instantiation -->
+        <g font-size="8.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="740" y="38" width="120" height="16" rx="2" fill="#D26A3F" fill-opacity="0.25"></rect><text x="746" y="50">new HttpClient()</text>
+          <rect x="746" y="58" width="120" height="16" rx="2" fill="#D26A3F" fill-opacity="0.25"></rect><text x="752" y="70">new HttpClient()</text>
+          <rect x="752" y="78" width="120" height="16" rx="2" fill="#D26A3F" fill-opacity="0.25"></rect><text x="758" y="90">new HttpClient()</text>
+        </g>
+        <text x="806" y="108" text-anchor="middle" font-size="9" fill="#D26A3F">per request: sockets, TLS, GC</text>
+        <!-- 6 monolithic persistence -->
+        <path d="M40 196 a50 6 0 0 1 100 0 v40 a50 6 0 0 1 -100 0 z" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></path>
+        <path d="M40 196 a50 6 0 0 0 100 0" fill="none" stroke="#D26A3F"></path>
+        <text x="90" y="216" text-anchor="middle" font-size="8.5" fill="currentColor">orders · sessions</text><text x="90" y="229" text-anchor="middle" font-size="8.5" fill="currentColor">logs · blobs · search</text>
+        <!-- 7 no caching -->
+        <rect x="196" y="198" width="40" height="36" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="216" y="220" text-anchor="middle" font-size="9.5" fill="currentColor">app</text>
+        <rect x="306" y="198" width="44" height="36" rx="4" fill="#D26A3F" fill-opacity="0.3" stroke="#D26A3F"></rect><text x="328" y="220" text-anchor="middle" font-size="9.5" fill="currentColor">DB</text>
+        <g stroke="#D26A3F" stroke-width="1"><line x1="236" y1="206" x2="304" y2="206" marker-end="url(#arwA)"></line><line x1="236" y1="216" x2="304" y2="216" marker-end="url(#arwA)"></line><line x1="236" y1="226" x2="304" y2="226" marker-end="url(#arwA)"></line></g>
+        <text x="270" y="250" text-anchor="middle" font-size="9" fill="#D26A3F">same query × 1,000/s</text>
+        <!-- 8 noisy neighbor -->
+        <rect x="380" y="190" width="150" height="54" rx="4" fill="none" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <rect x="388" y="226" width="20" height="12" fill="#8A94A3" fill-opacity="0.6"></rect><rect x="414" y="196" width="20" height="42" fill="#D26A3F" fill-opacity="0.7"></rect>
+        <rect x="440" y="228" width="20" height="10" fill="#8A94A3" fill-opacity="0.6"></rect><rect x="466" y="224" width="20" height="14" fill="#8A94A3" fill-opacity="0.6"></rect><rect x="492" y="227" width="20" height="11" fill="#8A94A3" fill-opacity="0.6"></rect>
+        <text x="455" y="258" text-anchor="middle" font-size="9" fill="#D26A3F">tenant B starves the rest</text>
+        <!-- 9 retry storm -->
+        <line x1="560" y1="244" x2="700" y2="244" stroke="currentColor" stroke-opacity="0.4"></line>
+        <rect x="580" y="196" width="8" height="48" fill="#D26A3F" fill-opacity="0.7"></rect><rect x="614" y="204" width="8" height="40" fill="#D26A3F" fill-opacity="0.7"></rect><rect x="662" y="210" width="8" height="34" fill="#D26A3F" fill-opacity="0.7"></rect>
+        <text x="630" y="192" text-anchor="middle" font-size="9" fill="#D26A3F">synchronised retries</text>
+        <!-- 10 sync io -->
+        <g font-size="8.5" fill="currentColor">
+          <rect x="740" y="196" width="18" height="14" fill="#3AA79B" fill-opacity="0.7"></rect><rect x="758" y="196" width="100" height="14" fill="#8A94A3" fill-opacity="0.35"></rect><rect x="858" y="196" width="14" height="14" fill="#3AA79B" fill-opacity="0.7"></rect>
+          <rect x="740" y="216" width="14" height="14" fill="#3AA79B" fill-opacity="0.7"></rect><rect x="754" y="216" width="110" height="14" fill="#8A94A3" fill-opacity="0.35"></rect>
+          <text x="806" y="206" text-anchor="middle">blocked on I/O</text><text x="808" y="226" text-anchor="middle">blocked on I/O</text>
+        </g>
+        <text x="806" y="250" text-anchor="middle" font-size="9" fill="#D26A3F">threads idle, pool exhausted</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="note tip"><span class="lbl">How to use the list</span>Walk your finished diagram looking for each one. Is anything called in a loop? That's chatty I/O. Is any hot read going to the database every time? No caching. Does one table hold everything? Monolithic persistence. Is there a synchronous call to a slow third party on the request path? Synchronous I/O, and probably a candidate for a queue. Saying "one risk here is chatty I/O between the feed and profile services, so I'd batch those lookups" shows seniority.</div>
+</section>

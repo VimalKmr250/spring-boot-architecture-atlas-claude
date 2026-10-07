@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Microservices done deliberately">
+  <h2>Split by business capability, give each service its data, and budget for the cost</h2>
+  <p class="dek">Good microservice boundaries follow the business, not the technical layers. Each service owns one capability (catalog, ordering, payments), its data, and its team. It talks to the others through APIs for queries and commands, and through events for facts. Bad boundaries give you a distributed monolith: every feature needs five services deployed in lock-step.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Clients go through an API gateway to services, one per business capability: catalog with a document store and search index, cart with Redis, orders with PostgreSQL, payments with its own PostgreSQL, inventory with PostgreSQL, and users. Orders calls payments and inventory synchronously during checkout, and publishes OrderPlaced to an event bus, which shipping, notifications and analytics consume asynchronously.">
+        <rect x="16" y="120" width="80" height="44" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="56" y="146" text-anchor="middle" font-size="11" fill="currentColor">Clients</text>
+        <rect x="120" y="100" width="70" height="84" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="155" y="138" text-anchor="middle" font-size="10.5" fill="currentColor">API</text><text x="155" y="152" text-anchor="middle" font-size="10.5" fill="currentColor">gateway</text>
+        <line x1="96" y1="142" x2="117" y2="142" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="230" y="16" width="120" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="290" y="38">Catalog</text>
+          <rect x="230" y="66" width="120" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="290" y="88">Cart</text>
+          <rect x="230" y="116" width="120" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="290" y="138">Users</text>
+          <rect x="230" y="166" width="120" height="40" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect><text x="290" y="190">Orders</text>
+          <rect x="470" y="150" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="525" y="172">Payments</text>
+          <rect x="470" y="204" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="525" y="226">Inventory</text>
+        </g>
+        <g font-size="8.5" fill="currentColor" opacity="0.75">
+          <text x="356" y="32">doc DB + search</text><text x="356" y="86">Redis</text><text x="356" y="136">PostgreSQL</text><text x="298" y="222">PostgreSQL</text>
+          <text x="586" y="172">own DB</text><text x="586" y="226">own DB</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3">
+          <line x1="190" y1="110" x2="227" y2="36" marker-end="url(#arwA)"></line><line x1="190" y1="124" x2="227" y2="86" marker-end="url(#arwA)"></line>
+          <line x1="190" y1="140" x2="227" y2="134" marker-end="url(#arwA)"></line><line x1="190" y1="160" x2="227" y2="184" marker-end="url(#arwA)"></line>
+          <line x1="350" y1="180" x2="467" y2="168" marker-end="url(#arwA)"></line><line x1="350" y1="196" x2="467" y2="220" marker-end="url(#arwA)"></line>
+        </g>
+        <text x="408" y="150" text-anchor="middle" font-size="9" fill="#D26A3F">sync: must</text>
+        <text x="408" y="161" text-anchor="middle" font-size="9" fill="#D26A3F">succeed now</text>
+
+        <rect x="230" y="262" width="640" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="550" y="279" text-anchor="middle" font-size="10.5" fill="currentColor">event bus · OrderPlaced · PaymentCaptured · StockReserved</text>
+        <line x1="290" y1="206" x2="290" y2="259" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="660" y="30" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="715" y="52">Shipping</text>
+          <rect x="660" y="90" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="715" y="112">Notifications</text>
+          <rect x="660" y="150" width="110" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="715" y="172">Analytics</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="5 4">
+          <path d="M800 262 V48 H773" fill="none" marker-end="url(#arwB)"></path>
+          <path d="M820 262 V108 H773" fill="none" marker-end="url(#arwB)"></path>
+          <path d="M840 262 V168 H773" fill="none" marker-end="url(#arwB)"></path>
+        </g>
+        <text x="866" y="222" font-size="9.5" fill="#3AA79B" transform="rotate(-90 866 222)" text-anchor="middle">async consumers</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Finding the boundaries</h4><ul class="tight">
+      <li><b>Business capability / bounded context:</b> a capability with its own language and rules. "Product" means different things in catalog and in shipping.</li>
+      <li><b>Data ownership:</b> exactly one service writes each piece of data. Others read it through the owner's API or keep a copy fed by its events.</li>
+      <li><b>Team ownership:</b> one team per service (Conway's law works for you or against you).</li>
+      <li><b>Different forces:</b> separate scaling (search), security or compliance (payments), or release cadence.</li>
+    </ul></div>
+    <div class="card"><h4>The cost ledger</h4><ul class="tight">
+      <li><b>Network:</b> latency, partial failure, retries, timeouts on every call.</li>
+      <li><b>Data:</b> no joins or transactions across services, so sagas, outboxes, read models.</li>
+      <li><b>Operations:</b> CI/CD per service, containers, service discovery, tracing, a platform team.</li>
+      <li><b>Contracts:</b> API and event versioning, consumer-driven contract tests.</li>
+      <li>If the teams can't afford these costs, a modular monolith gets most of the boundary benefit.</li>
+    </ul></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Extracting a service">Deck · Extracting a service</a><a data-deck="deck" data-slide="Conway's law in practice">Deck · Conway's law in practice</a></p>
+</section>

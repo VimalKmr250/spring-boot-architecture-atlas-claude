@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Design · Web crawler" data-title="Web crawler: API and data model">
+  <h2>No public API: the contracts are internal, and the URL table is the crawler's memory</h2>
+  <p class="dek">A crawler is a pipeline, so its "API" is a set of stage contracts: enqueue, next, fetch, store, emit. The data model is small but huge in volume. It holds per-URL state (when you last fetched it, whether it changed, when to come back), per-host state (robots.txt, crawl delay, errors), the raw pages, and the link graph that drives priority.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">stage contracts</div>
+<pre><code class="language-python">frontier.add(url, priority, found_on)    # only after the seen-check
+frontier.next(worker) -> url             # blocks until a host is ready
+fetch(url, etag, last_modified)
+    -> 200 body | 304 unchanged | 3xx | 4xx | 5xx | timeout
+store.append(warc_record) -> (warc_file, offset)
+emit("pages.fetched", {url_hash, warc_file, offset, sha256})</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">robots.txt (fetched per host, cached ~24 h)</div>
+<pre><code class="language-plaintext">User-agent: *
+Disallow: /cart/
+Disallow: /search?
+Crawl-delay: 5
+Sitemap: https://ex.com/sitemap.xml</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Data model. host_state, about 100 million rows cached in memory: host, IP, robots.txt and when it was fetched, crawl delay, last access and error rate. url_state, about 10 billion rows keyed by a 64-bit hash of the normalised URL: URL, host, depth, next fetch time, last status, ETag and last-modified, content hashes, change rate and a pointer into a WARC file. Many URLs belong to one host. The pointer locates the raw page inside large WARC files, about 1 gigabyte each, appended in object storage. A links table of from and to hashes feeds an offline PageRank job that sets priority.">
+          <rect x="20" y="14" width="380" height="62" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="30" y="32" font-size="10.5" font-weight="600" fill="currentColor">host_state</text>
+          <text x="390" y="32" text-anchor="end" font-size="9" fill="currentColor" opacity="0.75">~100 M rows · cached in RAM</text>
+          <line x1="20" y1="40" x2="400" y2="40" stroke="currentColor" stroke-opacity="0.25"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="30" y="56">host PK · ip · robots_txt · robots_at</text><text x="30" y="70">crawl_delay · last_access · error_rate</text></g>
+
+          <rect x="20" y="112" width="250" height="124" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="30" y="130" font-size="10.5" font-weight="600" fill="currentColor">url_state</text>
+          <text x="262" y="130" text-anchor="end" font-size="9" fill="currentColor" opacity="0.75">~10 B rows</text>
+          <line x1="20" y1="138" x2="270" y2="138" stroke="#D26A3F" stroke-opacity="0.4"></line>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="30" y="154">url_hash PK (64-bit)</text><text x="30" y="168">url · host FK · depth</text><text x="30" y="182">next_fetch · last_status</text><text x="30" y="196">etag · last_modified</text><text x="30" y="210">sha256 · simhash · change_rate</text><text x="30" y="224">warc_file · offset</text></g>
+
+          <path d="M300 136 a50 6 0 0 1 100 0 v74 a50 6 0 0 1 -100 0 z" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></path>
+          <path d="M300 136 a50 6 0 0 0 100 0" fill="none" stroke="#3AA79B"></path>
+          <g font-size="9" fill="currentColor" text-anchor="middle"><text x="350" y="164" font-weight="600">raw pages</text><text x="350" y="178">WARC files in</text><text x="350" y="191">object storage</text><text x="350" y="204" opacity="0.75">~1 GB each, appended</text></g>
+
+          <rect x="20" y="262" width="250" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="30" y="280" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">links (from_hash, to_hash)</text>
+          <text x="30" y="297" font-size="9" fill="currentColor" opacity="0.8">→ offline PageRank → priority</text>
+
+          <g stroke="#8A94A3" stroke-width="1.3"><line x1="140" y1="112" x2="140" y2="80" marker-end="url(#arw)"></line><line x1="270" y1="224" x2="297" y2="200" marker-end="url(#arw)"></line><line x1="140" y1="236" x2="140" y2="259" marker-end="url(#arw)"></line></g>
+          <text x="148" y="100" font-size="9" fill="currentColor" opacity="0.8">many URLs : 1 host</text>
+          <text x="210" y="324" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">key-value shaped and enormous: a wide-column or KV store, not SQL joins</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Normalise before you hash</h4><p>Lowercase the scheme and host, drop default ports and <code>#fragments</code>, resolve <code>../</code>, sort query parameters and strip tracking ones (<code>utm_*</code>, session ids). Without this, one page has dozens of "different" URLs and you crawl it dozens of times.</p></div>
+    <div class="card"><h4>Two different "seen" questions</h4><p><b>URL seen?</b> is checked before fetching and saves bandwidth. <b>Content seen?</b> is checked after fetching, because mirrors and syndicated copies have different URLs but the same body. It saves parsing, storage and index pollution.</p></div>
+    <div class="card"><h4>Store pages as WARC</h4><p>Append many fetched responses (headers and body) into large WARC files, around 1 GB each, in object storage. Small objects per page would mean billions of tiny writes. The URL table keeps a pointer (file and offset) to each record.</p></div>
+  </div>
+</section>

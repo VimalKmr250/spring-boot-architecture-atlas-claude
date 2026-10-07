@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: the transcoding pipeline">
+  <h2>Deep dive 1: split the video into chunks, then encode chunks × renditions in parallel</h2>
+  <p class="dek">Encoding one long file serially on one machine takes about as long as the video itself for every rendition, and a crash means starting over. Instead, split the original at keyframes into short chunks. Each chunk × rendition pair is then an independent, retryable task, and the whole thing finishes in minutes on a large pool of cheap workers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Transcoding DAG. The original is validated and probed, then split at keyframes into chunks of about 10 seconds. A matrix of tasks, 8 chunks by 5 renditions from 240p to 4K, runs in parallel: the first columns are done, some are running and the rest are queued. When all tasks for a rendition are done, a stitch and package step produces CMAF segments with HLS and DASH manifests. In parallel branches from the validated original: thumbnails, audio tracks with automatic captions, and moderation and copyright checks. Publish marks the video READY when every branch has finished. Timing: serial encoding of a 10 minute video into 5 renditions takes about 50 minutes; chunked and parallel takes about 2 minutes plus stitching.">
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="90" width="80" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="50" y="112">original</text><text x="50" y="126" font-size="8.5" opacity="0.75">2 GB .mov</text>
+          <rect x="110" y="90" width="90" height="50" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="155" y="112">validate</text><text x="155" y="126" font-size="8.5" opacity="0.75">probe · reject bad</text>
+          <rect x="220" y="90" width="90" height="50" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="265" y="112">split</text><text x="265" y="126" font-size="8.5" opacity="0.8">at keyframes</text>
+          <rect x="620" y="90" width="110" height="50" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="675" y="110">stitch + package</text><text x="675" y="124" font-size="8.5" opacity="0.8">CMAF · HLS · DASH</text>
+          <rect x="760" y="90" width="120" height="50" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="820" y="110" font-weight="600">publish</text><text x="820" y="124" font-size="8.5">status = READY</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="90" y1="115" x2="107" y2="115" marker-end="url(#arw)"></line><line x1="200" y1="115" x2="217" y2="115" marker-end="url(#arw)"></line><line x1="310" y1="115" x2="327" y2="115" marker-end="url(#arw)"></line><line x1="600" y1="115" x2="617" y2="115" marker-end="url(#arw)"></line><line x1="730" y1="115" x2="757" y2="115" marker-end="url(#arw)"></line></g>
+
+        <text x="484" y="60" text-anchor="middle" font-size="9.5" fill="currentColor">chunk 1 … 8 (≈10 s each)</text>
+        <g font-size="8.5" fill="currentColor" text-anchor="end"><text x="366" y="83">240p</text><text x="366" y="103">480p</text><text x="366" y="123">720p</text><text x="366" y="143">1080p</text><text x="366" y="163">4K</text></g>
+        <g fill="#3AA79B" fill-opacity="0.5">
+          <rect x="372" y="70" width="24" height="18"></rect><rect x="400" y="70" width="24" height="18"></rect><rect x="428" y="70" width="24" height="18"></rect><rect x="456" y="70" width="24" height="18"></rect><rect x="484" y="70" width="24" height="18"></rect>
+          <rect x="372" y="90" width="24" height="18"></rect><rect x="400" y="90" width="24" height="18"></rect><rect x="428" y="90" width="24" height="18"></rect><rect x="456" y="90" width="24" height="18"></rect>
+          <rect x="372" y="110" width="24" height="18"></rect><rect x="400" y="110" width="24" height="18"></rect><rect x="428" y="110" width="24" height="18"></rect>
+          <rect x="372" y="130" width="24" height="18"></rect><rect x="400" y="130" width="24" height="18"></rect>
+          <rect x="372" y="150" width="24" height="18"></rect>
+        </g>
+        <g fill="#D26A3F" fill-opacity="0.5">
+          <rect x="512" y="70" width="24" height="18"></rect><rect x="484" y="90" width="24" height="18"></rect><rect x="456" y="110" width="24" height="18"></rect><rect x="484" y="110" width="24" height="18"></rect><rect x="428" y="130" width="24" height="18"></rect><rect x="456" y="130" width="24" height="18"></rect><rect x="400" y="150" width="24" height="18"></rect><rect x="428" y="150" width="24" height="18"></rect>
+        </g>
+        <g fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-opacity="0.25">
+          <rect x="540" y="70" width="24" height="18"></rect><rect x="568" y="70" width="24" height="18"></rect>
+          <rect x="512" y="90" width="24" height="18"></rect><rect x="540" y="90" width="24" height="18"></rect><rect x="568" y="90" width="24" height="18"></rect>
+          <rect x="512" y="110" width="24" height="18"></rect><rect x="540" y="110" width="24" height="18"></rect><rect x="568" y="110" width="24" height="18"></rect>
+          <rect x="484" y="130" width="24" height="18"></rect><rect x="512" y="130" width="24" height="18"></rect><rect x="540" y="130" width="24" height="18"></rect><rect x="568" y="130" width="24" height="18"></rect>
+          <rect x="456" y="150" width="24" height="18"></rect><rect x="484" y="150" width="24" height="18"></rect><rect x="512" y="150" width="24" height="18"></rect><rect x="540" y="150" width="24" height="18"></rect><rect x="568" y="150" width="24" height="18"></rect>
+        </g>
+        <g font-size="8.5" fill="currentColor"><rect x="372" y="178" width="10" height="10" fill="#3AA79B" fill-opacity="0.5"></rect><text x="386" y="187">done</text><rect x="424" y="178" width="10" height="10" fill="#D26A3F" fill-opacity="0.5"></rect><text x="438" y="187">running</text><rect x="486" y="178" width="10" height="10" fill="currentColor" fill-opacity="0.12"></rect><text x="500" y="187">queued · 40 independent tasks</text></g>
+
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="200" width="110" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="75" y="220">thumbnails</text>
+          <rect x="140" y="200" width="110" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="195" y="220">audio · captions</text>
+          <rect x="260" y="200" width="130" height="32" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="325" y="220">moderation · copyright</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.1" fill="none"><line x1="145" y1="140" x2="78" y2="197" marker-end="url(#arw)"></line><line x1="155" y1="140" x2="193" y2="197" marker-end="url(#arw)"></line><line x1="165" y1="140" x2="318" y2="197" marker-end="url(#arw)"></line><path d="M390 216 H820 V143" marker-end="url(#arw)"></path></g>
+        <text x="605" y="232" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">publish waits for every branch</text>
+
+        <g font-size="9" fill="currentColor"><text x="20" y="268">serial</text><text x="20" y="288">chunked</text></g>
+        <rect x="80" y="258" width="560" height="14" fill="#8A94A3" fill-opacity="0.45"></rect><text x="648" y="269" font-size="9" fill="currentColor">≈ 50 min for a 10-min video × 5 renditions</text>
+        <rect x="80" y="278" width="26" height="14" fill="#D26A3F" fill-opacity="0.7"></rect><text x="114" y="289" font-size="9" fill="#D26A3F" font-weight="600">≈ 2 min + stitching</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why chunking works</h4><p>Each chunk starts on a keyframe, so it can be encoded without its neighbours. Parallelism turns wall-clock time from "length × renditions" into roughly "one chunk". A failed task retries only its 10 seconds of video, and slow stragglers can be speculatively re-run on another worker.</p></div>
+    <div class="card"><h4>Per-title bitrate ladders</h4><p>A cartoon needs far fewer bits than a football match at the same quality. Analyse complexity first and pick each video's ladder (resolutions and bitrates) to match. Encode popular videos in efficient codecs such as AV1 or HEVC later, when viewing numbers justify the extra compute.</p></div>
+    <div class="card"><h4>Cheap, preemptible compute</h4><p>Transcoding is batch work that can be retried, which is ideal for spot or preemptible instances at a fraction of the price. Use priority queues so a partner's premiere is processed before a backlog of long-tail uploads, and autoscale the fleet on queue depth.</p></div>
+  </div>
+</section>

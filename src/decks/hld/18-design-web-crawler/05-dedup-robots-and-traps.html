@@ -1,0 +1,78 @@
+<section class="slide" data-sec="Design · Web crawler" data-title="Web crawler: dedup, robots and traps">
+  <h2>Deep dive 2: don't fetch it twice, don't store it twice, don't fall into a hole</h2>
+  <p class="dek">Most discovered links are duplicates, and a large share of fetched pages are copies of other pages. A few sites generate infinitely many URLs, some deliberately. Three cheap structures handle it: a Bloom filter for URLs, fingerprints for content, and hard budgets for traps.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Left, URL seen: normalise the URL first, so HTTP://Ex.com:80/a?utm_source=x&amp;b=2&amp;a=1#top becomes http://ex.com/a?a=1&amp;b=2. A Bloom filter is a bit array; adding ex.com/a sets three bits chosen by three hashes. Checking ex.com/b hashes to three bits, one of which is 0, so it is definitely new and is enqueued. If all three were 1 it is probably seen and skipped, losing about 1 percent of new URLs. Ten billion URLs at 9.6 bits each is about 12 gigabytes. Middle, content seen: an exact copy has the same SHA-256 of the body. A near copy is found by SimHash; the two fingerprints shown differ in 2 of 16 bits, a Hamming distance within 3, so they are near-duplicates, such as the same article with different ads or timestamps. Right, crawler traps: a calendar page links to the next month forever. Defences cut it off: maximum URL length and depth, a per-host page budget per cycle, rejecting repeated path segments, stripping session IDs and facet explosions, and detecting soft 404s.">
+        <text x="150" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">URL seen? A Bloom filter</text>
+        <text x="20" y="38" font-size="9" fill="currentColor" opacity="0.8">normalise first:</text>
+        <g font-size="8.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="53" opacity="0.7">HTTP://Ex.com:80/a?utm_source=x&amp;b=2&amp;a=1#top</text><text x="20" y="67">→ http://ex.com/a?a=1&amp;b=2</text></g>
+        <text x="156" y="90" text-anchor="middle" font-size="9" fill="#3AA79B" font-family="IBM Plex Mono, monospace">add(ex.com/a)</text>
+        <g stroke="currentColor" stroke-opacity="0.45" font-size="9" font-family="IBM Plex Mono, monospace">
+          <rect x="20" y="110" width="16" height="22" fill="none"></rect><rect x="36" y="110" width="16" height="22" fill="currentColor" fill-opacity="0.18"></rect><rect x="52" y="110" width="16" height="22" fill="none"></rect><rect x="68" y="110" width="16" height="22" fill="none"></rect>
+          <rect x="84" y="110" width="16" height="22" fill="#3AA79B" fill-opacity="0.35"></rect><rect x="100" y="110" width="16" height="22" fill="none"></rect><rect x="116" y="110" width="16" height="22" fill="#D26A3F" fill-opacity="0.3"></rect><rect x="132" y="110" width="16" height="22" fill="currentColor" fill-opacity="0.18"></rect>
+          <rect x="148" y="110" width="16" height="22" fill="none"></rect><rect x="164" y="110" width="16" height="22" fill="#3AA79B" fill-opacity="0.35"></rect><rect x="180" y="110" width="16" height="22" fill="none"></rect><rect x="196" y="110" width="16" height="22" fill="none"></rect>
+          <rect x="212" y="110" width="16" height="22" fill="#3AA79B" fill-opacity="0.35"></rect><rect x="228" y="110" width="16" height="22" fill="none"></rect><rect x="244" y="110" width="16" height="22" fill="none"></rect><rect x="260" y="110" width="16" height="22" fill="currentColor" fill-opacity="0.18"></rect>
+        </g>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="28" y="125">0</text><text x="44" y="125">1</text><text x="60" y="125">0</text><text x="76" y="125">0</text><text x="92" y="125">1</text><text x="108" y="125">0</text><text x="124" y="125">0</text><text x="140" y="125">1</text>
+          <text x="156" y="125">0</text><text x="172" y="125">1</text><text x="188" y="125">0</text><text x="204" y="125">0</text><text x="220" y="125">1</text><text x="236" y="125">0</text><text x="252" y="125">0</text><text x="268" y="125">1</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.1"><line x1="150" y1="94" x2="94" y2="107" marker-end="url(#arwB)"></line><line x1="160" y1="94" x2="172" y2="107" marker-end="url(#arwB)"></line><line x1="168" y1="94" x2="218" y2="107" marker-end="url(#arwB)"></line></g>
+        <g stroke-width="1.1"><line x1="150" y1="156" x2="46" y2="135" stroke="#8A94A3" marker-end="url(#arw)"></line><line x1="156" y1="156" x2="126" y2="135" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line><line x1="164" y1="156" x2="266" y2="135" stroke="#8A94A3" marker-end="url(#arw)"></line></g>
+        <text x="156" y="168" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">check(ex.com/b)</text>
+        <text x="150" y="192" text-anchor="middle" font-size="9.5" fill="currentColor">a 0 bit: definitely new → enqueue</text>
+        <text x="150" y="208" text-anchor="middle" font-size="9.5" fill="currentColor">all 1s: probably seen → skip (~1% loss)</text>
+        <text x="150" y="232" text-anchor="middle" font-size="9.5" fill="#D26A3F">10 B URLs × 9.6 bits ≈ 12 GB of RAM</text>
+
+        <line x1="300" y1="10" x2="300" y2="250" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="450" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Content seen? Fingerprints</text>
+        <text x="450" y="42" text-anchor="middle" font-size="9.5" fill="currentColor">exact copy: same SHA-256 of the body → drop</text>
+        <text x="450" y="64" text-anchor="middle" font-size="9.5" fill="currentColor">near copy: SimHash, 64 bits (16 shown)</text>
+        <g font-size="9" fill="currentColor" font-weight="600"><text x="320" y="95">A</text><text x="320" y="121">B</text></g>
+        <g stroke="currentColor" stroke-opacity="0.4" fill="none">
+          <rect x="334" y="80" width="256" height="22"></rect><rect x="334" y="106" width="256" height="22"></rect>
+        </g>
+        <rect x="414" y="80" width="16" height="48" fill="#D26A3F" fill-opacity="0.3"></rect><rect x="510" y="80" width="16" height="48" fill="#D26A3F" fill-opacity="0.3"></rect>
+        <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <text x="342" y="95">1</text><text x="358" y="95">0</text><text x="374" y="95">1</text><text x="390" y="95">1</text><text x="406" y="95">0</text><text x="422" y="95">0</text><text x="438" y="95">1</text><text x="454" y="95">1</text><text x="470" y="95">0</text><text x="486" y="95">1</text><text x="502" y="95">0</text><text x="518" y="95">0</text><text x="534" y="95">1</text><text x="550" y="95">1</text><text x="566" y="95">1</text><text x="582" y="95">0</text>
+          <text x="342" y="121">1</text><text x="358" y="121">0</text><text x="374" y="121">1</text><text x="390" y="121">1</text><text x="406" y="121">0</text><text x="422" y="121">1</text><text x="438" y="121">1</text><text x="454" y="121">1</text><text x="470" y="121">0</text><text x="486" y="121">1</text><text x="502" y="121">0</text><text x="518" y="121">1</text><text x="534" y="121">1</text><text x="550" y="121">1</text><text x="566" y="121">1</text><text x="582" y="121">0</text>
+        </g>
+        <text x="450" y="152" text-anchor="middle" font-size="9.5" fill="#D26A3F" font-weight="600">Hamming distance 2 ≤ 3 → near-duplicate</text>
+        <text x="450" y="168" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">same article, different ads or timestamp</text>
+        <text x="450" y="192" text-anchor="middle" font-size="9.5" fill="currentColor">similar pages get similar fingerprints,</text>
+        <text x="450" y="208" text-anchor="middle" font-size="9.5" fill="currentColor">unlike a cryptographic hash</text>
+        <text x="450" y="232" text-anchor="middle" font-size="9.5" fill="#D26A3F">find neighbours fast: split into bands, look up each</text>
+
+        <line x1="600" y1="10" x2="600" y2="250" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="750" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Crawler traps</text>
+        <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="630" y="32" width="160" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="640" y="47">/cal?m=2026-10</text>
+          <rect x="630" y="64" width="160" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="640" y="79">/cal?m=2026-11</text>
+          <rect x="630" y="96" width="160" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="640" y="111">/cal?m=2026-12</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="710" y1="54" x2="710" y2="62" marker-end="url(#arw)"></line><line x1="710" y1="86" x2="710" y2="94" marker-end="url(#arw)"></line></g>
+        <text x="800" y="79" font-size="9" fill="currentColor" opacity="0.8">"next month"</text>
+        <text x="800" y="111" font-size="9" fill="currentColor" opacity="0.8">… forever</text>
+        <line x1="615" y1="132" x2="885" y2="132" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="6 4"></line>
+        <text x="750" y="148" text-anchor="middle" font-size="9.5" fill="#D26A3F" font-weight="600">cut off by budgets and rules:</text>
+        <g font-size="9.5" fill="currentColor">
+          <text x="625" y="168">max URL length and link depth</text>
+          <text x="625" y="184">per-host page budget per crawl cycle</text>
+          <text x="625" y="200">reject repeated segments: /a/b/a/b/…</text>
+          <text x="625" y="216">strip session ids; cap facet combinations</text>
+          <text x="625" y="232">detect soft 404s (200 with an error page)</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>robots.txt, properly</h4><p>Fetch <code>/robots.txt</code> before a host's first page and cache it for about 24 hours. Obey <code>Disallow</code> and <code>Crawl-delay</code> for your user agent. Under RFC 9309, a 4xx means no restrictions, but a 5xx or unreachable file means assume everything is disallowed until you can read it. Identify yourself with a user agent that includes a contact URL.</p></div>
+    <div class="card"><h4>Bloom filter trade-offs</h4><p>A false positive means you skip a new URL, and at 1% that's acceptable for a crawler. A false negative is impossible. Standard Bloom filters can't delete, so rebuild per crawl cycle or use a counting or cuckoo filter. Shard the filter by URL hash across nodes, the same way as <code>url_state</code>.</p></div>
+    <div class="card"><h4>Where each check sits</h4><p>The URL check comes before fetching, saves bandwidth, and runs at about 20 k lookups/s. The content check comes after fetching and saves storage and index quality. Trap rules run in the URL filter, cheaply, before a URL ever reaches the frontier.</p></div>
+  </div>
+</section>

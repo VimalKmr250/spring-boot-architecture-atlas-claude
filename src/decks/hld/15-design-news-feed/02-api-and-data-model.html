@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Design · News feed" data-title="News feed: API and data model">
+  <h2>Posts are the truth; a feed is just a list of post ids</h2>
+  <p class="dek">Keep post content in one place, and keep feeds as lightweight lists of ids per user, fetched and then <b>hydrated</b> in a batch. A feed entry never copies the post body. That's what makes edits and deletes tractable, and it keeps the feed cache small enough to hold for every active user.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/posts                      { "text": "…", "media_ids": ["m-1"] }
+→ 201 { "post_id": "18446…", "created_at": … }
+
+GET  /v1/feed?cursor=eyJzIjo…&amp;limit=20
+→ 200 { "items": [ { "post": {…}, "author": {…},
+                     "likes": 1204, "liked_by_me": false } ],
+        "next_cursor": "eyJzIjo…" }      # opaque: (score, post_id)
+
+PUT    /v1/users/{id}/follow
+DELETE /v1/users/{id}/follow
+POST   /v1/posts/{id}/like              # idempotent per user</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Posts table keyed by a time-sortable post id with author, text, media URLs and created time, sharded by post id and cached. Follow graph stored twice: followers keyed by followee, and following keyed by follower. Feed cache per user in Redis: a sorted set of post ids scored by time or rank, capped at 800 entries. Counters for likes and comments kept separately and sharded.">
+          <rect x="10" y="10" width="200" height="104" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="20" y="28" font-size="11" font-weight="600" fill="currentColor">posts</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="46" fill="#D26A3F">post_id  PK (snowflake)</text><text x="20" y="62">author_id · text</text><text x="20" y="78">media_urls · created_at</text><text x="20" y="100" opacity="0.7">shard by post_id; cached</text></g>
+          <rect x="220" y="10" width="190" height="104" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="230" y="28" font-size="11" font-weight="600" fill="currentColor">follow graph (×2)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="230" y="46">followers:</text><text x="242" y="62">PK followee · follower</text><text x="230" y="80">following:</text><text x="242" y="96">PK follower · followee</text></g>
+          <rect x="10" y="130" width="400" height="116" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="20" y="148" font-size="11" font-weight="600" fill="currentColor">feed cache (Redis sorted set per user)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="20" y="168">feed:u-42 → { 18446…901: score 1727…,</text>
+            <text x="112" y="184">18446…877: score 1727…, … }</text>
+            <text x="20" y="204">ZADD on fan-out · ZREVRANGE for reads</text>
+            <text x="20" y="220">ZREMRANGEBYRANK to cap at 800</text>
+            <text x="20" y="236" opacity="0.7">only for users active in the last 30 days</text>
+          </g>
+          <rect x="10" y="258" width="400" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="20" y="276" font-size="11" font-weight="600" fill="currentColor">counters (separate store)</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="294">likes:post_id → sharded counter</text><text x="20" y="310">liked:(user, post) → set (idempotent)</text></g>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Why the graph is stored twice</h4><p>Fan-out asks "who follows X?" and the profile page asks "whom does Y follow?". Each question needs its own partition key. Write both rows on follow (async repair keeps them in sync), or use a graph service such as Facebook's TAO.</p></div>
+    <div class="card"><h4>Cursor, not offset</h4><p>Feeds change while you scroll. Offsets skip and duplicate items. An opaque cursor, <code>(score, post_id)</code> of the last item, resumes exactly, and lets the server change the ranking without breaking pages already loaded.</p></div>
+    <div class="card"><h4>Counters live apart</h4><p>A viral post takes 100k likes a minute. Incrementing a column on the post row makes it a hot row. Use sharded counters (N sub-keys summed on read), plus a per-user "liked" set so the like button is idempotent.</p></div>
+  </div>
+</section>

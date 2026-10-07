@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Asynchronism" data-title="Dual write and outbox">
+  <h2>Writing to the database and the broker separately will eventually lose an event</h2>
+  <p class="dek">"Save the order, then publish OrderPlaced" is two writes to two systems, with no transaction spanning them. A crash, timeout or deploy between them leaves the order saved and the event never sent, or the event sent for an order that rolled back. The <b>transactional outbox</b> makes it one write.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="The dual write: the service commits the order to the database, then crashes before publishing to Kafka, so downstream systems never hear about the order; publishing first instead risks an event for an order that then fails to commit. The outbox: one local transaction inserts the order row and an outbox row; a relay, either a poller or change data capture reading the write-ahead log, publishes outbox rows to Kafka; consumers are idempotent because the relay may publish a row more than once.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">The dual write (broken)</text>
+        <rect x="20" y="100" width="110" height="56" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="75" y="132" text-anchor="middle" font-size="11.5" fill="currentColor">Order svc</text>
+        <path d="M260 44 a50 6 0 0 1 100 0 v40 a50 6 0 0 1 -100 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M260 44 a50 6 0 0 0 100 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="310" y="70" text-anchor="middle" font-size="11" fill="currentColor">Orders DB</text>
+        <rect x="260" y="178" width="100" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="310" y="197" text-anchor="middle" font-size="11" fill="currentColor">Kafka</text>
+        <line x1="130" y1="112" x2="257" y2="68" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="170" y="78" font-size="10" fill="currentColor">① COMMIT ✓</text>
+        <line x1="130" y1="146" x2="205" y2="176" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="4 3"></line>
+        <text x="214" y="186" text-anchor="middle" font-size="16" fill="#D26A3F">✕</text>
+        <text x="150" y="196" font-size="10" fill="#D26A3F">② publish: crash</text>
+        <text x="215" y="240" text-anchor="middle" font-size="10.5" fill="currentColor">order exists, OrderPlaced never sent:</text>
+        <text x="215" y="256" text-anchor="middle" font-size="10.5" fill="currentColor">no email, no shipment, no invoice</text>
+        <text x="215" y="278" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">(publish first? then a rollback leaves a ghost event)</text>
+
+        <line x1="440" y1="14" x2="440" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Transactional outbox</text>
+        <rect x="460" y="100" width="100" height="56" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="510" y="132" text-anchor="middle" font-size="11.5" fill="currentColor">Order svc</text>
+        <rect x="596" y="36" width="170" height="130" rx="8" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="681" y="54" text-anchor="middle" font-size="10" fill="#D26A3F">one local transaction</text>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="608" y="62" width="146" height="40" rx="3" fill="currentColor" fill-opacity="0.07"></rect>
+          <text x="614" y="78" font-weight="600">orders</text><text x="614" y="94">17 · PLACED · 49.90</text>
+          <rect x="608" y="110" width="146" height="46" rx="3" fill="#3AA79B" fill-opacity="0.15"></rect>
+          <text x="614" y="126" font-weight="600">outbox</text><text x="614" y="142">e-881 OrderPlaced {17}</text>
+        </g>
+        <line x1="560" y1="128" x2="593" y2="128" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <rect x="620" y="200" width="120" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="680" y="217" text-anchor="middle" font-size="10.5" fill="currentColor">Relay</text>
+        <text x="680" y="231" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">poller or CDC (Debezium)</text>
+        <line x1="681" y1="166" x2="681" y2="197" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <rect x="786" y="205" width="100" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="836" y="224" text-anchor="middle" font-size="11" fill="currentColor">Kafka</text>
+        <line x1="740" y1="220" x2="783" y2="220" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="836" y="252" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">→ idempotent</text>
+        <text x="836" y="265" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">consumers</text>
+        <text x="620" y="268" text-anchor="middle" font-size="10.5" fill="currentColor">both rows commit, or neither;</text>
+        <text x="620" y="284" text-anchor="middle" font-size="10.5" fill="currentColor">the relay retries until published</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Poller vs CDC relay</h4><p>A <b>poller</b> runs <code>SELECT … FROM outbox WHERE published = false ORDER BY id</code> every few hundred ms. It's simple, and it adds DB load and latency. <b>CDC</b> tails the database log (Debezium on the WAL or binlog): lower latency, no polling load, one more component to run.</p></div>
+    <div class="card"><h4>Still at-least-once</h4><p>The relay can publish a row and crash before marking it sent, so the row is published again. The outbox guarantees <em>no loss</em>, not no duplicates. Put a unique event id on every message and dedupe on the consumer side.</p></div>
+    <div class="card"><h4>The inbox is its mirror</h4><p>On the consuming side, record each processed event id in the same transaction as its effects (previous slide). Outbox plus inbox gives effectively-once processing across services without distributed transactions.</p></div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="ed" data-slide="The dual-write problem">Events · The dual-write problem</a><a data-deck="ed" data-slide="Outbox and CDC">Events · Outbox and CDC</a></p>
+</section>

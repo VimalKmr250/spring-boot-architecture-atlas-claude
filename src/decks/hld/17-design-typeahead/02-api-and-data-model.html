@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: API and data model">
+  <h2>One tiny GET, and a trie that stores its answers at every node</h2>
+  <p class="dek">The API is a single cacheable GET. The interesting data structure is a <b>trie</b> (prefix tree) in which every node also stores the <b>top-k completions below it</b>. A lookup becomes "walk down one node per character, then return the list stored there". There is no subtree search at query time.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">GET /v1/suggest?q=car&amp;lang=en&amp;limit=8
+Cache-Control: public, max-age=300           # short prefixes are very cacheable
+→ 200 { "prefix": "car",
+        "suggestions": [ "car insurance", "cars for sale", "cartoon",
+                         "car rental", "cardi b", … ],
+        "version": "trie-2026-09-30T10" }</code></pre>
+      <div class="codelabel" style="margin-top:10px;border-radius:var(--r) var(--r) 0 0">client behaviour (half the design)</div>
+<pre><code class="language-javascript">// debounce 50–100 ms; cancel stale requests; cache per prefix
+// "car" then "cart" → if "car" results are complete (&lt; 8 hits), filter locally
+// never block typing on the network</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 330" role="img" aria-label="Trie fragment. The root has child c; c has child a; ca has children r and t. Each node stores the top completions under it with scores: node car stores car insurance 950, cars for sale 870, cartoon 640; node cat stores cat videos 700 and caterpillar 300; node ca stores the best of both subtrees: car insurance, cars for sale, cat videos. Looking up car walks three nodes and returns the stored list.">
+          <g font-size="11" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+            <circle cx="210" cy="24" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="210" y="28">·</text>
+            <circle cx="210" cy="74" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="210" y="78">c</text>
+            <circle cx="210" cy="124" r="14" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F"></circle><text x="210" y="128">a</text>
+            <circle cx="110" cy="190" r="14" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-width="1.6"></circle><text x="110" y="194">r</text>
+            <circle cx="310" cy="190" r="14" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.5"></circle><text x="310" y="194">t</text>
+          </g>
+          <g stroke="#8A94A3" stroke-width="1.3"><line x1="210" y1="38" x2="210" y2="60"></line><line x1="210" y1="88" x2="210" y2="110"></line><line x1="200" y1="135" x2="120" y2="178"></line><line x1="220" y1="135" x2="300" y2="178"></line></g>
+          <rect x="236" y="100" width="176" height="50" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="242" y="114">top("ca"):</text><text x="242" y="128">car insurance 950</text><text x="242" y="142">cars for sale 870 · cat…</text></g>
+          <rect x="10" y="214" width="190" height="62" rx="4" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="16" y="230">top("car"):</text><text x="16" y="244">car insurance   950</text><text x="16" y="258">cars for sale   870</text><text x="16" y="272">cartoon         640 …</text></g>
+          <rect x="220" y="214" width="190" height="48" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="226" y="230">top("cat"):</text><text x="226" y="244">cat videos      700</text><text x="226" y="258">caterpillar     300</text></g>
+          <text x="210" y="300" text-anchor="middle" font-size="9.5" fill="currentColor">lookup("car") = 3 hops + read the list: O(len(prefix))</text>
+          <text x="210" y="316" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">memory traded for speed: each query is copied into its ancestors' lists</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Where the counts come from</h4><p>A <code>query_counts</code> table (query → decayed score), built from search logs by a batch or streaming job. Scores decay exponentially (half-life of about a week), so yesterday's spike fades and evergreen queries stay.</p></div>
+    <div class="card"><h4>The trie is a build artefact</h4><p>It isn't a database. It's an immutable snapshot built offline, versioned, stored in object storage and loaded into memory by the serving nodes. Updates arrive as new snapshots, never as in-place writes on the hot path.</p></div>
+    <div class="card"><h4>Or a KV of prefixes</h4><p>A flat alternative: precompute <code>prefix → top-8 list</code> for every prefix up to 20 characters and serve it from a KV store or a CDN. It's simpler to shard and cache, and bigger on disk. It's often the pragmatic interview answer after explaining the trie.</p></div>
+  </div>
+</section>

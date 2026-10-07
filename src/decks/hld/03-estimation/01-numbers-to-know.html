@@ -1,0 +1,90 @@
+<section class="slide" data-sec="Estimation" data-title="Numbers to know">
+  <h2>Memory is fast, the network is slower, and crossing an ocean is slowest</h2>
+  <p class="dek">You don't need these to the nanosecond. You need the orders of magnitude, because they decide designs: why a cache in memory beats a database round trip, why chatty services hurt, and why a synchronous call across continents can't sit on a 100 ms path.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Latency on a logarithmic scale from one nanosecond to one second: L1 cache 1 ns, main memory 100 ns, compress 1 KB 2 microseconds, send 1 KB over 1 gigabit 10 microseconds, random SSD read 50 microseconds, round trip in a datacenter 0.5 ms, read 1 MB from SSD 1 ms, cross-zone round trip 1.5 ms, disk seek 10 ms, read 1 MB from disk 20 ms, US coast-to-coast round trip 65 ms, California to Europe round trip 150 ms.">
+        <g font-size="10" fill="currentColor" opacity="0.55" text-anchor="middle">
+          <text x="250" y="20">1 ns</text><text x="319" y="20">10 ns</text><text x="388" y="20">100 ns</text><text x="457" y="20">1 µs</text>
+          <text x="526" y="20">10 µs</text><text x="595" y="20">100 µs</text><text x="664" y="20">1 ms</text><text x="733" y="20">10 ms</text>
+          <text x="802" y="20">100 ms</text><text x="870" y="20">1 s</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.12">
+          <line x1="250" y1="26" x2="250" y2="318"></line><line x1="319" y1="26" x2="319" y2="318"></line><line x1="388" y1="26" x2="388" y2="318"></line>
+          <line x1="457" y1="26" x2="457" y2="318"></line><line x1="526" y1="26" x2="526" y2="318"></line><line x1="595" y1="26" x2="595" y2="318"></line>
+          <line x1="664" y1="26" x2="664" y2="318"></line><line x1="733" y1="26" x2="733" y2="318"></line><line x1="802" y1="26" x2="802" y2="318"></line>
+          <line x1="870" y1="26" x2="870" y2="318"></line>
+        </g>
+        <g font-size="11" fill="currentColor" text-anchor="end">
+          <text x="240" y="44">L1 cache reference</text>
+          <text x="240" y="68">Main memory reference</text>
+          <text x="240" y="92">Compress 1 KB (fast codec)</text>
+          <text x="240" y="116">Send 1 KB over 1 Gbps</text>
+          <text x="240" y="140">Random 4 KB read, NVMe SSD</text>
+          <text x="240" y="164">Round trip inside a datacenter</text>
+          <text x="240" y="188">Read 1 MB sequentially, SSD</text>
+          <text x="240" y="212">Round trip across zones</text>
+          <text x="240" y="236">Disk seek (HDD)</text>
+          <text x="240" y="260">Read 1 MB sequentially, HDD</text>
+          <text x="240" y="284">Round trip US east ↔ west</text>
+          <text x="240" y="308">Round trip California ↔ Europe</text>
+        </g>
+        <g fill="#3AA79B" fill-opacity="0.55">
+          <rect x="250" y="34" width="3" height="13"></rect>
+          <rect x="250" y="58" width="138" height="13"></rect>
+          <rect x="250" y="82" width="228" height="13"></rect>
+        </g>
+        <g fill="#8A94A3" fill-opacity="0.7">
+          <rect x="250" y="106" width="276" height="13"></rect>
+          <rect x="250" y="130" width="324" height="13"></rect>
+          <rect x="250" y="154" width="393" height="13"></rect>
+          <rect x="250" y="178" width="414" height="13"></rect>
+          <rect x="250" y="202" width="426" height="13"></rect>
+        </g>
+        <g fill="#D26A3F" fill-opacity="0.7">
+          <rect x="250" y="226" width="483" height="13"></rect>
+          <rect x="250" y="250" width="504" height="13"></rect>
+          <rect x="250" y="274" width="539" height="13"></rect>
+          <rect x="250" y="298" width="564" height="13"></rect>
+        </g>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="259" y="45">1 ns</text><text x="394" y="69">100 ns</text><text x="484" y="93">~2 µs</text>
+          <text x="532" y="117">~10 µs</text><text x="580" y="141">~20–100 µs</text><text x="649" y="165">~0.5 ms</text>
+          <text x="670" y="189">~1 ms</text><text x="682" y="213">1–2 ms</text><text x="739" y="237">~10 ms</text>
+          <text x="760" y="261">~20 ms</text><text x="795" y="285">~65 ms</text><text x="820" y="309">~150 ms</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Each gridline is 10× the one before, so bars that look close differ a lot. A main-memory read is about 5,000× faster than a round trip inside the datacenter, and that round trip is about 300× faster than a trip to Europe and back. Teal is in-process, grey is local I/O and network, copper is long-haul I/O.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:380px">
+        <thead><tr><th>Handy conversions</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Seconds per day</td><td class="num">86,400 ≈ 10⁵</td></tr>
+          <tr><td>Seconds per month / year</td><td class="num">≈ 2.5 M / ≈ 31.5 M</td></tr>
+          <tr><td>1 M requests / day</td><td class="num">≈ 12 / s</td></tr>
+          <tr><td>1 B requests / day</td><td class="num">≈ 12,000 / s</td></tr>
+          <tr><td>2¹⁰ · 2²⁰ · 2³⁰ · 2⁴⁰ · 2⁵⁰</td><td class="num">KB · MB · GB · TB · PB (thousand … quadrillion)</td></tr>
+          <tr><td>1 Gbps</td><td class="num">≈ 125 MB/s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:380px">
+        <thead><tr><th>Typical sizes</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>int / long, timestamp / UUID</td><td class="num">4 B / 8 B / 16 B</td></tr>
+          <tr><td>A database row with a few columns</td><td class="num">100 B – 1 KB</td></tr>
+          <tr><td>A short post or chat message + metadata</td><td class="num">~0.5–1 KB</td></tr>
+          <tr><td>Compressed photo / thumbnail</td><td class="num">200 KB – 2 MB / 10–50 KB</td></tr>
+          <tr><td>1 minute of 1080p video at 5 Mbps</td><td class="num">≈ 40 MB</td></tr>
+          <tr><td>A web page's HTML / all its assets</td><td class="num">50–100 KB / 1–3 MB</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

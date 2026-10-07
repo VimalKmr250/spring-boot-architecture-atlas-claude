@@ -1,0 +1,69 @@
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: high-level design">
+  <h2>Limit at the edge in layers: coarse per IP first, precise per key at the gateway</h2>
+  <p class="dek">Rejecting a request is cheapest as early as possible. The CDN or WAF drops floods by IP before they reach you. The gateway enforces precise per-key and per-endpoint limits against a shared counter store. Services keep a last-line concurrency limit for their own expensive work.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Clients hit a CDN and WAF that applies coarse per-IP limits and bot rules. A load balancer spreads requests over 50 API gateway instances, each with a rate-limit filter holding the rules in memory. The filter makes one atomic call to a Redis cluster of 10 shards with replicas. Allowed requests continue to backend services, which also enforce concurrency limits; rejected requests get 429. Rules come from a config store pushed to gateways. Decisions are counted in metrics and streamed to Kafka for usage analytics and billing.">
+        <rect x="10" y="130" width="76" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="48" y="157" text-anchor="middle" font-size="10.5" fill="currentColor">Clients</text>
+        <rect x="104" y="124" width="92" height="56" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="150" y="146" text-anchor="middle" font-size="10.5" fill="currentColor">CDN / WAF</text>
+        <text x="150" y="162" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">per-IP floods,</text>
+        <text x="150" y="173" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">bots: ① coarse</text>
+        <rect x="214" y="130" width="56" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="242" y="157" text-anchor="middle" font-size="10.5" fill="currentColor">LB</text>
+        <line x1="86" y1="152" x2="101" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="196" y1="152" x2="211" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <rect x="296" y="80" width="200" height="150" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="396" y="100" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">API gateway × 50</text>
+        <rect x="312" y="112" width="168" height="60" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="396" y="130" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">② rate-limit filter</text>
+        <text x="396" y="146" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">rules in memory</text>
+        <text x="396" y="160" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">local fallback limiter</text>
+        <text x="396" y="192" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">auth first: limit by the</text>
+        <text x="396" y="205" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">verified key, not a header</text>
+        <line x1="270" y1="152" x2="293" y2="152" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <g>
+          <path d="M540 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M540 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M650 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M650 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M760 30 a45 6 0 0 1 90 0 v26 a45 6 0 0 1 -90 0 z" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></path>
+          <path d="M760 30 a45 6 0 0 0 90 0" fill="none" stroke="#D26A3F" stroke-width="1.3"></path>
+        </g>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle"><text x="585" y="50">shard 1</text><text x="695" y="50">shard 2</text><text x="805" y="50">… 10</text></g>
+        <text x="695" y="84" text-anchor="middle" font-size="10" fill="currentColor">Redis Cluster · counters · replica per shard</text>
+        <line x1="480" y1="120" x2="600" y2="66" stroke="#D26A3F" stroke-width="1.5" marker-start="url(#arwA)" marker-end="url(#arwA)"></line>
+        <text x="530" y="112" font-size="9" fill="#D26A3F">~0.5 ms, Lua</text>
+
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="560" y="130" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="635" y="148">backend services</text><text x="635" y="162" font-size="8.5" opacity="0.75">③ concurrency limits</text>
+          <rect x="560" y="186" width="150" height="30" rx="5" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="635" y="205" fill="#D26A3F">429 + Retry-After</text>
+        </g>
+        <line x1="496" y1="152" x2="557" y2="150" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="526" y="144" text-anchor="middle" font-size="9" fill="currentColor">allowed</text>
+        <line x1="496" y1="190" x2="557" y2="200" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="526" y="210" text-anchor="middle" font-size="9" fill="currentColor">rejected</text>
+
+        <path d="M296 262 a55 6 0 0 1 110 0 v26 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M296 262 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="351" y="284" text-anchor="middle" font-size="9.5" fill="currentColor">config store</text>
+        <line x1="351" y1="256" x2="360" y2="233" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="290" y="248" text-anchor="end" font-size="8.5" fill="#3AA79B">rules push</text>
+        <rect x="560" y="256" width="130" height="26" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="625" y="273" text-anchor="middle" font-size="9.5" fill="currentColor">Kafka · decisions</text>
+        <line x1="470" y1="230" x2="557" y2="266" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <g font-size="9.5" fill="currentColor"><text x="710" y="266">→ usage &amp; billing</text><text x="710" y="280">→ 429 dashboards, alerts</text></g>
+      </svg>
+    </div>
+    <figcaption>Three layers, three jobs. ① The edge sheds abusive volume by IP before TLS reaches your fleet. ② The gateway enforces the contract (per key, per endpoint) against shared state. ③ Services protect themselves from expensive requests even when every caller is within its rate: ten report exports at once is a concurrency problem, not a rate problem.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div class="card"><h4>Why at the gateway, not in each service</h4><p>One place to enforce and observe limits. The check happens before expensive work (auth, fan-out) and uses the authenticated identity. Services stay free of limit logic. The trade-off is that the gateway becomes critical, so the filter must be fast and have a failure mode.</p></div>
+    <div class="card"><h4>Why a shared store and not local counters</h4><p>With 50 gateways and a load balancer spreading requests, local counters each see about 1/50 of a key's traffic, so per-instance limits are wildly inaccurate for bursty clients. A shared atomic counter makes the limit exact, at the cost of about 0.5 ms and a dependency. Deep dive 2 shows the hybrids.</p></div>
+  </div>
+</section>

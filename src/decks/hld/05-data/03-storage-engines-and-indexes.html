@@ -1,0 +1,87 @@
+<section class="slide" data-sec="Data" data-title="Storage engines and indexes">
+  <h2>B-trees update in place; LSM-trees append and merge later</h2>
+  <p class="dek">Under every database is a storage engine, and there are two main families. <b>B-trees</b> (PostgreSQL, MySQL/InnoDB) keep sorted pages on disk and modify them in place, which makes them good at reads and range scans. <b>LSM-trees</b> (Cassandra, RocksDB, ScyllaDB, Bigtable) buffer writes in memory and flush them as immutable sorted files, which makes them good at heavy write loads.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="B-tree: a root page with keys 40 and 80 points to three leaf pages; updating key 60 walks root to leaf and rewrites that page, after logging it to the write-ahead log. LSM-tree: a write is appended to a commit log and inserted into an in-memory sorted memtable; full memtables flush to immutable SSTables at level 0; background compaction merges them into larger levels; reads check the memtable, then use bloom filters to skip SSTables that cannot contain the key.">
+        <text x="210" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">B-tree: modify pages in place</text>
+        <g font-size="11" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+          <rect x="150" y="40" width="120" height="30" rx="3" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="210" y="60">40 │ 80</text>
+          <rect x="20" y="120" width="120" height="30" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="80" y="140">10 20 30</text>
+          <rect x="150" y="120" width="120" height="30" rx="3" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="210" y="140">50 [60] 70</text>
+          <rect x="280" y="120" width="120" height="30" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="340" y="140">90 95 99</text>
+        </g>
+        <line x1="170" y1="70" x2="90" y2="117" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="210" y1="70" x2="210" y2="117" stroke="#D26A3F" stroke-width="1.6" marker-end="url(#arwA)"></line>
+        <line x1="250" y1="70" x2="330" y2="117" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="222" y="98" font-size="10" fill="#D26A3F">UPDATE id=60</text>
+        <line x1="150" y1="135" x2="140" y2="135" stroke="currentColor" stroke-opacity="0.3"></line>
+        <line x1="280" y1="135" x2="270" y2="135" stroke="currentColor" stroke-opacity="0.3"></line>
+        <text x="210" y="170" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">leaf pages are linked, so range scans walk sideways</text>
+        <rect x="60" y="192" width="300" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="210" y="211" text-anchor="middle" font-size="10.5" fill="currentColor">WAL first (durability), then rewrite the 8 KB page</text>
+        <text x="210" y="252" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">read: O(log n) page hops, usually 3–4</text>
+        <text x="210" y="268" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">write: random I/O, a whole page per small change</text>
+
+        <line x1="440" y1="14" x2="440" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">LSM-tree: append, then compact</text>
+        <rect x="460" y="40" width="80" height="30" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="500" y="60" text-anchor="middle" font-size="11" fill="currentColor">write</text>
+        <rect x="580" y="36" width="140" height="38" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="650" y="53" text-anchor="middle" font-size="11" fill="currentColor">memtable (RAM)</text>
+        <text x="650" y="67" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">sorted, e.g. skip list</text>
+        <rect x="760" y="36" width="126" height="38" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.2"></rect>
+        <text x="823" y="53" text-anchor="middle" font-size="11" fill="currentColor">commit log</text>
+        <text x="823" y="67" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">sequential append</text>
+        <line x1="540" y1="55" x2="577" y2="55" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <path d="M520 70 V88 H823 V77" fill="none" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></path>
+        <line x1="650" y1="74" x2="650" y2="110" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="660" y="100" font-size="9.5" fill="currentColor" opacity="0.75">flush when full</text>
+        <text x="468" y="130" font-size="10" fill="currentColor" opacity="0.7">L0</text>
+        <g fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4">
+          <rect x="560" y="114" width="56" height="24" rx="3"></rect><rect x="622" y="114" width="56" height="24" rx="3"></rect><rect x="684" y="114" width="56" height="24" rx="3"></rect>
+        </g>
+        <g font-size="9" fill="currentColor" text-anchor="middle" opacity="0.8"><text x="588" y="130">SST</text><text x="650" y="130">SST</text><text x="712" y="130">SST</text></g>
+        <text x="468" y="176" font-size="10" fill="currentColor" opacity="0.7">L1</text>
+        <rect x="540" y="160" width="220" height="24" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="650" y="176" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">merged, non-overlapping SSTables</text>
+        <text x="468" y="222" font-size="10" fill="currentColor" opacity="0.7">L2</text>
+        <rect x="500" y="206" width="300" height="24" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="650" y="222" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">10× larger per level</text>
+        <line x1="650" y1="138" x2="650" y2="157" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="650" y1="184" x2="650" y2="203" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="780" y="152" font-size="9.5" fill="currentColor" opacity="0.75">background</text>
+        <text x="780" y="165" font-size="9.5" fill="currentColor" opacity="0.75">compaction</text>
+        <text x="670" y="256" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">read: memtable → bloom filters skip SSTs → newest match wins</text>
+        <text x="670" y="272" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">write: sequential only, very fast; compaction costs later</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:400px">
+        <thead><tr><th></th><th>B-tree</th><th>LSM-tree</th></tr></thead>
+        <tbody>
+          <tr><td>Writes</td><td>Slower (random I/O)</td><td>Faster (sequential)</td></tr>
+          <tr><td>Point reads</td><td>Predictable, fast</td><td>May touch several files</td></tr>
+          <tr><td>Range scans</td><td>Excellent</td><td>Good within a partition</td></tr>
+          <tr><td>Hidden cost</td><td>Page splits, fragmentation</td><td>Compaction I/O spikes, tombstones</td></tr>
+          <tr><td>Found in</td><td>PostgreSQL, MySQL, SQL Server</td><td>Cassandra, RocksDB, LevelDB, HBase</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Indexes: speed reads, tax writes</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Primary</b> index: the table is ordered by it (clustered) or points into it.</li>
+        <li><b>Secondary</b> index: another sorted structure. Every insert updates each one, so five indexes means roughly six writes.</li>
+        <li><b>Composite</b> <code>(user_id, created_at)</code> serves "user X's latest", but not "all rows since T". Column order matters.</li>
+        <li><b>Covering</b> index: holds every column the query needs, so the table is never read.</li>
+        <li>Index for your queries, check with <code>EXPLAIN</code>, and drop unused indexes.</li>
+      </ul>
+    </div>
+  </div>
+</section>

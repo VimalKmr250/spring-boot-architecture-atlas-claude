@@ -1,0 +1,69 @@
+<section class="slide" data-sec="Fundamentals" data-title="Scaling up and out">
+  <h2>Scale the database up, scale the stateless tier out</h2>
+  <p class="dek">Vertical scaling buys a bigger machine. It needs no code change, but it has a ceiling, a single point of failure, and a price that grows faster than the capacity. Horizontal scaling adds more machines, which only works once the machines are interchangeable. So the real work of scaling out is moving state out of the application servers.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: vertical scaling, a server growing from 4 to 16 to 96 vCPUs until it hits the hardware ceiling. Right: horizontal scaling, a load balancer in front of four identical stateless app servers, which keep sessions in Redis, data in a database and files in object storage.">
+        <text x="200" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Vertical: scale up</text>
+        <line x1="20" y1="54" x2="390" y2="54" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="6 4"></line>
+        <text x="385" y="46" text-anchor="end" font-size="10.5" fill="#D26A3F">largest instance you can buy</text>
+        <rect x="30" y="200" width="70" height="56" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="65" y="226" text-anchor="middle" font-size="10.5" fill="currentColor">4 vCPU</text>
+        <text x="65" y="242" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">16 GB</text>
+        <rect x="120" y="148" width="100" height="108" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="170" y="198" text-anchor="middle" font-size="11" fill="currentColor">16 vCPU</text>
+        <text x="170" y="214" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">64 GB</text>
+        <rect x="240" y="64" width="150" height="192" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="315" y="152" text-anchor="middle" font-size="12" fill="currentColor">96 vCPU</text>
+        <text x="315" y="170" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.65">768 GB</text>
+        <text x="315" y="196" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">still one box,</text>
+        <text x="315" y="210" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">still one failure</text>
+        <line x1="102" y1="228" x2="116" y2="210" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="222" y1="200" x2="236" y2="170" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <text x="200" y="280" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">no code change · downtime to resize · cost grows faster than capacity</text>
+
+        <line x1="440" y1="20" x2="440" y2="280" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="670" y="22" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Horizontal: scale out</text>
+        <rect x="605" y="36" width="130" height="32" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="670" y="57" text-anchor="middle" font-size="11.5" fill="currentColor">load balancer</text>
+        <g>
+          <rect x="470" y="100" width="92" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <rect x="576" y="100" width="92" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <rect x="682" y="100" width="92" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <rect x="788" y="100" width="92" height="44" rx="5" fill="none" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3"></rect>
+        </g>
+        <g font-size="11" text-anchor="middle" fill="currentColor">
+          <text x="516" y="126">app</text><text x="622" y="126">app</text><text x="728" y="126">app</text><text x="834" y="126">+ app</text>
+        </g>
+        <line x1="640" y1="68" x2="520" y2="97" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="660" y1="68" x2="622" y2="97" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="680" y1="68" x2="728" y2="97" stroke="#8A94A3" stroke-width="1.2" marker-end="url(#arw)"></line>
+        <line x1="700" y1="68" x2="830" y2="97" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arw)"></line>
+        <text x="675" y="162" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">identical, stateless: any request can go to any box</text>
+
+        <path d="M480 190 a45 6 0 0 1 90 0 v44 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M480 190 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="525" y="218" text-anchor="middle" font-size="11" fill="currentColor">Redis</text>
+        <text x="525" y="232" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">sessions</text>
+        <path d="M625 190 a45 6 0 0 1 90 0 v44 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M625 190 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="670" y="218" text-anchor="middle" font-size="11" fill="currentColor">Database</text>
+        <text x="670" y="232" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">scaled up</text>
+        <path d="M770 190 a45 6 0 0 1 90 0 v44 a45 6 0 0 1 -90 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></path>
+        <path d="M770 190 a45 6 0 0 0 90 0" fill="none" stroke="currentColor" stroke-opacity="0.35"></path>
+        <text x="815" y="218" text-anchor="middle" font-size="11" fill="currentColor">Object store</text>
+        <text x="815" y="232" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">uploads</text>
+        <text x="670" y="276" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">state lives outside the app tier, so boxes can come and go</text>
+      </svg>
+    </div>
+    <figcaption>The usual first answer in an interview: stateless application servers behind a load balancer, scaled on CPU or request rate, with a large primary database plus read replicas. Shard the data only when one primary can no longer take the writes. That is later than most people think, since a well-tuned PostgreSQL primary handles thousands to tens of thousands of writes a second.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Where state hides</h4><p>In-memory sessions, local file uploads, in-process caches that must be coherent, scheduled jobs that run "on the server", WebSocket connections. Each one needs a home outside the box, or the box can't be replaced freely.</p></div>
+    <div class="card"><h4>Sticky sessions are a smell</h4><p>Pinning a user to one server works until that server dies or the load becomes uneven. Prefer a shared session store, or signed tokens (JWT) that carry the state. Keep stickiness for connection-oriented protocols such as WebSockets, where it is inherent.</p></div>
+    <div class="card"><h4>Autoscaling needs headroom</h4><p>New instances take 1–5 minutes to boot and warm up. Scale on a leading signal (request rate, queue depth) with a target around 60% utilisation. For known events, pre-scale rather than waiting for the autoscaler to react.</p></div>
+  </div>
+</section>

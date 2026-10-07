@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Design · URL shortener" data-title="URL shortener: the redirect path">
+  <h2>Deep dive 2: a redirect in under 10 ms, and clicks counted without slowing it</h2>
+  <p class="dek">The read path carries 99% of the traffic, and every millisecond is someone else's page-load time. Keep it to one memory lookup, keep the database off it, record clicks asynchronously, and decide deliberately what the browser and CDN are allowed to cache.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 310" role="img" aria-label="Sequence. The browser requests the short code from the edge, about 5 ms away. The edge forwards it to the redirect service. The redirect service reads Redis in about half a millisecond; on the rare miss it reads a database replica in about 3 ms and fills the cache. It returns 302 with the long URL, and the browser follows it. In parallel the service appends a click event to a local buffer that flushes to Kafka every few hundred milliseconds. Unknown codes are cached as not-found for a minute so random probes don't reach the database.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="16" y="14" width="100" height="30" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="66" y="34">Browser</text>
+          <rect x="166" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="216" y="34">Edge / LB</text>
+          <rect x="316" y="14" width="120" height="30" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect><text x="376" y="34">Redirect svc</text>
+          <rect x="486" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="536" y="34">Redis</text>
+          <rect x="636" y="14" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="686" y="34">DB replica</text>
+          <rect x="786" y="14" width="100" height="30" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="836" y="34">Kafka</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="66" y1="44" x2="66" y2="300"></line><line x1="216" y1="44" x2="216" y2="300"></line><line x1="376" y1="44" x2="376" y2="300"></line>
+          <line x1="536" y1="44" x2="536" y2="300"></line><line x1="686" y1="44" x2="686" y2="300"></line><line x1="836" y1="44" x2="836" y2="300"></line>
+        </g>
+        <line x1="66" y1="68" x2="212" y2="68" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="140" y="62" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">① GET /Ab3xK9q</text>
+        <line x1="216" y1="88" x2="372" y2="88" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="296" y="82" text-anchor="middle" font-size="9.5" fill="currentColor">② ~1 ms</text>
+        <line x1="376" y1="110" x2="532" y2="110" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <text x="456" y="104" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">③ GET url:Ab3xK9q</text>
+        <line x1="536" y1="128" x2="380" y2="128" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="456" y="142" text-anchor="middle" font-size="9.5" fill="#D26A3F">hit (95%): 0.5 ms</text>
+        <line x1="376" y1="162" x2="682" y2="162" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="2 3" marker-end="url(#arw)"></line>
+        <text x="610" y="156" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">miss: SELECT (3 ms), then SET 24 h</text>
+        <line x1="376" y1="196" x2="220" y2="196" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <line x1="216" y1="212" x2="70" y2="212" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwA)"></line>
+        <text x="296" y="190" text-anchor="middle" font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">④ 302 Location: …</text>
+        <text x="140" y="228" text-anchor="middle" font-size="9.5" fill="#D26A3F">total ≈ 5–10 ms + RTT</text>
+        <rect x="370" y="220" width="12" height="40" fill="#3AA79B" fill-opacity="0.3"></rect>
+        <text x="392" y="236" font-size="9" fill="#3AA79B">buffer click</text>
+        <line x1="382" y1="252" x2="832" y2="252" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="610" y="246" text-anchor="middle" font-size="9.5" fill="#3AA79B">⑤ async batch every 200 ms (never blocks the 302)</text>
+        <text x="450" y="290" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">unknown code → cache "NOT_FOUND" for 60 s; optional bloom filter of valid codes stops random probes early</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>What may be cached where</h4><p><b>Redis:</b> everything, with a long TTL (links are immutable; delete on expiry or takedown). <b>Browser/CDN:</b> only for links marked "no stats", via 301 or <code>max-age</code>. Tracked links use 302 + <code>no-store</code>, or the clicks would vanish into caches.</p></div>
+    <div class="card"><h4>Counting clicks at 20k/s</h4><p>Don't <code>UPDATE clicks = clicks + 1</code> per redirect. That's a hot-row write storm. Stream raw events, aggregate per code per minute in a consumer, and write the rollups to a columnar store. For a live counter, use Redis <code>INCR</code> on sharded keys, flushed periodically.</p></div>
+    <div class="card"><h4>Hot links</h4><p>A link shared by a celebrity can take 50k/s on one key, which means one Redis shard. Add a 1–5 s in-process cache in the redirect service (links never change, so staleness is harmless) or replicate hot keys. For "no stats" links, let the CDN absorb it entirely.</p></div>
+  </div>
+</section>

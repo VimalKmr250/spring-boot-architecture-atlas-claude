@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Architecture patterns" data-title="Serverless">
+  <h2>Serverless: pay per event, scale to zero, and give up control of the runtime</h2>
+  <p class="dek">In serverless (functions as a service, plus managed backends), you write handlers and the platform runs them on demand: one isolated invocation per event, scaling from zero to thousands in seconds, billed per millisecond. There are no servers to patch or size. In return you accept cold starts, execution limits and tight coupling to one cloud's services.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Event sources on the left: HTTPS requests through an API gateway, queue messages, object uploads, schedules and database change streams. Each triggers function invocations in the middle, scaling from zero to many concurrent instances. Functions use managed backends on the right: a key-value database, object storage, queues and notification topics. Inset: a cost chart where serverless cost rises linearly from zero with load while provisioned servers cost a flat step; below the crossover, serverless is cheaper.">
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="16" y="24" width="120" height="30" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="76" y="44">HTTPS · API GW</text>
+          <rect x="16" y="64" width="120" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="76" y="84">queue message</text>
+          <rect x="16" y="104" width="120" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="76" y="124">object uploaded</text>
+          <rect x="16" y="144" width="120" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="76" y="164">cron schedule</text>
+          <rect x="16" y="184" width="120" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="76" y="204">DB change stream</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="136" y1="39" x2="197" y2="100" marker-end="url(#arw)"></line><line x1="136" y1="79" x2="197" y2="108" marker-end="url(#arw)"></line>
+          <line x1="136" y1="119" x2="197" y2="119" marker-end="url(#arw)"></line><line x1="136" y1="159" x2="197" y2="130" marker-end="url(#arw)"></line><line x1="136" y1="199" x2="197" y2="138" marker-end="url(#arw)"></line>
+        </g>
+        <rect x="200" y="60" width="200" height="120" rx="8" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="300" y="80" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">functions</text>
+        <g fill="#D26A3F" fill-opacity="0.55">
+          <rect x="216" y="92" width="26" height="22" rx="3"></rect><rect x="248" y="92" width="26" height="22" rx="3"></rect><rect x="280" y="92" width="26" height="22" rx="3"></rect><rect x="312" y="92" width="26" height="22" rx="3"></rect><rect x="344" y="92" width="26" height="22" rx="3"></rect>
+          <rect x="216" y="120" width="26" height="22" rx="3"></rect><rect x="248" y="120" width="26" height="22" rx="3"></rect><rect x="280" y="120" width="26" height="22" rx="3"></rect>
+        </g>
+        <rect x="312" y="120" width="26" height="22" rx="3" fill="none" stroke="#D26A3F" stroke-dasharray="3 2"></rect>
+        <text x="300" y="164" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">0 → N instances, one event each</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="450" y="44" width="110" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="505" y="64">KV database</text>
+          <rect x="450" y="84" width="110" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="505" y="104">object storage</text>
+          <rect x="450" y="124" width="110" height="30" rx="4" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="505" y="144">queue / topic</text>
+          <rect x="450" y="164" width="110" height="30" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="505" y="184">SQL via proxy</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.2"><line x1="400" y1="100" x2="447" y2="60" marker-end="url(#arwA)"></line><line x1="400" y1="110" x2="447" y2="100" marker-end="url(#arwA)"></line><line x1="400" y1="130" x2="447" y2="140" marker-end="url(#arwA)"></line><line x1="400" y1="150" x2="447" y2="178" marker-end="url(#arwA)"></line></g>
+        <text x="300" y="232" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">cold start: 100 ms – 1 s+ on the first call to a new instance</text>
+        <text x="300" y="248" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">limits: run time (~15 min), memory, payload, concurrency quota</text>
+
+        <line x1="600" y1="14" x2="600" y2="282" stroke="currentColor" stroke-opacity="0.15"></line>
+        <text x="745" y="24" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Cost vs steady load</text>
+        <line x1="630" y1="230" x2="880" y2="230" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="630" y1="230" x2="630" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="630" y1="230" x2="870" y2="50" stroke="#D26A3F" stroke-width="2"></line>
+        <path d="M630 150 H760 V110 H880" fill="none" stroke="#3AA79B" stroke-width="2"></path>
+        <circle cx="737" cy="150" r="5" fill="currentColor"></circle>
+        <text x="745" y="170" font-size="9.5" fill="currentColor">crossover</text>
+        <text x="690" y="60" font-size="9.5" fill="#D26A3F">functions: pay per call</text>
+        <text x="880" y="126" text-anchor="end" font-size="9.5" fill="#3AA79B">servers: per hour</text>
+        <text x="880" y="248" text-anchor="end" font-size="9.5" fill="currentColor" opacity="0.7">requests / month →</text>
+        <text x="680" y="210" font-size="9.5" fill="currentColor" opacity="0.8">spiky or low traffic:</text>
+        <text x="680" y="222" font-size="9.5" fill="currentColor" opacity="0.8">serverless wins</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Great fits</h4><p>Event glue (resize on upload, react to a DB change), scheduled jobs, spiky or low-traffic APIs, webhooks, prototypes, and fan-out batch work. It also suits teams without a platform team, since nothing needs patching or capacity planning.</p></div>
+    <div class="card"><h4>Poor fits</h4><p>Latency-critical paths that can't tolerate cold starts (unless you pay for provisioned concurrency), long-running or stateful work, WebSockets at scale, and steady high throughput, where always-on containers are cheaper per request.</p></div>
+    <div class="card"><h4>Design gotchas</h4><p>Thousands of concurrent functions can exhaust a relational database's connections, so use a connection proxy or a serverless-native database. Make handlers idempotent, since platforms retry. Watch cost at scale, and design for vendor-specific triggers from the start.</p></div>
+  </div>
+</section>

@@ -1,0 +1,57 @@
+<section class="slide" data-sec="Design · Web crawler" data-title="Web crawler: trade-offs and follow-ups">
+  <h2>Partition by host so politeness stays local, and recrawl each page on its own clock</h2>
+  <p class="dek">To scale out, give every host to exactly one crawler node. Its frontier, politeness timers, robots cache and DNS cache then need no coordination. Then spend the fetch budget where change actually happens: a news front page changes hourly, an archived page almost never.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Left: three crawler nodes each own a third of hosts by hashing the host name, and each runs its own frontier, fetchers, Bloom filter shard and DNS cache. When node 1 finds a link to wiki.org, owned by node 3, it publishes the URL in a batch to a URL exchange topic keyed by host, and node 3 consumes it. Consistent hashing means adding a node moves only about one Nth of hosts. Right: recrawl frequency over one week. A news front page is fetched several times a day, an active blog every couple of days, reference docs twice a week, and an old archive page once. The interval shrinks when a page is seen to change and grows, doubling up to a cap, when it is unchanged. Conditional GETs with ETag or If-Modified-Since make an unchanged page a cheap 304.">
+        <text x="222" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Scale out: partition the crawl by host</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="36" width="125" height="86" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="82" y="56" font-size="10" font-weight="600">crawler node 1</text><text x="82" y="72">owns 1/3 of hosts</text><text x="82" y="88" opacity="0.8">frontier · fetchers</text><text x="82" y="104" opacity="0.8">Bloom shard · DNS</text>
+          <rect x="160" y="36" width="125" height="86" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="222" y="56" font-size="10" font-weight="600">crawler node 2</text><text x="222" y="72">owns 1/3 of hosts</text><text x="222" y="88" opacity="0.8">frontier · fetchers</text><text x="222" y="104" opacity="0.8">Bloom shard · DNS</text>
+          <rect x="300" y="36" width="125" height="86" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="362" y="56" font-size="10" font-weight="600">crawler node 3</text><text x="362" y="72">owns 1/3 of hosts</text><text x="362" y="88" opacity="0.8">frontier · fetchers</text><text x="362" y="104" opacity="0.8">Bloom shard · DNS</text>
+        </g>
+        <rect x="20" y="160" width="405" height="26" rx="3" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+        <g stroke="#3AA79B" stroke-opacity="0.6"><line x1="60" y1="160" x2="60" y2="186"></line><line x1="100" y1="160" x2="100" y2="186"></line><line x1="345" y1="160" x2="345" y2="186"></line><line x1="385" y1="160" x2="385" y2="186"></line></g>
+        <text x="222" y="177" text-anchor="middle" font-size="9.5" fill="currentColor">url-exchange topic, keyed by host</text>
+        <g stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4"><line x1="82" y1="122" x2="82" y2="157" marker-end="url(#arwB)"></line><line x1="362" y1="160" x2="362" y2="125" marker-end="url(#arwB)"></line></g>
+        <text x="90" y="145" font-size="9" fill="#3AA79B">link to wiki.org, batched</text>
+        <text x="354" y="145" text-anchor="end" font-size="9" fill="#3AA79B">owner consumes</text>
+        <text x="222" y="210" text-anchor="middle" font-size="9.5" fill="currentColor">politeness and dedup stay local: a host lives on one node</text>
+        <text x="222" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">consistent hashing moves only ~1/N of hosts per new node</text>
+        <text x="222" y="250" text-anchor="middle" font-size="9.5" fill="#D26A3F">one giant host (a CDN IP) may still need its own lane</text>
+
+        <line x1="450" y1="10" x2="450" y2="252" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Recrawl each page on its own schedule</text>
+        <g font-size="9.5" fill="currentColor"><text x="466" y="54">news front page</text><text x="466" y="84">active blog</text><text x="466" y="114">reference docs</text><text x="466" y="144">old archive page</text></g>
+        <g stroke="currentColor" stroke-opacity="0.3"><line x1="590" y1="50" x2="884" y2="50"></line><line x1="590" y1="80" x2="884" y2="80"></line><line x1="590" y1="110" x2="884" y2="110"></line><line x1="590" y1="140" x2="884" y2="140"></line></g>
+        <g stroke="#D26A3F" stroke-width="1.5"><line x1="596" y1="43" x2="596" y2="57"></line><line x1="608" y1="43" x2="608" y2="57"></line><line x1="620" y1="43" x2="620" y2="57"></line><line x1="632" y1="43" x2="632" y2="57"></line><line x1="644" y1="43" x2="644" y2="57"></line><line x1="656" y1="43" x2="656" y2="57"></line><line x1="668" y1="43" x2="668" y2="57"></line><line x1="680" y1="43" x2="680" y2="57"></line><line x1="692" y1="43" x2="692" y2="57"></line><line x1="704" y1="43" x2="704" y2="57"></line><line x1="716" y1="43" x2="716" y2="57"></line><line x1="728" y1="43" x2="728" y2="57"></line><line x1="740" y1="43" x2="740" y2="57"></line><line x1="752" y1="43" x2="752" y2="57"></line><line x1="764" y1="43" x2="764" y2="57"></line><line x1="776" y1="43" x2="776" y2="57"></line><line x1="788" y1="43" x2="788" y2="57"></line><line x1="800" y1="43" x2="800" y2="57"></line><line x1="812" y1="43" x2="812" y2="57"></line><line x1="824" y1="43" x2="824" y2="57"></line><line x1="836" y1="43" x2="836" y2="57"></line><line x1="848" y1="43" x2="848" y2="57"></line><line x1="860" y1="43" x2="860" y2="57"></line><line x1="872" y1="43" x2="872" y2="57"></line></g>
+        <g stroke="#3AA79B" stroke-width="1.5"><line x1="596" y1="73" x2="596" y2="87"></line><line x1="680" y1="73" x2="680" y2="87"></line><line x1="764" y1="73" x2="764" y2="87"></line><line x1="848" y1="73" x2="848" y2="87"></line>
+          <line x1="596" y1="103" x2="596" y2="117"></line><line x1="740" y1="103" x2="740" y2="117"></line></g>
+        <line x1="596" y1="133" x2="596" y2="147" stroke="#8A94A3" stroke-width="1.5"></line>
+        <text x="884" y="164" text-anchor="end" font-size="9" fill="currentColor" opacity="0.7">one week →</text>
+        <text x="675" y="190" text-anchor="middle" font-size="9.5" fill="currentColor">changed since last fetch → shorten the interval;</text>
+        <text x="675" y="206" text-anchor="middle" font-size="9.5" fill="currentColor">unchanged → double it, up to a cap</text>
+        <text x="675" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">conditional GET (ETag / If-Modified-Since): a 304 is almost free</text>
+        <text x="675" y="250" text-anchor="middle" font-size="9.5" fill="#D26A3F">sitemaps with lastmod tell you what changed without guessing</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>JavaScript-heavy sites</td><td>A separate pool of headless browsers for pages whose HTML is an empty shell; it costs 10–100× per page, so detect first and render selectively.</td></tr>
+          <tr><td>Freshness vs coverage</td><td>Split the fetch budget explicitly: a share for recrawls ranked by expected change × importance, and the rest for discovery.</td></tr>
+          <tr><td>Geography</td><td>Run crawler nodes in several regions and assign hosts to the closest one to cut latency and cross-ocean bandwidth.</td></tr>
+          <tr><td>Hostile content</td><td>Size and time limits, parsing in a sandbox, and never executing downloaded code outside the render sandbox.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"A per-node crawl loop in which the frontier separates priority from per-host politeness, a Bloom filter answers 'URL seen?', fingerprints answer 'content seen?', and budgets defuse traps. Hosts are partitioned across nodes by consistent hashing, pages are appended to WARC files in object storage, and a Kafka stream feeds everything downstream."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Consistent hashing">HLD · Consistent hashing</a><a data-deck="hld" data-slide="Object storage">HLD · Object storage</a></p>
+</section>

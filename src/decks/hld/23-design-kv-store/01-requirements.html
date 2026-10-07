@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · Key-value store" data-title="KV store: requirements">
+  <h2>Design a distributed key-value store: always writable, horizontally scalable, tunably consistent</h2>
+  <p class="dek">This is the question that tests the whole fundamentals section at once. Build <code>get</code> and <code>put</code> over hundreds of nodes, with no single point of failure, surviving node and network failures, and letting each caller trade consistency against latency. The standard answer is the Dynamo recipe, used in Cassandra, Riak and DynamoDB's ancestors: partition with consistent hashing, replicate N ways, coordinate with quorums, and repair in the background.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. One million operations a second, half reads and half writes: each write lands on 3 replicas and each quorum read touches 2, about 2.5 million replica operations a second, about 125 nodes at 20 thousand operations a second each. Ten billion keys of 1 kilobyte is 10 terabytes, times 3 replicas is 30 terabytes, plus compaction headroom about 50 terabytes of SSD, about 400 gigabytes per node. p99 under 10 milliseconds and always writable during a partition, as for a shopping cart, which means an AP design with tunable consistency: N, R and W per request.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">1 M ops/s, half writes</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">writes × 3 replicas, reads × 2</text><text x="140" y="125" font-size="9.5" opacity="0.75">(≈ 2.5 M replica ops/s)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">÷ 20 k ops/s per node</text><text x="140" y="190" font-weight="600">≈ 125 nodes</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">10 B keys × 1 KB</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">10 TB × RF 3 = 30 TB</text><text x="450" y="125" font-size="9.5" opacity="0.75">(+ compaction headroom)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="450" y="173">≈ 50 TB of SSD</text><text x="450" y="190" font-weight="600">≈ 400 GB per node</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">p99 &lt; 10 ms</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">writable during a partition</text><text x="760" y="125" font-size="9.5" opacity="0.75">(shopping-cart style: AP)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="760" y="173">tunable consistency</text><text x="760" y="190" font-weight="600">N, R, W per request</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">partitioned, replicated, leaderless, self-healing: the Dynamo recipe</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li><code>get(key)</code>, <code>put(key, value)</code>, <code>delete(key)</code>; optional TTL.</li>
+      <li>Values are opaque bytes, up to about 1 MB.</li>
+      <li>Consistency chosen per request (ONE, QUORUM, ALL).</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>No single point of failure; add or remove nodes while serving.</li>
+      <li>Highly available for writes, even during partitions.</li>
+      <li>Durable once acknowledged; self-repairing replicas.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Is strong consistency ever needed, or is eventual with a quorum enough?</li>
+      <li>Range scans? If not, hash partitioning; if so, range partitioning.</li>
+      <li>One datacenter or several? LWW acceptable, or keep siblings?</li>
+    </ul></div>
+  </div>
+</section>

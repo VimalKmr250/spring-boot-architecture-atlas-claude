@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Fundamentals" data-title="PACELC">
+  <h2>Partitions are rare; the latency-versus-consistency trade-off is paid on every request</h2>
+  <p class="dek">CAP only describes behaviour during a partition. PACELC adds the everyday case: <b>if P</b>artitioned, choose <b>A</b> or <b>C</b>; <b>E</b>lse, choose <b>L</b>atency or <b>C</b>onsistency. Waiting for replicas to confirm a write makes it consistent, and it makes the request slower. That trade-off applies on every request, not only during a partition.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Decision tree. Is the network partitioned? If yes, choose availability (PA) or consistency (PC). If no, else, choose latency (EL) or consistency (EC). Example systems: Cassandra and DynamoDB are PA/EL, Spanner and HBase are PC/EC, MongoDB is PA/EC, Yahoo PNUTS is PC/EL.">
+        <rect x="330" y="16" width="240" height="44" rx="8" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="450" y="43" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Is the network partitioned?</text>
+
+        <line x1="400" y1="60" x2="235" y2="104" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="300" y="76" text-anchor="middle" font-size="11" fill="currentColor">yes (P)</text>
+        <line x1="500" y1="60" x2="665" y2="104" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="600" y="76" text-anchor="middle" font-size="11" fill="currentColor">no (Else)</text>
+
+        <rect x="120" y="106" width="230" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="235" y="131" text-anchor="middle" font-size="12" fill="currentColor">availability or consistency?</text>
+        <rect x="550" y="106" width="230" height="40" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="665" y="131" text-anchor="middle" font-size="12" fill="currentColor">latency or consistency?</text>
+
+        <line x1="190" y1="146" x2="120" y2="186" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="280" y1="146" x2="340" y2="186" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <line x1="620" y1="146" x2="560" y2="186" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="710" y1="146" x2="780" y2="186" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+
+        <rect x="40" y="188" width="160" height="56" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="120" y="212" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">PA</text>
+        <text x="120" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">keep answering</text>
+        <rect x="260" y="188" width="160" height="56" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="340" y="212" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">PC</text>
+        <text x="340" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">refuse the minority side</text>
+        <rect x="480" y="188" width="160" height="56" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="560" y="212" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">EL</text>
+        <text x="560" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">ack after one replica</text>
+        <rect x="700" y="188" width="160" height="56" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="780" y="212" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">EC</text>
+        <text x="780" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">ack after a quorum</text>
+      </svg>
+    </div>
+    <figcaption>A system's label is one letter from each side, e.g. PA/EL. The example classifications below follow Abadi's original PACELC paper and assume default settings. Most modern stores let you change the letters per table or per request.</figcaption>
+  </figure>
+
+  <div class="grid2x2">
+    <div class="card"><h4><span class="tag s">PA/EL</span> fast and always up</h4><p><b>Cassandra, DynamoDB (default reads), Riak.</b> Writes are acknowledged by one or a few replicas and reads may be stale. Good for feeds, carts, sensor data, and anything that has to be write-heavy and low-latency.</p></div>
+    <div class="card"><h4><span class="tag a">PC/EC</span> correct, and pays for it</h4><p><b>Spanner, HBase, etcd / ZooKeeper, VoltDB.</b> Writes wait for a quorum or synchronous replicas. Good for money, metadata, coordination and schedules. Expect cross-zone round-trips on each write.</p></div>
+    <div class="card"><h4><span class="tag">PA/EC</span> consistent until it can't be</h4><p><b>MongoDB</b>, in Abadi's classification: it reads from the primary in normal operation, but during some partitions can serve writes that are later rolled back.</p></div>
+    <div class="card"><h4><span class="tag">PC/EL</span> fast normally, strict under stress</h4><p><b>Yahoo PNUTS</b>, the classic example: it serves reads from the local replica for low latency, but refuses writes to a record whose master is unreachable.</p></div>
+  </div>
+
+  <div class="note"><span class="lbl">The number to remember</span>Synchronous replication between availability zones in one region adds roughly 1–2 ms per write, which is usually worth it. Synchronous replication across continents adds 60–150 ms per write, which is why global systems are nearly always EL across regions and EC within one.</div>
+</section>

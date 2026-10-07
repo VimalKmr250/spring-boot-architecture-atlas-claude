@@ -1,0 +1,61 @@
+<section class="slide" data-sec="Design · Rate limiter" data-title="Rate limiter: trade-offs and follow-ups">
+  <h2>Limits are product decisions as well as defences</h2>
+  <p class="dek">A limiter that works technically can still fail its users. A partner who gets throttled with no warning, fair customers starved by one heavy customer, a limit change that locks out your biggest account. Wrap up with the operational and product sides, and with how the design grows.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Hierarchical limits for one request: the request is checked against the per-API-key limit, the per-organisation limit, the per-endpoint limit and a global safety limit; all must allow. Over time, a partner's usage approaches its limit: at 80 percent the partner is warned by headers and email; at 100 percent requests are throttled with 429 and Retry-After; an alert fires to account management if a top partner is throttled for more than five minutes.">
+        <text x="210" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Hierarchical limits: all must allow</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="36" width="360" height="30" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect><text x="210" y="56">global safety limit (protect the platform)</text>
+          <rect x="60" y="74" width="300" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="210" y="94">per organisation (contract tier)</text>
+          <rect x="90" y="112" width="240" height="30" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.7"></rect><text x="210" y="132">per API key (fairness inside the org)</text>
+          <rect x="120" y="150" width="180" height="30" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="210" y="170">per endpoint cost (exports ×10)</text>
+        </g>
+        <text x="210" y="208" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">one Lua call checks all four keys in one round trip</text>
+        <text x="210" y="224" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">(hash tags keep a client's keys on one shard)</text>
+
+        <line x1="440" y1="14" x2="440" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="665" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">A partner approaching its limit</text>
+        <line x1="470" y1="210" x2="880" y2="210" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="470" y1="210" x2="470" y2="40" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="470" y1="70" x2="880" y2="70" stroke="#D26A3F" stroke-dasharray="5 4"></line>
+        <text x="876" y="64" text-anchor="end" font-size="9.5" fill="#D26A3F">100%: 429 + Retry-After</text>
+        <line x1="470" y1="98" x2="880" y2="98" stroke="#3AA79B" stroke-dasharray="5 4"></line>
+        <text x="876" y="92" text-anchor="end" font-size="9.5" fill="#3AA79B">80%: warn (headers, email)</text>
+        <polyline points="470,190 540,178 600,160 660,130 700,104 740,84 770,72 800,70 840,70 880,70" fill="none" stroke="currentColor" stroke-width="2" stroke-opacity="0.85"></polyline>
+        <circle cx="700" cy="98" r="4" fill="#3AA79B"></circle>
+        <rect x="770" y="72" width="110" height="138" fill="#D26A3F" fill-opacity="0.06"></rect>
+        <text x="825" y="150" text-anchor="middle" font-size="9.5" fill="#D26A3F">throttled</text>
+        <text x="825" y="164" text-anchor="middle" font-size="9.5" fill="#D26A3F">&gt; 5 min → alert</text>
+        <text x="825" y="178" text-anchor="middle" font-size="9.5" fill="#D26A3F">account team</text>
+        <text x="880" y="228" text-anchor="end" font-size="9.5" fill="currentColor" opacity="0.7">time →</text>
+        <text x="476" y="52" font-size="9.5" fill="currentColor" opacity="0.7">usage</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr><td>Redis hot shard (one huge client)</td><td>Shard that client's key with sub-keys, or give it a lease-based local budget</td></tr>
+          <tr><td>Limit change locks out a big customer</td><td>Shadow mode first, gradual rollout, per-customer overrides</td></tr>
+          <tr><td>Clients hammer after 429</td><td><code>Retry-After</code>, SDKs with backoff + jitter, stricter limits on repeated violators</td></tr>
+          <tr><td>Limiter adds latency</td><td>Keep Redis local to the region, pipeline multi-rule checks, lease tokens</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Follow-ups to expect</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>"Limit concurrent requests, not rate?" A semaphore per key: increment on start, decrement on finish, with a TTL for crashed requests.</li>
+        <li>"Daily quotas for billing?" A separate durable counter, since Redis alone isn't billing-grade. Reconcile from the decision stream.</li>
+        <li>"Distributed DDoS?" That's the edge/WAF layer: anycast, IP reputation, challenges. Not this service.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Rate-limiting algorithms">HLD · Rate-limiting algorithms</a><a data-deck="deck" data-slide="Gateway configuration">Deck · Gateway configuration</a></p>
+</section>

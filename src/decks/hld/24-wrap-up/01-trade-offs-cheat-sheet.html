@@ -1,0 +1,27 @@
+<section class="slide" data-sec="Wrap-up" data-title="Trade-offs cheat sheet">
+  <h2>Every design decision is one of about a dozen trade-offs, so name it out loud</h2>
+  <p class="dek">Interviewers listen for trade-off language more than for any particular technology. When you make a choice, say which side of which trade-off you picked and why the requirements favour it. The right-hand column points to where each one was decisive in the worked designs.</p>
+
+  <div class="tblwrap">
+    <table class="tbl" style="min-width:760px">
+      <thead><tr><th>Trade-off</th><th>Lean left when…</th><th>Lean right when…</th><th>Decisive in</th></tr></thead>
+      <tbody>
+        <tr><td><b>Consistency ↔ availability</b></td><td>Money, stock, uniqueness: a wrong answer costs more than no answer.</td><td>Feeds, carts, presence: a stale answer beats an error.</td><td>E-commerce, KV store</td></tr>
+        <tr><td><b>Latency ↔ consistency</b> (PACELC)</td><td>Readers must see their own and others' latest writes.</td><td>p99 matters more than freshness; replicas far apart.</td><td>KV store, typeahead</td></tr>
+        <tr><td><b>Latency ↔ throughput</b></td><td>Interactive requests; small, immediate work.</td><td>Batch and pipelines: batch, buffer and compress.</td><td>Crawler, video</td></tr>
+        <tr><td><b>Sync ↔ async</b></td><td>The caller needs the result to continue.</td><td>Slow, retryable or fan-out work: queue it and return 202.</td><td>Notifications, video</td></tr>
+        <tr><td><b>Push ↔ pull</b> (fan-out on write vs read)</td><td>Few followers, many reads: precompute on write.</td><td>Celebrities and huge fan-out: merge on read.</td><td>News feed, chat</td></tr>
+        <tr><td><b>Normalise ↔ denormalise</b></td><td>Write-heavy with integrity rules; ad-hoc queries.</td><td>Read-heavy, known access patterns; one read per page.</td><td>News feed, e-commerce</td></tr>
+        <tr><td><b>SQL ↔ NoSQL</b></td><td>Relations, transactions, evolving queries.</td><td>Huge scale, simple key access, flexible schema.</td><td>URL shortener, KV store</td></tr>
+        <tr><td><b>Freshness ↔ cost</b> (caching, TTLs)</td><td>Data changes often and staleness is visible.</td><td>Read-mostly data; cache aggressively at the edge.</td><td>Typeahead, e-commerce</td></tr>
+        <tr><td><b>Exactly-once ↔ simplicity</b></td><td>Rarely worth it end to end across systems.</td><td>At-least-once plus idempotency keys: the default.</td><td>Notifications, checkout</td></tr>
+        <tr><td><b>Precompute ↔ compute on demand</b></td><td>Hot, bounded, predictable queries (top-k, feeds).</td><td>Long tail, rarely asked, or too many combinations.</td><td>Typeahead, video</td></tr>
+        <tr><td><b>Accuracy ↔ memory</b> (probabilistic)</td><td>Exact answers are required (billing).</td><td>Approximate is fine: Bloom filters, HyperLogLog, count-min.</td><td>Crawler, typeahead</td></tr>
+        <tr><td><b>Replication ↔ erasure coding</b></td><td>Hot data, fast repair, simple reads.</td><td>Cold bulk data where raw storage dominates cost.</td><td>File sync, video</td></tr>
+        <tr><td><b>Monolith ↔ microservices</b></td><td>Small team, unclear boundaries, early product.</td><td>Independent scaling, many teams, stable domains.</td><td>Architecture patterns</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The sentence to practise</span>"I'm choosing <em>X</em> over <em>Y</em> because the requirement is <em>Z</em>; the cost is <em>W</em>, and if <em>Z</em> changes I'd revisit it." Say it once per major decision and the interviewer never has to ask "why?".</div>
+</section>

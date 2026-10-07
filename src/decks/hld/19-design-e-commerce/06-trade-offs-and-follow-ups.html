@@ -1,0 +1,63 @@
+<section class="slide" data-sec="Design · E-commerce" data-title="E-commerce: trade-offs and follow-ups">
+  <h2>Spend consistency only where money and stock change, and scale for the sale before it starts</h2>
+  <p class="dek">The big trade-off is a spectrum, not a switch. Along the shopper's journey, staleness is fine at first (search, product pages) and unacceptable at the end (reserve, pay). The operational trade-off is timing: sales are planned, so capacity should be too. An autoscaler that reacts at 12:00:30 is too late.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Left: consistency along the journey. Search tolerates minutes of staleness via an index fed by CDC; the product page tolerates seconds via cache and CDN; the cart tolerates seconds in a key-value store merged at login; reserving stock is strong via a guarded update; paying is strong and idempotent via the provider key and reconciliation. From cheap, cached and available on the left to exact and transactional on the right. A stale in-stock badge is acceptable only because reserve re-checks it. Right: sale-day capacity. Traffic spikes at noon. Capacity pre-scaled at 11:00 stays above the spike. A reactive autoscaler only starts adding capacity after the spike begins, and errors happen while it catches up.">
+        <text x="264" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Consistency along the shopper's journey</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="36" width="88" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="64" y="58">search</text>
+          <rect x="120" y="36" width="88" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="164" y="58">product page</text>
+          <rect x="220" y="36" width="88" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="264" y="58">cart</text>
+          <rect x="320" y="36" width="88" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="364" y="58">reserve</text>
+          <rect x="420" y="36" width="88" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="464" y="58">pay</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2"><line x1="108" y1="54" x2="118" y2="54" marker-end="url(#arw)"></line><line x1="208" y1="54" x2="218" y2="54" marker-end="url(#arw)"></line><line x1="308" y1="54" x2="318" y2="54" marker-end="url(#arw)"></line><line x1="408" y1="54" x2="418" y2="54" marker-end="url(#arw)"></line></g>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="86" width="88" height="42" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="64" y="103" font-weight="600">minutes stale</text><text x="64" y="118">index via CDC</text>
+          <rect x="120" y="86" width="88" height="42" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="164" y="103" font-weight="600">seconds stale</text><text x="164" y="118">cache + CDN</text>
+          <rect x="220" y="86" width="88" height="42" rx="4" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="264" y="103" font-weight="600">seconds stale</text><text x="264" y="118">KV · merge at login</text>
+          <rect x="320" y="86" width="88" height="42" rx="4" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.3"></rect><text x="364" y="103" font-weight="600">strong</text><text x="364" y="118">guarded UPDATE</text>
+          <rect x="420" y="86" width="88" height="42" rx="4" fill="#D26A3F" fill-opacity="0.24" stroke="#D26A3F" stroke-width="1.5"></rect><text x="464" y="103" font-weight="600">strong + idem.</text><text x="464" y="118">PSP key + recon</text>
+        </g>
+        <line x1="24" y1="152" x2="504" y2="152" stroke="#8A94A3" stroke-width="1.4" marker-start="url(#arw)" marker-end="url(#arw)"></line>
+        <g font-size="9" fill="currentColor" opacity="0.8"><text x="20" y="170">cheap · cached · available</text><text x="508" y="170" text-anchor="end">exact · transactional</text></g>
+        <text x="264" y="206" text-anchor="middle" font-size="9.5" fill="#D26A3F">a stale "in stock" badge is fine only because reserve re-checks it</text>
+        <text x="264" y="226" text-anchor="middle" font-size="9.5" fill="currentColor">rule: never let a cached value decide a write</text>
+
+        <line x1="530" y1="10" x2="530" y2="262" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="720" y="18" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Sale day is planned, so scale ahead</text>
+        <line x1="560" y1="200" x2="880" y2="200" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="560" y1="200" x2="560" y2="34" stroke="currentColor" stroke-opacity="0.45"></line>
+        <polygon points="560,196 660,192 740,186 758,64 778,72 820,122 860,160 880,168 880,200 560,200" fill="#8A94A3" fill-opacity="0.25"></polygon>
+        <polyline points="560,168 660,168 660,50 880,50" fill="none" stroke="#3AA79B" stroke-width="2"></polyline>
+        <polyline points="560,168 766,168 776,148 790,110 800,78 880,78" fill="none" stroke="#D26A3F" stroke-width="2" stroke-dasharray="5 4"></polyline>
+        <text x="670" y="44" font-size="9" fill="#3AA79B">pre-scaled at 11:00</text>
+        <text x="668" y="120" font-size="9" fill="#D26A3F">reactive autoscaler</text>
+        <text x="668" y="132" font-size="9" fill="#D26A3F">lags: errors at noon</text>
+        <text x="690" y="184" font-size="9" fill="currentColor" opacity="0.8">sale traffic</text>
+        <g font-size="8.5" fill="currentColor" opacity="0.7" text-anchor="middle"><text x="560" y="214">10:00</text><text x="660" y="214">11:00</text><text x="760" y="214">12:00</text><text x="860" y="214">13:00</text></g>
+        <text x="720" y="240" text-anchor="middle" font-size="9.5" fill="currentColor">pre-warm caches, scale pools and DB connections ahead;</text>
+        <text x="720" y="256" text-anchor="middle" font-size="9.5" fill="currentColor">load-test at 2× forecast the week before; keep a kill switch</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Several warehouses</td><td>Allocate at reserve time: the nearest warehouse with stock, or split the shipment; availability is the sum across nodes.</td></tr>
+          <tr><td>Price changed after add-to-cart</td><td>Re-price at checkout, show the difference, and snapshot the agreed price on the order line.</td></tr>
+          <tr><td>Fraud</td><td>A risk score before authorisation; step-up (3-D Secure) or manual review for risky orders.</td></tr>
+          <tr><td>Multi-region</td><td>Catalog and search replicated everywhere; each SKU's stock has one home region that owns its writes.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Summarise</span>"Browsing is a cached fan-out, allowed to be seconds stale. Checkout is an orchestrated saga: reserve with a guarded update and a TTL, authorise with an idempotency key, then confirm, and publish through an outbox. Flash sales add a waiting room and an atomic gate so that only winners reach the database."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="2PC vs saga">HLD · 2PC vs saga</a><a data-deck="hld" data-slide="Dual write and outbox">HLD · Dual write and outbox</a><a data-deck="deck" data-slide="Concurrency and idempotency">Deck · Concurrency and idempotency</a></p>
+</section>

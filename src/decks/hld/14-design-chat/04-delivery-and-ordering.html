@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Design · Chat" data-title="Chat: delivery and ordering">
+  <h2>Deep dive 1: one message from Alice's phone to Bob's, with receipts</h2>
+  <p class="dek">Follow a single message through the system. The two properties to protect are <b>durability before acknowledgement</b> (the tick means it's safe) and <b>a single order per conversation</b> (every device shows the same sequence). Both come from one decision: the server assigns each message a per-conversation sequence number as it persists it.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Alice sends message c-9f1 over her socket to gateway 17, which forwards it to the chat service. The chat service dedupes on client message id, takes the next sequence number, 1043, for the conversation and writes the message; then it returns sent with seq 1043, shown to Alice as one tick. It publishes the message to Kafka; a delivery worker finds Bob on gateway 203 and forwards it; Bob's app displays it and acknowledges 1043; the delivered receipt flows back to Alice as two ticks. When Bob opens the chat, a read receipt up to 1043 follows the same path.">
+        <g font-size="10.5" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="12" width="80" height="28" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="50" y="31">Alice</text>
+          <rect x="130" y="12" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="175" y="31">gw 17</text>
+          <rect x="255" y="12" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="300" y="31">chat svc</text>
+          <rect x="380" y="12" width="90" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="425" y="31">store</text>
+          <rect x="505" y="12" width="90" height="28" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="550" y="31">worker</text>
+          <rect x="630" y="12" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect><text x="675" y="31">gw 203</text>
+          <rect x="770" y="12" width="80" height="28" rx="12" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="810" y="31">Bob</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 4">
+          <line x1="50" y1="40" x2="50" y2="312"></line><line x1="175" y1="40" x2="175" y2="312"></line><line x1="300" y1="40" x2="300" y2="312"></line>
+          <line x1="425" y1="40" x2="425" y2="312"></line><line x1="550" y1="40" x2="550" y2="312"></line><line x1="675" y1="40" x2="675" y2="312"></line><line x1="810" y1="40" x2="810" y2="312"></line>
+        </g>
+        <line x1="50" y1="62" x2="171" y2="62" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="112" y="56" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">① send c-9f1</text>
+        <line x1="175" y1="78" x2="296" y2="78" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="300" y1="96" x2="421" y2="96" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="362" y="90" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">② seq=1043, write</text>
+        <line x1="421" y1="112" x2="304" y2="112" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <line x1="296" y1="128" x2="179" y2="128" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <line x1="171" y1="142" x2="54" y2="142" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+        <text x="112" y="156" text-anchor="middle" font-size="9.5" fill="#D26A3F">③ sent ✓ (1043)</text>
+        <line x1="300" y1="172" x2="546" y2="172" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="425" y="166" text-anchor="middle" font-size="9" fill="#3AA79B">④ Kafka (key g-77)</text>
+        <line x1="550" y1="192" x2="671" y2="192" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <text x="612" y="186" text-anchor="middle" font-size="9" fill="#3AA79B">⑤ Bob → gw 203</text>
+        <line x1="675" y1="208" x2="806" y2="208" stroke="#3AA79B" stroke-width="1.5" marker-end="url(#arwB)"></line>
+        <text x="742" y="202" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">⑥ msg 1043</text>
+        <line x1="810" y1="232" x2="679" y2="232" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="742" y="226" text-anchor="middle" font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">⑦ ack 1043</text>
+        <path d="M675 248 H179" fill="none" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        <text x="425" y="242" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">receipt event (same pipeline, reversed)</text>
+        <line x1="171" y1="264" x2="54" y2="264" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <text x="112" y="280" text-anchor="middle" font-size="9.5" fill="currentColor">⑧ delivered ✓✓</text>
+        <text x="620" y="290" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">Bob offline at ⑤? → push notification, and on reconnect</text>
+        <text x="620" y="303" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">his app asks "g-77 since seq 1038", receiving 1039 … 1043</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Assigning the sequence</h4><p>There must be exactly one writer of a conversation's counter. Options: a per-conversation Redis <code>INCR</code>, persisted with the message; a conditional update on the conversation row; or routing every send for a conversation through one Kafka partition, whose single consumer numbers the messages. Never use client clocks.</p></div>
+    <div class="card"><h4>Acks at every hop</h4><p>Client → server: "sent" only after the write is durable, and the client retries with the same <code>client_msg_id</code> until it arrives. Server → client: the device acknowledges the highest seq it has, and anything unacknowledged is redelivered or picked up by sync. So delivery is at-least-once, and display is deduped by seq.</p></div>
+    <div class="card"><h4>Multi-device</h4><p>Each device is a separate connection with its own "acknowledged up to" position. Alice's own messages are also delivered to her other devices. Read state is per user: reading on the phone clears the badge on the laptop via a receipt to self.</p></div>
+  </div>
+</section>

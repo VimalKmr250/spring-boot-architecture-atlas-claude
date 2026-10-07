@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Networking & edge" data-title="Reverse proxy vs API gateway">
+  <h2>A gateway is a reverse proxy that knows about your API</h2>
+  <p class="dek">A reverse proxy sits in front of servers and hides them: it terminates TLS, compresses, caches and buffers. An API gateway adds API-aware policy: who is calling, how often they may call, and which of many services should answer. A service mesh applies the same ideas to traffic <em>between</em> services.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="North-south traffic flows from the client through a reverse proxy, which handles TLS, compression, caching and buffering, then an API gateway, which handles authentication, rate limits, routing, transformation and aggregation, to services. East-west traffic between services passes through sidecar proxies of a service mesh, which add mutual TLS, retries, timeouts and telemetry.">
+        <text x="330" y="22" text-anchor="middle" font-size="11" fill="#D26A3F">north-south: users → system</text>
+        <rect x="10" y="126" width="80" height="44" rx="14" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="50" y="152" text-anchor="middle" font-size="11.5" fill="currentColor">Client</text>
+
+        <rect x="120" y="40" width="180" height="220" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="210" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Reverse proxy</text>
+        <g font-size="10.5" fill="currentColor" opacity="0.85">
+          <text x="134" y="92">• TLS termination</text>
+          <text x="134" y="112">• compression (gzip, br)</text>
+          <text x="134" y="132">• cache static responses</text>
+          <text x="134" y="152">• buffer slow clients</text>
+          <text x="134" y="172">• hide server topology</text>
+          <text x="134" y="192">• load balancing</text>
+        </g>
+        <text x="210" y="236" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">Nginx · HAProxy · Envoy</text>
+
+        <rect x="330" y="40" width="200" height="220" rx="8" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="430" y="64" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">API gateway</text>
+        <text x="430" y="80" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.65">everything on the left, plus:</text>
+        <g font-size="10.5" fill="currentColor" opacity="0.85">
+          <text x="344" y="104">• authenticate (JWT, API key)</text>
+          <text x="344" y="124">• rate limits and quotas</text>
+          <text x="344" y="144">• route to N services by path</text>
+          <text x="344" y="164">• version and transform</text>
+          <text x="344" y="184">• aggregate calls (BFF)</text>
+          <text x="344" y="204">• per-consumer metrics</text>
+        </g>
+        <text x="430" y="236" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.6">Kong · Apigee · AWS API GW · SCG</text>
+
+        <line x1="90" y1="148" x2="117" y2="148" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+        <line x1="300" y1="148" x2="327" y2="148" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+
+        <rect x="560" y="40" width="330" height="220" rx="8" fill="none" stroke="#3AA79B" stroke-opacity="0.7" stroke-dasharray="6 4"></rect>
+        <text x="725" y="62" text-anchor="middle" font-size="11" fill="#3AA79B">east-west: service mesh</text>
+        <g>
+          <rect x="590" y="84" width="96" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="672" y="76" width="22" height="18" rx="3" fill="#3AA79B" fill-opacity="0.35" stroke="#3AA79B"></rect>
+          <text x="630" y="111" text-anchor="middle" font-size="11" fill="currentColor">orders</text>
+          <rect x="770" y="84" width="96" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="852" y="76" width="22" height="18" rx="3" fill="#3AA79B" fill-opacity="0.35" stroke="#3AA79B"></rect>
+          <text x="810" y="111" text-anchor="middle" font-size="11" fill="currentColor">payments</text>
+          <rect x="590" y="170" width="96" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="672" y="162" width="22" height="18" rx="3" fill="#3AA79B" fill-opacity="0.35" stroke="#3AA79B"></rect>
+          <text x="630" y="197" text-anchor="middle" font-size="11" fill="currentColor">catalog</text>
+          <rect x="770" y="170" width="96" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="852" y="162" width="22" height="18" rx="3" fill="#3AA79B" fill-opacity="0.35" stroke="#3AA79B"></rect>
+          <text x="810" y="197" text-anchor="middle" font-size="11" fill="currentColor">inventory</text>
+        </g>
+        <line x1="686" y1="106" x2="767" y2="106" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="640" y1="128" x2="640" y2="167" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <line x1="686" y1="120" x2="767" y2="182" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="725" y="238" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">sidecars add mTLS, retries, timeouts,</text>
+        <text x="725" y="252" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">traffic splits and telemetry: Istio · Linkerd</text>
+        <line x1="530" y1="148" x2="587" y2="112" stroke="#D26A3F" stroke-width="1.5" marker-end="url(#arwA)"></line>
+      </svg>
+    </div>
+    <figcaption>These are roles, not products. One Envoy can be a reverse proxy, a gateway and a mesh sidecar at once, and many teams run a cloud load balancer plus a gateway and no separate proxy. In an interview, draw the gateway as one box, list what it does, and move on.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Put in the gateway</h4><p>Cross-cutting, request-level policy that should be identical for every service: token validation, coarse authorisation (scopes), rate limits, request size limits, CORS, request IDs, access logs.</p></div>
+    <div class="card"><h4>Keep out of the gateway</h4><p>Business logic, orchestration across services, and anything that needs a database transaction. A gateway full of logic becomes a distributed monolith that every team queues to change.</p></div>
+    <div class="card"><h4>BFF: one gateway per client</h4><p>A <b>backend for frontend</b> is a thin gateway per client type (web, iOS, partner). It aggregates and shapes responses for that client, so the mobile app gets one call instead of six, and web and mobile evolve separately.</p></div>
+  </div>
+
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="deck" data-slide="Gateway, BFF or mesh">Deck · Gateway, BFF or mesh</a><a data-deck="deck" data-slide="Gateway configuration">Deck · Gateway configuration</a></p>
+</section>

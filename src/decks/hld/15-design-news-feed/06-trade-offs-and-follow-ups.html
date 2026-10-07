@@ -1,0 +1,59 @@
+<section class="slide" data-sec="Design · News feed" data-title="News feed: trade-offs and follow-ups">
+  <h2>Viral posts, degraded dependencies, and deletes that must stick</h2>
+  <p class="dek">A feed has many dependencies: graph, cache, ranker, counters, media. The page should get worse gracefully rather than fail when any one of them struggles. The other classic stress is a single viral post that every feed hydrates at once.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Left: a viral post. Millions of feed loads hydrate the same post id, concentrating on one post-cache shard. Mitigations: a one-to-five-second in-process cache in the feed service, the hot key replicated across shards, media served from the CDN, and like counts served from sharded counters displayed approximately. Right: a degradation ladder. If the ranking service fails, serve chronological order. If fan-out is lagging, pull recent posts from followees for that user. If the feed cache is lost, rebuild feeds on read under a rate limit. If counters are slow, show the post without counts.">
+        <text x="215" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One viral post, 50 M views an hour</text>
+        <g stroke="#D26A3F" stroke-width="1.1">
+          <line x1="20" y1="50" x2="160" y2="110" marker-end="url(#arwA)"></line><line x1="20" y1="80" x2="160" y2="116" marker-end="url(#arwA)"></line>
+          <line x1="20" y1="110" x2="160" y2="122" marker-end="url(#arwA)"></line><line x1="20" y1="140" x2="160" y2="128" marker-end="url(#arwA)"></line><line x1="20" y1="170" x2="160" y2="134" marker-end="url(#arwA)"></line>
+        </g>
+        <text x="30" y="200" font-size="9.5" fill="currentColor" opacity="0.8">every feed hydrates post 9…901</text>
+        <rect x="164" y="96" width="100" height="50" rx="6" fill="#D26A3F" fill-opacity="0.25" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="214" y="118" text-anchor="middle" font-size="10" fill="currentColor">post-cache</text><text x="214" y="132" text-anchor="middle" font-size="10" fill="currentColor">shard 7 (hot)</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="290" y="40" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="59">in-process cache 1–5 s</text>
+          <rect x="290" y="80" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="99">replicate hot key × N</text>
+          <rect x="290" y="120" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="139">media via CDN only</text>
+          <rect x="290" y="160" width="140" height="30" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="298" y="179">sharded like counter</text>
+        </g>
+        <line x1="264" y1="121" x2="287" y2="121" stroke="#3AA79B" stroke-width="1.3" marker-end="url(#arwB)"></line>
+        <text x="215" y="234" text-anchor="middle" font-size="9.5" fill="currentColor">counts display as "1.2M" and update every few seconds:</text>
+        <text x="215" y="248" text-anchor="middle" font-size="9.5" fill="currentColor">exactness is not a user requirement here</text>
+
+        <line x1="450" y1="12" x2="450" y2="284" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Degradation ladder: always return a feed</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="470" y="36" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="54" font-weight="600">ranker down / slow</text><text x="482" y="70" opacity="0.8">→ timeout at 60 ms, serve light-ranked or chronological order</text>
+          <rect x="470" y="86" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="104" font-weight="600">fan-out lagging (queue backlog)</text><text x="482" y="120" opacity="0.8">→ top up with a small pull from the user's most-followed accounts</text>
+          <rect x="470" y="136" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="154" font-weight="600">feed cache shard lost</text><text x="482" y="170" opacity="0.8">→ rebuild on read (pull) behind a concurrency limit; re-push later</text>
+          <rect x="470" y="186" width="410" height="42" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="482" y="204" font-weight="600">counters or media slow</text><text x="482" y="220" opacity="0.8">→ render posts without counts; lazy-load images</text>
+        </g>
+        <text x="675" y="256" text-anchor="middle" font-size="9.5" fill="#D26A3F">each rung has a timeout and a metric, so degradation is visible</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Follow-up</th><th>Answer sketch</th></tr></thead>
+        <tbody>
+          <tr><td>Delete or edit a post</td><td>Mark it deleted in the posts store. Filter tombstones at hydrate time (the feed holds only ids), and lazily remove it from caches.</td></tr>
+          <tr><td>Unfollow</td><td>Stop future fan-out, and filter that author at read until the cached entries age out.</td></tr>
+          <tr><td>Author sees own post now</td><td>Merge the author's own recent posts at read time (read-your-writes), without waiting for fan-out.</td></tr>
+          <tr><td>New user, empty feed</td><td>Candidates come from recommendations and popular posts until the follow graph fills in.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">The trade-off sentence</span>"We trade write amplification and some staleness for fast, predictable reads. Push for the 99.9% of authors with modest follower counts, pull for the celebrity tail, skip inactive users, and treat the feed as ids hydrated at read time, so edits, deletes and counts stay correct without rewriting millions of feeds."</div>
+  </div>
+  <p class="xrefs"><span class="lbl">Elsewhere in the atlas</span><a data-deck="hld" data-slide="Hot keys and resharding">HLD · Hot keys and resharding</a><a data-deck="hld" data-slide="Cache failure modes">HLD · Cache failure modes</a></p>
+</section>

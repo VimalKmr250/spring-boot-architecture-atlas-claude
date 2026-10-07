@@ -1,0 +1,44 @@
+<section class="slide" data-sec="Fundamentals" data-title="Performance vs scalability">
+  <h2>Slow for one user is a performance problem; slow for many is a scalability problem</h2>
+  <p class="dek">A service is <b>scalable</b> if adding resources adds capacity in roughly the same proportion. The two problems need different fixes, so diagnose which one you have before reaching for more servers. More servers won't fix a slow query, and faster code won't fix a single shared lock.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Chart of p99 latency against load. A performance problem is slow even at low load. A scalability problem is fast at low load but its latency shoots up at a knee around a thousand requests per second. Scaling the same service out to four nodes moves the knee to the right.">
+        <line x1="70" y1="255" x2="870" y2="255" stroke="currentColor" stroke-opacity="0.5"></line>
+        <line x1="70" y1="255" x2="70" y2="25" stroke="currentColor" stroke-opacity="0.5"></line>
+        <text x="870" y="280" text-anchor="end" font-size="11" fill="currentColor" opacity="0.7">load (requests per second) →</text>
+        <text x="60" y="30" text-anchor="end" font-size="11" fill="currentColor" opacity="0.7">p99</text>
+        <text x="60" y="44" text-anchor="end" font-size="11" fill="currentColor" opacity="0.7">latency</text>
+
+        <line x1="70" y1="165" x2="870" y2="165" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 4"></line>
+        <text x="866" y="158" text-anchor="end" font-size="10.5" fill="currentColor" opacity="0.7">latency SLO</text>
+
+        <path d="M70 120 H470 Q560 118 590 32" fill="none" stroke="#8A94A3" stroke-width="2.2"></path>
+        <text x="380" y="142" font-size="11" fill="currentColor">A · performance problem: slow even for one user</text>
+
+        <path d="M70 222 H250 Q330 218 355 32" fill="none" stroke="#D26A3F" stroke-width="2.2"></path>
+        <text x="150" y="240" font-size="11" fill="#D26A3F">B · one node: fast alone, knee at ~1k rps</text>
+
+        <path d="M70 222 H690 Q775 218 800 32" fill="none" stroke="#3AA79B" stroke-width="2.2" stroke-dasharray="7 4"></path>
+        <text x="520" y="210" font-size="11" fill="#3AA79B">C · same code on 4 nodes: knee at ~4k rps</text>
+
+        <line x1="375" y1="70" x2="690" y2="70" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line>
+        <text x="532" y="62" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">scale out: the knee moves right</text>
+
+        <circle cx="318" cy="165" r="4" fill="#D26A3F"></circle>
+        <circle cx="760" cy="165" r="4" fill="#3AA79B"></circle>
+        <text x="304" y="158" text-anchor="end" font-size="10" fill="currentColor" opacity="0.7">capacity at SLO</text>
+      </svg>
+    </div>
+    <figcaption>Capacity is not the peak throughput. It is the load at which p99 still meets the SLO. Curve A needs profiling: the slow query, the N+1, the missing index. Curve B needs the bottleneck removed so that curve C is possible. If C doesn't move right when you add nodes, something shared (the database, a lock, a single partition) is the real limit.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Diagnose performance</h4><p>Measure one request: trace it, profile it, look at <code>EXPLAIN</code>. The fixes are an index, a batched call, less serialisation, a cache in front of an expensive computation, or a better algorithm.</p></div>
+    <div class="card"><h4>Diagnose scalability</h4><p>Load-test at rising load and watch where latency turns upward. Find the resource that saturates first: CPU, connection pool, a DB row lock, one hot partition, or a single-threaded consumer.</p></div>
+    <div class="card"><h4>Why scaling is never perfectly linear</h4><p>The Universal Scalability Law names the two taxes. <b>Contention</b> is waiting for shared resources. <b>Coherency</b> is the work of keeping nodes in agreement. The second grows with the square of the node count, which is why "just add nodes" eventually stops helping.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Interviewers probe</span>"What happens at 10× load?" Name the first thing that saturates and what you'd do about it: "The primary database's write throughput. I'd first check whether writes can be batched or queued, then shard by user id." A vague "add more servers" is not an answer.</div>
+</section>

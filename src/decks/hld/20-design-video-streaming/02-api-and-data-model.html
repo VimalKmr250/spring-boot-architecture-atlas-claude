@@ -1,0 +1,56 @@
+<section class="slide" data-sec="Design · Video streaming" data-title="Video streaming: API and data model">
+  <h2>Upload in resumable chunks; play back as plain files that any CDN can cache</h2>
+  <p class="dek">The upload API hands out a signed, resumable upload URL, so large files go straight to object storage in chunks and a failed chunk is retried on its own. Playback isn't an API call per frame. The video becomes a <b>manifest</b> listing renditions, and each rendition is a list of short <b>segments</b>. Both are ordinary HTTP files, which is exactly what a CDN is good at.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">API</div>
+<pre><code class="language-http">POST /v1/uploads   { "filename": "trip.mov", "size": 2147483648 }
+→ 201 { "videoId": "v_8Kq", "chunkSize": 8388608,
+        "uploadUrl": "https://upload…/v_8Kq?sig=…" }
+
+PUT  {uploadUrl}   Content-Range: bytes 0-8388607/2147483648
+                   # resumable: retry only the failed chunk
+POST /v1/videos/v_8Kq/complete   → 202 { "status": "PROCESSING" }
+
+GET  /v1/videos/v_8Kq
+→ { "status": "READY", "duration": 312,
+    "manifest": "https://cdn…/v_8Kq/master.m3u8?token=…" }</code></pre>
+    </div>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 420 340" role="img" aria-label="HLS structure. A master playlist lists four renditions: 240p at 0.4 megabits a second, 480p at 1.2, 720p at 3 and 1080p at 6. Each rendition has its own playlist of 4 second segments in fMP4 or CMAF: segment 1, 2, 3 and so on. The player chooses a rendition for each segment. Metadata tables: videos has video id, owner, title, status and duration; renditions has video id, profile, codec, bitrate and the storage path.">
+          <rect x="120" y="12" width="180" height="40" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="210" y="30" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">master.m3u8</text>
+          <text x="210" y="44" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">lists renditions + bitrates</text>
+          <g font-size="9.5" fill="currentColor" text-anchor="middle">
+            <rect x="10" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="57" y="106" font-weight="600">240p</text><text x="57" y="121" font-size="8.5">0.4 Mbps</text>
+            <rect x="112" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="159" y="106" font-weight="600">480p</text><text x="159" y="121" font-size="8.5">1.2 Mbps</text>
+            <rect x="214" y="88" width="94" height="44" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="261" y="106" font-weight="600">720p</text><text x="261" y="121" font-size="8.5">3 Mbps</text>
+            <rect x="316" y="88" width="94" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="363" y="106" font-weight="600">1080p</text><text x="363" y="121" font-size="8.5">6 Mbps</text>
+          </g>
+          <g stroke="#8A94A3" stroke-width="1.2"><line x1="180" y1="52" x2="60" y2="85" marker-end="url(#arw)"></line><line x1="200" y1="52" x2="160" y2="85" marker-end="url(#arw)"></line><line x1="220" y1="52" x2="258" y2="85" marker-end="url(#arw)"></line><line x1="240" y1="52" x2="360" y2="85" marker-end="url(#arw)"></line></g>
+          <g font-size="9" fill="currentColor" text-anchor="middle" font-family="IBM Plex Mono, monospace">
+            <rect x="120" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="151" y="184">seg 1</text>
+            <rect x="190" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="221" y="184">seg 2</text>
+            <rect x="260" y="166" width="62" height="28" rx="3" fill="#3AA79B" fill-opacity="0.14" stroke="#3AA79B"></rect><text x="291" y="184">seg 3</text>
+            <rect x="330" y="166" width="62" height="28" rx="3" fill="none" stroke="#3AA79B" stroke-dasharray="3 3"></rect><text x="361" y="184">…</text>
+          </g>
+          <g stroke="#D26A3F" stroke-width="1.2"><line x1="250" y1="132" x2="156" y2="163" marker-end="url(#arwA)"></line><line x1="258" y1="132" x2="224" y2="163" marker-end="url(#arwA)"></line><line x1="266" y1="132" x2="288" y2="163" marker-end="url(#arwA)"></line><line x1="274" y1="132" x2="356" y2="163" marker-end="url(#arwA)"></line></g>
+          <text x="10" y="178" font-size="9" fill="currentColor" opacity="0.8">720p playlist:</text>
+          <text x="256" y="212" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">4 s each · fMP4 / CMAF · same boundaries in every rendition</text>
+
+          <rect x="10" y="232" width="400" height="66" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="20" y="252" font-weight="600">videos</text><text x="100" y="252">video_id · owner · title · status · duration</text><text x="20" y="270" font-weight="600">renditions</text><text x="100" y="270">video_id · profile · codec · bitrate · path</text><text x="20" y="288" font-weight="600">views</text><text x="100" y="288" opacity="0.8">counted async from player events</text></g>
+          <text x="210" y="326" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">aligned segments let the player switch quality at any boundary</text>
+        </svg>
+      </div>
+    </figure>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Upload straight to storage</h4><p>API servers never proxy gigabytes. They issue a signed resumable URL (S3 multipart, GCS resumable) and the client uploads directly in 8 MB chunks. The <code>complete</code> call, or the storage event, triggers processing. Keep the original forever, in a colder storage tier.</p></div>
+    <div class="card"><h4>HLS and DASH, one set of segments</h4><p>HLS (Apple) and DASH (everyone else) differ mainly in the manifest. With CMAF-packaged fMP4 segments, both manifests point at the <em>same</em> segment files, halving storage and CDN cache footprint compared with packaging each format separately.</p></div>
+    <div class="card"><h4>Metadata is small</h4><p>Videos and renditions are ordinary rows: tens of millions of videos, a few KB each, in a sharded SQL or wide-column store, heavily cached. View counts are events aggregated asynchronously, never a row update per view.</p></div>
+  </div>
+</section>

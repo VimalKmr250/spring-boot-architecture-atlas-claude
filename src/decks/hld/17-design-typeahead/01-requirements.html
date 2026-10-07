@@ -1,0 +1,46 @@
+<section class="slide" data-sec="Design · Typeahead" data-title="Typeahead: requirements">
+  <h2>Design search autocomplete: a million prefix lookups a second, each answered in milliseconds</h2>
+  <p class="dek">As the user types "how to b", show the eight most popular completions. It has to feel instant, so suggestions must arrive before the next keystroke, and it's called on nearly every keystroke. That makes this a read-latency problem, solved by precomputing answers offline and serving them from memory.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Estimate. 500 million daily users times 10 searches times about 6 suggestion requests per search, after debouncing, is 30 billion requests a day, about 350 thousand a second, one million at peak. Latency: the whole round trip must fit in about 100 milliseconds, so the server has about 10 to 20 milliseconds. Data: about 100 million distinct queries worth keeping; a trie with the top 8 completions cached at each node fits in tens of gigabytes, so shard it across memory servers.">
+        <g font-size="11" fill="currentColor" text-anchor="middle">
+          <rect x="30" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">500 M DAU × 10 searches</text>
+          <rect x="30" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="111">× ~6 keystroke calls</text><text x="140" y="125" font-size="9.5" opacity="0.75">(after debouncing)</text>
+          <rect x="30" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="140" y="173">30 B/day ≈ 350 k/s</text><text x="140" y="190" font-weight="600">≈ 1 M req/s at peak</text>
+          <rect x="340" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">feel instant: &lt; 100 ms total</text>
+          <rect x="340" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="111">minus network + render</text><text x="450" y="125" font-size="9.5" opacity="0.75">(mobile RTT 40–80 ms)</text>
+          <rect x="340" y="154" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="173">server budget</text><text x="450" y="190" font-weight="600">≈ 10–20 ms p99</text>
+          <rect x="650" y="30" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">~100 M distinct queries kept</text>
+          <rect x="650" y="92" width="220" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="111">trie + top-8 per node</text><text x="760" y="125" font-size="9.5" opacity="0.75">(depth capped ~30 chars)</text>
+          <rect x="650" y="154" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="173">tens of GB in memory</text><text x="760" y="190" font-weight="600">shard + replicate</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="70" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="132" x2="140" y2="151" marker-end="url(#arw)"></line>
+          <line x1="450" y1="70" x2="450" y2="89" marker-end="url(#arw)"></line><line x1="450" y1="132" x2="450" y2="151" marker-end="url(#arw)"></line>
+          <line x1="760" y1="70" x2="760" y2="89" marker-end="url(#arw)"></line><line x1="760" y1="132" x2="760" y2="151" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="232" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">no database on the read path: precompute answers per prefix and serve them from RAM</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Functional</h4><ul class="tight">
+      <li>Given a prefix, return the top 8 completions by popularity.</li>
+      <li>Reflect trending queries within about an hour.</li>
+      <li>Filter offensive or legally blocked suggestions.</li>
+    </ul></div>
+    <div class="card"><h4>Non-functional</h4><ul class="tight">
+      <li>Server p99 &lt; 20 ms; highly available. If it fails, the search box still works, just without suggestions.</li>
+      <li>Eventual consistency is fine: suggestions may be hours old.</li>
+      <li>Heavily read-dominated: suggestions are rebuilt offline.</li>
+    </ul></div>
+    <div class="card"><h4>Clarify</h4><ul class="tight">
+      <li>Personalised or global? Global first, with a personal blend as a follow-up.</li>
+      <li>Prefix only, or typo-tolerant? Prefix only; fuzzy is a follow-up.</li>
+      <li>One language to start (lowercased, normalised).</li>
+    </ul></div>
+  </div>
+</section>

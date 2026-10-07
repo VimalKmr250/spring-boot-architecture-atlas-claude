@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Fundamentals" data-title="Consistency models">
+  <h2>"Consistent" is a spectrum: say which guarantee you need</h2>
+  <p class="dek">A consistency model is a promise about what reads may return after a write. Stronger promises are simpler to reason about and cost more latency and availability. Most products need strong consistency on a few operations and one of the session guarantees everywhere else.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="After a write of x equals 2 is acknowledged at time t1, five successive reads under each model. Linearizable: always 2. Read-your-writes for the writer: always 2. Read-your-writes for another user: 1, 1, 2, 1, 2, because there is no promise to others. Monotonic reads: 1, 1, 2, 2, 2, never going backwards. Eventual: 1, 2, 1, 1, 2, which can flip until replicas converge.">
+        <text x="20" y="30" font-size="11" fill="currentColor" opacity="0.7">x = 1 before; a client writes x = 2</text>
+        <line x1="245" y1="18" x2="245" y2="290" stroke="#D26A3F" stroke-width="1.4" stroke-dasharray="4 3"></line>
+        <text x="245" y="12" text-anchor="middle" font-size="10.5" fill="#D26A3F">t1: write acknowledged</text>
+        <line x1="260" y1="40" x2="700" y2="40" stroke="currentColor" stroke-opacity="0.4" marker-end="url(#arw)"></line>
+        <text x="480" y="34" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">successive reads, later in time →</text>
+
+        <g font-size="11.5" fill="currentColor">
+          <text x="20" y="80" font-weight="600">Linearizable (strong)</text>
+          <text x="20" y="130" font-weight="600">Read-your-writes: the writer</text>
+          <text x="20" y="180" font-weight="600">Read-your-writes: anyone else</text>
+          <text x="20" y="230" font-weight="600">Monotonic reads</text>
+          <text x="20" y="280" font-weight="600">Eventual</text>
+        </g>
+
+        <!-- row 1 -->
+        <g font-size="13" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="270" y="58" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="305" y="78">2</text>
+          <rect x="358" y="58" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="393" y="78">2</text>
+          <rect x="446" y="58" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="481" y="78">2</text>
+          <rect x="534" y="58" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="569" y="78">2</text>
+          <rect x="622" y="58" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="657" y="78">2</text>
+        <!-- row 2 -->
+          <rect x="270" y="108" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="305" y="128">2</text>
+          <rect x="358" y="108" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="393" y="128">2</text>
+          <rect x="446" y="108" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="481" y="128">2</text>
+          <rect x="534" y="108" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="569" y="128">2</text>
+          <rect x="622" y="108" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="657" y="128">2</text>
+        <!-- row 3 -->
+          <rect x="270" y="158" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="305" y="178">1</text>
+          <rect x="358" y="158" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="393" y="178">1</text>
+          <rect x="446" y="158" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="481" y="178">2</text>
+          <rect x="534" y="158" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.6"></rect><text x="569" y="178">1</text>
+          <rect x="622" y="158" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="657" y="178">2</text>
+        <!-- row 4 -->
+          <rect x="270" y="208" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="305" y="228">1</text>
+          <rect x="358" y="208" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="393" y="228">1</text>
+          <rect x="446" y="208" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="481" y="228">2</text>
+          <rect x="534" y="208" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="569" y="228">2</text>
+          <rect x="622" y="208" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="657" y="228">2</text>
+        <!-- row 5 -->
+          <rect x="270" y="258" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="305" y="278">1</text>
+          <rect x="358" y="258" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="393" y="278">2</text>
+          <rect x="446" y="258" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.6"></rect><text x="481" y="278">1</text>
+          <rect x="534" y="258" width="70" height="30" rx="5" fill="currentColor" fill-opacity="0.06" stroke="#D26A3F" stroke-width="1.6"></rect><text x="569" y="278">1</text>
+          <rect x="622" y="258" width="70" height="30" rx="5" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B"></rect><text x="657" y="278">2</text>
+        </g>
+
+        <g font-size="10.5" fill="currentColor" opacity="0.8">
+          <text x="708" y="78">every read sees the write</text>
+          <text x="708" y="128">you always see your own</text>
+          <text x="708" y="178">no promise to others</text>
+          <text x="708" y="228">never goes back in time</text>
+          <text x="708" y="278">may flip until it converges</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Teal cells are the new value. Copper-outlined cells are a read that went back to the old value after seeing the new one, which is what "went backwards" looks like to a user: a comment appears and then vanishes on refresh. Monotonic reads rules that out. It is usually achieved by pinning a user to one replica.</figcaption>
+  </figure>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Model</th><th>Guarantee</th><th>Typical implementation</th><th>Use it for</th></tr></thead>
+      <tbody>
+        <tr><td>Strong (linearizable)</td><td>Behaves like a single copy; reads see all completed writes</td><td>Single leader + sync replication, consensus (Raft/Paxos), quorum R+W&gt;N</td><td>Balances, stock at checkout, unique usernames, locks</td></tr>
+        <tr><td>Causal</td><td>Effects are never seen before their causes</td><td>Version vectors, dependency tracking</td><td>Comment threads, chat (a reply never appears before its message)</td></tr>
+        <tr><td>Read-your-writes</td><td>A session sees its own writes</td><td>Read from the leader for a few seconds after a write, or send a version token</td><td>Profile edits, posting a comment, settings</td></tr>
+        <tr><td>Monotonic reads</td><td>A session never sees older data than it already saw</td><td>Sticky replica per user, or reads with a min-version</td><td>Feeds, inboxes, anything refreshed</td></tr>
+        <tr><td>Eventual</td><td>If writes stop, replicas converge</td><td>Async replication, anti-entropy, last-write-wins or CRDTs</td><td>Like counts, view counts, DNS, search index, analytics</td></tr>
+        <tr><td>Weak</td><td>Best effort; reads may miss writes entirely</td><td>Fire-and-forget, in-memory caches</td><td>VoIP, live video frames, multiplayer positions</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

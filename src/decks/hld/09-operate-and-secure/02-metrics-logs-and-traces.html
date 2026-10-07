@@ -1,0 +1,60 @@
+<section class="slide" data-sec="Operate & secure" data-title="Metrics, logs and traces">
+  <h2>Metrics say something is wrong, traces say where, logs say why</h2>
+  <p class="dek">Each signal answers a different question at a different cost. <b>Metrics</b> are cheap aggregates you can alert on. <b>Traces</b> follow one request across services and show where its time went. <b>Logs</b> hold the detail of individual events. Tie them together with one trace id, and an incident goes from an alert to a graph to a trace to a log line in a few clicks.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Trace waterfall of a 480 ms checkout request. The gateway span covers everything. Inside the orders service span: reading the cart takes 40 ms, reserving inventory 60 ms, authorising payment 300 ms, of which the external provider call is 280 ms, inserting the order 30 ms and publishing the event 5 ms. The payment span dominates, so that is where to look.">
+        <g font-size="9.5" fill="currentColor" opacity="0.6" text-anchor="middle">
+          <text x="220" y="20">0 ms</text><text x="380" y="20">120</text><text x="540" y="20">240</text><text x="700" y="20">360</text><text x="860" y="20">480</text>
+        </g>
+        <g stroke="currentColor" stroke-opacity="0.1"><line x1="220" y1="26" x2="220" y2="250"></line><line x1="380" y1="26" x2="380" y2="250"></line><line x1="540" y1="26" x2="540" y2="250"></line><line x1="700" y1="26" x2="700" y2="250"></line><line x1="860" y1="26" x2="860" y2="250"></line></g>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="20" y="46">gateway GET /checkout</text>
+          <text x="30" y="72">orders POST /orders</text>
+          <text x="44" y="98">db SELECT cart</text>
+          <text x="44" y="124">inventory.reserve</text>
+          <text x="44" y="150" fill="#D26A3F">payment.authorize</text>
+          <text x="58" y="176" fill="#D26A3F">http provider /auth</text>
+          <text x="44" y="202">db INSERT order</text>
+          <text x="44" y="228">outbox publish</text>
+        </g>
+        <rect x="220" y="34" width="640" height="16" rx="3" fill="#8A94A3" fill-opacity="0.45"></rect>
+        <rect x="226.7" y="60" width="626.6" height="16" rx="3" fill="#8A94A3" fill-opacity="0.45"></rect>
+        <rect x="233.3" y="86" width="53.3" height="16" rx="3" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <rect x="293.3" y="112" width="80" height="16" rx="3" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <rect x="380" y="138" width="400" height="16" rx="3" fill="#D26A3F" fill-opacity="0.65"></rect>
+        <rect x="393.3" y="164" width="373.3" height="16" rx="3" fill="#D26A3F" fill-opacity="0.4"></rect>
+        <rect x="786.7" y="190" width="40" height="16" rx="3" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <rect x="830.7" y="216" width="6.7" height="16" rx="2" fill="#3AA79B" fill-opacity="0.6"></rect>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="292" y="98">40 ms</text><text x="378" y="124">60 ms</text><text x="786" y="150" fill="#D26A3F">300 ms</text><text x="772" y="176" fill="#D26A3F">280 ms</text>
+          <text x="740" y="202" text-anchor="end">30 ms</text><text x="824" y="228" text-anchor="end">5 ms</text>
+        </g>
+        <text x="540" y="274" text-anchor="middle" font-size="10.5" fill="currentColor">trace_id 4bf9…a31 in every span, and in every log line those services wrote for this request</text>
+      </svg>
+    </div>
+    <figcaption>One glance shows that the payment provider owns 58% of the latency, and that inventory and payment run sequentially. That suggests two design changes: run the independent calls in parallel, and put a tighter timeout plus a breaker on the provider.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th>Method</th><th>For</th><th>Signals</th></tr></thead>
+        <tbody>
+          <tr><td>Golden signals</td><td>Any user-facing system</td><td>Latency, traffic, errors, saturation</td></tr>
+          <tr><td>RED</td><td>Services and endpoints</td><td><b>R</b>ate, <b>E</b>rrors, <b>D</b>uration (as a histogram)</td></tr>
+          <tr><td>USE</td><td>Resources: CPU, disks, pools</td><td><b>U</b>tilisation, <b>S</b>aturation (queueing), <b>E</b>rrors</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Costs to design for</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Metric cardinality:</b> a label per user id makes millions of series. Keep labels bounded (endpoint, status class, region).</li>
+        <li><b>Log volume:</b> use structured JSON, sample debug logs, and set retention by tier. Log bills rival compute bills.</li>
+        <li><b>Trace sampling:</b> keep 1–10% at random, plus every error and slow trace, decided at the tail.</li>
+      </ul>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,84 @@
+<section class="slide" data-sec="Networking & edge" data-title="TCP, UDP and HTTP versions">
+  <h2>Every new connection costs round trips, so reuse them</h2>
+  <p class="dek">TCP guarantees ordered, reliable delivery and pays for it with handshakes and head-of-line blocking. UDP guarantees nothing and adds nothing. HTTP/3 runs over QUIC, which rebuilds TCP's reliability on top of UDP with fewer round trips and independent streams. For system design, the lesson is: long-lived, pooled connections, and fewer round trips on the critical path.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Left: round trips before the first response byte on a new connection. TCP plus TLS 1.2 takes four round trips; TCP plus TLS 1.3 three; QUIC with HTTP/3 two; QUIC 0-RTT resumption one. At 100 ms round-trip time that is 400, 300, 200 and 100 ms. Right: HTTP/1.1 uses several connections with one request at a time; HTTP/2 multiplexes streams over one TCP connection, but a lost packet stalls all of them; HTTP/3 streams are independent, so a loss stalls only one stream.">
+        <text x="215" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Round trips before the first byte (new connection)</text>
+        <g font-size="10.5" fill="currentColor" text-anchor="end">
+          <text x="128" y="58">TCP + TLS 1.2</text><text x="128" y="98">TCP + TLS 1.3</text><text x="128" y="138">QUIC (HTTP/3)</text><text x="128" y="178">QUIC 0-RTT resume</text>
+        </g>
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="136" y="44" width="68" height="22" fill="#8A94A3" fill-opacity="0.35"></rect><text x="170" y="59">TCP</text>
+          <rect x="204" y="44" width="136" height="22" fill="#3AA79B" fill-opacity="0.30"></rect><text x="272" y="59">TLS 1.2 (2 RTT)</text>
+          <rect x="340" y="44" width="68" height="22" fill="#D26A3F" fill-opacity="0.45"></rect><text x="374" y="59">req→resp</text>
+          <rect x="136" y="84" width="68" height="22" fill="#8A94A3" fill-opacity="0.35"></rect><text x="170" y="99">TCP</text>
+          <rect x="204" y="84" width="68" height="22" fill="#3AA79B" fill-opacity="0.30"></rect><text x="238" y="99">TLS 1.3</text>
+          <rect x="272" y="84" width="68" height="22" fill="#D26A3F" fill-opacity="0.45"></rect><text x="306" y="99">req→resp</text>
+          <rect x="136" y="124" width="68" height="22" fill="#3AA79B" fill-opacity="0.30"></rect><text x="170" y="139">QUIC+TLS</text>
+          <rect x="204" y="124" width="68" height="22" fill="#D26A3F" fill-opacity="0.45"></rect><text x="238" y="139">req→resp</text>
+          <rect x="136" y="164" width="68" height="22" fill="#D26A3F" fill-opacity="0.45"></rect><text x="170" y="179">req→resp</text>
+        </g>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace" opacity="0.8">
+          <text x="414" y="59">400 ms</text><text x="346" y="99">300 ms</text><text x="278" y="139">200 ms</text><text x="210" y="179">100 ms</text>
+        </g>
+        <text x="215" y="214" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">each block = 1 round trip; ms shown at RTT = 100 ms</text>
+        <text x="215" y="232" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">(e.g. a phone in Asia talking to a server in the US)</text>
+        <text x="215" y="262" text-anchor="middle" font-size="10.5" fill="#D26A3F">a reused (keep-alive) connection pays only the last block</text>
+
+        <line x1="450" y1="14" x2="450" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Multiplexing requests</text>
+        <text x="468" y="50" font-size="10.5" font-weight="600" fill="currentColor">HTTP/1.1</text>
+        <text x="468" y="64" font-size="9.5" fill="currentColor" opacity="0.65">~6 conns, 1 at a time</text>
+        <g>
+          <rect x="590" y="38" width="80" height="10" fill="#D26A3F" fill-opacity="0.6"></rect><rect x="674" y="38" width="80" height="10" fill="#3AA79B" fill-opacity="0.6"></rect>
+          <rect x="590" y="52" width="110" height="10" fill="#8A94A3" fill-opacity="0.8"></rect><rect x="704" y="52" width="60" height="10" fill="#D26A3F" fill-opacity="0.6"></rect>
+          <rect x="590" y="66" width="60" height="10" fill="#3AA79B" fill-opacity="0.6"></rect><rect x="654" y="66" width="90" height="10" fill="#8A94A3" fill-opacity="0.8"></rect>
+        </g>
+
+        <text x="468" y="128" font-size="10.5" font-weight="600" fill="currentColor">HTTP/2</text>
+        <text x="468" y="142" font-size="9.5" fill="currentColor" opacity="0.65">1 TCP conn, interleaved</text>
+        <rect x="590" y="122" width="290" height="16" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <g>
+          <rect x="592" y="124" width="26" height="12" fill="#D26A3F" fill-opacity="0.6"></rect><rect x="620" y="124" width="26" height="12" fill="#3AA79B" fill-opacity="0.6"></rect>
+          <rect x="648" y="124" width="26" height="12" fill="#8A94A3" fill-opacity="0.8"></rect><rect x="676" y="124" width="26" height="12" fill="#D26A3F" fill-opacity="0.6"></rect>
+          <rect x="704" y="124" width="26" height="12" fill="none" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <rect x="732" y="124" width="146" height="12" fill="currentColor" fill-opacity="0.08"></rect>
+        </g>
+        <text x="717" y="134" text-anchor="middle" font-size="10" fill="#D26A3F">✕</text>
+        <text x="805" y="160" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">one lost packet: every stream waits</text>
+        <text x="805" y="173" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">(TCP head-of-line blocking)</text>
+
+        <text x="468" y="216" font-size="10.5" font-weight="600" fill="currentColor">HTTP/3 (QUIC)</text>
+        <text x="468" y="230" font-size="9.5" fill="currentColor" opacity="0.65">independent streams</text>
+        <g>
+          <rect x="590" y="204" width="26" height="10" fill="#D26A3F" fill-opacity="0.6"></rect><rect x="620" y="204" width="26" height="10" fill="none" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <rect x="650" y="204" width="60" height="10" fill="currentColor" fill-opacity="0.08"></rect><rect x="714" y="204" width="40" height="10" fill="#D26A3F" fill-opacity="0.6"></rect>
+          <rect x="590" y="218" width="160" height="10" fill="#3AA79B" fill-opacity="0.6"></rect>
+          <rect x="590" y="232" width="130" height="10" fill="#8A94A3" fill-opacity="0.8"></rect>
+        </g>
+        <text x="633" y="213" text-anchor="middle" font-size="9" fill="#D26A3F">✕</text>
+        <text x="805" y="256" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">a loss stalls only its own stream</text>
+        <text x="675" y="276" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">colours = different requests; grey gaps = waiting</text>
+      </svg>
+    </div>
+    <figcaption>HTTP/2 fixed HTTP/1.1's one-request-per-connection limit, but it inherited TCP's rule that bytes are delivered in order, so one lost packet blocks every stream on the connection. QUIC moves streams and loss recovery above UDP, which helps most on lossy mobile networks. It also survives a network change such as Wi-Fi to cellular.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:420px">
+        <thead><tr><th></th><th>TCP</th><th>UDP</th></tr></thead>
+        <tbody>
+          <tr><td>Delivery</td><td>Reliable, ordered, retransmits</td><td>Best effort: may drop, duplicate or reorder</td></tr>
+          <tr><td>Connection</td><td>Handshake, per-connection state</td><td>None; each datagram stands alone</td></tr>
+          <tr><td>Flow / congestion control</td><td>Built in</td><td>Your job, if you need it</td></tr>
+          <tr><td>Use for</td><td>HTTP/1–2, databases, gRPC, anything that must arrive</td><td>DNS, VoIP, video calls, games, QUIC, metrics (StatsD)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">What this means for designs</span>Pool connections to databases and services, because a new TLS connection per call adds 2–3 RTT. Keep chatty protocols inside a datacenter. For real-time media, prefer UDP-based transports (WebRTC), where a late packet is worthless and should be dropped, not retransmitted.</div>
+  </div>
+</section>

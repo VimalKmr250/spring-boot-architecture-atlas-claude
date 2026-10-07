@@ -1,0 +1,49 @@
+<section class="slide" data-sec="Design · File sync" data-title="File sync: high-level design">
+  <h2>Bytes through a block service, truth through a metadata service, and a poke to everyone else</h2>
+  <p class="dek">The client does much of the work: it watches the folder, chunks and hashes files, and keeps a local database of what it believes is synced. On the server, the block service stores immutable blocks in blob storage and the metadata service commits journal entries. A notification service tells other devices that a namespace changed. They then pull the changes and fetch any blocks they lack.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 320" role="img" aria-label="Device A runs a file watcher, a chunker and hasher, and a local state database. Step 1: it uploads missing blocks to the block service, which writes them to erasure-coded blob storage. Step 2: it commits the file's block list to the metadata service, which appends to the journal in the metadata database, sharded by namespace. Step 3: the metadata service publishes that the namespace changed to the notification service. Step 4: the notification service pokes other devices over held long-poll or WebSocket connections. Step 5: device B asks the metadata service for changes since its cursor. Step 6: it downloads the blocks it lacks from the block service.">
+        <rect x="20" y="96" width="130" height="118" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="85" y="116" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">device A</text>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="32" y="126" width="106" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect><text x="85" y="141">file watcher</text>
+          <rect x="32" y="154" width="106" height="22" rx="3" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.3"></rect><text x="85" y="169">chunk + hash</text>
+          <rect x="32" y="182" width="106" height="22" rx="3" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-opacity="0.7"></rect><text x="85" y="197">local state DB</text>
+        </g>
+
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="260" y="40" width="150" height="46" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="335" y="59" font-weight="600">metadata service</text><text x="335" y="74" font-size="8.5">check · commit · changes</text>
+          <rect x="260" y="220" width="150" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="335" y="239">block service</text><text x="335" y="254" font-size="8.5">put / get by hash</text>
+          <rect x="640" y="40" width="130" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="705" y="59">notification svc</text><text x="705" y="74" font-size="8.5" opacity="0.8">long-poll · WebSocket</text>
+          <rect x="760" y="150" width="120" height="54" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.45"></rect><text x="820" y="173" font-weight="600">device B</text><text x="820" y="189" font-size="8.5" opacity="0.75">and other devices</text>
+        </g>
+        <path d="M460 40 a55 6 0 0 1 110 0 v44 a55 6 0 0 1 -110 0 z" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></path>
+        <path d="M460 40 a55 6 0 0 0 110 0" fill="none" stroke="currentColor" stroke-opacity="0.45"></path>
+        <text x="515" y="64" text-anchor="middle" font-size="10" fill="currentColor">metadata DB</text><text x="515" y="78" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">journal · by namespace</text>
+        <path d="M460 220 a55 6 0 0 1 110 0 v44 a55 6 0 0 1 -110 0 z" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></path>
+        <path d="M460 220 a55 6 0 0 0 110 0" fill="none" stroke="#3AA79B"></path>
+        <text x="515" y="244" text-anchor="middle" font-size="10" fill="currentColor">blob storage</text><text x="515" y="258" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.75">erasure-coded</text>
+
+        <g stroke="#D26A3F" stroke-width="1.6"><line x1="150" y1="200" x2="257" y2="238" marker-end="url(#arwA)"></line><line x1="150" y1="112" x2="257" y2="70" marker-end="url(#arwA)"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="410" y1="63" x2="457" y2="63" marker-end="url(#arw)"></line><line x1="410" y1="243" x2="457" y2="243" marker-end="url(#arw)"></line></g>
+        <path d="M335 40 V24 H705 V37" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></path>
+        <line x1="730" y1="86" x2="800" y2="147" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arwB)"></line>
+        <g stroke="#8A94A3" stroke-width="1.3" fill="none"><line x1="760" y1="170" x2="413" y2="84" marker-end="url(#arw)"></line><path d="M820 204 V298 H335 V269" marker-end="url(#arw)"></path></g>
+        <g font-size="9" fill="#D26A3F"><text x="150" y="246">1 upload missing</text><text x="150" y="258">blocks</text><text x="165" y="52">2 commit block list</text><text x="165" y="64">+ parentRev</text></g>
+        <text x="520" y="18" text-anchor="middle" font-size="9" fill="#3AA79B">3 "ns_42 changed" (pub/sub)</text>
+        <text x="772" y="112" font-size="9" fill="#3AA79B">4 poke</text>
+        <g font-size="9" fill="currentColor" opacity="0.85"><text x="590" y="116">5 GET /changes?cursor</text><text x="600" y="292">6 download missing blocks</text></g>
+        <text x="810" y="238" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">LAN peers can serve</text><text x="810" y="250" text-anchor="end" font-size="8.5" fill="currentColor" opacity="0.7">blocks too (LAN sync)</text>
+      </svg>
+    </div>
+    <figcaption>The notification carries no data, only "namespace X changed". Every device then pulls from its own cursor, which makes sync idempotent and resumable: a device offline for a week catches up with exactly the same code path as one that missed a single poke.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>The client is half the system</h4><p>The watcher debounces bursts of events (an editor saving through a temp file and a rename). The local state database remembers the last synced revision and hash per path. That is how the client tells "I changed this" from "the server changed this", and how it avoids re-uploading after a restart.</p></div>
+    <div class="card"><h4>Notifications are cheap to hold</h4><p>Hundreds of millions of devices keep one long-poll or WebSocket open to the notification service, not to the metadata service. A commit publishes to a pub/sub channel per namespace, and only the notification servers holding subscribers wake up.</p></div>
+    <div class="card"><h4>Blocks and metadata scale apart</h4><p>Blob storage grows with bytes and is optimised for throughput and durability. The metadata tier grows with operations and is optimised for transactional commits. Different teams can scale, tune and fail over each one independently.</p></div>
+  </div>
+</section>

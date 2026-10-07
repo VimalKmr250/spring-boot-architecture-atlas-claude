@@ -1,0 +1,71 @@
+<section class="slide" data-sec="Reliability" data-title="Bulkheads and load shedding">
+  <h2>Partition resources so one slow dependency can't drain them all</h2>
+  <p class="dek">Named after a ship's watertight compartments: a <b>bulkhead</b> gives each dependency or workload its own bounded pool of threads, connections or instances, so a leak in one can't sink the ship. <b>Load shedding</b> is its partner at the front door. When the whole service is saturated, reject the least important requests early, so the important ones still get through.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Shared pool: one pool of 200 threads; the recommendations dependency slows down and its calls occupy 180 threads, so checkout requests find no free thread and fail. Bulkheads: checkout has its own pool of 100 threads, mostly free; recommendations has 40, all stuck, so extra recommendation calls fail fast to a fallback; reviews has 40. Checkout is unaffected.">
+        <text x="215" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">One shared pool (200 threads)</text>
+        <rect x="100" y="36" width="230" height="140" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <g fill="#D26A3F" fill-opacity="0.65">
+          <rect x="112" y="48" width="36" height="22" rx="2"></rect><rect x="154" y="48" width="36" height="22" rx="2"></rect><rect x="196" y="48" width="36" height="22" rx="2"></rect><rect x="238" y="48" width="36" height="22" rx="2"></rect><rect x="280" y="48" width="36" height="22" rx="2"></rect>
+          <rect x="112" y="76" width="36" height="22" rx="2"></rect><rect x="154" y="76" width="36" height="22" rx="2"></rect><rect x="196" y="76" width="36" height="22" rx="2"></rect><rect x="238" y="76" width="36" height="22" rx="2"></rect><rect x="280" y="76" width="36" height="22" rx="2"></rect>
+          <rect x="112" y="104" width="36" height="22" rx="2"></rect><rect x="154" y="104" width="36" height="22" rx="2"></rect><rect x="196" y="104" width="36" height="22" rx="2"></rect><rect x="238" y="104" width="36" height="22" rx="2"></rect><rect x="280" y="104" width="36" height="22" rx="2"></rect>
+          <rect x="112" y="132" width="36" height="22" rx="2"></rect><rect x="154" y="132" width="36" height="22" rx="2"></rect><rect x="196" y="132" width="36" height="22" rx="2"></rect>
+        </g>
+        <g fill="#8A94A3" fill-opacity="0.5"><rect x="238" y="132" width="36" height="22" rx="2"></rect><rect x="280" y="132" width="36" height="22" rx="2"></rect></g>
+        <text x="215" y="170" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">180 threads stuck waiting on slow recs</text>
+        <rect x="10" y="60" width="70" height="28" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="45" y="78" text-anchor="middle" font-size="10" fill="currentColor">/recs</text>
+        <rect x="10" y="120" width="70" height="28" rx="10" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="45" y="138" text-anchor="middle" font-size="10" fill="currentColor">/checkout</text>
+        <line x1="80" y1="74" x2="97" y2="74" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="80" y1="134" x2="96" y2="134" stroke="#8A94A3" stroke-width="1.4"></line>
+        <text x="90" y="128" font-size="13" fill="#D26A3F" text-anchor="middle">✕</text>
+        <rect x="350" y="70" width="80" height="40" rx="5" fill="none" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        <text x="390" y="88" text-anchor="middle" font-size="10" fill="currentColor">recs svc</text><text x="390" y="102" text-anchor="middle" font-size="9" fill="#D26A3F">p99 8 s</text>
+        <line x1="330" y1="90" x2="347" y2="90" stroke="#D26A3F" stroke-width="1.3" marker-end="url(#arwA)"></line>
+        <text x="215" y="206" text-anchor="middle" font-size="11" fill="#D26A3F" font-weight="600">checkout fails because recommendations are slow</text>
+
+        <line x1="450" y1="14" x2="450" y2="290" stroke="currentColor" stroke-opacity="0.15"></line>
+
+        <text x="675" y="20" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Bulkheads: a pool per dependency</text>
+        <rect x="470" y="36" width="190" height="104" rx="8" fill="none" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="480" y="52" font-size="10" fill="#3AA79B" font-weight="600">checkout · 100</text>
+        <g fill="#8A94A3" fill-opacity="0.45">
+          <rect x="480" y="60" width="30" height="16" rx="2"></rect><rect x="514" y="60" width="30" height="16" rx="2"></rect><rect x="548" y="60" width="30" height="16" rx="2"></rect><rect x="582" y="60" width="30" height="16" rx="2"></rect><rect x="616" y="60" width="30" height="16" rx="2"></rect>
+          <rect x="548" y="82" width="30" height="16" rx="2"></rect><rect x="582" y="82" width="30" height="16" rx="2"></rect><rect x="616" y="82" width="30" height="16" rx="2"></rect>
+          <rect x="480" y="104" width="30" height="16" rx="2"></rect><rect x="514" y="104" width="30" height="16" rx="2"></rect><rect x="548" y="104" width="30" height="16" rx="2"></rect><rect x="582" y="104" width="30" height="16" rx="2"></rect><rect x="616" y="104" width="30" height="16" rx="2"></rect>
+        </g>
+        <g fill="#3AA79B" fill-opacity="0.7"><rect x="480" y="82" width="30" height="16" rx="2"></rect><rect x="514" y="82" width="30" height="16" rx="2"></rect></g>
+        <text x="565" y="134" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">plenty free</text>
+
+        <rect x="680" y="36" width="96" height="104" rx="8" fill="none" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <text x="690" y="52" font-size="10" fill="#D26A3F" font-weight="600">recs · 40</text>
+        <g fill="#D26A3F" fill-opacity="0.65"><rect x="690" y="60" width="36" height="16" rx="2"></rect><rect x="730" y="60" width="36" height="16" rx="2"></rect><rect x="690" y="82" width="36" height="16" rx="2"></rect><rect x="730" y="82" width="36" height="16" rx="2"></rect><rect x="690" y="104" width="36" height="16" rx="2"></rect><rect x="730" y="104" width="36" height="16" rx="2"></rect></g>
+        <text x="728" y="134" text-anchor="middle" font-size="9.5" fill="#D26A3F">full → fallback</text>
+
+        <rect x="790" y="36" width="96" height="104" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="800" y="52" font-size="10" fill="currentColor" font-weight="600">reviews · 40</text>
+        <g fill="#8A94A3" fill-opacity="0.45"><rect x="800" y="60" width="36" height="16" rx="2"></rect><rect x="840" y="60" width="36" height="16" rx="2"></rect><rect x="840" y="82" width="36" height="16" rx="2"></rect><rect x="800" y="104" width="36" height="16" rx="2"></rect><rect x="840" y="104" width="36" height="16" rx="2"></rect></g>
+        <g fill="#3AA79B" fill-opacity="0.7"><rect x="800" y="82" width="36" height="16" rx="2"></rect></g>
+
+        <text x="675" y="170" text-anchor="middle" font-size="11" fill="#3AA79B" font-weight="600">recommendations degrade; checkout carries on</text>
+
+        <text x="675" y="206" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">Load shedding at the gateway (at 90% capacity)</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <rect x="470" y="220" width="130" height="50" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="535" y="240" font-weight="600">critical</text><text x="535" y="256" opacity="0.8">checkout, login: admit</text>
+          <rect x="610" y="220" width="130" height="50" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="675" y="240" font-weight="600">normal</text><text x="675" y="256" opacity="0.8">browse: admit, slower</text>
+          <rect x="750" y="220" width="130" height="50" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="815" y="240" font-weight="600">sheddable</text><text x="815" y="256" opacity="0.8">prefetch, beacons: 503</text>
+        </g>
+        <text x="215" y="240" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">shed early and cheaply: rejecting at the edge</text>
+        <text x="215" y="256" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">costs microseconds; timing out deep inside</text>
+        <text x="215" y="272" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.8">costs seconds of every resource on the way</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Kinds of bulkhead</h4><p>A thread or connection pool per dependency. Separate deployments for API, workers and admin traffic. Separate clusters for your largest tenants (cells, §10). Per-tenant rate limits. The same principle applies at every scale: bound the blast radius.</p></div>
+    <div class="card"><h4>Sizing a pool</h4><p>Use Little's law: pool = peak rate × p99 latency × headroom. At 100 req/s to a dependency with a 200 ms p99, that's about 20 slots, so give it 30. A pool that is too big stops being a bulkhead; one that is too small throttles healthy traffic.</p></div>
+    <div class="card"><h4>Shedding signals</h4><p>Shed on concurrency or queueing delay (in-flight requests, time spent in queue), not only CPU. Prioritise by request class, carried in a header. Prefer retrying clients' second attempts last. Return <code>503</code> with <code>Retry-After</code> so well-behaved clients back off.</p></div>
+  </div>
+</section>

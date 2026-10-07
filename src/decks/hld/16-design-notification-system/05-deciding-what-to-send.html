@@ -1,0 +1,65 @@
+<section class="slide" data-sec="Design · Notifications" data-title="Notifications: deciding what to send">
+  <h2>Deep dive 2: the router is a policy engine that mostly says "not now"</h2>
+  <p class="dek">The best notification system sends <em>fewer</em> notifications. Each candidate passes a sequence of checks, and most of the product value is in them: duplicates dropped, preferences honoured, quiet hours respected, bursts collapsed into digests, and every channel chosen for this user right now. Critical messages skip the checks that could delay them.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Flowchart for one candidate notification. First, a duplicate check: if the same user and template were sent within the dedupe window, drop it. Second, preferences: if the user opted out of this category on this channel, suppress it and log that. Third, quiet hours: if it is night in the user's time zone and the message is not critical, schedule it for 8 am local. Fourth, frequency cap: if the user has already had three marketing messages today, drop it or fold it into a digest. Fifth, aggregation: collapse bursts such as five likes into one message. Finally render in the user's locale and choose channels: push to active devices, otherwise email, and SMS only for critical messages.">
+        <g font-size="9.5" fill="currentColor" text-anchor="middle">
+          <rect x="10" y="60" width="80" height="44" rx="12" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="50" y="80">candidate</text><text x="50" y="94" font-size="8.5" opacity="0.75">user × template</text>
+        </g>
+        <g fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5">
+          <polygon points="160,52 210,82 160,112 110,82"></polygon>
+          <polygon points="290,52 340,82 290,112 240,82"></polygon>
+          <polygon points="420,52 470,82 420,112 370,82"></polygon>
+          <polygon points="550,52 600,82 550,112 500,82"></polygon>
+        </g>
+        <polygon points="680,52 730,82 680,112 630,82" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></polygon>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <text x="160" y="79">dupe?</text><text x="160" y="91" font-size="8" opacity="0.7">10-min key</text>
+          <text x="290" y="79">opted</text><text x="290" y="91">in?</text>
+          <text x="420" y="79">quiet</text><text x="420" y="91">hours?</text>
+          <text x="550" y="79">over</text><text x="550" y="91">cap?</text>
+          <text x="680" y="79">burst?</text><text x="680" y="91" font-size="8" opacity="0.7">aggregate</text>
+        </g>
+        <rect x="760" y="56" width="130" height="52" rx="6" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="825" y="76" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">render + choose</text>
+        <text x="825" y="92" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.8">locale · channels</text>
+        <g stroke="#D26A3F" stroke-width="1.3">
+          <line x1="90" y1="82" x2="107" y2="82" marker-end="url(#arwA)"></line><line x1="210" y1="82" x2="237" y2="82" marker-end="url(#arwA)"></line>
+          <line x1="340" y1="82" x2="367" y2="82" marker-end="url(#arwA)"></line><line x1="470" y1="82" x2="497" y2="82" marker-end="url(#arwA)"></line>
+          <line x1="600" y1="82" x2="627" y2="82" marker-end="url(#arwA)"></line><line x1="730" y1="82" x2="757" y2="82" marker-end="url(#arwA)"></line>
+        </g>
+        <g font-size="8.5" fill="#D26A3F" text-anchor="middle"><text x="224" y="74">no</text><text x="354" y="74">yes</text><text x="484" y="74">no</text><text x="614" y="74">no</text></g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="160" y1="112" x2="160" y2="147" marker-end="url(#arw)"></line><line x1="290" y1="112" x2="290" y2="147" marker-end="url(#arw)"></line>
+          <line x1="420" y1="112" x2="420" y2="147" marker-end="url(#arw)"></line><line x1="550" y1="112" x2="550" y2="147" marker-end="url(#arw)"></line><line x1="680" y1="112" x2="680" y2="147" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="8.5" fill="currentColor" opacity="0.8" text-anchor="middle"><text x="170" y="132">yes</text><text x="300" y="132">no</text><text x="432" y="132">yes</text><text x="562" y="132">yes</text><text x="692" y="132">yes</text></g>
+        <g font-size="9" fill="currentColor" text-anchor="middle">
+          <rect x="110" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="160" y="167">drop</text><text x="160" y="180" font-size="8" opacity="0.75">log "duplicate"</text>
+          <rect x="240" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="290" y="167">suppress</text><text x="290" y="180" font-size="8" opacity="0.75">log "opted out"</text>
+          <rect x="370" y="150" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="420" y="167">defer to 8 am</text><text x="420" y="180" font-size="8" opacity="0.75">user's timezone</text>
+          <rect x="500" y="150" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect><text x="550" y="167">drop or digest</text><text x="550" y="180" font-size="8" opacity="0.75">bulk only</text>
+          <rect x="630" y="150" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect><text x="680" y="167">"Ana and 4 others</text><text x="680" y="180">liked your post"</text>
+        </g>
+        <path d="M680 190 C 680 214, 760 214, 800 112" fill="none" stroke="#3AA79B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwB)"></path>
+        <rect x="100" y="222" width="510" height="54" rx="6" fill="#D26A3F" fill-opacity="0.07" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="355" y="242" text-anchor="middle" font-size="10" fill="currentColor" font-weight="600">critical (OTP, security alert, fraud): skip quiet hours and caps</text>
+        <text x="355" y="260" text-anchor="middle" font-size="9.5" fill="currentColor">dedupe and opt-out still apply (security alerts may be non-optional)</text>
+        <g font-size="9" fill="currentColor">
+          <text x="640" y="236">channel choice:</text>
+          <text x="640" y="250">• push → devices seen &lt; 30 d</text>
+          <text x="640" y="264">• none → email fallback</text>
+          <text x="640" y="278">• SMS only if critical or opted in</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Check late, not early</h4><p>Preferences and quiet hours are evaluated at <em>send</em> time, not when the notification was requested. A deferred or scheduled message rechecks them, so a user who unsubscribed at 9 pm doesn't get the 8 am campaign.</p></div>
+    <div class="card"><h4>Caps are counters</h4><p>Per user, per category, per day: a Redis <code>INCR</code> with a TTL until midnight in the user's timezone. Check and increment atomically. Caps are the single best defence against a buggy producer spamming users in a loop.</p></div>
+    <div class="card"><h4>Aggregation windows</h4><p>For bursty events (likes, comments), hold the first event for a short window, say 2 minutes, keyed by (user, post, type), and collapse everything that arrives in it into one message. That's fewer notifications, better copy, and lower cost.</p></div>
+  </div>
+</section>

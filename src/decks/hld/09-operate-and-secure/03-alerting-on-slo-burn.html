@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Operate & secure" data-title="Alerting on SLO burn">
+  <h2>Page on how fast the error budget is burning, not on raw thresholds</h2>
+  <p class="dek">"Error rate above 1%" pages too often at night on low traffic, and too late for a slow leak. <b>Burn-rate</b> alerts ask a better question: at this rate, how soon will the month's error budget be gone? A fast burn pages within minutes. A slow burn that would still exhaust the budget pages within hours. Everything else becomes a ticket.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Error rate over twelve hours against a 99.9 percent SLO, whose budget rate is 0.1 percent. Threshold lines at 6 times budget, 0.6 percent, and 14.4 times, 1.44 percent. At hour 2 a 20-minute spike to 1.9 percent crosses the fast-burn line and pages within minutes. From hour 6 the rate sits at 0.7 percent, above the slow-burn line, which pages once it has been sustained long enough.">
+        <line x1="70" y1="250" x2="866" y2="250" stroke="currentColor" stroke-opacity="0.45"></line>
+        <line x1="70" y1="250" x2="70" y2="26" stroke="currentColor" stroke-opacity="0.45"></line>
+        <g font-size="9.5" fill="currentColor" opacity="0.6" text-anchor="end"><text x="64" y="253">0%</text><text x="64" y="143">1%</text><text x="64" y="33">2%</text></g>
+        <g font-size="9.5" fill="currentColor" opacity="0.6" text-anchor="middle"><text x="70" y="268">0 h</text><text x="267" y="268">3</text><text x="464" y="268">6</text><text x="662" y="268">9</text><text x="860" y="268">12 h</text></g>
+        <line x1="70" y1="239" x2="860" y2="239" stroke="#8A94A3" stroke-dasharray="3 4"></line>
+        <text x="858" y="234" text-anchor="end" font-size="9.5" fill="currentColor" opacity="0.75">1× = 0.1%: exactly on budget</text>
+        <line x1="70" y1="184" x2="860" y2="184" stroke="#3AA79B" stroke-dasharray="6 4"></line>
+        <text x="858" y="200" text-anchor="end" font-size="10" fill="#3AA79B">6× slow burn: page if held over 6 h (and last 30 min)</text>
+        <line x1="70" y1="91.6" x2="860" y2="91.6" stroke="#D26A3F" stroke-dasharray="6 4"></line>
+        <text x="858" y="86" text-anchor="end" font-size="10" fill="#D26A3F">14.4× fast burn: page if held over 1 h (and last 5 min)</text>
+        <path d="M70 245 H201.6 L205 41 H223.5 L227 245 H464.8 L468 173 H860" fill="none" stroke="currentColor" stroke-width="2" stroke-opacity="0.85"></path>
+        <circle cx="214" cy="41" r="5" fill="#D26A3F"></circle>
+        <text x="236" y="46" font-size="10.5" fill="currentColor">bad deploy: 1.9% ≈ 19× → pages in minutes</text>
+        <text x="236" y="62" font-size="9.5" fill="currentColor" opacity="0.75">(20 min at this rate spends ~0.9% of the monthly budget)</text>
+        <circle cx="850" cy="173" r="5" fill="#3AA79B"></circle>
+        <text x="480" y="164" font-size="10.5" fill="currentColor">slow leak: 0.7% = 7× · pages once the 6 h window is sustained</text>
+      </svg>
+    </div>
+    <figcaption>The pairs of windows (1 h and 5 min, 6 h and 30 min) are the multi-window, multi-burn-rate pattern from Google's SRE workbook. The long window proves the burn is significant, and the short window proves it's still happening. That way the page stops soon after the fix instead of an hour later. At 14.4×, one hour spends 2% of a 30-day budget.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Alert on symptoms</h4><p>Page on what users feel: error-budget burn on the key journeys, and synthetic checks failing. Causes such as high CPU, a full disk or consumer lag go to dashboards and tickets, unless they predict a symptom soon (a disk full within 4 hours).</p></div>
+    <div class="card"><h4>Every page must be actionable</h4><p>If the response is "wait and see", it isn't a page. Each alert links to a runbook: what it means, how to check, how to mitigate (roll back, fail over, shed load). Review noisy alerts weekly, and delete or fix them.</p></div>
+    <div class="card"><h4>Asynchronous systems need their own SLOs</h4><p>For queues and pipelines, "requests succeed" isn't enough. Add freshness and throughput SLOs: 99% of events processed within 60 s, with the dead-letter queue empty. Alert on the age of the oldest message.</p></div>
+  </div>
+</section>
