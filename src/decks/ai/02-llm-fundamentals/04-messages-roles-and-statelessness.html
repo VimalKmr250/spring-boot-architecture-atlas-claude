@@ -1,0 +1,70 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="Messages, roles and statelessness">
+  <h2>A chat is a list of messages you resend on every call</h2>
+  <p class="dek">Chat models take a list of messages, each with a role. The model remembers nothing between calls, so to continue a conversation your application sends the whole relevant history again. Understanding that one fact explains chat memory, context limits and most of the token bill.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 300" role="img" aria-label="Two calls to the model. Call 1 sends a system message and a user message asking where order 1042 is, and gets an assistant reply. Call 2 sends the same system message, the first user message, the first assistant reply and a new user message asking to change the address. The model has kept nothing from call 1: the application resent it.">
+          <text x="10" y="18" font-size="11" font-weight="600" fill="currentColor">Call 1</text>
+          <g font-size="10" fill="currentColor">
+            <rect x="10" y="28" width="200" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="18" y="44">system · You are Acme's support…</text>
+            <rect x="10" y="58" width="200" height="24" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="18" y="74">user · Where is order 1042?</text>
+          </g>
+          <line x1="210" y1="56" x2="262" y2="56" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="266" y="38" width="70" height="36" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="301" y="60" text-anchor="middle" font-size="10.5" fill="currentColor">model</text>
+          <line x1="336" y1="56" x2="356" y2="56" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="360" y="44" width="72" height="24" rx="4" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.6"></rect><text x="396" y="60" text-anchor="middle" font-size="10" fill="currentColor">assistant</text>
+
+          <text x="10" y="120" font-size="11" font-weight="600" fill="currentColor">Call 2</text>
+          <g font-size="10" fill="currentColor">
+            <rect x="10" y="130" width="200" height="24" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="18" y="146">system · You are Acme's support…</text>
+            <rect x="10" y="160" width="200" height="24" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="4 3"></rect><text x="18" y="176">user · Where is order 1042?</text>
+            <rect x="10" y="190" width="200" height="24" rx="4" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.6" stroke-dasharray="4 3"></rect><text x="18" y="206">assistant · It ships tomorrow…</text>
+            <rect x="10" y="220" width="200" height="24" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="18" y="236">user · Change the address</text>
+          </g>
+          <line x1="210" y1="187" x2="262" y2="187" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="266" y="169" width="70" height="36" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="301" y="191" text-anchor="middle" font-size="10.5" fill="currentColor">model</text>
+          <path d="M216 166 h10 v46 h-10" fill="none" stroke="#D26A3F" stroke-width="1.2"></path>
+          <text x="232" y="232" font-size="9" fill="#D26A3F">resent by</text>
+          <text x="232" y="244" font-size="9" fill="#D26A3F">your app</text>
+          <text x="10" y="284" font-size="9.5" fill="currentColor" opacity="0.75">Input grows every turn; so do cost and latency.</text>
+        </svg>
+      </div>
+    </figure>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Role</th><th>Who writes it</th><th>Spring AI type</th></tr></thead>
+          <tbody>
+            <tr><td>system</td><td>You. Persona, rules, output format. Highest priority.</td><td><code>SystemMessage</code></td></tr>
+            <tr><td>user</td><td>The end user, or your code on their behalf. Untrusted.</td><td><code>UserMessage</code></td></tr>
+            <tr><td>assistant</td><td>The model. Text, or requests to call tools.</td><td><code>AssistantMessage</code></td></tr>
+            <tr><td>tool</td><td>Your code: the result of a tool the model asked for.</td><td><code>ToolResponseMessage</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Sending history by hand (excerpt) · memory advisors do this for you</div>
+<pre><code class="language-java">List&lt;Message&gt; history = List.of(
+        new UserMessage("Where is order 1042?"),
+        new AssistantMessage("It ships tomorrow from the Pune warehouse."));
+
+String reply = chatClient.prompt()
+        .system("You are Acme's support assistant. Be brief.")
+        .messages(history)                       // earlier turns
+        .user("Can I still change the address?") // this turn
+        .call()
+        .content();</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>History is a cost decision</h4><p>Resending 40 turns costs 40 turns of tokens on every call. Keep a window of recent messages, summarise older ones, or retrieve only relevant turns. See <a data-deck="ai" data-slide="Window, summary or vector memory">memory strategies</a>.</p></div>
+    <div class="card"><h4>The system message is not a security boundary</h4><p>It has priority, but a determined user message can still talk the model out of it. Enforce rules in code: authorisation on tools, validation of outputs, filters on retrieval.</p></div>
+    <div class="card"><h4>Stateless is good news</h4><p>Because the model holds no session, any instance of your service can serve any turn. Keep the history in a shared store (JDBC, Redis) and your chat service scales like any stateless API.</p></div>
+  </div>
+</section>

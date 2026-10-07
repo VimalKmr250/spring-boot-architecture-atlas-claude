@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q10–12 · Embeddings and vector stores">
+  <h2>Three questions on vectors, indexes and their trade-offs</h2>
+  <p class="dek">Expect a concept question, an infrastructure question and a "what goes wrong over time" question. Numbers (dimensions, storage, recall) make the answers credible.</p>
+
+  <article class="q"><header><i>Q10</i><h3>What are embeddings, and how is similarity measured?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>An embedding model maps text to a fixed-length vector, for example 1,536 floats, so that texts with similar meaning are close together. Similarity is usually cosine similarity, the angle between vectors; for normalised vectors dot product gives the same ranking. In Spring AI, <code>EmbeddingModel.embed()</code> returns the vector, and a <code>VectorStore</code> embeds and searches for you.</div>
+    <p class="deeper"><b>Go deeper:</b> Embeddings capture topic and paraphrase but are weak on exact identifiers and negation, which is why hybrid keyword plus vector search exists. Scores are not probabilities and thresholds are model-specific, so tune them on labelled data. Many features need only embeddings: deduplication, semantic search, classification by nearest examples, recommendations.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="What an embedding is">Embeddings</a><a data-deck="ai" data-slide="Embeddings beyond RAG">Beyond RAG</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q11</i><h3>How do you choose a vector store and an index type?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>I start with what the team already operates: pgvector if we run PostgreSQL, Elasticsearch or OpenSearch if we have a search cluster and need hybrid search. A dedicated engine such as Qdrant or Milvus comes in at hundreds of millions of vectors or very high query rates. For the index, HNSW is the default: excellent recall at low latency, more memory; IVF builds faster with less memory but needs re-clustering.</div>
+    <p class="deeper"><b>Go deeper:</b> ANN indexes trade recall for speed; tune <code>ef_search</code> and measure recall against exact search on sample queries. Selective metadata filters can starve ANN results, so test filters at realistic selectivity. Storage estimate: one million chunks × 1,536 dimensions × 4 bytes is about 6 GB raw, plus index overhead. Because Spring AI abstracts <code>VectorStore</code>, a move is a re-index, not a rewrite.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="How vector search scales">ANN indexes</a><a data-deck="ai" data-slide="Choosing a vector store">Choosing a store</a><a data-deck="ai" data-slide="PgVector in practice">PgVector</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q12</i><h3>What happens when you change the embedding model?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Every stored vector must be recomputed, because vectors from different models live in different spaces and cannot be compared; the dimension may change too, which means a new column or index. So I keep the source text, store the model name with each vector, and run the migration as a background job: build a new index next to the old one, compare retrieval quality on the evaluation set, then switch queries over.</div>
+    <p class="deeper"><b>Go deeper:</b> Budget it: re-embedding a million 400-token chunks is 400M tokens. Profiles that use different embedding models, such as OpenAI in production and Ollama locally, must not share a table. The same discipline applies to chunking changes: anything that changes what is embedded requires re-ingestion.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Choosing an embedding model">Choosing an embedding model</a><a data-deck="ai" data-slide="The EmbeddingModel API">EmbeddingModel</a></p>
+  </div></article>
+</section>

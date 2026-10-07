@@ -1,0 +1,138 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Compliance checking: code">
+  <h2>Extract, check in code, judge with evidence, verify the evidence</h2>
+  <p class="dek">Two <code>ChatClient</code>s do the language work: one extracts typed clauses, one judges a clause against retrieved policy rules. Everything around them is ordinary code: numeric rules, the verbatim-quote check that downgrades unsupported findings, and an audit record per run tied to the policy version used.</p>
+
+  <div class="codewrap">
+    <div class="codelabel">ContractComplianceService.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.compliance;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.stereotype.Service;
+
+@Service
+class ContractComplianceService {
+
+    record Clause(String id, String heading, String text, Integer paymentDays, BigDecimal liabilityCap) {}
+
+    record ExtractedContract(String supplier, List&lt;Clause&gt; clauses) {}
+
+    enum Status { COMPLIANT, NON_COMPLIANT, NEEDS_REVIEW }
+
+    enum Severity { LOW, MEDIUM, HIGH }
+
+    record Judgement(Status status, Severity severity, String ruleId,
+                     String evidenceQuote, String explanation) {}
+
+    record Finding(String clauseId, Judgement judgement, String checkedBy) {}
+
+    interface AuditLog {
+        void record(String contractHash, String policyVersion, List&lt;Finding&gt; findings);
+    }
+
+    static final String POLICY_VERSION = "2026.3";
+
+    private final ChatClient extractor;
+    private final ChatClient judge;
+    private final VectorStore policies;
+    private final AuditLog audit;
+
+    ContractComplianceService(ChatClient.Builder builder, VectorStore policies, AuditLog audit) {
+        this.extractor = builder.clone()
+                .defaultSystem("""
+                        Split the contract into clauses. Copy each clause's text exactly.
+                        Fill paymentDays and liabilityCap only when the clause states them.""")
+                .build();
+        this.judge = builder.clone()
+                .defaultSystem("""
+                        You check one contract clause against company policy rules.
+                        Return NON_COMPLIANT only if the clause conflicts with a rule.
+                        evidenceQuote must be copied word for word from the clause.
+                        If unsure, return NEEDS_REVIEW.""")
+                .build();
+        this.policies = policies;
+        this.audit = audit;
+    }
+
+    List&lt;Finding&gt; review(String contractText, String contractHash) {
+        ExtractedContract contract = extractor.prompt().user(contractText).call()
+                .entity(ExtractedContract.class);
+        List&lt;Finding&gt; findings = new ArrayList&lt;&gt;();
+        var f = new FilterExpressionBuilder();
+        for (Clause clause : contract.clauses()) {
+            numericRules(clause).ifPresent(findings::add);                       // code, not model
+            List&lt;Document&gt; rules = policies.similaritySearch(SearchRequest.builder()
+                    .query(clause.heading() + "\n" + clause.text())
+                    .topK(3)
+                    .similarityThreshold(0.4)
+                    .filterExpression(f.and(f.eq("type", "policy-rule"),
+                            f.eq("version", POLICY_VERSION)).build())
+                    .build());
+            if (rules.isEmpty()) {
+                continue;
+            }
+            String ruleText = rules.stream()
+                    .map(r -&gt; r.getMetadata().get("ruleId") + ": " + r.getText())
+                    .collect(Collectors.joining("\n"));
+            Judgement j = judge.prompt()
+                    .user(u -&gt; u.text("Rules:\n{rules}\n\nClause {id}:\n&lt;clause&gt;\n{clause}\n&lt;/clause&gt;")
+                            .param("rules", ruleText)
+                            .param("id", clause.id())
+                            .param("clause", clause.text()))
+                    .call()
+                    .entity(Judgement.class);
+            findings.add(new Finding(clause.id(), verifyEvidence(j, clause), "model"));
+        }
+        audit.record(contractHash, POLICY_VERSION, findings);
+        return findings;
+    }
+
+    /** A finding whose quote is not in the clause cannot stand on its own. */
+    static Judgement verifyEvidence(Judgement j, Clause clause) {
+        boolean quoted = j.evidenceQuote() != null
+                &amp;&amp; normalise(clause.text()).contains(normalise(j.evidenceQuote()));
+        if (j.status() == Status.COMPLIANT || quoted) {
+            return j;
+        }
+        return new Judgement(Status.NEEDS_REVIEW, j.severity(), j.ruleId(), j.evidenceQuote(),
+                "Evidence not found verbatim in the clause. " + j.explanation());
+    }
+
+    static Optional&lt;Finding&gt; numericRules(Clause clause) {
+        if (clause.paymentDays() != null &amp;&amp; clause.paymentDays() &gt; 60) {
+            return Optional.of(new Finding(clause.id(), new Judgement(Status.NON_COMPLIANT,
+                    Severity.MEDIUM, "FIN-02", null, "Payment terms of " + clause.paymentDays()
+                    + " days exceed the 60-day maximum."), "rule-check"));
+        }
+        return Optional.empty();
+    }
+
+    private static String normalise(String s) {
+        return s.replaceAll("\\s+", " ").strip().toLowerCase();
+    }
+}</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="codewrap">
+      <div class="codelabel">Verified with a stub model</div>
+<pre><code class="language-plaintext">clause 7.2 "Supplier's total liability shall not
+            exceed £10,000."   paymentDays=90
+→ FIN-02 NON_COMPLIANT (rule-check)
+→ judge quotes "liability shall not exceed £10,000"
+  → kept: quote found verbatim
+→ judge quotes "liability is capped at ten thousand"
+  → NEEDS_REVIEW: evidence not found verbatim</code></pre>
+    </div>
+    <div class="note warn"><span class="lbl">Long contracts</span>Extracting 40 pages in one call risks truncation and skipped clauses. Split by section headings first, extract per section, and check that the extracted clause count matches the document's numbering.</div>
+    <div class="note"><span class="lbl">Positioning</span>This is decision support. The output is a prioritised review list with evidence, never an automatic approval or rejection of a contract.</div>
+  </div>
+</section>

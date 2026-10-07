@@ -1,0 +1,44 @@
+<section class="slide" data-sec="Advisors" data-title="The advisor chain">
+  <h2>Advisors wrap the model call like servlet filters, in order</h2>
+  <p class="dek">An advisor sees the request on the way in and the response on the way out, and can change either, or stop the call entirely. Spring AI sorts advisors by <code>getOrder()</code>, lowest first, and always ends the chain with an advisor that calls the <code>ChatModel</code>. Memory, RAG, the tool loop, output validation and logging are all advisors. Knowing their order explains most surprising behaviour.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="Advisors as nested layers, outermost on the left. The request enters MessageChatMemoryAdvisor (order highest plus 200), which adds history. Then ToolCallingAdvisor (highest plus 300), which loops: every tool round trip re-runs everything to its right. Then retrieval advisors such as QuestionAnswerAdvisor or RetrievalAugmentationAdvisor and SimpleLoggerAdvisor at order 0. Then StructuredOutputValidationAdvisor near the end. The final advisor calls the ChatModel. The response flows back out through the same advisors in reverse order. Values measured on Spring AI 2.0.1.">
+        <rect x="10" y="20" width="880" height="200" rx="10" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="22" y="40" font-size="10.5" font-weight="600" fill="currentColor">MessageChatMemoryAdvisor · HIGHEST+200</text>
+        <text x="22" y="55" font-size="9" fill="currentColor" opacity="0.8">in: add history · out: save turn</text>
+
+        <rect x="160" y="64" width="720" height="146" rx="10" fill="#3AA79B" fill-opacity="0.06" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="172" y="84" font-size="10.5" font-weight="600" fill="currentColor">ToolCallingAdvisor · HIGHEST+300</text>
+        <text x="172" y="99" font-size="9" fill="currentColor" opacity="0.8">loops while the model asks for tools</text>
+
+        <rect x="390" y="108" width="480" height="94" rx="10" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="402" y="127" font-size="10.5" font-weight="600" fill="currentColor">RAG advisors · SimpleLoggerAdvisor · SafeGuardAdvisor · order 0</text>
+        <text x="402" y="142" font-size="9" fill="currentColor" opacity="0.8">in: retrieve and add context · log · block</text>
+
+        <rect x="600" y="150" width="260" height="44" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></rect>
+        <text x="612" y="168" font-size="10" font-weight="600" fill="currentColor">StructuredOutputValidationAdvisor</text>
+        <text x="612" y="183" font-size="9" fill="currentColor" opacity="0.8">LOWEST−2000 · re-asks on invalid JSON</text>
+
+        <rect x="770" y="230" width="120" height="30" rx="8" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+        <text x="830" y="249" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">ChatModel</text>
+        <line x1="830" y1="196" x2="830" y2="227" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <line x1="20" y1="244" x2="740" y2="244" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="24" y="238" font-size="9" fill="currentColor" opacity="0.75">request: lowest order first →</text>
+        <path d="M300 92 C 330 70, 360 70, 380 104" fill="none" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <text x="300" y="118" font-size="9" fill="#3AA79B">re-runs the inner</text>
+        <text x="300" y="130" font-size="9" fill="#3AA79B">layers per tool call</text>
+        <text x="22" y="262" font-size="9" fill="currentColor" opacity="0.75">response: the same layers in reverse ←</text>
+      </svg>
+    </div>
+    <figcaption>Orders measured on Spring AI 2.0.1. "HIGHEST" is <code>Ordered.HIGHEST_PRECEDENCE</code>; most built-ins default to 0, so their relative order follows registration.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Memory outside the tool loop</h4><p>Memory runs once per user turn: it loads history before the loop and saves the final exchange after it. Advisors ordered after <code>ToolCallingAdvisor</code>, such as RAG and logging, run on every tool round trip, so a three-tool answer retrieves three times. Order an advisor before the tool advisor if it should run once.</p></div>
+    <div class="card"><h4>Guards go first</h4><p><code>SafeGuardAdvisor</code> defaults to order 0, so memory has already stored the message it is about to block. Give it, and any redaction advisor, an order below <code>HIGHEST_PRECEDENCE + 200</code> so nothing sensitive reaches memory, retrieval or logs.</p></div>
+    <div class="card"><h4>Advisors share a context map</h4><p>Each request carries a <code>context()</code> map that advisors read and write: the conversation id for memory, retrieved documents for citations, your own flags. Set values per call with <code>.advisors(a -&gt; a.param(key, value))</code>.</p></div>
+  </div>
+</section>

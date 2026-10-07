@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Embeddings" data-title="What an embedding is">
+  <h2>A fixed-length vector that encodes meaning, compared with a distance metric</h2>
+  <p class="dek">An embedding model maps text (or an image) to a point in a space with hundreds or thousands of dimensions. The individual numbers mean nothing on their own; only distances between vectors matter. The model was trained so that texts people would call "about the same thing" end up close together, which is exactly what search and retrieval need.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 250" role="img" aria-label="Three texts go into the same embedding model and come out as vectors of 1,536 numbers each. 'Refund for a damaged lamp' becomes 0.021, minus 0.113, 0.064 and so on. 'Can I get my money back for a broken lamp?' becomes a vector very close to the first one: cosine similarity about 0.86. 'Reset my password' becomes a distant vector: cosine similarity about 0.12 with the first. Numbers are illustrative.">
+          <g font-size="9.5" fill="currentColor">
+            <rect x="10" y="16" width="170" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="18" y="35">"Refund for a damaged lamp"</text>
+            <rect x="10" y="62" width="170" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="18" y="79">"Can I get my money back</text><text x="18" y="93">for a broken lamp?"</text>
+            <rect x="10" y="118" width="170" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="18" y="137">"Reset my password"</text>
+          </g>
+          <rect x="200" y="40" width="70" height="84" rx="8" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="235" y="78" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">embedding</text><text x="235" y="92" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">model</text>
+          <g stroke="#8A94A3" stroke-width="1.2">
+            <line x1="180" y1="31" x2="197" y2="60" marker-end="url(#arw)"></line><line x1="180" y1="82" x2="197" y2="82" marker-end="url(#arw)"></line><line x1="180" y1="133" x2="197" y2="106" marker-end="url(#arw)"></line>
+            <line x1="270" y1="60" x2="288" y2="31" marker-end="url(#arw)"></line><line x1="270" y1="82" x2="288" y2="82" marker-end="url(#arw)"></line><line x1="270" y1="106" x2="288" y2="133" marker-end="url(#arw)"></line>
+          </g>
+          <g font-size="9" fill="currentColor" font-family="IBM Plex Mono, monospace">
+            <text x="292" y="35">[0.021, -0.113, 0.064, …]</text>
+            <text x="292" y="86">[0.019, -0.098, 0.071, …]</text>
+            <text x="292" y="137">[-0.087, 0.040, -0.012, …]</text>
+          </g>
+          <line x1="10" y1="168" x2="430" y2="168" stroke="currentColor" stroke-opacity="0.2"></line>
+          <g font-size="10" fill="currentColor">
+            <text x="10" y="190">cos(refund, money back)</text><text x="200" y="190" fill="#3AA79B" font-weight="600">≈ 0.86   very similar</text>
+            <text x="10" y="210">cos(refund, password)</text><text x="200" y="210" fill="#D26A3F" font-weight="600">≈ 0.12   unrelated</text>
+          </g>
+          <text x="10" y="238" font-size="9" fill="currentColor" opacity="0.7">1,536 numbers each; values illustrative, from a text-embedding-3-small-sized model</text>
+        </svg>
+      </div>
+    </figure>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Metric</th><th>Formula</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Cosine similarity</td><td class="num">a·b / (|a| |b|)</td><td>The default. Angle only, ignores length. 1 = same direction.</td></tr>
+          <tr><td>Dot product</td><td class="num">a·b</td><td>Same ranking as cosine when vectors are normalised to length 1, which most hosted models do. Fastest.</td></tr>
+          <tr><td>Euclidean (L2)</td><td class="num">|a − b|</td><td>Straight-line distance; smaller is closer. Equivalent ranking for normalised vectors.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>What "similar" means is the model's choice</h4><p>Embeddings capture topic and intent well. They are weaker on negation ("refund" and "no refund" are close), exact numbers and identifiers, and anything the model's training did not cover, such as your internal product codes.</p></div>
+    <div class="card"><h4>Scores are not probabilities</h4><p>0.82 does not mean "82% relevant", and a good threshold for one model is wrong for another. Pick thresholds from labelled examples of your own data, per model.</p></div>
+    <div class="card"><h4>Embed what you will search for</h4><p>A chunk of text, a product title plus description, a ticket subject plus first message. Embedding a whole 50-page document as one vector averages away the detail you will want to find.</p></div>
+  </div>
+</section>

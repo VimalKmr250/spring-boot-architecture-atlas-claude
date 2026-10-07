@@ -1,0 +1,97 @@
+<section class="slide" data-sec="Production" data-title="Resilience: retries, timeouts and fallbacks">
+  <h2>Resilience: bounded retries, real timeouts, a fallback, and a concurrency cap</h2>
+  <p class="dek">Model providers rate-limit, time out and have outages like any remote dependency, and a single call can take tens of seconds. Know which retry layer applies to your provider, make the worst-case wait shorter than your users' patience, cap concurrent calls under your quota, and decide what happens when the model is unavailable: a second provider, a cached answer, or an honest message.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Provider (2.0.1)</th><th>Who retries</th><th>Defaults</th></tr></thead>
+          <tbody>
+            <tr><td>OpenAI, Anthropic</td><td>The official SDK</td><td>OpenAI: <code>max-retries: 3</code>, <code>timeout: 60s</code>; Anthropic: <code>spring.ai.anthropic.max-retries</code> / <code>timeout</code></td></tr>
+            <tr><td>Ollama and other HTTP-based models</td><td>Spring AI's <code>RetryTemplate</code>: <code>spring.ai.retry.*</code></td><td>10 attempts, 2 s backoff × 5, capped at 3 min</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml · fail fast on user-facing paths</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    openai:
+      chat:
+        timeout: 20s          # per attempt
+        max-retries: 2        # SDK retries 429 / 5xx / connection errors
+    retry:                    # applies to Ollama and similar models
+      max-attempts: 3
+      backoff:
+        initial-interval: 500ms
+        multiplier: 2
+        max-interval: 4s</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Check the defaults</span>With Spring AI's defaults, ten attempts wait 2 + 10 + 50 + 6 × 180 seconds between them: about 19 minutes of backoff alone, holding the request thread. Fine for a nightly batch, unacceptable behind a chat box. Set retries per workload, and do not stack your own retries on top of the provider's without counting the total.</div>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">ResilientAnswerService.java</div>
+<pre><code class="language-java">package com.acme.ai.ops;
+
+import com.openai.errors.InternalServerException;
+import com.openai.errors.OpenAIIoException;
+import com.openai.errors.RateLimitException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.retry.TransientAiException;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
+import org.springframework.resilience.annotation.EnableResilientMethods;
+import org.springframework.stereotype.Service;
+
+@Configuration
+@EnableResilientMethods
+class ResilienceConfig {}
+
+@Service
+class ResilientAnswerService {
+
+    private static final Logger log = LoggerFactory.getLogger(ResilientAnswerService.class);
+
+    private final ChatClient primary;
+    private final ChatClient fallback;
+
+    ResilientAnswerService(@Qualifier("primaryChatClient") ChatClient primary,
+                           @Qualifier("fallbackChatClient") ChatClient fallback) {
+        this.primary = primary;
+        this.fallback = fallback;
+    }
+
+    /** At most 20 calls in flight from this instance: stays under the provider quota. */
+    @ConcurrencyLimit(20)
+    public String answer(String question) {
+        try {
+            return primary.prompt().user(question).call().content();
+        } catch (RuntimeException e) {
+            if (!isTransient(e)) {
+                throw e;                     // a bad request will fail on any provider
+            }
+            log.warn("primary model unavailable ({}), using fallback", e.getClass().getSimpleName());
+            return fallback.prompt().user(question).call().content();
+        }
+    }
+
+    static boolean isTransient(Throwable e) {
+        return e instanceof RateLimitException
+                || e instanceof InternalServerException
+                || e instanceof OpenAIIoException
+                || e instanceof TransientAiException;
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Fallback options</h4><p>Same model through another region or provider; a smaller model; a cached answer for common questions; or a clear "the assistant is busy, here is the help page". Decide per feature, and test the fallback path regularly.</p></div>
+    <div class="card"><h4>Rate limits are capacity</h4><p>Providers limit requests and tokens per minute. A concurrency cap and a queue protect you from 429 storms; provisioned throughput or a second region buys headroom for peaks.</p></div>
+    <div class="card"><h4>Circuit breakers</h4><p>When the primary is failing, stop sending it traffic for a while instead of paying the timeout on every request. Resilience4j's circuit breaker around <code>answer()</code> is the usual choice.</p></div>
+  </div>
+</section>

@@ -1,0 +1,94 @@
+<section class="slide" data-sec="RAG" data-title="Grounding and citations">
+  <h2>Number the sources, ask for citations, and check them in code</h2>
+  <p class="dek">A grounded answer is one a reader can verify. Label every retrieved chunk with a number, ask the model to cite the numbers it used and to say when the context does not contain the answer, return the answer as a record, then check in code that every cited number was actually retrieved. Show the user the source titles and links. An answer with no valid citation is treated as "not found".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CitedAnswerService.java</div>
+<pre><code class="language-java">package com.acme.ai.rag;
+
+import java.util.List;
+import java.util.stream.IntStream;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.Query;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.stereotype.Service;
+
+@Service
+class CitedAnswerService {
+
+    record ModelAnswer(boolean answered, String answer, List&lt;Integer&gt; citations) {}
+
+    record Source(int number, String title, String url) {}
+
+    record CitedAnswer(String text, List&lt;Source&gt; sources) {}
+
+    private static final String GROUNDED = """
+            Answer the question using only the numbered sources below.
+            After each claim, cite the source numbers you used, like [2].
+            If the sources do not contain the answer, set answered to false.
+
+            Sources:
+            {sources}
+
+            Question: {question}""";
+
+    private final ChatClient chatClient;
+    private final DocumentRetriever retriever;
+
+    CitedAnswerService(ChatClient.Builder builder, VectorStore vectorStore) {
+        this.chatClient = builder.build();
+        this.retriever = VectorStoreDocumentRetriever.builder()
+                .vectorStore(vectorStore).topK(5).similarityThreshold(0.5).build();
+    }
+
+    CitedAnswer ask(String question) {
+        List&lt;Document&gt; docs = retriever.retrieve(new Query(question));
+        if (docs.isEmpty()) {
+            return new CitedAnswer("I couldn't find that in our policies.", List.of());
+        }
+        String numbered = IntStream.range(0, docs.size())
+                .mapToObj(i -&gt; "[" + (i + 1) + "] " + docs.get(i).getText())
+                .reduce("", (a, b) -&gt; a + b + "\n\n");
+
+        ResponseEntity&lt;ChatResponse, ModelAnswer&gt; result = chatClient.prompt()
+                .user(u -&gt; u.text(GROUNDED)
+                        .param("sources", numbered)
+                        .param("question", question))
+                .call()
+                .responseEntity(ModelAnswer.class);
+        ModelAnswer a = result.entity();
+
+        List&lt;Integer&gt; valid = a.citations() == null ? List.of() : a.citations().stream()
+                .filter(n -&gt; n &gt;= 1 &amp;&amp; n &lt;= docs.size()).distinct().toList();
+        if (!a.answered() || valid.isEmpty()) {          // no evidence, no answer
+            return new CitedAnswer("I couldn't find that in our policies.", List.of());
+        }
+        return new CitedAnswer(a.answer(), valid.stream().map(n -&gt; new Source(n,
+                String.valueOf(docs.get(n - 1).getMetadata().get("title")),
+                String.valueOf(docs.get(n - 1).getMetadata().get("url")))).toList());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Sample response (illustrative)</div>
+<pre><code class="language-json">{
+  "text": "Most items can be returned within 30 days of delivery [1]. Sofas are collected by our courier; book it from your order page [2].",
+  "sources": [
+    { "number": 1, "title": "Returns policy", "url": "https://help.acme.example/returns" },
+    { "number": 2, "title": "Large item collection", "url": "https://help.acme.example/collection" }
+  ]
+}</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Why retrieve outside the advisor here</span>The advisor is convenient, but this use case needs the exact list of chunks <i>and their numbering</i> to validate citations, so the service retrieves with the same <code>DocumentRetriever</code> the advisor would use and builds the prompt itself. With the advisor you can read the retrieved list from the response context (<code>RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT</code>).</div>
+      <div class="note warn"><span class="lbl">Citations can be wrong too</span>A model can cite [2] for a claim that is not in source 2. Valid numbers prove the source was retrieved, not that it supports the claim. Measure support offline with a fact-checking evaluator (next slide), and show sources so users can check.</div>
+      <div class="note"><span class="lbl">Say it in the interview</span>"Grounding is a contract: answer only from numbered context, cite it, and decline when it is missing. I enforce the contract in code with structured output and citation checks, and I measure faithfulness offline."</div>
+    </div>
+  </div>
+</section>

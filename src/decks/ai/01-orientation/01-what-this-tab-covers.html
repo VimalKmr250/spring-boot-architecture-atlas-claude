@@ -1,0 +1,40 @@
+<section class="slide" data-sec="Orientation" data-title="What this tab covers">
+  <h2>Spring AI: LLM features built like any other Spring Boot feature</h2>
+  <p class="lede">This tab teaches you to add large language models to an enterprise Spring Boot application with the same habits you use everywhere else: an injected client, typed results, configuration properties, tests and metrics. It starts with what an LLM actually does, works through the Spring AI API, prompts, structured output, memory and tools, then grounds the model in your own data with embeddings, vector stores and RAG. It ends with fine-tuning, agents, nine use cases, production concerns and the interview.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">2.0</span><p>Spring AI 2.0.1 on Spring Boot 4.1 and Java 21. Boxes tagged <span class="tag w">1.x</span> mark what is different in Spring AI 1.0/1.1, because many codebases have not upgraded yet.</p></div>
+    <div class="card lift"><span class="bignum">9</span><p>use cases with code: five common ones (support chatbot, summarisation, semantic search, code assistant, sentiment) and four that enterprises build for themselves (knowledge assistant, report generation, compliance checking, recommendations).</p></div>
+    <div class="card lift"><span class="bignum">24</span><p>interview questions, each with a 30-second answer and a "go deeper" paragraph, linked back to the slides that cover the topic.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>What the eighteen sections cover</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Orientation</dt><dd>this slide, the learning path, project setup</dd>
+        <dt>LLM fundamentals</dt><dd>tokens, context windows, sampling, roles, choosing a model, failure modes, the adaptation ladder</dd>
+        <dt>Spring AI overview</dt><dd>the layers, <code>ChatClient</code> and <code>ChatModel</code>, providers, streaming, token usage</dd>
+        <dt>Prompts and output</dt><dd>prompt engineering, templates, prompt injection, structured output into records</dd>
+        <dt>Advisors, memory, tools</dt><dd>the advisor chain, chat memory, tool calling and MCP</dd>
+        <dt>Your data</dt><dd>embeddings, vector stores, RAG from ingestion to evaluation</dd>
+        <dt>Beyond prompting</dt><dd>fine-tuning, and agentic workflows</dd>
+        <dt>Use cases</dt><dd>five common and four bespoke enterprise solutions, each with a design and code</dd>
+        <dt>Production</dt><dd>architecture, observability, cost, resilience, security, guardrails, testing</dd>
+        <dt>Interview</dt><dd>24 questions, then a wrap-up: trade-offs, mistakes, the 1.x → 2.0 migration, a study plan</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>How to use it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents.</li>
+          <li>New to LLMs? Read LLM fundamentals first. Every later section assumes tokens, temperature and context windows.</li>
+          <li>Already shipping Spring AI? Start at <a data-deck="ai" data-slide="The advisor chain">the advisor chain</a> and <a data-deck="ai" data-slide="Two pipelines: ingestion and retrieval">RAG</a>, then read <a data-deck="ai" data-slide="Spring AI 1.x to 2.0 migration">the migration slide</a>.</li>
+          <li>Preparing for an interview? Each slide ends with a callout you can say out loud; the questions section links back here.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">How the code is written</span>A code label that starts with a file name, such as <code>SupportController.java</code>, is a complete file. Every one compiles against Spring AI 2.0.1 and Spring Boot 4.1.1 with <code>javac --release 21 -Xlint:all</code>, without warnings. Every <code>spring.ai.*</code> property on a slide is checked against the configuration metadata in the 2.0.1 jars. Blocks labelled with "verified" or "Spring AI 2.0.1 output" show what the code actually did, run against a stub model. Model replies are labelled <b>Sample response</b>: the same prompt gives different words on every run, so they show the shape, not exact output.</div>
+    </div>
+  </div>
+</section>

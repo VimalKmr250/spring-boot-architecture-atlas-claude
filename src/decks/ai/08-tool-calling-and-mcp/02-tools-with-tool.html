@@ -1,0 +1,102 @@
+<section class="slide" data-sec="Tool calling and MCP" data-title="Tools with @Tool">
+  <h2>Annotate a method with <code>@Tool</code>; pass request data through <code>ToolContext</code></h2>
+  <p class="dek">Any bean method can be a tool. Spring AI builds the JSON schema from the parameters, serialises the return value to JSON for the model, and runs the method when the model asks. A <code>ToolContext</code> parameter is excluded from the schema: it carries data from your code to the tool, such as the authenticated customer, that the model must never see or choose.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">OrderTools.java</div>
+<pre><code class="language-java">package com.acme.ai.tools;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+@Component
+class OrderTools {
+
+    record OrderStatus(String orderId, String status, String carrier, LocalDate estimatedDelivery) {}
+
+    /** Your existing order service, behind a port. */
+    interface OrderLookup {
+        Optional&lt;OrderStatus&gt; findForCustomer(String orderId, String customerId);
+        List&lt;OrderStatus&gt; recentForCustomer(String customerId, int limit);
+    }
+
+    private final OrderLookup orders;
+
+    OrderTools(OrderLookup orders) {
+        this.orders = orders;
+    }
+
+    @Tool(description = """
+            Returns status, carrier and estimated delivery date of one of the
+            current customer's orders. Use it for any question about a specific order.""")
+    OrderStatus getOrderStatus(@ToolParam(description = "Order id, for example 1042") String orderId,
+                               ToolContext context) {
+        return orders.findForCustomer(orderId, customerId(context))
+                .orElseThrow(() -&gt; new IllegalArgumentException(
+                        "No order " + orderId + " for this customer"));
+    }
+
+    @Tool(description = "Lists the current customer's most recent orders, newest first.")
+    List&lt;OrderStatus&gt; recentOrders(@ToolParam(description = "How many orders, 1 to 10") int limit,
+                                   ToolContext context) {
+        return orders.recentForCustomer(customerId(context), Math.clamp(limit, 1, 10));
+    }
+
+    private static String customerId(ToolContext context) {
+        return (String) context.getContext().get("customerId");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">OrderAssistant.java</div>
+<pre><code class="language-java">package com.acme.ai.tools;
+
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class OrderAssistant {
+
+    private final ChatClient chatClient;
+
+    OrderAssistant(ChatClient.Builder builder, OrderTools orderTools) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        You are Acme Retail's order assistant. Use the tools for any
+                        question about orders; never guess order details.""")
+                .defaultTools(orderTools)
+                .build();
+    }
+
+    String ask(String question, String customerId) {
+        return chatClient.prompt()
+                .user(question)
+                .toolContext(Map.of("customerId", customerId))   // from the session, not the model
+                .call()
+                .content();
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">The schema the model sees for getOrderStatus · Spring AI 2.0.1</div>
+<pre><code class="language-json">{
+  "type" : "object",
+  "properties" : {
+    "orderId" : { "type" : "string", "description" : "Order id, for example 1042" }
+  },
+  "required" : [ "orderId" ],
+  "additionalProperties" : false
+}</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Notice what is missing</span>No <code>customerId</code> and no <code>ToolContext</code> in the schema. The model can only choose the order id; whose orders it may see is fixed by your code. That one design choice closes the most common tool vulnerability: a user persuading the model to look up somebody else's data.</div>
+    </div>
+  </div>
+</section>

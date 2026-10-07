@@ -1,0 +1,30 @@
+<section class="slide" data-sec="Spring AI overview" data-title="The building blocks">
+  <h2>Two dozen types cover almost everything you will write</h2>
+  <p class="dek">Spring AI has a large surface, but day-to-day code touches a small set of types. Learn these names and what each is responsible for; the rest of the tab uses them constantly, and interviewers expect you to place each one in the request flow.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Type</th><th>Package (<code>org.springframework.ai.…</code>)</th><th>Responsibility</th></tr></thead>
+      <tbody>
+        <tr><td><code>ChatClient</code></td><td><code>chat.client</code></td><td>The fluent API you inject (via <code>ChatClient.Builder</code>) and call. Holds defaults: system prompt, advisors, tools, options.</td></tr>
+        <tr><td><code>ChatModel</code> · <code>StreamingChatModel</code></td><td><code>chat.model</code></td><td>The provider-neutral model interface. One implementation per provider.</td></tr>
+        <tr><td><code>Prompt</code> · <code>Message</code> · <code>ChatOptions</code></td><td><code>chat.prompt</code> · <code>chat.messages</code></td><td>A request: messages (<code>SystemMessage</code>, <code>UserMessage</code>, <code>AssistantMessage</code>, <code>ToolResponseMessage</code>) plus options.</td></tr>
+        <tr><td><code>ChatResponse</code> · <code>Usage</code></td><td><code>chat.model</code> · <code>chat.metadata</code></td><td>The reply: generations, finish reason, model id, token counts.</td></tr>
+        <tr><td><code>PromptTemplate</code></td><td><code>chat.prompt</code></td><td>Renders <code>{placeholders}</code> into text, from a string or a resource.</td></tr>
+        <tr><td><code>BeanOutputConverter</code></td><td><code>converter</code></td><td>Turns the reply into a record or list; behind <code>.entity()</code>.</td></tr>
+        <tr><td><code>Advisor</code> (<code>CallAdvisor</code>, <code>StreamAdvisor</code>)</td><td><code>chat.client.advisor.api</code></td><td>Interceptors around the model call: memory, RAG, tool loop, logging, guardrails.</td></tr>
+        <tr><td><code>ChatMemory</code> · <code>ChatMemoryRepository</code></td><td><code>chat.memory</code></td><td>Which messages to keep per conversation, and where to store them.</td></tr>
+        <tr><td><code>@Tool</code> · <code>ToolCallback</code> · <code>ToolContext</code></td><td><code>tool.annotation</code> · <code>tool</code> · <code>chat.model</code></td><td>Methods the model may ask your code to run, and request-scoped data passed to them.</td></tr>
+        <tr><td><code>EmbeddingModel</code></td><td><code>embedding</code></td><td>Text in, <code>float[]</code> out.</td></tr>
+        <tr><td><code>Document</code> · <code>DocumentReader</code> · <code>DocumentTransformer</code> · <code>DocumentWriter</code></td><td><code>document</code></td><td>The ETL pipeline: read files, split and enrich them, write them to a store.</td></tr>
+        <tr><td><code>VectorStore</code> · <code>SearchRequest</code></td><td><code>vectorstore</code></td><td>Stores documents with their embeddings; similarity search with metadata filters.</td></tr>
+        <tr><td><code>Evaluator</code></td><td><code>evaluation</code> · <code>chat.evaluation</code></td><td>Judges an answer: relevant to the question? supported by the context?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">Where the beans come from</span>A model starter auto-configures a <code>ChatModel</code>, an <code>EmbeddingModel</code> where the provider has one, and a prototype-scoped <code>ChatClient.Builder</code>. A vector store starter adds a <code>VectorStore</code>. A chat memory starter adds <code>ChatMemory</code>. You inject the builder, add your defaults, and build one <code>ChatClient</code> per use case.</div>
+    <div class="note"><span class="lbl">Say it in the interview</span>"<code>ChatClient</code> is the API, advisors are the extension points, <code>ChatModel</code> is the provider seam. Retrieval and memory are advisors, so I add them per client or per request instead of hand-building prompts."</div>
+  </div>
+</section>

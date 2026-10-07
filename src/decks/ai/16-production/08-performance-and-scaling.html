@@ -1,0 +1,53 @@
+<section class="slide" data-sec="Production" data-title="Performance and scaling">
+  <h2>Performance: budget the latency, stream the wait, and scale with virtual threads</h2>
+  <p class="dek">An LLM call spends seconds waiting on the network, so an AI service is I/O-bound with long request times. On classic platform threads, 200 concurrent conversations exhaust Tomcat's default pool. Java 21 virtual threads make blocking calls cheap again, so the simple <code>call()</code> style scales without rewriting into reactive code. Latency itself is managed by budgeting each stage, streaming, and doing less.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Latency budget for a RAG answer · illustrative</div>
+<pre><code class="language-plaintext">stage                          p50       p95      lever
+gateway + auth                 10 ms     30 ms
+memory load (JDBC)             5 ms      20 ms    index on conversation_id
+query embedding                80 ms     200 ms   cache frequent queries
+vector search (HNSW)           15 ms     60 ms    ef_search, filters, RAM
+model: time to first token     600 ms    1.8 s    smaller model, shorter prompt
+model: 150 output tokens       1.5 s     3.5 s    shorter answers, faster model
+──────────────────────────────────────────────
+first visible word (stream)    ≈ 0.7 s   ≈ 2.1 s
+complete answer                ≈ 2.2 s   ≈ 5.6 s</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml</div>
+<pre><code class="language-yaml">spring:
+  threads:
+    virtual:
+      enabled: true          # Tomcat and @Async run requests on virtual threads
+  mvc:
+    async:
+      request-timeout: 120s  # long streamed answers
+server:
+  tomcat:
+    max-connections: 10000</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Bottleneck</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>Threads blocked on model calls</td><td>Virtual threads; or streaming with <code>Flux</code></td></tr>
+            <tr><td>Provider rate limits (requests and tokens per minute)</td><td>Concurrency cap per instance, a queue, more quota or regions, provisioned throughput</td></tr>
+            <tr><td>Long prompts</td><td>Trim history and context; prompt caching for the stable prefix</td></tr>
+            <tr><td>Long answers</td><td>Ask for brevity; cap output; stream</td></tr>
+            <tr><td>Sequential calls in a workflow</td><td>Run independent calls in parallel; merge steps that do not need separate calls</td></tr>
+            <tr><td>Repeated work</td><td>Cache embeddings, retrieval results and frequent answers</td></tr>
+            <tr><td>Batch jobs competing with users</td><td>Separate quotas or deployments; provider batch APIs</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Scale out, not up</span>The service is stateless and the work is waiting, so horizontal scaling is easy; the real limit is your provider quota. Load-test with a stubbed or mocked model endpoint to find your own limits, then with the real provider at low volume to measure its latency distribution.</div>
+      <div class="note"><span class="lbl">Say it in the interview</span>"The model dominates latency, so I stream for perceived speed, budget every stage, keep prompts and answers short, and use virtual threads so blocking calls don't exhaust the thread pool. Throughput is bounded by provider quota, so I cap concurrency and plan quota like capacity."</div>
+    </div>
+  </div>
+</section>

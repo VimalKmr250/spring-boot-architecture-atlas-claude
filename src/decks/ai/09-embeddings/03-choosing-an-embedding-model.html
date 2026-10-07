@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Embeddings" data-title="Choosing an embedding model">
+  <h2>The embedding model is a long-term commitment; choose it with your own queries</h2>
+  <p class="dek">Swapping a chat model is a configuration change. Swapping an embedding model means re-embedding every stored document, because vectors from different models cannot be compared. So the choice deserves a small experiment: 50–100 real questions, the passages that answer them, and a measurement of how often each candidate model puts the right passage in its top 5.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Model</th><th>Dimensions</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>OpenAI <code>text-embedding-3-small</code></td><td class="num">1,536 (shortenable)</td><td>Cheap, strong general default; 8k-token input; also on Azure</td></tr>
+          <tr><td>OpenAI <code>text-embedding-3-large</code></td><td class="num">3,072 (shortenable)</td><td>Higher quality, about 6× the price of small</td></tr>
+          <tr><td>Amazon Titan Text Embeddings V2</td><td class="num">1,024 / 512 / 256</td><td>On Bedrock: stays in your AWS account and region</td></tr>
+          <tr><td>Cohere Embed (Bedrock or direct)</td><td class="num">1,024</td><td>Strong multilingual; separate query and document modes</td></tr>
+          <tr><td><code>nomic-embed-text</code> (Ollama)</td><td class="num">768</td><td>Local, free, long input; good for development and private data</td></tr>
+          <tr><td><code>mxbai-embed-large</code> (Ollama)</td><td class="num">1,024</td><td>Local; short 512-token input, so keep chunks small</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>What to compare</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Retrieval quality</dt><dd>recall@5 and MRR on <i>your</i> question set; public benchmarks are a starting point only</dd>
+        <dt>Languages</dt><dd>multilingual models if users ask in one language about documents in another</dd>
+        <dt>Max input</dt><dd>must exceed your chunk size, or chunks are silently truncated</dd>
+        <dt>Dimensions</dt><dd>storage and index memory scale linearly with them</dd>
+        <dt>Where it runs</dt><dd>data residency often decides between a public API, your cloud's model service, or self-hosting</dd>
+        <dt>Price</dt><dd>per million tokens, times the size of your corpus, times how often you re-embed</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="codewrap">
+      <div class="codelabel">Storage back-of-envelope</div>
+<pre><code class="language-plaintext">1,000,000 chunks × 1,536 dims × 4 bytes  ≈ 6.1 GB of raw vectors
+same, shortened to 512 dims               ≈ 2.0 GB
+HNSW index on top                         ≈ 1.5–2× the raw size, ideally in RAM
+re-embedding 1M chunks × 400 tokens       = 400M tokens per full rebuild</code></pre>
+    </div>
+    <div class="note tip"><span class="lbl">Plan for the migration you will need</span>Store the model name and version with every vector (as metadata), keep the source text so you can re-embed, and build a new index alongside the old one before switching queries over. Then a better model next year is a background job, not an outage.</div>
+  </div>
+</section>

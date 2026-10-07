@@ -1,0 +1,50 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="The adaptation ladder">
+  <h2>Five ways to make a model fit your problem, cheapest first</h2>
+  <p class="dek">When a model's answers are not good enough, there is a ladder of fixes. Each rung costs more and changes something different. Most enterprise problems are solved on the first three rungs; teams that jump straight to fine-tuning usually had a knowledge problem, which fine-tuning does not fix.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="A staircase with five steps rising left to right. Step one, prompt engineering: clearer instructions, changes behaviour, minutes. Step two, few-shot examples: shows the format, hours. Step three, RAG: adds knowledge from your documents, days. Step four, tools: live data and actions, days. Step five, fine-tuning: changes style and behaviour at scale, weeks. An arrow underneath says cost, effort and lead time rise to the right. A note says RAG is for knowledge, fine-tuning is for behaviour.">
+        <g font-size="11" fill="currentColor">
+          <rect x="10"  y="186" width="168" height="54" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="94" y="207" text-anchor="middle" font-weight="600">1 · Prompt</text>
+          <text x="94" y="224" text-anchor="middle" font-size="9.5" opacity="0.8">clearer instructions · minutes</text>
+
+          <rect x="186" y="146" width="168" height="94" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="270" y="167" text-anchor="middle" font-weight="600">2 · Few-shot</text>
+          <text x="270" y="184" text-anchor="middle" font-size="9.5" opacity="0.8">show 2–5 worked examples</text>
+          <text x="270" y="198" text-anchor="middle" font-size="9.5" opacity="0.8">format, tone · hours</text>
+
+          <rect x="362" y="106" width="168" height="134" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+          <text x="446" y="127" text-anchor="middle" font-weight="600">3 · RAG</text>
+          <text x="446" y="144" text-anchor="middle" font-size="9.5" opacity="0.8">retrieve your documents</text>
+          <text x="446" y="158" text-anchor="middle" font-size="9.5" opacity="0.8">into the prompt</text>
+          <text x="446" y="172" text-anchor="middle" font-size="9.5" opacity="0.8">adds knowledge · days</text>
+
+          <rect x="538" y="66" width="168" height="174" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="622" y="87" text-anchor="middle" font-weight="600">4 · Tools</text>
+          <text x="622" y="104" text-anchor="middle" font-size="9.5" opacity="0.8">model calls your APIs</text>
+          <text x="622" y="118" text-anchor="middle" font-size="9.5" opacity="0.8">live data, actions · days</text>
+
+          <rect x="714" y="26" width="176" height="214" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="802" y="47" text-anchor="middle" font-weight="600">5 · Fine-tune</text>
+          <text x="802" y="64" text-anchor="middle" font-size="9.5" opacity="0.8">train on your examples</text>
+          <text x="802" y="78" text-anchor="middle" font-size="9.5" opacity="0.8">style, format, narrow skill</text>
+          <text x="802" y="92" text-anchor="middle" font-size="9.5" opacity="0.8">weeks + training budget</text>
+        </g>
+        <line x1="20" y1="254" x2="880" y2="254" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="20" y="22" font-size="10" fill="currentColor" opacity="0.75">cost, effort and lead time rise to the right →</text>
+        <text x="20" y="40" font-size="10" fill="#D26A3F">RAG and tools change what the model knows.</text>
+        <text x="20" y="56" font-size="10" fill="currentColor">Prompts, examples and fine-tuning change how it behaves.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Knowledge problem</h4><p>"It does not know our return policy." Fix with RAG. Fine-tuning a model on your policy documents teaches it the <i>style</i> of your policies, not reliable recall of their contents, and it is out of date the day a policy changes.</p></div>
+    <div class="card"><h4>Live-data or action problem</h4><p>"It does not know where order 1042 is" or "it should cancel the order." Fix with tools: the model asks, your code calls the order service with the user's permissions.</p></div>
+    <div class="card"><h4>Behaviour problem</h4><p>"It knows the facts but answers in the wrong format, tone or level of detail." Try a clearer prompt and examples first. Fine-tune when you have thousands of good examples and the prompt has become long and expensive.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say it in the interview</span>"RAG for knowledge, tools for live data and actions, fine-tuning for behaviour. I start at the cheapest rung and only climb when an evaluation set shows the current one is not enough." The full decision table is on <a data-deck="ai" data-slide="Prompting, RAG or fine-tuning?">Prompting, RAG or fine-tuning?</a>.</div>
+</section>

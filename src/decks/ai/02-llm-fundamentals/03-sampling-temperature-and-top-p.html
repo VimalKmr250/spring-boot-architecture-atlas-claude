@@ -1,0 +1,46 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="Sampling: temperature, top-p and limits">
+  <h2>Sampling options decide how the next token is picked</h2>
+  <p class="dek">The model produces a probability for every possible next token; the sampler picks one. Sampling options reshape that choice. They are the first knobs you reach for, and the ones most often set by superstition. Set them per task, write down why, and check the model supports them.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Option</th><th>What it does</th><th>Typical setting</th></tr></thead>
+        <tbody>
+          <tr><td><code>temperature</code></td><td>Scales the probabilities. Low values make the top token dominate; high values flatten the curve and add variety.</td><td>0–0.2 extraction, classification · 0.3–0.5 summaries, Q&amp;A · 0.7–1.0 brainstorming</td></tr>
+          <tr><td><code>topP</code></td><td>Samples only from the smallest set of tokens whose probabilities add up to <i>p</i>.</td><td>Leave at default; change temperature <i>or</i> top-p, not both</td></tr>
+          <tr><td><code>topK</code></td><td>Samples only from the <i>k</i> most likely tokens. Not every provider supports it.</td><td>Default</td></tr>
+          <tr><td><code>maxTokens</code></td><td>Hard cap on output tokens. The answer is cut off mid-sentence when hit.</td><td>Always set it: it bounds cost and latency</td></tr>
+          <tr><td><code>stopSequences</code></td><td>Stops generation when one of these strings appears.</td><td>Delimiters in few-shot formats</td></tr>
+          <tr><td><code>frequencyPenalty</code> · <code>presencePenalty</code></td><td>Discourage repeating tokens already used.</td><td>Rarely needed with modern models</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Portable options: a model that samples (ollama profile, Claude Haiku 4.5…) · excerpt</div>
+<pre><code class="language-java">String label = chatClient.prompt()
+        .system("Classify the review as POSITIVE, NEGATIVE or MIXED. Reply with the label only.")
+        .user(review)
+        .options(ChatOptions.builder()
+                .temperature(0.0)        // same input, (almost) same label
+                .maxTokens(10))          // a label, not an essay
+        .call()
+        .content();</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">OpenAI reasoning model (gpt-5-mini, this tab's default) · excerpt</div>
+<pre><code class="language-java">        .options(OpenAiChatOptions.builder()
+                .reasoningEffort("minimal")       // instead of temperature
+                .maxCompletionTokens(400))        // counts hidden reasoning tokens too</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Reasoning models are different</span>Models that "think" before answering reject a custom <code>temperature</code> or <code>topP</code>: OpenAI's gpt-5 and o-series families, and Anthropic's current Opus and Sonnet models, which use an effort setting instead. OpenAI's reasoning models also expect <code>max_completion_tokens</code>, which Spring AI sends from <code>maxCompletionTokens</code>; the portable <code>maxTokens</code> is sent as <code>max_tokens</code>. Portable options are the intersection of what providers support, so check the model card before relying on them.</div>
+      <div class="note"><span class="lbl">Temperature 0 is not deterministic</span>It makes the most likely token win, but batching and floating-point effects on the provider's GPUs still change outputs now and then. Never write a test that expects an exact string from a real model. Use structured output and assertions on fields instead.</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h4>Defaults in config, overrides in code</h4><p>Put the common case in <code>application.yml</code>. Override per request only where a use case needs something else, such as a classifier at temperature 0. Options set on the request win over the defaults.</p></div>
+    <div class="card"><h4>Interview trap</h4><p>"How do you stop hallucinations?" — "Set temperature to 0" is the wrong answer. Low temperature makes the model consistently pick its most likely continuation, which can be consistently wrong. Grounding, citations and validation reduce hallucination; temperature only reduces variety.</p></div>
+  </div>
+</section>

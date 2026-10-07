@@ -1,0 +1,105 @@
+<section class="slide" data-sec="Chat memory" data-title="Conversation memory in code">
+  <h2>A multi-turn chat API with memory, ownership checks and a delete</h2>
+  <p class="dek">The auto-configured <code>ChatMemory</code> bean keeps a 20-message window per conversation, stored in memory unless a repository starter is present. Add the advisor as a default, pass the conversation id on each request, and treat the id like any other resource identifier: issued by the server, owned by a user, checked on every access, deletable on request.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SupportChatController.java</div>
+<pre><code class="language-java">package com.acme.ai.memory;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.security.Principal;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+@RequestMapping("/api/conversations")
+class SupportChatController {
+
+    record UserText(@NotBlank @Size(max = 2_000) String text) {}
+
+    record Reply(String conversationId, String text) {}
+
+    private final ChatClient chatClient;
+    private final ChatMemory chatMemory;
+    private final ConversationOwners owners;
+
+    SupportChatController(ChatClient.Builder builder, ChatMemory chatMemory,
+                          ConversationOwners owners) {
+        this.chatClient = builder
+                .defaultSystem("You are Acme Retail's support assistant. Be brief.")
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
+        this.chatMemory = chatMemory;
+        this.owners = owners;
+    }
+
+    @PostMapping
+    Reply start(@Valid @RequestBody UserText first, Principal user) {
+        return send(owners.open(user.getName()), first, user);
+    }
+
+    @PostMapping("/{id}/messages")
+    Reply send(@PathVariable String id, @Valid @RequestBody UserText message, Principal user) {
+        owners.requireOwner(id, user.getName());
+        String text = chatClient.prompt()
+                .user(message.text())
+                .advisors(a -&gt; a.param(ChatMemory.CONVERSATION_ID, id))
+                .call()
+                .content();
+        return new Reply(id, text);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable String id, Principal user) {
+        owners.requireOwner(id, user.getName());
+        chatMemory.clear(id);                       // the user's "forget this" button
+    }
+}
+
+@Component
+class ConversationOwners {
+
+    private final Map&lt;String, String&gt; ownerById = new ConcurrentHashMap&lt;&gt;();   // a table in production
+
+    String open(String userName) {
+        String id = UUID.randomUUID().toString();   // 36 chars: fits the JDBC schema
+        ownerById.put(id, userName);
+        return id;
+    }
+
+    void requireOwner(String id, String userName) {
+        if (!userName.equals(ownerById.get(id))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);   // do not reveal it exists
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">What the model receives on turn 2 · verified with a stub model</div>
+<pre><code class="language-plaintext">USER:      Where is order 1042?
+ASSISTANT: It ships tomorrow.
+USER:      Can I change the address?</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Without a conversation id · Spring AI 2.0.1</div>
+<pre><code class="language-plaintext">java.lang.IllegalArgumentException: conversationId cannot be null</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">The window counts messages, not tokens</span>A 20-message window of short questions is a few hundred tokens; 20 messages that each paste a contract can overflow the context window. Size the window from real conversations, and cap the size of each user message at the API, as <code>@Size</code> does here.</div>
+      <div class="note"><span class="lbl">Memory and tools</span>In 2.0 the memory advisor sits outside the tool loop, so one user turn is stored as one user message and one final answer, not the intermediate tool calls. If you need the full trace, including tool calls, for audit, look at the community <code>spring-ai-session</code> project, an event-sourced replacement for <code>ChatMemory</code>.</div>
+      <div class="note warn"><span class="lbl">Stateless service, stateful store</span>With the default in-memory repository, a restart forgets every conversation and two instances behind a load balancer each see half of it. Use a shared repository in any deployed environment: next slide.</div>
+    </div>
+  </div>
+</section>

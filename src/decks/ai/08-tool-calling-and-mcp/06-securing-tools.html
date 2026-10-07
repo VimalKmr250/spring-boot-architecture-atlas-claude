@@ -1,0 +1,42 @@
+<section class="slide" data-sec="Tool calling and MCP" data-title="Securing tools">
+  <h2>Design every tool as if an attacker were choosing the arguments</h2>
+  <p class="dek">Through prompt injection, sometimes one is. A tool is an API endpoint whose caller is a language model influenced by whatever text it has read. Apply the same controls you would to a public endpoint, plus two that are specific to AI: the model must never choose <i>whose</i> data it touches, and actions with consequences need a confirmation step outside the model.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Risk</th><th>Example</th><th>Control</th></tr></thead>
+      <tbody>
+        <tr><td>Broken object-level authorisation</td><td>"Show me order 2077" for an order that belongs to someone else</td><td>Identity from <code>ToolContext</code> or the security context; ownership check inside the tool</td></tr>
+        <tr><td>Excessive agency</td><td>A summariser that can also send e-mail</td><td>Least privilege: attach only the tools this use case and this role need</td></tr>
+        <tr><td>Unconfirmed side effects</td><td>A refund issued because a review said "refund me"</td><td>The tool creates a <i>pending</i> action; a person or the user confirms in the UI</td></tr>
+        <tr><td>Injection through arguments</td><td>A model-built SQL fragment or file path</td><td>Typed, validated parameters; enums and ids, never query text or paths</td></tr>
+        <tr><td>Data exfiltration</td><td>A "fetch URL" tool called with <code>evil.example/?d=…secrets…</code></td><td>Allow-list hosts; no generic HTTP or e-mail tools</td></tr>
+        <tr><td>Retries and loops</td><td>The same payment tool called twice after a timeout</td><td>Idempotency keys; tool call limits; per-user rate limits</td></tr>
+        <tr><td>No audit trail</td><td>"Who cancelled this order?" — "the AI"</td><td>Log user, conversation id, tool, arguments and result for every call</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">A write tool that proposes instead of acting (excerpt)</div>
+<pre><code class="language-java">@Tool(description = """
+        Proposes a refund for one of the current customer's orders.
+        The customer must confirm it in the app before anything is paid.""")
+RefundProposal proposeRefund(@ToolParam(description = "Order id") String orderId,
+                             @ToolParam(description = "Reason in the customer's words") String reason,
+                             ToolContext ctx) {
+    String customerId = (String) ctx.getContext().get("customerId");
+    Order order = orders.requireOwned(orderId, customerId);            // authorisation
+    RefundProposal proposal = refunds.propose(order, reason);          // idempotent per order
+    audit.record(customerId, "proposeRefund", orderId, proposal.id()); // who, what, when
+    return proposal;   // the model tells the user to confirm; the UI calls the real refund API
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">The rule of thumb</span>If you would not expose the tool as a public REST endpoint with the same parameters and the user's token, do not expose it to a model.</div>
+      <div class="note"><span class="lbl">Observability built in</span>Spring AI records an <code>execute_tool &lt;name&gt;</code> span for every tool call. Arguments and results are not recorded unless you set <code>spring.ai.tools.observations.include-content=true</code>; leave it off where tools handle personal data.</div>
+      <div class="note"><span class="lbl">Say it in the interview</span>"Tools run with the user's identity, never one the model supplies. Read tools are broad, write tools are narrow, and anything with money or messages creates a pending action that a human confirms. Every call is audited and limited."</div>
+    </div>
+  </div>
+</section>

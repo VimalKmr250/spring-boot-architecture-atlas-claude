@@ -1,0 +1,107 @@
+<section class="slide" data-sec="Chat memory" data-title="Persistent memory with JDBC">
+  <h2>Put conversations in your database, size the window, and expire them</h2>
+  <p class="dek">Add the JDBC chat memory starter and the auto-configured <code>ChatMemory</code> writes to a <code>SPRING_AI_CHAT_MEMORY</code> table in your existing database. Redis, Cassandra, MongoDB and Neo4j starters work the same way. Two things are still yours: the window size, and how long conversations live, because chat transcripts are personal data.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">pom.xml (excerpt)</div>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.ai&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-ai-starter-model-chat-memory-repository-jdbc&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;org.postgresql&lt;/groupId&gt;
+  &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
+  &lt;scope&gt;runtime&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml</div>
+<pre><code class="language-yaml">spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/acme
+    username: acme
+    password: ${DB_PASSWORD}
+  ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never   # Flyway owns the schema in production</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">The PostgreSQL schema shipped in Spring AI 2.0.1</div>
+<pre><code class="language-sql">CREATE TABLE IF NOT EXISTS SPRING_AI_CHAT_MEMORY (
+    conversation_id VARCHAR(36) NOT NULL,
+    content TEXT NOT NULL,
+    type VARCHAR(10) NOT NULL
+        CHECK (type IN ('USER', 'ASSISTANT', 'SYSTEM', 'TOOL')),
+    "timestamp" TIMESTAMP NOT NULL,
+    sequence_id BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_TIMESTAMP_IDX
+    ON SPRING_AI_CHAT_MEMORY(conversation_id, "timestamp");
+CREATE INDEX IF NOT EXISTS SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_SEQUENCE_ID_IDX
+    ON SPRING_AI_CHAT_MEMORY(conversation_id, sequence_id);</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">ChatMemoryConfig.java</div>
+<pre><code class="language-java">package com.acme.ai.memory.jdbc;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+
+@Configuration
+@EnableScheduling
+class ChatMemoryConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatMemoryConfig.class);
+    private static final Duration RETENTION = Duration.ofDays(30);
+
+    private final JdbcTemplate jdbc;
+
+    ChatMemoryConfig(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /** Replaces the auto-configured 20-message window; the JDBC repository is still injected. */
+    @Bean
+    ChatMemory chatMemory(ChatMemoryRepository repository) {
+        return MessageWindowChatMemory.builder()
+                .chatMemoryRepository(repository)
+                .maxMessages(12)
+                .build();
+    }
+
+    /** Conversations are personal data: keep them only as long as the policy says. */
+    @Scheduled(cron = "0 15 3 * * *")
+    void expireOldConversations() {
+        int deleted = jdbc.update("""
+                DELETE FROM SPRING_AI_CHAT_MEMORY
+                WHERE conversation_id IN (
+                    SELECT conversation_id FROM SPRING_AI_CHAT_MEMORY
+                    GROUP BY conversation_id
+                    HAVING MAX("timestamp") &lt; ?)""",
+                LocalDateTime.now().minus(RETENTION));
+        log.info("expired {} chat memory rows", deleted);
+    }
+}</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl"><span class="tag w">1.x</span> migrating an existing table</span>Spring AI 2.0 added <code>sequence_id</code> and an index on <code>(conversation_id, sequence_id)</code> to order messages reliably. A table created by 1.x needs both before you upgrade: write a Flyway migration that adds the column, backfills it from <code>"timestamp"</code> order, and creates the index.</div>
+      <div class="note"><span class="lbl">Window size is a trade-off</span>Larger windows remember more and cost more on every turn. 10–20 messages covers most support chats; beyond that, summarise older turns (next slide).</div>
+    </div>
+  </div>
+</section>

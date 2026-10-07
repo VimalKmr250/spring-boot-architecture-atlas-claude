@@ -1,0 +1,105 @@
+<section class="slide" data-sec="Structured output" data-title="Structured output into records">
+  <h2><code>.entity(Record.class)</code>: the model fills in your type, Jackson does the rest</h2>
+  <p class="dek">Most enterprise LLM calls feed code, not people: a classifier's label, extracted invoice fields, a routing decision. Parsing free text with regular expressions breaks on the first creative answer. Spring AI derives a JSON Schema from your record, tells the model to follow it, and converts the reply back into the record.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="The structured output flow. A Java record, ReviewInsight, is turned into a JSON Schema by BeanOutputConverter. The schema is appended to the prompt as format instructions, or passed to the provider as a native response format. The model returns JSON. Jackson converts the JSON into a ReviewInsight instance. If parsing fails, an exception is thrown or, with validation enabled, the model is asked again with the error.">
+        <g font-size="10.5" fill="currentColor">
+          <rect x="6" y="40" width="140" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="76" y="63" text-anchor="middle" font-weight="600">record ReviewInsight</text><text x="76" y="80" text-anchor="middle" font-size="9" opacity="0.8">your type</text>
+          <rect x="182" y="40" width="140" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="252" y="63" text-anchor="middle" font-weight="600">JSON Schema</text><text x="252" y="80" text-anchor="middle" font-size="9" opacity="0.8">BeanOutputConverter</text>
+          <rect x="358" y="40" width="160" height="56" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="438" y="60" text-anchor="middle" font-weight="600">prompt + format</text><text x="438" y="76" text-anchor="middle" font-size="9" opacity="0.8">instructions appended, or</text><text x="438" y="88" text-anchor="middle" font-size="9" opacity="0.8">native response_format</text>
+          <rect x="554" y="40" width="110" height="56" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="609" y="72" text-anchor="middle" font-weight="600">model</text>
+          <rect x="700" y="40" width="190" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="795" y="63" text-anchor="middle" font-weight="600">JSON → Jackson</text><text x="795" y="80" text-anchor="middle" font-size="9" opacity="0.8">ReviewInsight instance</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.4">
+          <line x1="146" y1="68" x2="179" y2="68" marker-end="url(#arw)"></line>
+          <line x1="322" y1="68" x2="355" y2="68" marker-end="url(#arw)"></line>
+          <line x1="518" y1="68" x2="551" y2="68" marker-end="url(#arw)"></line>
+          <line x1="664" y1="68" x2="697" y2="68" marker-end="url(#arw)"></line>
+        </g>
+        <path d="M795 96 C 795 136, 609 136, 609 99" fill="none" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <text x="702" y="140" text-anchor="middle" font-size="9" fill="#D26A3F">invalid? ask again with the error (validateSchema)</text>
+        <text x="6" y="24" font-size="9.5" fill="currentColor" opacity="0.7">One line of code: .call().entity(ReviewInsight.class)</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ReviewInsightService.java</div>
+<pre><code class="language-java">package com.acme.ai.structured;
+
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class ReviewInsightService {
+
+    enum Sentiment { POSITIVE, NEGATIVE, MIXED }
+
+    record ReviewInsight(
+            @JsonPropertyDescription("Overall sentiment of the review")
+            Sentiment sentiment,
+            @JsonPropertyDescription("Product aspects mentioned, e.g. delivery, quality")
+            List&lt;String&gt; aspects,
+            @JsonPropertyDescription("1 = very unhappy, 5 = delighted")
+            int score) {}
+
+    private final ChatClient chatClient;
+
+    ReviewInsightService(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("You analyse customer reviews for Acme Retail.")
+                .build();
+    }
+
+    ReviewInsight analyse(String review) {
+        return chatClient.prompt()
+                .user(u -&gt; u.text("Analyse this review: &lt;review&gt;{review}&lt;/review&gt;")
+                        .param("review", review))
+                .call()
+                .entity(ReviewInsight.class);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">What Spring AI appends to the prompt · Spring AI 2.0.1 output, trimmed</div>
+<pre><code class="language-plaintext">Your response should be in JSON format.
+Do not include any explanations, only provide a RFC8259 compliant
+JSON response following this format without deviation.
+...
+Here is the JSON Schema instance your output must adhere to:
+{
+  "type" : "object",
+  "properties" : {
+    "aspects" : { "description" : "Product aspects mentioned, e.g. …",
+                  "type" : "array", "items" : { "type" : "string" } },
+    "score" : { "type" : "integer", "format" : "int32",
+                "description" : "1 = very unhappy, 5 = delighted" },
+    "sentiment" : { "type" : "string",
+                    "enum" : [ "POSITIVE", "NEGATIVE", "MIXED" ], … }
+  },
+  "required" : [ "aspects", "score", "sentiment" ],
+  "additionalProperties" : false
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Converting a reply · Spring AI 2.0.1 output</div>
+<pre><code class="language-plaintext">reply:  ```json
+        {"sentiment":"MIXED","aspects":["delivery","quality"],"score":3}
+        ```
+entity: ReviewInsight[sentiment=MIXED, aspects=[delivery, quality], score=3]</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Descriptions are prompt text</span><code>@JsonPropertyDescription</code> ends up in the schema the model reads. Use it to define each field precisely, including units and ranges. Enums become an <code>enum</code> list, the cheapest way to force a closed set of labels. The converter also strips markdown fences, as the second block shows.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,94 @@
+<section class="slide" data-sec="Agentic patterns" data-title="Routing and chaining">
+  <h2>Routing and chaining: small, typed steps with code in between</h2>
+  <p class="dek">Routing classifies the request with one cheap call and hands it to a specialist with its own prompt and tools. Chaining breaks a task into steps whose outputs feed the next, with deterministic checks between them. Both turn one unreliable mega-prompt into several small calls you can test, measure and swap independently.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SupportWorkflow.java</div>
+<pre><code class="language-java">package com.acme.ai.agents;
+
+import java.util.EnumMap;
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class SupportWorkflow {
+
+    enum Route { ORDER_STATUS, RETURNS, PRODUCT_QUESTION, COMPLAINT, OTHER }
+
+    record Classification(Route route, String summary) {}
+
+    record OrderFacts(String orderId, String problem, boolean customerWantsRefund) {}
+
+    sealed interface Outcome permits Reply, Escalation {}
+    record Reply(String text) implements Outcome {}
+    record Escalation(String reason, String summary) implements Outcome {}
+
+    private final ChatClient classifier;
+    private final ChatClient extractor;
+    private final Map&lt;Route, ChatClient&gt; specialists = new EnumMap&lt;&gt;(Route.class);
+
+    SupportWorkflow(ChatClient.Builder builder) {
+        this.classifier = builder.clone()
+                .defaultSystem("Classify the customer's message. Summarise it in one sentence.")
+                .build();
+        this.extractor = builder.clone()
+                .defaultSystem("Extract the facts from the message. Use null when a fact is missing.")
+                .build();
+        specialists.put(Route.RETURNS, builder.clone()
+                .defaultSystem("You handle returns for Acme Retail. 30-day window; large items are collected.")
+                .build());
+        specialists.put(Route.PRODUCT_QUESTION, builder.clone()
+                .defaultSystem("You answer questions about Acme products. Never invent specifications.")
+                .build());
+        specialists.put(Route.OTHER, builder.clone()
+                .defaultSystem("You are Acme Retail's general assistant. Be brief.")
+                .build());
+    }
+
+    Outcome handle(String message) {
+        // 1. route: one small, cheap call
+        Classification c = classifier.prompt().user(message).call().entity(Classification.class);
+
+        // 2. deterministic branches the model cannot talk its way around
+        if (c.route() == Route.COMPLAINT) {
+            return new Escalation("complaint", c.summary());
+        }
+        if (c.route() == Route.ORDER_STATUS) {
+            // 3. chain: extract facts, check them in code, then act
+            OrderFacts facts = extractor.prompt().user(message).call().entity(OrderFacts.class);
+            if (facts.orderId() == null) {
+                return new Reply("Could you tell me your order number? It starts with A-.");
+            }
+            return new Reply(statusText(facts.orderId()));    // plain code, no model needed
+        }
+        ChatClient specialist = specialists.getOrDefault(c.route(), specialists.get(Route.OTHER));
+        return new Reply(specialist.prompt().user(message).call().content());
+    }
+
+    private String statusText(String orderId) {
+        return "Order " + orderId + " is on its way.";        // look it up in the order service
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="grid2">
+        <div class="card"><h4>Why route first</h4><p>Each specialist has a short, focused prompt and only its own tools, which improves quality and shrinks the attack surface. The classifier can use the cheapest model you have.</p></div>
+        <div class="card"><h4>Why the gate in the chain</h4><p>Missing order number? Ask for it, in code. The model never sees a half-specified task and never invents an order id to fill the gap.</p></div>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Test</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Each branch</td><td>Stub the classifier's <code>Classification</code>; assert the outcome type</td></tr>
+            <tr><td>Classifier accuracy</td><td>Labelled set of real messages; confusion matrix per route</td></tr>
+            <tr><td>Escalation safety</td><td>Every complaint in the set must escalate: zero tolerance</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Always <code>builder.clone()</code> when building several clients</span>The injected builder is one mutable instance, and clients built from it share its state. Verified on Spring AI 2.0.1 with a stub model: build client C with <code>defaultSystem("SYSTEM C")</code>, then client D from the same builder with <code>"SYSTEM D"</code>, and client C sends <b>SYSTEM D</b>. <code>clone()</code> gives each client its own copy.</div>
+      <div class="note"><span class="lbl">Not everything needs a model</span>The order-status branch ends in plain code. A workflow is the natural place to decide that some answers are lookups, which are faster, cheaper and always correct.</div>
+    </div>
+  </div>
+</section>

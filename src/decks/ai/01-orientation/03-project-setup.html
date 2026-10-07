@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Orientation" data-title="Project setup">
+  <h2>One BOM, one starter per provider, and a profile that runs without an API key</h2>
+  <p class="dek">Every example in this tab runs on this setup. OpenAI is the default for chat and embeddings, because most enterprises start there and its starter also talks to Azure OpenAI and OpenAI-compatible gateways. The <code>ollama</code> profile swaps both models for local ones, so you can run every slide on a laptop with no key and no cost.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">pom.xml · the parts that matter (Maven)</div>
+<pre><code class="language-xml">&lt;parent&gt;
+  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;
+  &lt;version&gt;4.1.1&lt;/version&gt;
+&lt;/parent&gt;
+
+&lt;properties&gt;
+  &lt;java.version&gt;21&lt;/java.version&gt;
+  &lt;spring-ai.version&gt;2.0.1&lt;/spring-ai.version&gt;
+&lt;/properties&gt;
+
+&lt;dependencyManagement&gt;
+  &lt;dependencies&gt;
+    &lt;dependency&gt;   &lt;!-- one version for every Spring AI module --&gt;
+      &lt;groupId&gt;org.springframework.ai&lt;/groupId&gt;
+      &lt;artifactId&gt;spring-ai-bom&lt;/artifactId&gt;
+      &lt;version&gt;${spring-ai.version}&lt;/version&gt;
+      &lt;type&gt;pom&lt;/type&gt;
+      &lt;scope&gt;import&lt;/scope&gt;
+    &lt;/dependency&gt;
+  &lt;/dependencies&gt;
+&lt;/dependencyManagement&gt;
+
+&lt;dependencies&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-webmvc&lt;/artifactId&gt;
+  &lt;/dependency&gt;
+  &lt;dependency&gt;   &lt;!-- ChatModel + EmbeddingModel + ChatClient.Builder --&gt;
+    &lt;groupId&gt;org.springframework.ai&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-ai-starter-model-openai&lt;/artifactId&gt;
+  &lt;/dependency&gt;
+  &lt;dependency&gt;   &lt;!-- local models for the ollama profile --&gt;
+    &lt;groupId&gt;org.springframework.ai&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-ai-starter-model-ollama&lt;/artifactId&gt;
+  &lt;/dependency&gt;
+&lt;/dependencies&gt;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">src/main/resources/application.yml</div>
+<pre><code class="language-yaml">spring:
+  application:
+    name: acme-assistant
+  ai:
+    model:
+      chat: openai           # two starters on the classpath:
+      embedding: openai      # say which one creates the beans
+    openai:
+      api-key: ${OPENAI_API_KEY}   # from the environment, never the repo
+      chat:
+        model: gpt-5-mini
+      embedding:
+        model: text-embedding-3-small</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">src/main/resources/application-ollama.yml</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: http://localhost:11434
+      init:
+        pull-model-strategy: when_missing   # downloads on first start
+      chat:
+        model: qwen3:4b
+      embedding:
+        model: nomic-embed-text</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Run it</div>
+<pre><code class="language-plaintext">export OPENAI_API_KEY=...          # or set it in your IDE run config
+./mvnw spring-boot:run
+
+# no key: install Ollama, then
+./mvnw spring-boot:run -Dspring-boot.run.profiles=ollama</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Why <code>spring.ai.model.chat</code></h4><p>Each provider's auto-configuration creates its <code>ChatModel</code> when that property is missing. With two starters you would get two <code>ChatModel</code> beans, and the auto-configured <code>ChatClient.Builder</code> needs exactly one. Naming the provider keeps one.</p></div>
+    <div class="card"><h4>Gradle</h4><p><code>implementation(platform("org.springframework.ai:spring-ai-bom:2.0.1"))</code> then <code>implementation("org.springframework.ai:spring-ai-starter-model-openai")</code>. The BOM keeps every module on the same version.</p></div>
+    <div class="card"><h4><span class="tag w">1.x</span> property names</h4><p>Spring AI 1.x put model options under an extra segment: <code>spring.ai.openai.chat.options.model</code>. In 2.0 it is <code>spring.ai.openai.chat.model</code>. The old keys still bind in 2.0 but are deprecated, so the IDE flags them; move to the flat form before they are removed.</p></div>
+  </div>
+</section>

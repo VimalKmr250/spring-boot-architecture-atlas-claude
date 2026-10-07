@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Vector stores" data-title="Metadata filters and multi-tenancy">
+  <h2>A user may only retrieve what they may read: enforce it in the query</h2>
+  <p class="dek">A vector store has no idea who is asking. If tenant A's contract is the nearest neighbour to tenant B's question, it comes back, goes into the prompt, and the model happily quotes it. Access control must therefore be part of every search, built from the authenticated user on the server, never from anything the client or the model supplies.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SecureDocumentSearch.java</div>
+<pre><code class="language-java">package com.acme.ai.vectors;
+
+import java.util.List;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+@Service
+class SecureDocumentSearch {
+
+    private final VectorStore vectorStore;
+
+    SecureDocumentSearch(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    List&lt;Document&gt; search(String question) {
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                .query(question)
+                .topK(8)
+                .similarityThreshold(0.3)
+                .filterExpression(accessFilter())
+                .build());
+    }
+
+    /** tenant == current tenant AND the document is shared with one of the user's groups. */
+    static Filter.Expression accessFilter() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new IllegalStateException("search requires an authenticated user");
+        }
+        List&lt;Object&gt; groups = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -&gt; a.startsWith("GROUP_"))
+                .map(a -&gt; (Object) a)
+                .toList();
+        String tenant = tenantOf(auth);
+        var f = new FilterExpressionBuilder();
+        return groups.isEmpty()
+                ? f.and(f.eq("tenant", tenant), f.eq("visibility", "TENANT")).build()
+                : f.and(f.eq("tenant", tenant),
+                        f.or(f.eq("visibility", "TENANT"), f.in("aclGroup", groups))).build();
+    }
+
+    private static String tenantOf(Authentication auth) {
+        // e.g. from a JWT claim; here the first TENANT_ authority
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -&gt; a.startsWith("TENANT_"))
+                .map(a -&gt; a.substring("TENANT_".length()))
+                .findFirst()
+                .orElseThrow(() -&gt; new IllegalStateException("user has no tenant"));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Isolation</th><th>How</th><th>Trade-off</th></tr></thead>
+          <tbody>
+            <tr><td>Filter column</td><td>One table; <code>tenant</code> in metadata; filter on every query</td><td>Simplest; one forgotten filter leaks data; noisy neighbours share the index</td></tr>
+            <tr><td>Table or collection per tenant</td><td>One <code>VectorStore</code> bean per tenant, chosen per request</td><td>Hard isolation, easy deletion; many indexes to build and monitor</td></tr>
+            <tr><td>Database or cluster per tenant</td><td>Separate infrastructure</td><td>For regulated or very large tenants; highest cost</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Copy permissions at ingestion, keep them fresh</span>The ACL metadata is a <i>copy</i> of permissions from SharePoint, Confluence or the file system. When a document's audience changes in the source, the vector store must change too, or revoked users keep retrieving it. Re-sync ACLs on change events or on a short schedule, and delete vectors when the source document is deleted.</div>
+      <div class="note tip"><span class="lbl">Test the leak, not just the feature</span>Write an integration test that indexes a document for tenant A and asserts that tenant B's search, with the most similar possible question, returns nothing. Run it on every build.</div>
+      <div class="note"><span class="lbl">Say it in the interview</span>"Retrieval is where most RAG data leaks happen, so the filter is built server-side from the authenticated principal: tenant plus ACL groups copied from the source system, kept in sync, with a test that proves cross-tenant isolation."</div>
+    </div>
+  </div>
+</section>

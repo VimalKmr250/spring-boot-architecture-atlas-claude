@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Spring AI overview" data-title="What Spring AI is">
+  <h2>Spring AI is a portable API over models, plus the plumbing around them</h2>
+  <p class="dek">Spring AI does for AI models what Spring Data does for databases: one programming model across providers, auto-configured from properties, with the cross-cutting concerns (memory, retrieval, tools, observability, retries) handled by the framework. You write against <code>ChatClient</code>; the starter on your classpath decides whether it talks to OpenAI, Anthropic, Bedrock or a local Ollama.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Spring AI layers. Your controllers and services call ChatClient, the fluent API. ChatClient runs a chain of advisors: chat memory, retrieval augmentation, tool calling, structured output validation, logging and safeguards. The last advisor calls a ChatModel, the portable interface, which has one implementation per provider: OpenAiChatModel, AnthropicChatModel, OllamaChatModel, BedrockProxyChatModel and others, each calling its provider's API. Alongside: EmbeddingModel feeds VectorStore implementations such as PgVector, Redis and Elasticsearch; an ETL pipeline of document readers, transformers and writers loads documents; tools and MCP connect the model to your services. Across everything: auto-configuration from properties, and Micrometer observations for metrics and traces.">
+        <rect x="10" y="10" width="560" height="38" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect>
+        <text x="290" y="34" text-anchor="middle" font-size="11" fill="currentColor">Your code · controllers, services, scheduled jobs</text>
+        <line x1="290" y1="48" x2="290" y2="64" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="10" y="68" width="560" height="44" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="290" y="87" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">ChatClient</text>
+        <text x="290" y="103" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">fluent API: system · user · options · tools · advisors · call() / stream() · content() / entity()</text>
+        <line x1="290" y1="112" x2="290" y2="126" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="10" y="130" width="560" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="22" y="148" font-size="11" font-weight="600" fill="currentColor">Advisor chain</text>
+        <g font-size="9.5" fill="currentColor">
+          <rect x="22" y="156" width="84" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="64" y="170" text-anchor="middle">chat memory</text>
+          <rect x="112" y="156" width="84" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="154" y="170" text-anchor="middle">RAG</text>
+          <rect x="202" y="156" width="84" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="244" y="170" text-anchor="middle">tool calling</text>
+          <rect x="292" y="156" width="88" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="336" y="170" text-anchor="middle">output validation</text>
+          <rect x="386" y="156" width="84" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="428" y="170" text-anchor="middle">safeguards</text>
+          <rect x="476" y="156" width="84" height="20" rx="4" fill="currentColor" fill-opacity="0.07"></rect><text x="518" y="170" text-anchor="middle">your own</text>
+        </g>
+        <line x1="290" y1="186" x2="290" y2="200" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="10" y="204" width="560" height="38" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.55"></rect>
+        <text x="290" y="221" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">ChatModel</text>
+        <text x="290" y="235" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">portable interface: call(Prompt) → ChatResponse · stream(Prompt) → Flux</text>
+        <line x1="290" y1="242" x2="290" y2="256" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <g font-size="9.5" fill="currentColor">
+          <rect x="10" y="260" width="134" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="77" y="279" text-anchor="middle">OpenAiChatModel</text>
+          <rect x="152" y="260" width="134" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="219" y="279" text-anchor="middle">AnthropicChatModel</text>
+          <rect x="294" y="260" width="134" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="361" y="279" text-anchor="middle">OllamaChatModel</text>
+          <rect x="436" y="260" width="134" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="503" y="279" text-anchor="middle">BedrockProxyChatModel</text>
+        </g>
+        <text x="290" y="310" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.7">one starter each · HTTP to the provider's API, or a local model</text>
+
+        <rect x="600" y="10" width="290" height="82" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect>
+        <text x="745" y="30" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Your data</text>
+        <text x="745" y="48" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">EmbeddingModel → VectorStore</text>
+        <text x="745" y="63" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">PgVector, Redis, Elasticsearch, Qdrant…</text>
+        <text x="745" y="80" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">ETL: DocumentReader → Transformer → Writer</text>
+
+        <rect x="600" y="104" width="290" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="745" y="124" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Tools and MCP</text>
+        <text x="745" y="142" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">@Tool methods · ToolCallback</text>
+        <text x="745" y="157" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">MCP clients and servers (@McpTool)</text>
+
+        <rect x="600" y="178" width="290" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="745" y="198" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Other model types</text>
+        <text x="745" y="216" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">ImageModel · audio transcription and speech</text>
+        <text x="745" y="231" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.85">ModerationModel</text>
+
+        <rect x="600" y="252" width="290" height="58" rx="6" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect>
+        <text x="745" y="274" text-anchor="middle" font-size="10" fill="currentColor">Across all of it: auto-configuration from</text>
+        <text x="745" y="290" text-anchor="middle" font-size="10" fill="currentColor">spring.ai.* properties, Micrometer metrics</text>
+        <text x="745" y="304" text-anchor="middle" font-size="10" fill="currentColor">and traces, retries</text>
+        <line x1="570" y1="160" x2="597" y2="135" stroke="#8A94A3" stroke-width="1.1" stroke-dasharray="3 3"></line>
+        <line x1="570" y1="152" x2="597" y2="60" stroke="#8A94A3" stroke-width="1.1" stroke-dasharray="3 3"></line>
+      </svg>
+    </div>
+    <figcaption>Copper is the API you use every day. The advisor chain is where Spring AI's real value sits: memory, retrieval and tool calling are advisors you add to a request, not code you write around it.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Portable, not lowest-common-denominator</h4><p>The common options (<code>model</code>, <code>temperature</code>, <code>maxTokens</code>) are portable. Provider features such as OpenAI's reasoning effort or Anthropic's prompt caching are reached through provider option classes, like <code>OpenAiChatOptions</code>, without leaving the API.</p></div>
+    <div class="card"><h4>Spring idioms throughout</h4><p>Starters and auto-configuration, <code>application.yml</code>, beans you can override, <code>@Tool</code> on ordinary methods, Micrometer observations, Testcontainers support. Nothing about it feels like a Python port.</p></div>
+    <div class="card"><h4><span class="tag w">1.x</span> what 2.0 changed</h4><p>2.0 needs Boot 4 and Jackson 3, made the tool-call loop an advisor (<code>ToolCallingAdvisor</code>) instead of code inside each model, and made options immutable builders. The <a data-deck="ai" data-slide="Spring AI 1.x to 2.0 migration">migration slide</a> lists what breaks.</p></div>
+  </div>
+</section>

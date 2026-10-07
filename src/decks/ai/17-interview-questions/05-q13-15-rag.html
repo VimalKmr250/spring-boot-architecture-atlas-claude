@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q13–15 · RAG">
+  <h2>Three RAG questions: explain it, fix it, measure it</h2>
+  <p class="dek">RAG is the most asked-about enterprise LLM pattern. Interviewers listen for the two pipelines, for access control, and for a debugging method that is stage by stage rather than "try a bigger model".</p>
+
+  <article class="q"><header><i>Q13</i><h3>Explain retrieval-augmented generation and how you would build it with Spring AI.</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>RAG answers from your own content by retrieving relevant passages and putting them in the prompt. Ingestion reads documents with a <code>DocumentReader</code>, splits them with <code>TokenTextSplitter</code>, adds metadata such as source and ACL groups, and writes them to a <code>VectorStore</code>, which embeds them. At question time a <code>QuestionAnswerAdvisor</code> or <code>RetrievalAugmentationAdvisor</code> searches with the user's access filter and adds the top chunks with a grounding instruction. The answer cites its sources.</div>
+    <p class="deeper"><b>Go deeper:</b> Contrast the simple advisor with the modular one: query compression for follow-ups, multi-query expansion, a custom <code>DocumentRetriever</code> for hybrid search, post-processors for re-ranking, and <code>allowEmptyContext(false)</code> so the model declines when nothing relevant is found. Mention idempotent ingestion with stable ids and deletion of stale chunks.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Two pipelines: ingestion and retrieval">Two pipelines</a><a data-deck="ai" data-slide="Ingestion: read, split, enrich, store">Ingestion</a><a data-deck="ai" data-slide="Modular RAG with RetrievalAugmentationAdvisor">Modular RAG</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q14</i><h3>Your RAG assistant gives poor answers. How do you find and fix the problem?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Stage by stage, using the retrieved chunk ids I log with every answer. Was the right document ingested and parsed? Was the right passage retrieved? If not, fix chunking, add hybrid search for exact terms, rewrite follow-up queries, or tune top-K and the threshold. If it was retrieved but the answer is still wrong, tighten the grounding instruction, reduce irrelevant context, and require citations. I change one stage at a time and re-run the evaluation set.</div>
+    <p class="deeper"><b>Go deeper:</b> Most failures are retrieval and ingestion, not the model: stale or duplicate versions of a policy, tables split mid-row, boilerplate crowding out content, missing ACL metadata filtering out the answer. Re-ranking and contextual chunk headers are common high-value fixes. Only after retrieval is measurably good does a model change make sense.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="RAG failure modes">Failure modes</a><a data-deck="ai" data-slide="Chunking strategies">Chunking</a><a data-deck="ai" data-slide="Hybrid search and re-ranking">Hybrid search</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q15</i><h3>How do you evaluate a RAG system?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>With a golden set of real questions, each linked to the passage that answers it or marked unanswerable. I measure retrieval separately, recall at K and context precision, and generation separately: faithfulness to the retrieved context and relevance to the question, using Spring AI's <code>FactCheckingEvaluator</code> and <code>RelevancyEvaluator</code> as LLM judges, plus correct refusal of unanswerable questions. It runs in CI with thresholds, and nightly against the real model.</div>
+    <p class="deeper"><b>Go deeper:</b> Judges are models too: use a strong one, keep it fixed while comparing changes, and spot-check its verdicts by hand. Add production signals: thumbs-down rate, escalations, questions with no sources. Grow the golden set from real failures so the same mistake cannot return unnoticed.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Evaluating RAG">Evaluating RAG</a><a data-deck="ai" data-slide="Grounding and citations">Citations</a></p>
+  </div></article>
+</section>

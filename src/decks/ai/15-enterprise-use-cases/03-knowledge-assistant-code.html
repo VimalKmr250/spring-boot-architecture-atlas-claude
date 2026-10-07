@@ -1,0 +1,125 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Internal knowledge assistant: code">
+  <h2>The request path: identity in, filter built, cited answer out</h2>
+  <p class="dek">The service is small because the hard work sits in ingestion and permissions. On each question it builds an access filter from the employee's authenticated groups, passes it to the RAG advisor for this request only, and returns the answer with the documents that were actually used. Every question, source list and rating is logged for analytics and audit.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">KnowledgeAssistantController.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.knowledge;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/knowledge")
+class KnowledgeAssistantController {
+
+    record Question(@NotBlank @Size(max = 1_000) String text) {}
+
+    record Source(String title, String url, String lastModified) {}
+
+    record Answer(String text, List&lt;Source&gt; sources) {}
+
+    interface QuestionLog {
+        void record(String employee, String question, List&lt;Source&gt; sources);
+    }
+
+    private final ChatClient chatClient;
+    private final QuestionLog questionLog;
+
+    KnowledgeAssistantController(ChatClient.Builder builder, VectorStore vectorStore,
+                                 QuestionLog questionLog) {
+        var rag = RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(VectorStoreDocumentRetriever.builder()
+                        .vectorStore(vectorStore)
+                        .topK(6)
+                        .similarityThreshold(0.45)
+                        .build())
+                .queryAugmenter(ContextualQueryAugmenter.builder().allowEmptyContext(false).build())
+                .build();
+        this.chatClient = builder
+                .defaultSystem("""
+                        You are Acme's internal knowledge assistant for employees.
+                        Be concise. Name the document each fact comes from.""")
+                .defaultAdvisors(rag)
+                .build();
+        this.questionLog = questionLog;
+    }
+
+    @PostMapping("/ask")
+    Answer ask(@Valid @RequestBody Question question, Authentication employee) {
+        ChatClientResponse response = chatClient.prompt()
+                .user(question.text())
+                .advisors(a -&gt; a.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION,
+                        accessFilter(employee)))
+                .call()
+                .chatClientResponse();
+
+        @SuppressWarnings("unchecked")
+        List&lt;Document&gt; used = (List&lt;Document&gt;) response.context()
+                .getOrDefault(RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT, List.of());
+        List&lt;Source&gt; sources = used.stream()
+                .map(d -&gt; new Source(String.valueOf(d.getMetadata().get("title")),
+                        String.valueOf(d.getMetadata().get("url")),
+                        String.valueOf(d.getMetadata().get("lastModified"))))
+                .distinct()
+                .toList();
+
+        questionLog.record(employee.getName(), question.text(), sources);
+        return new Answer(response.chatResponse().getResult().getOutput().getText(), sources);
+    }
+
+    /** Readable by everyone, or shared with one of the employee's groups. */
+    static Filter.Expression accessFilter(Authentication employee) {
+        List&lt;Object&gt; groups = employee.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -&gt; a.startsWith("GROUP_"))
+                .map(a -&gt; (Object) a)
+                .toList();
+        var f = new FilterExpressionBuilder();
+        return groups.isEmpty()
+                ? f.eq("aclGroup", "EVERYONE").build()
+                : f.or(f.eq("aclGroup", "EVERYONE"), f.in("aclGroup", groups)).build();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Verified with a stub model and an in-memory store</div>
+<pre><code class="language-plaintext">index:  "Travel policy: economy class for flights under 6 hours"  aclGroup=EVERYONE
+        "Exec travel: business class allowed on any flight"        aclGroup=GROUP_EXEC
+
+GROUP_ENGINEERING asks "Can I fly business class?"
+  → context contains only the travel policy chunk
+GROUP_EXEC asks the same question
+  → context contains both chunks</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Piece</th><th>Where it lives</th></tr></thead>
+          <tbody>
+            <tr><td>Groups in the token</td><td>Spring Security OAuth2 resource server, authorities mapped from the IdP's group claim</td></tr>
+            <tr><td>Per-request filter</td><td><code>VectorStoreDocumentRetriever.FILTER_EXPRESSION</code>: a <code>Filter.Expression</code> or a string</td></tr>
+            <tr><td>Used documents</td><td><code>RetrievalAugmentationAdvisor.DOCUMENT_CONTEXT</code> in the response context</td></tr>
+            <tr><td>Analytics</td><td><code>QuestionLog</code>: questions with no sources become content tickets</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Groups can be large</span>Employees in hundreds of groups produce huge <code>IN</code> filters and slow searches. Map fine-grained source permissions to a manageable set of access groups at ingestion, and cache each employee's set for the token's lifetime.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,74 @@
+<section class="slide" data-sec="Spring AI overview" data-title="Streaming responses">
+  <h2>Stream tokens to the browser so a 10-second answer starts in one second</h2>
+  <p class="dek">Total generation time is set by the model, but perceived latency is time to first token. <code>.stream()</code> returns a <code>Flux</code> that emits text as the model produces it. Spring MVC writes a <code>Flux</code> as server-sent events, so you do not need WebFlux for this.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">StreamingController.java</div>
+<pre><code class="language-java">package com.acme.ai.streaming;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+class StreamingController {
+
+    private final ChatClient chatClient;
+
+    StreamingController(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("You are Acme Retail's assistant. Use short paragraphs.")
+                .build();
+    }
+
+    /** Plain text chunks; the simplest form. */
+    @GetMapping(value = "/api/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    Flux&lt;String&gt; stream(@RequestParam @NotBlank @Size(max = 2_000) String q) {
+        return chatClient.prompt().user(q).stream().content();
+    }
+
+    /** Named events, so the client can tell tokens, the end and errors apart. */
+    @GetMapping(value = "/api/stream/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    Flux&lt;ServerSentEvent&lt;String&gt;&gt; events(@RequestParam @NotBlank @Size(max = 2_000) String q) {
+        return chatClient.prompt().user(q).stream().content()
+                .map(chunk -&gt; ServerSentEvent.builder(chunk).event("token").build())
+                .concatWith(Mono.just(ServerSentEvent.builder("").event("done").build()))
+                .onErrorResume(e -&gt; Mono.just(ServerSentEvent
+                        .builder("The assistant is unavailable. Please try again.")
+                        .event("error").build()));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">The browser side (excerpt)</div>
+<pre><code class="language-javascript">const es = new EventSource('/api/stream/events?q=' + encodeURIComponent(q));
+es.addEventListener('token', e =&gt; { answer.textContent += e.data; });
+es.addEventListener('done',  () =&gt; es.close());
+es.addEventListener('error', e =&gt; { showError(e.data); es.close(); });</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Concern</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td>Proxies buffer the stream</td><td>Disable response buffering for the route (nginx: <code>X-Accel-Buffering: no</code>), or tokens arrive all at once.</td></tr>
+            <tr><td>Long answers time out</td><td>Raise <code>spring.mvc.async.request-timeout</code> above your longest expected answer.</td></tr>
+            <tr><td>Structured output</td><td>You cannot parse JSON until the stream ends. Stream prose to people; use <code>call().entity()</code> for code.</td></tr>
+            <tr><td>Errors after the first token</td><td>The HTTP status is already 200. Send an <code>error</code> event, as above.</td></tr>
+            <tr><td>Token usage</td><td>Arrives on the last chunk. For OpenAI, enable it with <code>OpenAiChatOptions.builder().streamUsage(true)</code>.</td></tr>
+            <tr><td>The user leaves</td><td>Cancelling the subscription stops the upstream call, so you stop paying for tokens nobody reads.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Advisors and streaming</span>Every advisor on a streaming request must implement <code>StreamAdvisor</code>. The built-in ones do; a custom advisor that only implements <code>CallAdvisor</code> is skipped on streams, which is an easy way to lose a guardrail. See <a data-deck="ai" data-slide="Writing your own advisor">custom advisors</a>.</div>
+    </div>
+  </div>
+</section>

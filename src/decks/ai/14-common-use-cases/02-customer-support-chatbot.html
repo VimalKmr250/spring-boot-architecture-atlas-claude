@@ -1,0 +1,123 @@
+<section class="slide" data-sec="Common use cases" data-title="Customer support chatbot">
+  <h2>Support chatbot: memory, policy RAG, order tools, streaming and a way out</h2>
+  <p class="dek">A support assistant combines most of this tab: conversation memory, answers grounded in help-centre content, tools for order-specific questions that run as the logged-in customer, streamed replies, and an escalation path the model can take and the code can force. Each piece is a few lines on the same <code>ChatClient</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SupportBotController.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.support;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.security.Principal;
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+
+@RestController
+@RequestMapping("/api/support")
+class SupportBotController {
+
+    record UserText(@NotBlank @Size(max = 2_000) String text) {}
+
+    private final ChatClient chatClient;
+
+    SupportBotController(ChatClient.Builder builder, ChatMemory chatMemory,
+                         VectorStore vectorStore, SupportTools tools) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        You are Acme Retail's support assistant.
+                        Answer policy questions only from the provided context.
+                        Use the tools for anything about a specific order.
+                        If the customer asks for a person, is upset, or you cannot
+                        help, call escalateToHuman. Keep answers under 80 words.""")
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        QuestionAnswerAdvisor.builder(vectorStore)
+                                .searchRequest(SearchRequest.builder()
+                                        .topK(4)
+                                        .similarityThreshold(0.5)
+                                        .filterExpression("audience == 'customer'")
+                                        .build())
+                                .build())
+                .defaultTools(tools)
+                .build();
+    }
+
+    /** Ownership of the conversation id is checked as on "Conversation memory in code". */
+    @PostMapping(value = "/{conversationId}/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    Flux&lt;String&gt; chat(@PathVariable String conversationId,
+                      @Valid @RequestBody UserText body, Principal customer) {
+        return chatClient.prompt()
+                .user(body.text())
+                .advisors(a -&gt; a.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .toolContext(Map.of("customerId", customer.getName()))
+                .stream()
+                .content();
+    }
+}
+
+@Component
+class SupportTools {
+
+    interface Orders {
+        String statusFor(String orderId, String customerId);
+    }
+
+    interface Handoff {
+        String open(String customerId, String reason);
+    }
+
+    private final Orders orders;
+    private final Handoff handoff;
+
+    SupportTools(Orders orders, Handoff handoff) {
+        this.orders = orders;
+        this.handoff = handoff;
+    }
+
+    @Tool(description = "Status, carrier and delivery estimate of one of the current customer's orders")
+    String orderStatus(@ToolParam(description = "Order id, e.g. A-1042") String orderId, ToolContext ctx) {
+        return orders.statusFor(orderId, customerId(ctx));
+    }
+
+    @Tool(description = "Hands the conversation to a human agent and returns the case number")
+    String escalateToHuman(@ToolParam(description = "One-sentence reason") String reason, ToolContext ctx) {
+        return handoff.open(customerId(ctx), reason);
+    }
+
+    private static String customerId(ToolContext ctx) {
+        return (String) ctx.getContext().get("customerId");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Piece</th><th>Why it is there</th></tr></thead>
+          <tbody>
+            <tr><td>Memory advisor</td><td>Follow-ups ("and the other order?") work; conversations survive restarts with a JDBC repository</td></tr>
+            <tr><td>QA advisor + <code>audience</code> filter</td><td>Policy answers come from customer-facing articles only, never internal runbooks</td></tr>
+            <tr><td>Tools with <code>ToolContext</code></td><td>Order questions answered from live data, scoped to the logged-in customer</td></tr>
+            <tr><td>Escalation tool</td><td>The model can hand over; your code can also force it (keywords, repeated failures, VIP customers)</td></tr>
+            <tr><td>Streaming</td><td>First words in about a second, even when tools run</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Before it faces customers</span>Redaction ahead of memory; a refusal path for out-of-scope topics; rate limits per customer; an evaluation set of real tickets with expected outcomes (answer, tool call or escalation); transcripts sampled for review every week; and a visible "talk to a person" button that never depends on the model.</div>
+      <div class="note"><span class="lbl">What to measure</span>Containment (resolved without a person), escalation rate and its reasons, customer satisfaction on bot conversations, wrong-answer reports, and cost per resolved conversation compared with a human-handled ticket.</div>
+    </div>
+  </div>
+</section>

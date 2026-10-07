@@ -1,0 +1,86 @@
+<section class="slide" data-sec="RAG" data-title="Naive RAG with QuestionAnswerAdvisor">
+  <h2>One advisor turns a chat client into a question-answering client</h2>
+  <p class="dek"><code>QuestionAnswerAdvisor</code> searches the vector store with the user's message, appends the matching chunks and a grounding instruction to it, and lets the call continue. It is the right first version: one dependency (<code>spring-ai-vector-store-advisor</code>), a search request you can tune, and a per-request filter for access control.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">PolicyAssistant.java</div>
+<pre><code class="language-java">package com.acme.ai.rag;
+
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.stereotype.Service;
+
+@Service
+class PolicyAssistant {
+
+    record Answer(String text, List&lt;String&gt; sources) {}
+
+    private final ChatClient chatClient;
+
+    PolicyAssistant(ChatClient.Builder builder, VectorStore vectorStore) {
+        this.chatClient = builder
+                .defaultSystem("You answer questions about Acme Retail's customer policies.")
+                .defaultAdvisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder()
+                                .topK(5)
+                                .similarityThreshold(0.5)
+                                .build())
+                        .build())
+                .build();
+    }
+
+    Answer ask(String question, String tenant) {
+        ChatClientResponse response = chatClient.prompt()
+                .user(question)
+                .advisors(a -&gt; a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION,
+                        "tenant == '" + tenant.replace("'", "") + "'"))
+                .call()
+                .chatClientResponse();
+
+        @SuppressWarnings("unchecked")
+        List&lt;Document&gt; used = (List&lt;Document&gt;) response.context()
+                .getOrDefault(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS, List.of());
+
+        return new Answer(
+                response.chatResponse().getResult().getOutput().getText(),
+                used.stream().map(d -&gt; String.valueOf(d.getMetadata().get("title"))).distinct().toList());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">The user message the model receives · Spring AI 2.0.1, test index</div>
+<pre><code class="language-plaintext">Can I return a sofa after delivery?
+
+Context information is below, surrounded by ---------------------
+
+---------------------
+Customers may return most items within 30 days of delivery.
+Gift cards never expire and can be used online and in stores.
+---------------------
+
+Given the context and provided history information and not prior knowledge,
+reply to the user comment. If the answer is not in the context, inform
+the user that you can't answer the question.</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Look at that second chunk</span>The gift-card sentence is irrelevant but was retrieved because it cleared a low threshold in this test. In production that is wasted tokens at best and a confusing answer at worst. Tune <code>topK</code> and <code>similarityThreshold</code> on real questions, and log the retrieved sources with every answer.</div>
+      <div class="note"><span class="lbl">Filters per request</span><code>FILTER_EXPRESSION</code> narrows this one search, here to the caller's tenant. Build it from the authenticated user on the server; the value above is sanitised only because it is concatenated into an expression. Prefer a <code>Filter.Expression</code> from <code>FilterExpressionBuilder</code> where the API accepts one.</div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Limits of the simple version</th><th>Fix, in the modular advisor</th></tr></thead>
+          <tbody>
+            <tr><td>Searches with the raw message ("and what about sofas?")</td><td>Rewrite or compress the query with history</td></tr>
+            <tr><td>One query, one phrasing</td><td>Expand to several queries, join results</td></tr>
+            <tr><td>No re-ranking or dedupe</td><td>Document post-processors</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

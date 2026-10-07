@@ -1,0 +1,83 @@
+<section class="slide" data-sec="Spring AI overview" data-title="Your first endpoint">
+  <h2>A REST endpoint that asks a model, in one class</h2>
+  <p class="dek">Inject the auto-configured <code>ChatClient.Builder</code>, set the defaults this use case needs, build once, and call it per request. The builder is a prototype bean, so each injection point gets its own and defaults never leak between features. The built <code>ChatClient</code> is immutable and thread-safe.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">AskController.java</div>
+<pre><code class="language-java">package com.acme.ai.first;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/ask")
+class AskController {
+
+    record Question(@NotBlank @Size(max = 2_000) String text) {}
+
+    record Answer(String text) {}
+
+    private final ChatClient chatClient;
+
+    AskController(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        You are the assistant for Acme Retail's customers.
+                        Answer in at most three sentences.
+                        If you are not sure, say so instead of guessing.""")
+                .build();
+    }
+
+    @PostMapping
+    Answer ask(@Valid @RequestBody Question question) {
+        String text = chatClient.prompt()
+                .user(question.text())
+                .call()
+                .content();
+        return new Answer(text);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">AssistantApplication.java</div>
+<pre><code class="language-java">package com.acme.ai;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class AssistantApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AssistantApplication.class, args);
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Try it · Sample response (illustrative)</div>
+<pre><code class="language-plaintext">$ curl -s localhost:8080/api/ask -H 'content-type: application/json' \
+       -d '{"text":"Can I return a sofa after 30 days?"}'
+
+{"text":"Acme's standard return window is 30 days, so a sofa
+returned after that is usually not accepted. I'm not certain
+about exceptions for large items; please check the returns
+page or contact support."}</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Notice the honest hedge</span>The model does not know Acme's policy. The system prompt told it to admit uncertainty, so it hedged instead of inventing a rule. Making it actually <i>know</i> the policy is the job of <a data-deck="ai" data-slide="Two pipelines: ingestion and retrieval">RAG</a>.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Validate input like any API</h4><p><code>@Size(max = 2_000)</code> is a cost control as well as a sanity check: every character you accept is a token you pay for, and a 2 MB paste would fill the context window.</p></div>
+    <div class="card"><h4>One client per use case</h4><p>Build separate <code>ChatClient</code>s for support, summarisation and classification, each with its own system prompt, options and advisors. Sharing one "god client" mixes concerns the way a shared god service does.</p></div>
+    <div class="card"><h4>Errors are your API's errors</h4><p>Timeouts, rate limits and provider outages surface as exceptions from <code>call()</code>. Map them in your <code>@RestControllerAdvice</code> to a 503 with a retry hint; never return the provider's raw error to the client.</p></div>
+  </div>
+</section>

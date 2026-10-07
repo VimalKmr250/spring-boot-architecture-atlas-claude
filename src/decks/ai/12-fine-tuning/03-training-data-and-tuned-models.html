@@ -1,0 +1,110 @@
+<section class="slide" data-sec="Fine-tuning" data-title="Training data and tuned models in Spring AI">
+  <h2>Build the dataset from your systems; serve the tuned model like any other</h2>
+  <p class="dek">The Java side of fine-tuning is mostly data engineering: select good examples from your systems, remove personal data, deduplicate, hold some back for evaluation, and write them in the provider's chat format (one JSON object per line). Once the tuning job finishes, a tuned model is just another model id in <code>application.yml</code>, so the application code does not change.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TrainingSetExporter.java</div>
+<pre><code class="language-java">package com.acme.ai.finetune;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
+
+@Service
+class TrainingSetExporter {
+
+    record ResolvedTicket(String id, String customerMessage, String agentReply,
+                          int satisfaction, boolean consentForTraining) {}
+
+    interface TicketArchive {
+        Stream&lt;ResolvedTicket&gt; resolvedSince(LocalDate date);
+    }
+
+    /** One line of the chat fine-tuning format: {"messages":[{"role":…,"content":…},…]} */
+    record Message(String role, String content) {}
+
+    record Example(List&lt;Message&gt; messages) {}
+
+    record Counts(int train, int holdout, int skipped) {}
+
+    private static final String SYSTEM = "You are Acme Retail's support assistant.";
+    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+");
+    private static final Pattern NUMBER = Pattern.compile("\\b\\d[\\d -]{6,}\\d\\b");
+
+    private final TicketArchive archive;
+    private final JsonMapper json;
+
+    TrainingSetExporter(TicketArchive archive, JsonMapper json) {
+        this.archive = archive;
+        this.json = json;
+    }
+
+    Counts export(LocalDate since, Path dir) throws IOException {
+        Set&lt;String&gt; seen = new HashSet&lt;&gt;();
+        int train = 0, holdout = 0, skipped = 0;
+        try (Stream&lt;ResolvedTicket&gt; tickets = archive.resolvedSince(since);
+             BufferedWriter trainOut = Files.newBufferedWriter(dir.resolve("train.jsonl"));
+             BufferedWriter holdoutOut = Files.newBufferedWriter(dir.resolve("holdout.jsonl"))) {
+            for (ResolvedTicket t : (Iterable&lt;ResolvedTicket&gt;) tickets::iterator) {
+                String question = redact(t.customerMessage());
+                boolean good = t.consentForTraining() &amp;&amp; t.satisfaction() &gt;= 4;
+                if (!good || !seen.add(question.toLowerCase().strip())) {
+                    skipped++;                      // unconsented, poorly rated or duplicate
+                    continue;
+                }
+                String line = json.writeValueAsString(new Example(List.of(
+                        new Message("system", SYSTEM),
+                        new Message("user", question),
+                        new Message("assistant", redact(t.agentReply())))));
+                boolean isHoldout = Math.floorMod(t.id().hashCode(), 10) == 0;   // stable 10%
+                BufferedWriter out = isHoldout ? holdoutOut : trainOut;
+                out.write(line);
+                out.newLine();
+                if (isHoldout) holdout++; else train++;
+            }
+        }
+        return new Counts(train, holdout, skipped);
+    }
+
+    static String redact(String text) {
+        return NUMBER.matcher(EMAIL.matcher(text).replaceAll("[EMAIL]")).replaceAll("[NUMBER]");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">One line of exporter output · run against a test archive</div>
+<pre><code class="language-json">{"messages":[{"role":"system","content":"You are Acme Retail's support assistant."},{"role":"user","content":"my lamp came with a cracked shade, order [NUMBER]"},{"role":"assistant","content":"I'm sorry about the shade. I've arranged a replacement; it ships within 2 working days and you can keep the old one."}]}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml · a hosted tuned model</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    openai:
+      chat:
+        model: ft:BASE_MODEL:acme:support-style:JOB_ID   # id returned by the tuning job</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">A self-hosted LoRA adapter on Ollama</div>
+<pre><code class="language-plaintext"># Modelfile
+FROM qwen3:4b
+ADAPTER ./support-style-lora
+SYSTEM "You are Acme Retail's support assistant."
+
+$ ollama create acme-support:v3 -f Modelfile
+# then: spring.ai.ollama.chat.model=acme-support:v3</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Consent and provenance</span>Use only data you are allowed to train on, record which tickets went into which model version, and be able to rebuild the dataset without a customer who asks to be forgotten. That record is also what an auditor will ask for.</div>
+    </div>
+  </div>
+</section>

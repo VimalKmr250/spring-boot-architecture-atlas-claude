@@ -1,0 +1,51 @@
+<section class="slide" data-sec="Fine-tuning" data-title="How fine-tuning works">
+  <h2>Full tuning, adapters and distillation: what changes, and who runs it</h2>
+  <p class="dek">All fine-tuning starts from a pre-trained model and nudges its weights with your examples. The methods differ in how many weights change, what hardware they need, and whether you or a provider runs the training and serves the result. As a Java team you will usually call a hosted tuning API or a platform team's pipeline, then point Spring AI at the resulting model id.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 250" role="img" aria-label="Left: full fine-tuning updates all of the base model's billions of weights and produces a complete new copy of the model. Right: LoRA freezes the base weights and trains two small low-rank matrices per layer, an adapter of a few megabytes to a few hundred megabytes, which is added to the base model at inference. Several adapters can share one base model.">
+          <text x="110" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Full fine-tuning</text>
+          <rect x="30" y="30" width="160" height="120" rx="8" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="110" y="84" text-anchor="middle" font-size="10" fill="currentColor">all weights updated</text>
+          <text x="110" y="100" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">billions of parameters</text>
+          <text x="110" y="172" text-anchor="middle" font-size="9.5" fill="currentColor">→ a whole new model copy</text>
+          <text x="110" y="188" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">most GPUs, most risk of forgetting</text>
+
+          <text x="330" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">LoRA / QLoRA (adapters)</text>
+          <rect x="250" y="30" width="120" height="120" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="310" y="84" text-anchor="middle" font-size="10" fill="currentColor">base weights</text>
+          <text x="310" y="100" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">frozen</text>
+          <rect x="378" y="52" width="28" height="76" rx="4" fill="#3AA79B" fill-opacity="0.18" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="392" y="94" text-anchor="middle" font-size="9" fill="currentColor" transform="rotate(-90 392 94)">adapter</text>
+          <text x="330" y="172" text-anchor="middle" font-size="9.5" fill="currentColor">→ a small adapter file</text>
+          <text x="330" y="188" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">one GPU (QLoRA: 4-bit base)</text>
+
+          <line x1="20" y1="208" x2="420" y2="208" stroke="currentColor" stroke-opacity="0.2"></line>
+          <text x="220" y="228" text-anchor="middle" font-size="9.5" fill="currentColor">Distillation: a large model labels examples; a small model is tuned on them</text>
+          <text x="220" y="243" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">cheaper and faster at run time, for one task</text>
+        </svg>
+      </div>
+    </figure>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>What it is</th><th>Typical use</th></tr></thead>
+        <tbody>
+          <tr><td>Supervised fine-tuning (SFT)</td><td>Train on input → ideal output pairs</td><td>Format, style, classification, extraction</td></tr>
+          <tr><td>LoRA / QLoRA</td><td>SFT that trains small adapter matrices only</td><td>Open-weight models on modest hardware; many tenants share one base</td></tr>
+          <tr><td>Preference tuning (DPO and similar)</td><td>Train on "this answer is better than that one"</td><td>Tone, helpfulness, refusing the right things</td></tr>
+          <tr><td>Distillation</td><td>A strong model produces the training labels for a small one</td><td>Cutting cost and latency on a high-volume task</td></tr>
+          <tr><td>Hosted tuning</td><td>Provider APIs: OpenAI fine-tuning, Bedrock custom models, Vertex AI tuning</td><td>No GPUs to run; data goes to the provider; served at their prices</td></tr>
+          <tr><td>Self-hosted</td><td>Open weights tuned with Hugging Face tooling, served by vLLM or Ollama</td><td>Data must stay in-house; you run training and serving</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Catastrophic forgetting</h4><p>A model tuned hard on one task can get worse at others. Evaluate the tuned model on general prompts as well as the target task, and keep adapters narrow.</p></div>
+    <div class="card"><h4>Training data leaks</h4><p>Models can reproduce training examples verbatim. Anything in the training set, such as a customer's address in a support reply, may come back out. Redact before training, not after.</p></div>
+    <div class="card"><h4>Where Java fits</h4><p>Building and governing the dataset from your systems, calling the tuning API or pipeline, registering model versions, and serving the tuned model through Spring AI like any other.</p></div>
+  </div>
+</section>

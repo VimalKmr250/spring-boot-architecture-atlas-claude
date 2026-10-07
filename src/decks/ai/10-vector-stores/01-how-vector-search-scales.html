@@ -1,0 +1,54 @@
+<section class="slide" data-sec="Vector stores" data-title="How vector search scales">
+  <h2>Exact search compares everything; an ANN index trades a little recall for speed</h2>
+  <p class="dek">Finding the nearest vectors exactly means comparing the query with every stored vector: fine for ten thousand, too slow for ten million. Vector stores build an approximate nearest neighbour (ANN) index that visits only a small part of the data. The price is recall: occasionally the true nearest neighbour is missed. Knowing the two common index types, and the knobs that move that trade-off, is a standard interview topic.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 270" role="img" aria-label="HNSW, a hierarchical navigable small world graph. Three layers. The top layer has a few nodes with long links; the middle layer more nodes; the bottom layer every vector with short links to close neighbours. A search starts at an entry point in the top layer, greedily moves to the neighbour closest to the query, drops a layer when it cannot get closer, and finishes with a local search in the bottom layer, visiting a few hundred nodes instead of millions.">
+          <g font-size="9.5" fill="currentColor" opacity="0.75">
+            <text x="10" y="34">layer 2</text><text x="10" y="114">layer 1</text><text x="10" y="200">layer 0 · all vectors</text>
+          </g>
+          <g stroke="currentColor" stroke-opacity="0.35" stroke-width="1.1">
+            <line x1="90" y1="40" x2="250" y2="30"></line><line x1="250" y1="30" x2="390" y2="46"></line>
+            <line x1="70" y1="120" x2="150" y2="104"></line><line x1="150" y1="104" x2="250" y2="114"></line><line x1="250" y1="114" x2="330" y2="98"></line><line x1="330" y1="98" x2="400" y2="126"></line><line x1="150" y1="104" x2="330" y2="98"></line>
+            <line x1="60" y1="220" x2="100" y2="232"></line><line x1="100" y1="232" x2="140" y2="214"></line><line x1="140" y1="214" x2="180" y2="236"></line><line x1="180" y1="236" x2="220" y2="218"></line><line x1="220" y1="218" x2="260" y2="234"></line><line x1="260" y1="234" x2="300" y2="214"></line><line x1="300" y1="214" x2="340" y2="230"></line><line x1="340" y1="230" x2="380" y2="216"></line><line x1="380" y1="216" x2="420" y2="232"></line><line x1="220" y1="218" x2="300" y2="214"></line>
+          </g>
+          <g fill="currentColor">
+            <circle cx="90" cy="40" r="4"></circle><circle cx="250" cy="30" r="4"></circle><circle cx="390" cy="46" r="4"></circle>
+            <circle cx="70" cy="120" r="4"></circle><circle cx="150" cy="104" r="4"></circle><circle cx="250" cy="114" r="4"></circle><circle cx="330" cy="98" r="4"></circle><circle cx="400" cy="126" r="4"></circle>
+            <circle cx="60" cy="220" r="3.5"></circle><circle cx="100" cy="232" r="3.5"></circle><circle cx="140" cy="214" r="3.5"></circle><circle cx="180" cy="236" r="3.5"></circle><circle cx="220" cy="218" r="3.5"></circle><circle cx="260" cy="234" r="3.5"></circle><circle cx="300" cy="214" r="3.5"></circle><circle cx="340" cy="230" r="3.5"></circle><circle cx="380" cy="216" r="3.5"></circle><circle cx="420" cy="232" r="3.5"></circle>
+          </g>
+          <g stroke="#D26A3F" stroke-width="2" fill="none">
+            <path d="M90 40 L250 30" marker-end="url(#arwA)"></path>
+            <path d="M250 30 L250 108" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+            <path d="M250 114 L326 100" marker-end="url(#arwA)"></path>
+            <path d="M330 98 L300 208" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+            <path d="M300 214 L336 228" marker-end="url(#arwA)"></path>
+          </g>
+          <circle cx="345" cy="245" r="6" fill="#3AA79B"></circle>
+          <text x="356" y="258" font-size="9.5" fill="#3AA79B" font-weight="600">query</text>
+          <text x="96" y="58" font-size="9" fill="#D26A3F">entry point</text>
+        </svg>
+      </div>
+      <figcaption>HNSW: start sparse and far, end dense and near. A search visits hundreds of vectors, not millions.</figcaption>
+    </figure>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th></th><th>HNSW (graph)</th><th>IVF (clusters)</th></tr></thead>
+          <tbody>
+            <tr><td>How</td><td>Multi-layer proximity graph, greedy walk</td><td>Vectors bucketed around k-means centroids; search the closest buckets</td></tr>
+            <tr><td>Query speed / recall</td><td>Excellent at high recall</td><td>Good; depends on buckets probed</td></tr>
+            <tr><td>Build and memory</td><td>Slower build, more memory</td><td>Faster build, less memory; needs data before training</td></tr>
+            <tr><td>Updates</td><td>Handles inserts well</td><td>Re-cluster after large changes</td></tr>
+            <tr><td>Knobs (pgvector)</td><td><code>m</code>, <code>ef_construction</code>, <code>hnsw.ef_search</code></td><td><code>lists</code>, <code>ivfflat.probes</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Default to HNSW</span>It is the default in pgvector, Redis, Elasticsearch, OpenSearch and most dedicated stores, and the Spring AI PgVector default too. Raise <code>ef_search</code> when recall is too low; it costs latency, not rebuilds.</div>
+      <div class="note"><span class="lbl">Measure recall, not just latency</span>Compare the ANN results with an exact search on a sample of queries. An index that answers in 5 ms but misses the right passage 10% of the time quietly degrades every RAG answer built on it.</div>
+      <div class="note warn"><span class="lbl">Filters and ANN interact</span>A selective metadata filter ("only tenant 42") applied after the ANN search can leave fewer than top-K results. Stores handle this differently (pre-filtering, iterative scans, partial indexes); test your filters with realistic selectivity.</div>
+    </div>
+  </div>
+</section>

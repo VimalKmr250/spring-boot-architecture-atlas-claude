@@ -1,0 +1,71 @@
+<section class="slide" data-sec="Agentic patterns" data-title="Workflows and agents">
+  <h2>Workflows follow paths you wrote; agents choose their own. Start with workflows.</h2>
+  <p class="dek">An <b>agent</b> is a model in a loop: it decides which tool to call next, reads the result, and repeats until it judges the task done. A <b>workflow</b> is your code calling models at fixed steps. Workflows are predictable, testable and cheap; agents handle open-ended tasks at the price of variable cost, latency and behaviour. Five workflow patterns cover most enterprise needs, and each is ordinary Spring code around <code>ChatClient</code>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Five workflow patterns and the agent loop. Chain: step one, a check, step two, step three in sequence. Routing: a classifier sends the input to one of several specialised handlers. Parallelisation: the input is split or sent to several calls at once and the results are aggregated. Orchestrator-workers: an orchestrator model plans subtasks, workers execute them, the orchestrator combines results. Evaluator-optimiser: a generator drafts, an evaluator critiques, the generator revises, in a loop with a limit. Agent: a model in a loop choosing tools until done, with budgets and human approval.">
+        <g font-size="10" fill="currentColor">
+          <text x="10" y="18" font-weight="600" font-size="11">Chain</text>
+          <rect x="10" y="28" width="46" height="26" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="33" y="45" text-anchor="middle">LLM</text>
+          <rect x="70" y="30" width="30" height="22" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="85" y="45" text-anchor="middle" font-size="9">gate</text>
+          <rect x="114" y="28" width="46" height="26" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="137" y="45" text-anchor="middle">LLM</text>
+          <rect x="174" y="28" width="46" height="26" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="197" y="45" text-anchor="middle">LLM</text>
+          <text x="10" y="74" font-size="9" opacity="0.75">fixed steps; code checks between them</text>
+
+          <text x="300" y="18" font-weight="600" font-size="11">Routing</text>
+          <rect x="300" y="36" width="60" height="26" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="330" y="53" text-anchor="middle">classify</text>
+          <rect x="400" y="22" width="76" height="20" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="438" y="36" text-anchor="middle" font-size="9">returns</text>
+          <rect x="400" y="46" width="76" height="20" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="438" y="60" text-anchor="middle" font-size="9">orders + tools</text>
+          <rect x="400" y="70" width="76" height="20" rx="4" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="438" y="84" text-anchor="middle" font-size="9">human</text>
+          <text x="300" y="104" font-size="9" opacity="0.75">one cheap call picks the specialist</text>
+
+          <text x="600" y="18" font-weight="600" font-size="11">Parallelisation</text>
+          <rect x="600" y="40" width="40" height="26" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="620" y="57" text-anchor="middle" font-size="9">split</text>
+          <rect x="670" y="26" width="46" height="18" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="693" y="39" text-anchor="middle" font-size="9">LLM</text>
+          <rect x="670" y="45" width="46" height="18" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="693" y="58" text-anchor="middle" font-size="9">LLM</text>
+          <rect x="670" y="64" width="46" height="18" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="693" y="77" text-anchor="middle" font-size="9">LLM</text>
+          <rect x="744" y="40" width="52" height="26" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="770" y="57" text-anchor="middle" font-size="9">aggregate</text>
+          <text x="600" y="104" font-size="9" opacity="0.75">sections or votes at the same time</text>
+
+          <text x="10" y="150" font-weight="600" font-size="11">Orchestrator–workers</text>
+          <rect x="10" y="166" width="82" height="28" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="51" y="184" text-anchor="middle">orchestrator</text>
+          <rect x="130" y="158" width="58" height="18" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="159" y="171" text-anchor="middle" font-size="9">worker</text>
+          <rect x="130" y="182" width="58" height="18" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="159" y="195" text-anchor="middle" font-size="9">worker</text>
+          <text x="10" y="222" font-size="9" opacity="0.75">model plans subtasks at run time</text>
+
+          <text x="300" y="150" font-weight="600" font-size="11">Evaluator–optimiser</text>
+          <rect x="300" y="166" width="70" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="335" y="184" text-anchor="middle">generate</text>
+          <rect x="420" y="166" width="70" height="28" rx="5" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect><text x="455" y="184" text-anchor="middle">evaluate</text>
+          <text x="300" y="222" font-size="9" opacity="0.75">draft, critique, revise; max N rounds</text>
+
+          <text x="600" y="150" font-weight="600" font-size="11">Agent</text>
+          <rect x="600" y="166" width="90" height="28" rx="5" fill="#D26A3F" fill-opacity="0.16" stroke="#D26A3F" stroke-width="1.5"></rect><text x="645" y="184" text-anchor="middle">model decides</text>
+          <rect x="730" y="166" width="64" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="762" y="184" text-anchor="middle">tools</text>
+          <text x="600" y="222" font-size="9" opacity="0.75">open-ended loop until "done"</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.2">
+          <line x1="56" y1="41" x2="68" y2="41" marker-end="url(#arw)"></line><line x1="100" y1="41" x2="112" y2="41" marker-end="url(#arw)"></line><line x1="160" y1="41" x2="172" y2="41" marker-end="url(#arw)"></line>
+          <line x1="360" y1="49" x2="398" y2="32" marker-end="url(#arw)"></line><line x1="360" y1="49" x2="398" y2="56" marker-end="url(#arw)"></line><line x1="360" y1="49" x2="398" y2="80" marker-end="url(#arw)"></line>
+          <line x1="640" y1="53" x2="668" y2="35" marker-end="url(#arw)"></line><line x1="640" y1="53" x2="668" y2="54" marker-end="url(#arw)"></line><line x1="640" y1="53" x2="668" y2="73" marker-end="url(#arw)"></line>
+          <line x1="716" y1="35" x2="742" y2="50" marker-end="url(#arw)"></line><line x1="716" y1="54" x2="742" y2="54" marker-end="url(#arw)"></line><line x1="716" y1="73" x2="742" y2="58" marker-end="url(#arw)"></line>
+          <line x1="92" y1="176" x2="128" y2="167" marker-end="url(#arw)"></line><line x1="92" y1="184" x2="128" y2="191" marker-end="url(#arw)"></line>
+          <line x1="370" y1="174" x2="418" y2="174" marker-end="url(#arw)"></line>
+          <line x1="690" y1="174" x2="728" y2="174" marker-end="url(#arw)"></line>
+        </g>
+        <path d="M455 194 C 455 210, 335 210, 335 197" fill="none" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <path d="M762 194 C 762 210, 645 210, 645 197" fill="none" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <line x1="10" y1="244" x2="890" y2="244" stroke="currentColor" stroke-opacity="0.2"></line>
+        <text x="10" y="264" font-size="10" fill="currentColor">← more predictable, testable, cheaper</text>
+        <text x="890" y="264" text-anchor="end" font-size="10" fill="currentColor">more flexible, variable cost and behaviour →</text>
+        <text x="450" y="288" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">In Spring AI, an agent is a ChatClient with tools: ToolCallingAdvisor runs the loop, tool limits bound it.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Most "agents" should be workflows</h4><p>If you can draw the flowchart, write it as code: each step is a <code>ChatClient</code> call with structured output, and the branches are <code>if</code> statements you can unit-test.</p></div>
+    <div class="card"><h4>When an agent earns it</h4><p>The steps genuinely cannot be known in advance (investigating an incident, researching across systems), the value justifies variable cost, and mistakes can be caught before they matter.</p></div>
+    <div class="card"><h4>Spring AI building blocks</h4><p>Tool calling and its limits for the loop, MCP for tools owned by other teams, structured output for decisions, memory for multi-turn tasks, observability for every step. The community <code>spring-ai-agent-utils</code> project adds higher-level agent primitives.</p></div>
+  </div>
+</section>

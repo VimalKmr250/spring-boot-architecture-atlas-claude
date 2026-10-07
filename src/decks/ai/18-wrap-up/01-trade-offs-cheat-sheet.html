@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Wrap-up" data-title="Trade-offs cheat sheet">
+  <h2>The trade-offs you will be asked to defend, on one page</h2>
+  <p class="dek">Nearly every design question in this area is one of these choices. Name the option you would start with, the evidence that would make you switch, and the cost of switching. That structure answers most follow-ups before they are asked.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Decision</th><th>Start with</th><th>Switch when</th><th>Cost of switching</th></tr></thead>
+      <tbody>
+        <tr><td>Frontier vs small model</td><td>Small model per task, frontier for the hard tail</td><td>Evaluation shows the small one misses the bar</td><td>Config change; re-run evals</td></tr>
+        <tr><td>Hosted API vs self-hosted model</td><td>Hosted, via an approved provider or cloud platform</td><td>Data must not leave your network, or volume makes GPUs cheaper</td><td>Operating GPUs, scaling, upgrades</td></tr>
+        <tr><td>Prompting vs RAG vs fine-tuning</td><td>Prompting, then RAG for knowledge</td><td>Behaviour needs many examples at high volume</td><td>Dataset, training pipeline, model operations</td></tr>
+        <tr><td><code>QuestionAnswerAdvisor</code> vs modular RAG</td><td>The simple advisor</td><td>Follow-ups fail, exact terms missed, context noisy</td><td>Extra LLM calls and latency per stage</td></tr>
+        <tr><td>Vector-only vs hybrid search</td><td>Vector</td><td>Users search codes, SKUs, names</td><td>A keyword index and fusion</td></tr>
+        <tr><td>pgvector vs dedicated vector DB</td><td>pgvector</td><td>Hundreds of millions of vectors, very high QPS</td><td>Re-index; another system to run</td></tr>
+        <tr><td>Format instructions vs native structured output</td><td>Native where supported</td><td>Schema features unsupported by the provider</td><td>Validation and retries</td></tr>
+        <tr><td>Window vs summary vs vector memory</td><td>Window of recent messages</td><td>Long sessions lose early facts</td><td>Extra summarisation calls or a vector store</td></tr>
+        <tr><td>Workflow vs agent</td><td>Workflow</td><td>The path truly cannot be known in advance</td><td>Variable cost, harder testing, more guardrails</td></tr>
+        <tr><td>Streaming vs blocking</td><td>Stream text to people, block for code consumers</td><td>Output must be checked before anyone sees it</td><td>Output guards on chunks, or buffering</td></tr>
+        <tr><td>Direct provider vs LLM gateway</td><td>Direct for one team</td><td>Many teams, shared quotas, central audit</td><td>A gateway to run; one more hop</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The meta-answer</span>"I start with the simplest option that can work, define how I would measure 'good enough', and switch only when the measurement says so. Spring AI's abstractions make most switches configuration or a local refactor; the expensive switches are the ones that change stored data: embedding models, chunking and vector stores."</div>
+</section>
