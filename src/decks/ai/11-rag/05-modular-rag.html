@@ -1,0 +1,100 @@
+<section class="slide" data-sec="RAG" data-title="Modular RAG with RetrievalAugmentationAdvisor">
+  <h2>Modular RAG: every stage of retrieval is a pluggable component</h2>
+  <p class="dek"><code>RetrievalAugmentationAdvisor</code> (module <code>spring-ai-rag</code>) runs the retrieval row of the two-pipelines picture as separate components: transform the query, expand it, retrieve per query, join the results, post-process them, and augment the prompt. Each is an interface with a sensible implementation, so you improve one stage at a time and measure the effect.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">KnowledgeRagConfig.java</div>
+<pre><code class="language-java">package com.acme.ai.rag;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.ai.rag.postretrieval.document.DocumentPostProcessor;
+import org.springframework.ai.rag.preretrieval.query.expansion.MultiQueryExpander;
+import org.springframework.ai.rag.preretrieval.query.transformation.CompressionQueryTransformer;
+import org.springframework.ai.rag.retrieval.join.ConcatenationDocumentJoiner;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+class KnowledgeRagConfig {
+
+    @Bean
+    ChatClient knowledgeChatClient(ChatClient.Builder builder, VectorStore vectorStore,
+                                   ChatMemory chatMemory) {
+        var rag = RetrievalAugmentationAdvisor.builder()
+                // "and for sofas?" + history → "What is the return window for sofas?"
+                .queryTransformers(CompressionQueryTransformer.builder()
+                        .chatClientBuilder(builder.clone())
+                        .build())
+                // three phrasings of the question, each searched separately
+                .queryExpander(MultiQueryExpander.builder()
+                        .chatClientBuilder(builder.clone())
+                        .numberOfQueries(3)
+                        .build())
+                .documentRetriever(VectorStoreDocumentRetriever.builder()
+                        .vectorStore(vectorStore)
+                        .topK(5)
+                        .similarityThreshold(0.5)
+                        .filterExpression(() -&gt; new FilterExpressionBuilder()
+                                .eq("status", "PUBLISHED").build())
+                        .build())
+                .documentJoiner(new ConcatenationDocumentJoiner())    // merges, drops duplicates
+                .documentPostProcessors(maxTwoChunksPerSource())
+                .queryAugmenter(ContextualQueryAugmenter.builder()
+                        .allowEmptyContext(false)                     // no context: decline
+                        .build())
+                .build();
+
+        return builder
+                .defaultSystem("You answer questions about Acme Retail policies. Be concise.")
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build(), rag)
+                .build();
+    }
+
+    /** Diversity: no single long document may fill the whole context. */
+    static DocumentPostProcessor maxTwoChunksPerSource() {
+        return (query, documents) -&gt; {
+            Map&lt;Object, Integer&gt; perSource = new LinkedHashMap&lt;&gt;();
+            return documents.stream()
+                    .filter(d -&gt; perSource.merge(d.getMetadata().get("sourceId"), 1, Integer::sum) &lt;= 2)
+                    .toList();
+        };
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Stage</th><th>Spring AI component</th><th>Costs</th></tr></thead>
+          <tbody>
+            <tr><td>Transform</td><td><code>CompressionQueryTransformer</code>, <code>RewriteQueryTransformer</code>, <code>TranslationQueryTransformer</code></td><td>One small LLM call each</td></tr>
+            <tr><td>Expand</td><td><code>MultiQueryExpander</code></td><td>One LLM call + N searches</td></tr>
+            <tr><td>Retrieve</td><td><code>VectorStoreDocumentRetriever</code>, or your own <code>DocumentRetriever</code></td><td>Embedding + search per query</td></tr>
+            <tr><td>Join</td><td><code>ConcatenationDocumentJoiner</code></td><td>None</td></tr>
+            <tr><td>Post-process</td><td>Your <code>DocumentPostProcessor</code>: re-rank, dedupe, cap, compress</td><td>Depends</td></tr>
+            <tr><td>Augment</td><td><code>ContextualQueryAugmenter</code></td><td>Context tokens</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">With no relevant chunks · Spring AI 2.0.1, allowEmptyContext(false)</div>
+<pre><code class="language-plaintext">user message sent to the model:
+  The user query is outside your knowledge base.
+  Politely inform the user that you can't answer it.</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Every stage adds latency</span>Compression plus expansion adds two LLM calls and three searches before the real answer starts: often 1–2 seconds. Use a small, fast model for the transformer and expander clients, add stages only when the evaluation set shows they help, and watch the <code>spring.ai.advisor</code> timer.</div>
+      <div class="note"><span class="lbl">Order with memory</span>Memory runs first (HIGHEST+200), so the RAG advisor sees the history and the compression step can resolve "and for sofas?".</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,99 @@
+<section class="slide" data-sec="RAG" data-title="Ingestion: read, split, enrich, store">
+  <h2>Ingestion is an ETL job: read, split, enrich, store, and make it repeatable</h2>
+  <p class="dek">Spring AI models ingestion as <code>DocumentReader</code> → <code>DocumentTransformer</code>s → <code>DocumentWriter</code>, and a <code>VectorStore</code> is a writer. The code is short; the engineering is in the details: stable ids so re-runs replace instead of duplicate, metadata for filters and citations, and removing chunks when the source changes or disappears.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">KnowledgeIngestionService.java</div>
+<pre><code class="language-java">package com.acme.ai.rag.ingest;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.reader.tika.TikaDocumentReader;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+
+@Service
+class KnowledgeIngestionService {
+
+    record SourceDocument(String sourceId, String title, String url, Resource content,
+                          String tenant, List&lt;String&gt; aclGroups, Instant lastModified) {}
+
+    private final VectorStore vectorStore;
+    private final TokenTextSplitter splitter = TokenTextSplitter.builder()
+            .withChunkSize(500)            // tokens per chunk; the default is 800
+            .withMinChunkSizeChars(200)    // look for a sentence end after this many characters
+            .withMaxNumChunks(5_000)       // guard against runaway documents
+            .build();
+
+    KnowledgeIngestionService(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    /** Idempotent: re-ingesting a source replaces its chunks. */
+    int ingest(SourceDocument source) {
+        List&lt;Document&gt; extracted = new TikaDocumentReader(source.content()).get();   // PDF, DOCX, HTML…
+        List&lt;Document&gt; chunks = splitter.apply(extracted);
+
+        List&lt;Document&gt; enriched = chunks.stream().map(chunk -&gt; {
+            Map&lt;String, Object&gt; md = new HashMap&lt;&gt;(chunk.getMetadata());   // keeps chunk_index
+            md.put("sourceId", source.sourceId());
+            md.put("title", source.title());
+            md.put("url", source.url());
+            md.put("tenant", source.tenant());
+            md.put("aclGroup", source.aclGroups());       // a list: PgVector's JSONPath matches any element
+            md.put("lastModified", source.lastModified().toString());
+            String id = source.sourceId() + "#" + md.get("chunk_index");
+            return Document.builder()
+                    .id(UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)).toString())
+                    .text(chunk.getText())
+                    .metadata(md)
+                    .build();
+        }).toList();
+
+        // the new version may have fewer chunks than the old one: remove the old ones first
+        vectorStore.delete(new FilterExpressionBuilder().eq("sourceId", source.sourceId()).build());
+        vectorStore.add(enriched);
+        return enriched.size();
+    }
+
+    void remove(String sourceId) {
+        vectorStore.delete(new FilterExpressionBuilder().eq("sourceId", sourceId).build());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">TokenTextSplitter on a 1,918-token policy text · Spring AI 2.0.1 output</div>
+<pre><code class="language-plaintext">chunkSize 800 (default) → 3 chunks: 798, 798, 319 tokens
+chunkSize 500           → 4 chunks: 495, 481, 495, 446 tokens
+chunkSize 250           → 9 chunks: 245, 250, 229, 234, 233, 246, 229, 229, 22
+
+metadata on every chunk: source, tenant            (copied from the page)
+                         chunk_index, total_chunks,
+                         parent_document_id        (added by the splitter)</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Reader</th><th>Module</th><th>Use for</th></tr></thead>
+          <tbody>
+            <tr><td><code>TikaDocumentReader</code></td><td><code>spring-ai-tika-document-reader</code></td><td>Almost any office format: PDF, DOCX, PPTX, HTML</td></tr>
+            <tr><td><code>PagePdfDocumentReader</code></td><td><code>spring-ai-pdf-document-reader</code></td><td>PDFs, one document per page, page numbers in metadata for citations</td></tr>
+            <tr><td><code>MarkdownDocumentReader</code></td><td><code>spring-ai-markdown-document-reader</code></td><td>Docs-as-code, wikis exported to Markdown</td></tr>
+            <tr><td><code>JsonReader</code>, <code>TextReader</code></td><td>core</td><td>Exports from your own systems</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Run it like any data pipeline</span>Trigger on change events from the source system, with a nightly full reconciliation to catch misses and deletions. Track counts and failures per source, and run large back-fills as a Spring Batch job rather than inside a web request.</div>
+      <div class="note warn"><span class="lbl">Delete-then-add leaves a gap</span>For a few milliseconds the source has no chunks. If that matters, write the new chunks with a version number, switch readers to it with a filter, then delete the old version.</div>
+    </div>
+  </div>
+</section>

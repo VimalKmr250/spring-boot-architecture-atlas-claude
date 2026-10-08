@@ -1,0 +1,103 @@
+<section class="slide" data-sec="Structured output" data-title="Validating structured output">
+  <h2>Validate twice: the schema with the model, the business rules in code</h2>
+  <p class="dek">Two kinds of wrong output reach you. <b>Malformed</b>: not JSON, a missing field, a label outside the enum. <b>Well-formed but wrong</b>: urgency 7 on a 1–3 scale, a summary of 2,000 words. Spring AI's <code>StructuredOutputValidationAdvisor</code> checks the reply against the JSON schema and asks the model again with the errors. Bean Validation on the record checks the rest, and anything still invalid goes to a person instead of downstream.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ValidatedRouter.java</div>
+<pre><code class="language-java">package com.acme.ai.structured;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.util.Set;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvisor;
+import org.springframework.stereotype.Service;
+
+@Service
+class ValidatedRouter {
+
+    enum Queue { DELIVERY, ORDER_CHANGE, BILLING, RETURNS, PRODUCT_QUESTION, OTHER }
+
+    record Routing(@NotNull Queue queue,
+                   @Min(1) @Max(3) int urgency,
+                   @NotBlank @Size(max = 200) String summary) {}
+
+    sealed interface Outcome permits Routed, NeedsHuman {}
+    record Routed(Routing routing) implements Outcome {}
+    record NeedsHuman(String reason) implements Outcome {}
+
+    private final ChatClient chatClient;
+    private final Validator validator;
+
+    ValidatedRouter(ChatClient.Builder builder, Validator validator) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        Route Acme support tickets.
+                        urgency: 1 = low, 2 = time-sensitive, 3 = money lost or customer upset.
+                        summary: one sentence, at most 200 characters.""")
+                .defaultAdvisors(StructuredOutputValidationAdvisor.builder()
+                        .outputType(Routing.class)     // schema derived from the record
+                        .maxRepeatAttempts(2)          // re-ask with the errors, twice at most
+                        .build())
+                .build();
+        this.validator = validator;
+    }
+
+    Outcome route(String ticket) {
+        Routing routing;
+        try {
+            routing = chatClient.prompt().user(ticket).call().entity(Routing.class);
+        } catch (RuntimeException e) {    // still unparseable, or the provider failed
+            return new NeedsHuman("unusable model output: " + e.getMessage());
+        }
+        Set&lt;ConstraintViolation&lt;Routing&gt;&gt; violations = validator.validate(routing);
+        if (!violations.isEmpty()) {
+            ConstraintViolation&lt;Routing&gt; first = violations.iterator().next();
+            return new NeedsHuman(first.getPropertyPath() + " " + first.getMessage());
+        }
+        return new Routed(routing);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Layer</th><th>Catches</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Native structured output</td><td>Shape errors, before they happen</td><td>None; not every provider or schema</td></tr>
+            <tr><td><code>StructuredOutputValidationAdvisor</code> (or <code>.entity(T.class, s -&gt; s.validateSchema())</code>)</td><td>Shape errors, by re-asking with the validation message</td><td>One extra call per failure (default 3 attempts)</td></tr>
+            <tr><td>Bean Validation on the record</td><td>Ranges, lengths, required fields, patterns</td><td>Microseconds</td></tr>
+            <tr><td>Business checks</td><td>Totals that do not add up, unknown SKUs, dates in the future</td><td>A lookup or a sum</td></tr>
+            <tr><td>Human review queue</td><td>Everything that still fails, plus a random sample</td><td>People's time; measure the rate</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">What happens · run on Spring AI 2.0.1 with a stub model</div>
+<pre><code class="language-plaintext">reply 1: {"queue":"SHIPPING","urgency":2}
+WARN StructuredOutputValidationAdvisor -- JSON validation failed:
+  does not have a value in the enumeration ["DELIVERY", …, "OTHER"];
+  required property 'summary' not found
+
+re-sent user message ends with:
+  Output JSON validation failed because of: does not have a value in
+  the enumeration [...]; required property 'summary' not found
+  Your response should be in JSON format. … (schema again)
+
+reply 2: {"queue":"DELIVERY","urgency":3,"summary":"Parcel missing twice."}
+→ Routed[routing=Routing[queue=DELIVERY, urgency=3, …]]
+
+a reply with "urgency":7 passes the schema, fails Bean Validation:
+→ NeedsHuman[reason=urgency must be less than or equal to 3]</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Make the failure path a first-class result</span>Returning a sealed <code>Outcome</code> instead of throwing forces every caller to handle "needs a human". Track the share of <code>NeedsHuman</code> outcomes as a metric: when it rises after a prompt or model change, you know before your users do.</div>
+      <div class="note"><span class="lbl">Enums are your best friend</span>For classification, an enum gives the model a closed list, gives the schema an <code>enum</code> constraint, and gives your code an exhaustive <code>switch</code>. Add an <code>OTHER</code> value so the model never has to force a ticket into the wrong queue.</div>
+    </div>
+  </div>
+</section>

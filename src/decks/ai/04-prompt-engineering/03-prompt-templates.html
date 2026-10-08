@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Prompt engineering" data-title="Prompt templates">
+  <h2>Templates keep prompt text and data apart, and fail loudly on a missing value</h2>
+  <p class="dek">Never build prompts with string concatenation. A template keeps the wording in one reviewable place, fills it with named values, and with the default validation mode throws when a placeholder has no value instead of sending the model a prompt with a hole in it. Spring AI renders templates with StringTemplate, using <code>{name}</code> placeholders.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProductCopyService.java</div>
+<pre><code class="language-java">package com.acme.ai.templates;
+
+import java.util.List;
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.template.st.StTemplateRenderer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+
+@Service
+class ProductCopyService {
+
+    record Product(String name, List&lt;String&gt; features, String audience) {}
+
+    private final ChatClient chatClient;
+    private final Resource copyTemplate;
+
+    ProductCopyService(ChatClient.Builder builder,
+                       @Value("classpath:prompts/product-copy.st") Resource copyTemplate) {
+        this.chatClient = builder.build();
+        this.copyTemplate = copyTemplate;
+    }
+
+    /** A template from a resource, filled per request. */
+    String describe(Product p) {
+        return chatClient.prompt()
+                .user(u -&gt; u.text(copyTemplate)
+                        .param("name", p.name())
+                        .param("features", String.join(", ", p.features()))
+                        .param("audience", p.audience()))
+                .call()
+                .content();
+    }
+
+    /** JSON in the prompt: switch delimiters so its braces stay literal. */
+    String parseOrderNote(String note) {
+        return chatClient.prompt()
+                .templateRenderer(StTemplateRenderer.builder()
+                        .startDelimiterToken('&lt;')
+                        .endDelimiterToken('&gt;')
+                        .build())
+                .user(u -&gt; u.text("""
+                        Return JSON shaped like {"sku": "...", "qty": 0}
+                        for this order note: &lt;note&gt;""")
+                        .param("note", note))
+                .call()
+                .content();
+    }
+
+    /** Render without calling a model: handy in tests and logs. */
+    static String preview(String template, Map&lt;String, Object&gt; values) {
+        return PromptTemplate.builder()
+                .template(template)
+                .variables(values)
+                .build()
+                .render();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">src/main/resources/prompts/product-copy.st</div>
+<pre><code class="language-plaintext">Write a product description for {name}.
+Audience: {audience}.
+Features to cover, in this order: {features}.
+
+Two short paragraphs. No superlatives such as "best" or
+"revolutionary". Do not invent features that are not listed.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Rendering behaviour · run on Spring AI 2.0.1</div>
+<pre><code class="language-plaintext">preview("Hello {name}, {missing}", Map.of("name", "Ana"))
+→ IllegalStateException: Not all variables were replaced in the
+  template. Missing variable names are: [missing].
+
+with &lt; &gt; delimiters:
+"Return {\"sku\": \"...\"} for &lt;note&gt;" + note = "2 lamps"
+→ Return {"sku": "..."} for 2 lamps</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Validation modes</h4><p><code>THROW</code> (default) fails on a missing variable; <code>WARN</code> logs; <code>NONE</code> skips the check. Keep <code>THROW</code>: a silent hole in a prompt produces confident nonsense.</p></div>
+        <div class="card"><h4>Values are data</h4><p>A parameter value is inserted as text, never re-rendered as a template. Still, it is untrusted input to the <i>model</i>: delimit it and label it.</p></div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,64 @@
+<section class="slide" data-sec="RAG" data-title="Two pipelines: ingestion and retrieval">
+  <h2>RAG is two pipelines: one prepares your documents, one answers with them</h2>
+  <p class="dek">Retrieval-augmented generation answers a question by first finding relevant passages in your own content and putting them in the prompt, so the model answers from evidence instead of memory. It is two systems with different shapes. <b>Ingestion</b> is a batch or event-driven ETL job. <b>Retrieval</b> runs on every question and has a latency budget. Most quality problems are ingestion problems that show up at retrieval time.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Top row, ingestion, offline: sources such as SharePoint, Confluence, PDFs and databases are read by DocumentReaders into Documents. A splitter cuts them into chunks of a few hundred tokens along the document structure. Enrichers add metadata: source, tenant, ACL groups, dates, keywords. The EmbeddingModel turns each chunk into a vector. The VectorStore stores chunk, metadata and vector. Bottom row, retrieval, on every question: the user's question, optionally rewritten or expanded into several queries, is embedded, and the vector store returns the top-K chunks that pass the similarity threshold and the user's access filter. The chunks are optionally re-ranked, then added to the prompt as context with instructions to answer only from it and cite sources. The model answers with citations. Both rows use the same embedding model.">
+        <text x="10" y="18" font-size="10" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">INGESTION · OFFLINE, BATCH OR ON CHANGE</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="10" y="28" width="132" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="76" y="48" text-anchor="middle" font-weight="600">Sources</text><text x="76" y="64" text-anchor="middle" font-size="9" opacity="0.8">SharePoint, Confluence</text><text x="76" y="77" text-anchor="middle" font-size="9" opacity="0.8">PDFs, databases</text>
+          <rect x="166" y="28" width="118" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="225" y="48" text-anchor="middle" font-weight="600">Read</text><text x="225" y="64" text-anchor="middle" font-size="9" opacity="0.8">DocumentReader</text><text x="225" y="77" text-anchor="middle" font-size="9" opacity="0.8">Tika, PDF, Markdown</text>
+          <rect x="308" y="28" width="118" height="62" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="367" y="48" text-anchor="middle" font-weight="600">Split</text><text x="367" y="64" text-anchor="middle" font-size="9" opacity="0.8">chunks of ~300–800</text><text x="367" y="77" text-anchor="middle" font-size="9" opacity="0.8">tokens, by structure</text>
+          <rect x="450" y="28" width="118" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="509" y="48" text-anchor="middle" font-weight="600">Enrich</text><text x="509" y="64" text-anchor="middle" font-size="9" opacity="0.8">source, tenant, ACL,</text><text x="509" y="77" text-anchor="middle" font-size="9" opacity="0.8">dates, keywords</text>
+          <rect x="592" y="28" width="118" height="62" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="651" y="48" text-anchor="middle" font-weight="600">Embed</text><text x="651" y="64" text-anchor="middle" font-size="9" opacity="0.8">EmbeddingModel</text><text x="651" y="77" text-anchor="middle" font-size="9" opacity="0.8">one vector per chunk</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="142" y1="59" x2="163" y2="59" marker-end="url(#arw)"></line><line x1="284" y1="59" x2="305" y2="59" marker-end="url(#arw)"></line>
+          <line x1="426" y1="59" x2="447" y2="59" marker-end="url(#arw)"></line><line x1="568" y1="59" x2="589" y2="59" marker-end="url(#arw)"></line>
+          <line x1="710" y1="59" x2="756" y2="140" marker-end="url(#arw)"></line>
+        </g>
+
+        <path d="M760 136 a64 8 0 0 1 128 0 v52 a64 8 0 0 1 -128 0 z" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.5"></path>
+        <path d="M760 136 a64 8 0 0 0 128 0" fill="none" stroke="#D26A3F" stroke-width="1.5"></path>
+        <text x="824" y="164" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">VectorStore</text>
+        <text x="824" y="180" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">chunk + metadata + vector</text>
+
+        <text x="10" y="222" font-size="10" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">RETRIEVAL · EVERY QUESTION · LATENCY BUDGET</text>
+        <g font-size="10" fill="currentColor">
+          <rect x="10" y="232" width="118" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="69" y="252" text-anchor="middle" font-weight="600">Question</text><text x="69" y="268" text-anchor="middle" font-size="9" opacity="0.8">+ the user's identity</text><text x="69" y="281" text-anchor="middle" font-size="9" opacity="0.8">+ chat history</text>
+          <rect x="150" y="232" width="128" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="214" y="252" text-anchor="middle" font-weight="600">Transform</text><text x="214" y="268" text-anchor="middle" font-size="9" opacity="0.8">rewrite, compress,</text><text x="214" y="281" text-anchor="middle" font-size="9" opacity="0.8">expand (optional)</text>
+          <rect x="300" y="232" width="150" height="62" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="375" y="252" text-anchor="middle" font-weight="600">Retrieve</text><text x="375" y="268" text-anchor="middle" font-size="9" opacity="0.8">embed query, top-K,</text><text x="375" y="281" text-anchor="middle" font-size="9" opacity="0.8">threshold, ACL filter</text>
+          <rect x="472" y="232" width="118" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="531" y="252" text-anchor="middle" font-weight="600">Post-process</text><text x="531" y="268" text-anchor="middle" font-size="9" opacity="0.8">re-rank, dedupe,</text><text x="531" y="281" text-anchor="middle" font-size="9" opacity="0.8">trim to budget</text>
+          <rect x="612" y="232" width="128" height="62" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="676" y="252" text-anchor="middle" font-weight="600">Augment</text><text x="676" y="268" text-anchor="middle" font-size="9" opacity="0.8">context + "answer only</text><text x="676" y="281" text-anchor="middle" font-size="9" opacity="0.8">from it, cite sources"</text>
+          <rect x="762" y="232" width="128" height="62" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="826" y="256" text-anchor="middle" font-weight="600">Model</text><text x="826" y="272" text-anchor="middle" font-size="9" opacity="0.8">grounded answer</text><text x="826" y="285" text-anchor="middle" font-size="9" opacity="0.8">with citations</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="128" y1="263" x2="147" y2="263" marker-end="url(#arw)"></line><line x1="278" y1="263" x2="297" y2="263" marker-end="url(#arw)"></line>
+          <line x1="450" y1="263" x2="469" y2="263" marker-end="url(#arw)"></line><line x1="590" y1="263" x2="609" y2="263" marker-end="url(#arw)"></line>
+          <line x1="740" y1="263" x2="759" y2="263" marker-end="url(#arw)"></line>
+        </g>
+        <line x1="790" y1="192" x2="410" y2="230" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arwB)"></line>
+        <text x="560" y="206" font-size="9" fill="#3AA79B">nearest chunks</text>
+        <text x="450" y="322" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">Both pipelines must use the same embedding model. In Spring AI: readers + splitters + VectorStore.add() above; a RAG advisor below.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why RAG and not a bigger context?</h4><p>You cannot paste 40,000 documents into a prompt, and even when the relevant ones fit, sending them all costs money on every call and degrades recall. Retrieval sends the five passages that matter, with the user's permissions applied.</p></div>
+    <div class="card"><h4>What it buys you</h4><p>Answers from current, private content; citations a user can check; knowledge that updates when a document changes, with no retraining; and access control enforced at retrieval.</p></div>
+    <div class="card"><h4>Two Spring AI advisors</h4><p><code>QuestionAnswerAdvisor</code> does the simple version in one line. <code>RetrievalAugmentationAdvisor</code> exposes every stage of the bottom row as a pluggable module. Both are covered next.</p></div>
+  </div>
+</section>

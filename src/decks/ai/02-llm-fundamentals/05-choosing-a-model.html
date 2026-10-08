@@ -1,0 +1,35 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="Choosing a model">
+  <h2>Choose a model per task, on your data, against a budget</h2>
+  <p class="dek">There is no best model, only the cheapest one that passes your evaluation for a given task. A classifier that runs a million times a day and a contract reviewer that runs fifty times a day should not use the same model. Because Spring AI hides the provider behind one API, switching is a configuration change, so the decision can follow evidence instead of fashion.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Tier</th><th>Examples (2026)</th><th>Good for</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>Frontier, hosted</td><td>Claude Opus and Sonnet, OpenAI GPT-5 family, Gemini Pro</td><td>Hard reasoning, long documents, agents with many tools, code</td><td>Cost per call, latency of several seconds, rate limits</td></tr>
+        <tr><td>Small, hosted</td><td>Claude Haiku, gpt-5-mini, Gemini Flash</td><td>Classification, extraction, routing, summaries, most chat</td><td>Weaker on multi-step reasoning; test before you assume</td></tr>
+        <tr><td>Open weights, self-hosted</td><td>Llama, Qwen, Mistral, Gemma on Ollama or vLLM</td><td>Data that must not leave your network, fixed-cost high volume, offline</td><td>You run the GPUs, scaling, upgrades and safety filtering</td></tr>
+        <tr><td>Through a cloud platform</td><td>Amazon Bedrock, Azure OpenAI / Foundry, Vertex AI</td><td>Existing cloud contract, data residency, private networking, IAM</td><td>Model versions lag direct APIs; quotas per region</td></tr>
+        <tr><td>Embedding models</td><td>text-embedding-3, Titan, nomic-embed-text, mxbai</td><td>Search, RAG, clustering, deduplication</td><td>Changing model means re-embedding everything</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>What to compare</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Quality</dt><dd>pass rate on <i>your</i> evaluation set, not public leaderboards</dd>
+        <dt>Latency</dt><dd>time to first token (streaming UX) and tokens per second (total time)</dd>
+        <dt>Cost</dt><dd>input and output price × your measured token counts</dd>
+        <dt>Context</dt><dd>window size, and how well it recalls from long inputs</dd>
+        <dt>Features</dt><dd>tool calling, native structured output, vision, audio, prompt caching</dd>
+        <dt>Governance</dt><dd>data retention, training on your data (should be "no"), region, certifications</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">The pattern that saves the most money</span>Route by task. A small model handles the high-volume, well-defined calls (classify, extract, route); a frontier model handles the few calls that need deep reasoning. In Spring AI that is two <code>ChatClient</code> beans built from two models: see <a data-deck="ai" data-slide="Providers and multiple models">multiple models</a>.</div>
+      <div class="note warn"><span class="lbl">Pin the version</span>Aliases such as "latest" move under you, and a model update can change answers your tests depend on. In production, pin a dated model id in configuration and re-run your evaluation set before you move to a new one. The samples in this tab use short aliases only to stay readable.</div>
+    </div>
+  </div>
+</section>

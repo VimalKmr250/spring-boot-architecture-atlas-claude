@@ -1,0 +1,78 @@
+<section class="slide" data-sec="Prompt engineering" data-title="Multimodal prompts">
+  <h2>Images and documents go into the prompt as media</h2>
+  <p class="dek">Most current chat models read images, and many read PDFs. That turns a whole class of enterprise chores into one call: read a delivery photo, a scanned invoice, a screenshot of an error, a hand-filled form. In Spring AI an image is a <code>Media</code> attached to the user message; combine it with structured output and you get typed data from a picture.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DamageClaimController.java</div>
+<pre><code class="language-java">package com.acme.ai.vision;
+
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.io.Resource;
+import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+class DamageClaimController {
+
+    enum Severity { NONE, COSMETIC, FUNCTIONAL, DESTROYED }
+
+    record DamageReport(boolean packagingDamaged, Severity productDamage,
+                        List&lt;String&gt; visibleIssues, boolean needsHumanReview) {}
+
+    private static final List&lt;String&gt; ALLOWED = List.of("image/jpeg", "image/png");
+
+    private final ChatClient chatClient;
+
+    DamageClaimController(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        You assess photos of delivered parcels for damage claims.
+                        Describe only what is visible. If the photo is unclear or
+                        does not show a parcel, set needsHumanReview to true.""")
+                .build();
+    }
+
+    @PostMapping("/api/claims/photo")
+    DamageReport assess(@RequestParam("photo") MultipartFile photo) {
+        if (!ALLOWED.contains(photo.getContentType()) || photo.getSize() &gt; 5_000_000) {
+            throw new IllegalArgumentException("JPEG or PNG up to 5 MB");
+        }
+        MimeType type = MimeTypeUtils.parseMimeType(photo.getContentType());
+        Resource image = photo.getResource();
+        return chatClient.prompt()
+                .user(u -&gt; u.text("Assess this delivery photo.").media(type, image))
+                .call()
+                .entity(DamageReport.class);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Sample response (illustrative)</div>
+<pre><code class="language-json">{
+  "packagingDamaged": true,
+  "productDamage": "COSMETIC",
+  "visibleIssues": ["crushed box corner", "scratch on lamp base"],
+  "needsHumanReview": false
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Input</th><th>Good fit</th><th>Watch out for</th></tr></thead>
+          <tbody>
+            <tr><td>Photos</td><td>Damage claims, shelf audits, returns triage</td><td>Images cost hundreds to thousands of tokens each; resize first</td></tr>
+            <tr><td>Scans and PDFs</td><td>Invoices, delivery notes, forms</td><td>Check provider support and page limits; for large archives, extract text once and use RAG</td></tr>
+            <tr><td>Screenshots</td><td>Support tickets ("what does this error mean?")</td><td>They may contain personal data; redact or keep them in your region</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Validate before you pay</span>Check type and size before calling the model, as above. A 40 MB phone photo is expensive, slow, and may be rejected by the provider after the upload. Text visible <i>inside</i> an image is also untrusted input: a photo can carry an injection as easily as a document can.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,58 @@
+<section class="slide" data-sec="Tool calling and MCP" data-title="Many tools and tool search">
+  <h2>Past a dozen tools, stop sending them all: let the model search for them</h2>
+  <p class="dek">Every attached tool's name, description and schema is sent on every model call. Ten tools cost a few hundred tokens; two hundred tools from a handful of MCP servers cost tens of thousands, slow every call, and make the model pick the wrong tool more often. <code>ToolSearchToolCallingAdvisor</code> replaces the full list with one search tool: the model describes what it needs, the advisor finds matching tools in an index, and only those are disclosed.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 260" role="img" aria-label="Without tool search, every request carries all 200 tool definitions, about 40,000 tokens. With tool search, the request carries one toolSearch tool. The model calls toolSearch with a query such as 'refund an order'. The advisor searches an index of the 200 tools using regex, Lucene or a vector store and discloses the best matches, for example createRefund and getOrderStatus. The model then calls those tools normally.">
+          <text x="10" y="18" font-size="10.5" font-weight="600" fill="currentColor">Without</text>
+          <rect x="10" y="26" width="420" height="40" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <text x="20" y="44" font-size="9.5" fill="currentColor">every call: prompt + 200 tool definitions</text>
+          <text x="20" y="58" font-size="9" fill="currentColor" opacity="0.8">≈ 40k tokens of schemas, more wrong tool picks</text>
+
+          <text x="10" y="96" font-size="10.5" font-weight="600" fill="currentColor">With tool search</text>
+          <rect x="10" y="104" width="160" height="40" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="20" y="122" font-size="9.5" fill="currentColor">call 1: prompt + toolSearch</text>
+          <text x="20" y="136" font-size="9" fill="currentColor" opacity="0.8">one small tool</text>
+          <line x1="170" y1="124" x2="226" y2="124" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="230" y="104" width="200" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="240" y="122" font-size="9.5" fill="currentColor">toolSearch("refund an order")</text>
+          <text x="240" y="136" font-size="9" fill="currentColor" opacity="0.8">index: regex · Lucene · vector</text>
+          <line x1="330" y1="144" x2="330" y2="174" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="190" y="178" width="240" height="40" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="200" y="196" font-size="9.5" fill="currentColor">call 2: + createRefund, getOrderStatus</text>
+          <text x="200" y="210" font-size="9" fill="currentColor" opacity="0.8">only the matches are disclosed</text>
+          <text x="10" y="248" font-size="9" fill="currentColor" opacity="0.75">One extra round trip, far fewer tokens per call.</text>
+        </svg>
+      </div>
+    </figure>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">application.yml · with spring-ai-starter-tool-search-advisor</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    chat:
+      client:
+        tool-search-advisor:
+          enabled: true
+          tool-index-type: lucene   # regex (default), lucene or vector
+          max-results: 5
+    tools:
+      limits:
+        max-total-tool-calls: 20</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Tools attached</th><th>Approach</th></tr></thead>
+          <tbody>
+            <tr><td>1–10</td><td>Attach them all; write precise descriptions</td></tr>
+            <tr><td>10–30</td><td>Split by use case: separate clients with separate tool sets</td></tr>
+            <tr><td>30+ or from MCP servers</td><td>Tool search, or route first with a classifier and attach that route's tools</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Search does not replace authorisation</span>Tool search changes what the model <i>sees</i>, not what it may <i>do</i>. Only index tools the current user is allowed to use, and keep the permission checks inside each tool.</div>
+    </div>
+  </div>
+</section>

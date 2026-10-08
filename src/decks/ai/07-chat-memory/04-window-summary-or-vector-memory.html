@@ -1,0 +1,52 @@
+<section class="slide" data-sec="Chat memory" data-title="Window, summary or vector memory">
+  <h2>Three memory strategies, chosen by conversation length and what must be remembered</h2>
+  <p class="dek">A sliding window is simple and right for most chats. Long-running conversations need something more: a running summary that keeps the facts that matter, or retrieval of only the past turns relevant to the current question. Whichever you choose, memory is stored personal data, with the obligations that come with it.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Strategy</th><th>How</th><th>Good for</th><th>Weakness</th></tr></thead>
+      <tbody>
+        <tr><td>Sliding window</td><td><code>MessageWindowChatMemory</code> + <code>MessageChatMemoryAdvisor</code></td><td>Support chats, short tasks; the default</td><td>Forgets the start of long conversations entirely</td></tr>
+        <tr><td>Window + summary</td><td>Summarise older turns with a cheap model; keep the summary plus recent turns</td><td>Long advisory sessions, case handling</td><td>Summaries lose detail; one more model call; the summary can drift</td></tr>
+        <tr><td>Vector memory</td><td><code>VectorStoreChatMemoryAdvisor</code>: embed every turn, retrieve the top-K relevant ones</td><td>Assistants used over weeks; "what did I say about X?"</td><td>Loses order and recency; retrieval can miss; more infrastructure</td></tr>
+        <tr><td>Structured facts</td><td>Extract facts into your own tables (preferences, open cases); add them to the system message</td><td>Personalisation that must be exact and editable</td><td>You design and maintain the schema</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Summarising older turns with a cheap model (excerpt)</div>
+<pre><code class="language-java">List&lt;Message&gt; history = chatMemory.get(id);
+if (history.size() &gt; 16) {
+    List&lt;Message&gt; older = history.subList(0, history.size() - 6);
+    List&lt;Message&gt; recent = List.copyOf(history.subList(history.size() - 6, history.size()));
+
+    String summary = fastChatClient.prompt()
+            .system("""
+                    Summarise this support conversation in at most 6 bullet points.
+                    Keep order ids, amounts, dates and anything we promised.""")
+            .messages(older)
+            .user("Summarise the conversation above.")
+            .call()
+            .content();
+
+    chatMemory.clear(id);
+    chatMemory.add(id, new UserMessage("Summary of our earlier conversation:\n" + summary));
+    chatMemory.add(id, recent);
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Vector memory instead of a window (excerpt)</div>
+<pre><code class="language-java">ChatClient assistant = builder
+        .defaultAdvisors(VectorStoreChatMemoryAdvisor.builder(vectorStore)
+                .defaultTopK(6)        // the six most relevant past turns
+                .build())
+        .build();</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Memory is personal data</span>Decide retention up front and enforce it with a job. Support "delete this conversation" with <code>chatMemory.clear(id)</code>. Redact card numbers and secrets <i>before</i> they are stored by ordering a redaction advisor ahead of memory. Keep each tenant's conversations in a separate partition or table, and include memory in your data-subject access and erasure processes.</div>
+      <div class="note"><span class="lbl">Say it in the interview</span>"The model is stateless, so memory is a cost and privacy decision. I default to a window of recent messages in a shared store, keyed by a server-issued conversation id with an ownership check. For long sessions I summarise older turns with a small model, and conversations expire on a retention schedule."</div>
+    </div>
+  </div>
+</section>

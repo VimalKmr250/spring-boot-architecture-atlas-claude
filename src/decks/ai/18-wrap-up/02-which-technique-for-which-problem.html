@@ -1,0 +1,77 @@
+<section class="slide" data-sec="Wrap-up" data-title="Which technique for which problem">
+  <h2>From the problem to the technique, in five questions</h2>
+  <p class="dek">When a stakeholder says "we want AI for this", walk the questions in order. The first "yes" usually names the core technique; the rest of this tab tells you how to build it safely.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 330" role="img" aria-label="A decision path. Question one: can rules or plain code do it reliably? If yes, write code, no model. Question two: is the output a decision or label from a closed set? If yes, classification with structured output, a small model or embeddings. Question three: does it need facts from your documents or data? If documents, RAG with access filters; if live system data, tools. Question four: does it need to take actions? If yes, tools with identity, limits and human confirmation. Question five: are the steps unknowable in advance? If yes, a bounded agent; if no, a workflow. Throughout: if the behaviour still falls short with many examples at high volume, consider fine-tuning.">
+        <g font-size="10.5" fill="currentColor">
+          <rect x="10" y="20" width="250" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="135" y="45" text-anchor="middle" font-weight="600">1 · Can rules or plain code do it?</text>
+          <rect x="10" y="80" width="250" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="135" y="105" text-anchor="middle" font-weight="600">2 · Output from a closed set of labels?</text>
+          <rect x="10" y="140" width="250" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="135" y="165" text-anchor="middle" font-weight="600">3 · Needs your documents or data?</text>
+          <rect x="10" y="200" width="250" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="135" y="225" text-anchor="middle" font-weight="600">4 · Needs to take actions?</text>
+          <rect x="10" y="260" width="250" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="135" y="285" text-anchor="middle" font-weight="600">5 · Steps unknowable in advance?</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="135" y1="60" x2="135" y2="77" marker-end="url(#arw)"></line><line x1="135" y1="120" x2="135" y2="137" marker-end="url(#arw)"></line>
+          <line x1="135" y1="180" x2="135" y2="197" marker-end="url(#arw)"></line><line x1="135" y1="240" x2="135" y2="257" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="9" fill="currentColor" opacity="0.7"><text x="142" y="72">no</text><text x="142" y="132">no</text><text x="142" y="192">no</text><text x="142" y="252">no</text></g>
+
+        <g font-size="10" fill="currentColor">
+          <line x1="260" y1="40" x2="326" y2="40" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line><text x="272" y="34" font-size="9" fill="#3AA79B">yes</text>
+          <rect x="330" y="22" width="300" height="36" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="342" y="44">Write code. No model: cheaper, testable, exact.</text>
+
+          <line x1="260" y1="100" x2="326" y2="100" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line><text x="272" y="94" font-size="9" fill="#3AA79B">yes</text>
+          <rect x="330" y="82" width="300" height="36" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B"></rect>
+          <text x="342" y="104">Classification: enum output, small model or embeddings</text>
+
+          <line x1="260" y1="160" x2="326" y2="160" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line><text x="272" y="154" font-size="9" fill="#3AA79B">yes</text>
+          <rect x="330" y="142" width="300" height="36" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <text x="342" y="158">Documents → RAG with access filters, citations</text>
+          <text x="342" y="172">Live data → read-only tools</text>
+
+          <line x1="260" y1="220" x2="326" y2="220" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line><text x="272" y="214" font-size="9" fill="#3AA79B">yes</text>
+          <rect x="330" y="202" width="300" height="36" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F"></rect>
+          <text x="342" y="224">Write tools: user identity, limits, human confirms</text>
+
+          <line x1="260" y1="270" x2="326" y2="270" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></line><text x="272" y="264" font-size="9" fill="#3AA79B">yes</text>
+          <rect x="330" y="252" width="140" height="36" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="342" y="274">Bounded agent</text>
+          <line x1="135" y1="300" x2="135" y2="316" stroke="#8A94A3" stroke-width="1.3"></line>
+          <line x1="135" y1="316" x2="486" y2="316" stroke="#8A94A3" stroke-width="1.3"></line>
+          <line x1="486" y1="316" x2="486" y2="292" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <text x="300" y="312" font-size="9" fill="currentColor" opacity="0.7">no</text>
+          <rect x="490" y="252" width="140" height="36" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="502" y="274">Workflow</text>
+
+          <rect x="670" y="22" width="220" height="266" rx="8" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></rect>
+          <text x="684" y="44" font-weight="600">At every step, also ask</text>
+          <text x="684" y="68" font-size="9.5">· What does "good" look like,</text>
+          <text x="684" y="82" font-size="9.5">  and how will we measure it?</text>
+          <text x="684" y="104" font-size="9.5">· Whose data may it see?</text>
+          <text x="684" y="126" font-size="9.5">· What is the cost per task?</text>
+          <text x="684" y="148" font-size="9.5">· What happens when the model</text>
+          <text x="684" y="162" font-size="9.5">  is wrong, slow or down?</text>
+          <text x="684" y="184" font-size="9.5">· Who signs off on outputs</text>
+          <text x="684" y="198" font-size="9.5">  with consequences?</text>
+          <text x="684" y="226" font-size="9.5">· Still short of the bar with</text>
+          <text x="684" y="240" font-size="9.5">  many good examples at high</text>
+          <text x="684" y="254" font-size="9.5">  volume? Consider fine-tuning.</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Combinations are normal</h4><p>A support assistant is RAG (policies) plus read tools (orders) plus a write tool with confirmation (returns) inside a routing workflow. The questions identify the parts; the earlier slides show how each part is built.</p></div>
+    <div class="card"><h4>Question 1 saves the most money</h4><p>Teams under pressure to "use AI" build models into features that a rules engine or a SQL query solves exactly. Saying so in a design review, or an interview, shows judgement.</p></div>
+    <div class="card"><h4>Then pick a use-case template</h4><p>The common and enterprise use cases in this tab are worked answers for the most frequent combinations: start from the closest one.</p></div>
+  </div>
+</section>

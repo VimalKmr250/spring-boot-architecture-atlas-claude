@@ -1,0 +1,31 @@
+<section class="slide" data-sec="Wrap-up" data-title="Spring AI 1.x to 2.0 migration">
+  <h2>Spring AI 1.x → 2.0: what breaks, and what to change</h2>
+  <p class="dek">Many production codebases still run Spring AI 1.0 or 1.1 on Spring Boot 3.x. Spring AI 2.0 requires Spring Boot 4 (Framework 7) and Jackson 3, so the upgrade usually follows the Boot 4 migration. This is the list to work through, taken from the official upgrade notes and checked against the 2.0.1 jars.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Area</th><th>1.x</th><th>2.0</th></tr></thead>
+      <tbody>
+        <tr><td>Baseline</td><td>Boot 3.4/3.5, Jackson 2</td><td>Boot 4.0/4.1, Framework 7, Jackson 3 (<code>tools.jackson</code>), JSpecify null-safety</td></tr>
+        <tr><td>Properties</td><td><code>spring.ai.openai.chat.options.model</code></td><td><code>spring.ai.openai.chat.model</code> (old keys deprecated, still bound)</td></tr>
+        <tr><td>Per-request options</td><td><code>.options(OpenAiChatOptions.builder()….build())</code></td><td><code>.options(OpenAiChatOptions.builder()…)</code>: pass the builder</td></tr>
+        <tr><td>Tool loop</td><td>Inside each <code>ChatModel</code></td><td><code>ToolCallingAdvisor</code> (renamed from <code>ToolCallAdvisor</code>), auto-registered by <code>ChatClient</code>; <code>ChatModel.call()</code> returns raw tool requests</td></tr>
+        <tr><td>Tool lookup</td><td><code>toolNames(…)</code>, resolver over all beans</td><td>Attach <code>ToolCallback</code>s or <code>@Tool</code> objects explicitly; fallback resolution off by default</td></tr>
+        <tr><td>Tool limits</td><td>None</td><td>Defaults 40 calls per tool, 150 total; <code>spring.ai.tools.limits.*</code></td></tr>
+        <tr><td>Chat memory</td><td>Default conversation id; <code>PromptChatMemoryAdvisor</code></td><td>Conversation id required per request; <code>PromptChatMemoryAdvisor</code> removed; memory advisor order HIGHEST+200</td></tr>
+        <tr><td>JDBC memory schema</td><td>No ordering column</td><td><code>sequence_id</code> column and index: migrate existing tables</td></tr>
+        <tr><td>Modules</td><td><code>spring-ai-advisors-vector-store</code>; separate Azure OpenAI and OpenAI SDK modules</td><td><code>spring-ai-vector-store-advisor</code>; Azure via <code>spring-ai-openai</code></td></tr>
+        <tr><td>Anthropic</td><td>Hand-written <code>AnthropicApi</code> client</td><td>Official Anthropic Java SDK; <code>AnthropicApi</code> removed; default max tokens 4096</td></tr>
+        <tr><td>Retries (OpenAI, Anthropic)</td><td>Spring AI <code>RetryTemplate</code></td><td>The official SDK's retries and timeouts (<code>max-retries</code>, <code>timeout</code>)</td></tr>
+        <tr><td>MCP</td><td><code>org.springaicommunity.mcp.*</code> annotations, SSE default</td><td><code>org.springframework.ai.mcp.annotation.*</code>; MCP Java SDK 2.0; Streamable HTTP default</td></tr>
+        <tr><td>Options objects</td><td>Mutable, <code>copy()</code></td><td>Immutable; <code>mutate()</code> returns a builder</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Order of work</h4><p>Boot 4 and Jackson 3 first; then dependencies and module names; then compile errors (options, tools, MCP packages); then behaviour changes (memory ids, tool attachment, retries); then the JDBC schema migration.</p></div>
+    <div class="card"><h4>Behaviour, not just compilation</h4><p>Code that compiles can still behave differently: tools no longer run from <code>ChatModel</code>, unattached tools are not found, retries and timeouts come from a different layer. The stub-model unit tests and the evaluation set are what prove equivalence.</p></div>
+    <div class="card"><h4>Source</h4><p>Spring AI reference documentation, "Upgrade notes", and the Spring AI 2.0.0 GA announcement (June 2026). Re-check them for patch releases after 2.0.1.</p></div>
+  </div>
+</section>

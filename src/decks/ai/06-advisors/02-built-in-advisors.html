@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Advisors" data-title="Built-in advisors">
+  <h2>The built-in advisors, what each adds, and where it sits</h2>
+  <p class="dek">You will rarely write the plumbing these advisors provide. Learn what each one does to the request and response, its default order, and which module it lives in, because several sit outside the core <code>spring-ai-client-chat</code> jar.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Advisor</th><th>Does</th><th>Default order</th><th>Module</th></tr></thead>
+      <tbody>
+        <tr><td><code>MessageChatMemoryAdvisor</code></td><td>Adds stored history as messages; saves the new turn</td><td class="num">HIGHEST+200</td><td><code>spring-ai-client-chat</code></td></tr>
+        <tr><td><code>VectorStoreChatMemoryAdvisor</code></td><td>Retrieves only <i>relevant</i> past turns from a vector store</td><td class="num">HIGHEST+200</td><td><code>spring-ai-vector-store-advisor</code></td></tr>
+        <tr><td><code>ToolCallingAdvisor</code></td><td>Runs the tool-call loop; auto-registered by <code>ChatClient</code></td><td class="num">HIGHEST+300</td><td><code>spring-ai-client-chat</code></td></tr>
+        <tr><td><code>ToolSearchToolCallingAdvisor</code></td><td>Exposes only the tools relevant to the request, found by search</td><td class="num">configurable</td><td><code>spring-ai-tool-search-advisor</code></td></tr>
+        <tr><td><code>QuestionAnswerAdvisor</code></td><td>Simple RAG: similarity search, then context added to the user message</td><td class="num">0</td><td><code>spring-ai-vector-store-advisor</code></td></tr>
+        <tr><td><code>RetrievalAugmentationAdvisor</code></td><td>Modular RAG: query transform, expand, retrieve, join, augment</td><td class="num">0</td><td><code>spring-ai-rag</code></td></tr>
+        <tr><td><code>SafeGuardAdvisor</code></td><td>Blocks requests that contain listed words; returns a fixed reply</td><td class="num">0</td><td><code>spring-ai-client-chat</code></td></tr>
+        <tr><td><code>SimpleLoggerAdvisor</code></td><td>Logs request and response at DEBUG</td><td class="num">0</td><td><code>spring-ai-client-chat</code></td></tr>
+        <tr><td><code>StructuredOutputValidationAdvisor</code></td><td>Validates JSON against the schema; re-asks with the errors</td><td class="num">LOWEST−2000</td><td><code>spring-ai-client-chat</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Defaults on the client, extras per request (excerpt)</div>
+<pre><code class="language-java">ChatClient support = builder
+        .defaultAdvisors(
+                SafeGuardAdvisor.builder()
+                        .sensitiveWords(List.of("internal use only"))
+                        .order(Ordered.HIGHEST_PRECEDENCE)        // before memory
+                        .build(),
+                MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                QuestionAnswerAdvisor.builder(vectorStore).build(),
+                new SimpleLoggerAdvisor())
+        .build();
+
+String answer = support.prompt()
+        .user(question)
+        .advisors(a -&gt; a.param(ChatMemory.CONVERSATION_ID, conversationId))
+        .call()
+        .content();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">Logging prompts is a data decision</span><code>SimpleLoggerAdvisor</code> logs full prompts and answers, which may contain personal data and retrieved confidential documents. Enable its DEBUG logger only where your log retention allows it, or write a logger advisor that records sizes and ids instead of content.</div>
+      <div class="note warn"><span class="lbl"><span class="tag w">1.x</span> renames and removals</span><code>ToolCallAdvisor</code> became <code>ToolCallingAdvisor</code>; <code>PromptChatMemoryAdvisor</code> was removed in favour of <code>MessageChatMemoryAdvisor</code>; the vector store advisor module was renamed from <code>spring-ai-advisors-vector-store</code> to <code>spring-ai-vector-store-advisor</code>.</div>
+    </div>
+  </div>
+</section>

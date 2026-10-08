@@ -1,0 +1,79 @@
+<section class="slide" data-sec="Prompt engineering" data-title="Few-shot examples and reasoning">
+  <h2>Show the model two or three answers, and give it room to think</h2>
+  <p class="dek">Examples are the most reliable way to pin down a format or a judgement call that is hard to describe in rules. Send them as earlier conversation turns, so the model sees exactly what a good answer looks like. For decisions with several factors, ask a non-reasoning model to write its reasoning <i>before</i> its answer; reasoning models already do that internally.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TicketRouter.java · few-shot as message pairs</div>
+<pre><code class="language-java">package com.acme.ai.fewshot;
+
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.stereotype.Service;
+
+@Service
+class TicketRouter {
+
+    /** Varied on purpose: different queues, urgencies and writing styles. */
+    private static final List&lt;Message&gt; EXAMPLES = List.of(
+            new UserMessage("Parcel says delivered but it's not here. Third time this month!!"),
+            new AssistantMessage("DELIVERY | HIGH"),
+            new UserMessage("hi, can I change the colour on order 5521 before it ships?"),
+            new AssistantMessage("ORDER_CHANGE | MEDIUM"),
+            new UserMessage("Your site charged my card twice for one order."),
+            new AssistantMessage("BILLING | HIGH"),
+            new UserMessage("Do you sell gift cards?"),
+            new AssistantMessage("PRODUCT_QUESTION | LOW"));
+
+    private final ChatClient chatClient;
+
+    TicketRouter(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        Route the support ticket. Reply with QUEUE | URGENCY only.
+                        Queues: DELIVERY, ORDER_CHANGE, BILLING, RETURNS, PRODUCT_QUESTION, OTHER.
+                        Urgency: HIGH if money is lost or the customer is already upset,
+                        MEDIUM if it is time-sensitive, otherwise LOW.""")
+                .build();
+    }
+
+    String route(String ticket) {
+        return chatClient.prompt()
+                .messages(EXAMPLES)      // the examples go before the real ticket
+                .user(ticket)
+                .call()
+                .content();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Reasoning first, decision second (excerpt)</div>
+<pre><code class="language-java">record RefundAssessment(
+        String reasoning,          // generated first: the model "thinks" here
+        boolean eligible,
+        String policyClause) {}
+
+RefundAssessment a = chatClient.prompt()
+        .system("""
+                Decide whether the request is eligible under the policy.
+                In 'reasoning', check the dates, the item condition and the
+                policy clause one by one. Then fill the other fields.""")
+        .user(u -&gt; u.text("Policy: {policy}\n\nRequest: {request}")
+                .param("policy", policy).param("request", request))
+        .call()
+        .entity(RefundAssessment.class);
+
+log.debug("refund reasoning: {}", a.reasoning());   // for you, not the customer</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>Good examples</h4><p>Two to five, covering the edge cases, varied in length and style, and correct. The model copies their patterns, mistakes included. If every example is HIGH, expect HIGH.</p></div>
+        <div class="card"><h4>When to stop adding them</h4><p>Each example is input tokens on every call. If you need dozens to get the behaviour right, that is the signal to consider <a data-deck="ai" data-slide="Prompting, RAG or fine-tuning?">fine-tuning</a>.</p></div>
+      </div>
+      <div class="note warn"><span class="lbl">Reasoning models are different</span>With gpt-5, o-series or Claude's adaptive thinking, the model reasons before answering on its own, and the provider bills those hidden tokens. Asking it to "think step by step" in the output only adds cost. Tune the effort setting instead, and keep a reasoning field only when you want an explanation to log or show a reviewer.</div>
+    </div>
+  </div>
+</section>

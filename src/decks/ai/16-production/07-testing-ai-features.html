@@ -1,0 +1,129 @@
+<section class="slide" data-sec="Production" data-title="Testing AI features">
+  <h2>Test the code around the model deterministically; test the model with evaluations</h2>
+  <p class="dek">Most bugs in AI features are ordinary bugs: a wrong prompt parameter, a missing filter, an unhandled tool error, a parser that breaks on an empty list. A stub <code>ChatModel</code> that returns canned replies and records what it was sent makes those tests fast and exact. Containers give realistic integration tests without API keys, and evaluation suites against real models measure the part that is not deterministic.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TicketRouterTest.java · unit test, no network</div>
+<pre><code class="language-java">package com.acme.ai.fewshot;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+
+class TicketRouterTest {
+
+    /** Returns a canned reply and records every prompt. */
+    static class StubChatModel implements ChatModel {
+        final List&lt;Prompt&gt; prompts = new ArrayList&lt;&gt;();
+        private final String reply;
+
+        StubChatModel(String reply) {
+            this.reply = reply;
+        }
+
+        @Override
+        public ChatResponse call(Prompt prompt) {
+            prompts.add(prompt);
+            return new ChatResponse(List.of(new Generation(new AssistantMessage(reply))));
+        }
+    }
+
+    @Test
+    void sendsExamplesBeforeTheTicketAndReturnsTheLabel() {
+        var model = new StubChatModel("BILLING | HIGH");
+        var router = new TicketRouter(ChatClient.builder(model));
+
+        String label = router.route("I was charged twice for order 5521");
+
+        assertThat(label).isEqualTo("BILLING | HIGH");
+        List&lt;Message&gt; sent = model.prompts.getFirst().getInstructions();
+        assertThat(sent.getFirst().getMessageType()).isEqualTo(MessageType.SYSTEM);
+        assertThat(sent.getLast().getText()).isEqualTo("I was charged twice for order 5521");
+        assertThat(sent).hasSize(1 + 8 + 1);          // system + 4 example pairs + ticket
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">VectorSearchIT.java · real Ollama and pgvector in containers</div>
+<pre><code class="language-java">package com.acme.ai.it;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.ollama.OllamaContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+@SpringBootTest(properties = {
+        "spring.ai.model.chat=ollama",
+        "spring.ai.model.embedding=ollama",
+        "spring.ai.ollama.embedding.model=nomic-embed-text",
+        "spring.ai.ollama.init.pull-model-strategy=when_missing",
+        "spring.ai.vectorstore.pgvector.dimensions=768",
+        "spring.ai.vectorstore.pgvector.initialize-schema=true"})
+@Testcontainers(disabledWithoutDocker = true)
+class VectorSearchIT {
+
+    @Container
+    @ServiceConnection
+    static OllamaContainer ollama = new OllamaContainer("ollama/ollama:latest");
+
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer postgres = new PostgreSQLContainer(
+            DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"));
+
+    @Autowired
+    VectorStore vectorStore;
+
+    @Test
+    void findsByMeaningAndRespectsTheTenantFilter() {
+        vectorStore.add(List.of(
+                new Document("Refunds are paid within 5 working days.", Map.of("tenant", "acme")),
+                new Document("Refunds are paid within 5 working days.", Map.of("tenant", "globex"))));
+
+        var hits = vectorStore.similaritySearch(SearchRequest.builder()
+                .query("how long until I get my money back?")
+                .filterExpression("tenant == 'acme'")
+                .build());
+
+        assertThat(hits).isNotEmpty()
+                .allSatisfy(d -&gt; assertThat(d.getMetadata()).containsEntry("tenant", "acme"));
+    }
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Layer</th><th>Runs</th><th>Checks</th></tr></thead>
+          <tbody>
+            <tr><td>Unit, stub model</td><td>Every commit, milliseconds</td><td>Prompts, parameters, parsing, branches, tool logic, error paths</td></tr>
+            <tr><td>Integration, containers</td><td>Every commit or PR, minutes</td><td>Wiring, schema, filters, real embeddings</td></tr>
+            <tr><td>Evaluation, real model</td><td>Nightly and before releases</td><td>Quality thresholds on a golden set</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

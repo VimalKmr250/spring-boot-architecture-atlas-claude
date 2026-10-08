@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q16–18 · Tools, MCP and agents">
+  <h2>Three questions on letting a model act</h2>
+  <p class="dek">Once a model can call code, the interview turns to control: who the tool runs as, what it may do, and how the loop is bounded. Show you know the mechanics and the security model.</p>
+
+  <article class="q"><header><i>Q16</i><h3>How does tool calling work, and how do you make it safe?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>You describe tools with a name, description and argument schema; in Spring AI, <code>@Tool</code> methods. The model may reply with a tool call instead of text; <code>ToolCallingAdvisor</code> runs the method and sends the result back, looping until a final answer, within configured limits. Safety comes from code: the user's identity arrives through <code>ToolContext</code>, never as an argument the model chooses; tools check ownership; write actions create pending requests a person confirms.</div>
+    <p class="deeper"><b>Go deeper:</b> Each tool use costs at least two model calls. Exceptions become messages to the model by default, so keep them user-safe. Attach only the tools a role needs; Spring AI 2.0 has no global by-name lookup, which helps. Use <code>returnDirect</code> to skip the second call for results shown verbatim. Set <code>spring.ai.tools.limits.*</code> to stop loops, and audit every call.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="How tool calling works">How it works</a><a data-deck="ai" data-slide="Tools with @Tool">@Tool</a><a data-deck="ai" data-slide="Securing tools">Securing tools</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q17</i><h3>What is MCP, and when would you use it?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>The Model Context Protocol standardises how AI applications discover and call tools, read resources and fetch prompts from separate servers. I use it when tools belong to another team or should be shared by several AI clients: the inventory team runs one MCP server, and Spring AI apps, IDE assistants and chat clients all use it. In Spring AI, <code>@McpTool</code> methods make a server, and the MCP client starter turns remote tools into <code>ToolCallback</code>s.</div>
+    <p class="deeper"><b>Go deeper:</b> Spring AI 2.0 ships the MCP Java SDK 2.0 with Streamable HTTP as the default transport and stdio for local processes. An MCP server is a trust decision: its descriptions enter your prompt and its results your context. Secure servers with OAuth 2.0, connect only to vetted ones, filter exposed tools, and use tool search when many servers add up to hundreds of tools.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="MCP: tools as a protocol">MCP</a><a data-deck="ai" data-slide="Many tools and tool search">Tool search</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q18</i><h3>Workflow or agent: when would you build an agent?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>A workflow runs model calls at steps I wrote: routing, chaining, parallel calls, evaluator–optimiser. An agent lets the model choose its next tool in a loop. I default to workflows because they are predictable, testable and cheaper, and build an agent only when the path genuinely cannot be known in advance, the value justifies variable cost, and mistakes can be caught. Then I bound it with tool and token limits, read-only defaults, human approval for side effects, and tracing.</div>
+    <p class="deeper"><b>Go deeper:</b> A good first agent is internal and read-only, such as investigating why an order is stuck across several systems for a support agent who reviews the findings. A risky first agent is customer-facing with refund rights. In Spring AI an agent is a <code>ChatClient</code> with tools; the loop and its limits come from the tool-calling advisor.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Workflows and agents">Workflows and agents</a><a data-deck="ai" data-slide="When to build an agent, and how to contain it">Containing agents</a></p>
+  </div></article>
+</section>

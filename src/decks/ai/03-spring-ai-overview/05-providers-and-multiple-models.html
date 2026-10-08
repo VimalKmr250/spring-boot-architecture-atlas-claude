@@ -1,0 +1,97 @@
+<section class="slide" data-sec="Spring AI overview" data-title="Providers and multiple models">
+  <h2>Switch providers with a starter; run several models with explicit beans</h2>
+  <p class="dek">Code written against <code>ChatClient</code> does not change when the provider does. Swapping is a dependency plus properties. Running two models side by side, a cheap one for routing and a strong one for reasoning, takes one more step: turn off the auto-configured builder and declare a <code>ChatClient</code> bean per model.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Provider</th><th>Starter (<code>org.springframework.ai</code>)</th><th><code>spring.ai.model.chat</code></th><th>Key properties</th></tr></thead>
+      <tbody>
+        <tr><td>OpenAI, Azure OpenAI, OpenAI-compatible</td><td><code>spring-ai-starter-model-openai</code></td><td><code>openai</code></td><td><code>spring.ai.openai.api-key</code>, <code>.base-url</code>, <code>.chat.model</code>; Azure: <code>.chat.microsoft-foundry=true</code> + deployment name</td></tr>
+        <tr><td>Anthropic (Claude)</td><td><code>spring-ai-starter-model-anthropic</code></td><td><code>anthropic</code></td><td><code>spring.ai.anthropic.api-key</code>, <code>.chat.model</code> (e.g. <code>claude-sonnet-5-5</code>)</td></tr>
+        <tr><td>Amazon Bedrock (Converse API)</td><td><code>spring-ai-starter-model-bedrock-converse</code></td><td><code>bedrock-converse</code></td><td><code>spring.ai.bedrock.aws.region</code>, <code>.converse.chat.model</code>; credentials from the AWS default chain</td></tr>
+        <tr><td>Ollama (local, open weights)</td><td><code>spring-ai-starter-model-ollama</code></td><td><code>ollama</code></td><td><code>spring.ai.ollama.base-url</code>, <code>.chat.model</code></td></tr>
+        <tr><td>Google, Mistral, DeepSeek</td><td><code>…-google-genai</code>, <code>…-mistral-ai</code>, <code>…-deepseek</code></td><td>provider name</td><td>same pattern</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChatClientConfig.java · a fast model and a deep one</div>
+<pre><code class="language-java">package com.acme.ai.models;
+
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.stereotype.Service;
+
+@Configuration
+class ChatClientConfig {
+
+    /** Cheap and quick: routing, classification, short answers. */
+    @Bean
+    @Primary
+    ChatClient fastChatClient(OpenAiChatModel model, ObservationRegistry registry) {
+        return ChatClient.builder(model, registry, null, null)
+                .defaultSystem("Be brief and precise.")
+                .build();
+    }
+
+    /** Stronger and slower: long documents, multi-step reasoning. */
+    @Bean
+    ChatClient deepChatClient(AnthropicChatModel model, ObservationRegistry registry) {
+        return ChatClient.builder(model, registry, null, null)
+                .defaultSystem("Think carefully. Cite the parts of the input you used.")
+                .build();
+    }
+}
+
+@Service
+class ContractReviewService {
+
+    private final ChatClient deep;
+
+    ContractReviewService(@Qualifier("deepChatClient") ChatClient deep) {
+        this.deep = deep;
+    }
+
+    String review(String contract) {
+        return deep.prompt().user(contract).call().content();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">application.yml · two chat providers in one app</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    chat:
+      client:
+        enabled: false          # no auto-configured ChatClient.Builder
+    model:
+      embedding: openai         # chat left unset: both ChatModels are created
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        model: gpt-5-mini
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        model: claude-sonnet-5-5</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Why the builder is switched off</span>The auto-configured <code>ChatClient.Builder</code> injects a single <code>ChatModel</code>. With two <code>ChatModel</code> beans, startup fails with "expected single matching bean". Disable it and build each client yourself.</div>
+      <div class="note tip"><span class="lbl">Keep the metrics</span><code>ChatClient.builder(model)</code> without an <code>ObservationRegistry</code> produces no metrics or traces. Pass the registry, as above, so hand-built clients are observed exactly like auto-configured ones.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Portable code, provider-tuned options</h4><p>Business code uses <code>ChatClient</code> and portable options. Provider-specific settings (reasoning effort, prompt caching, Bedrock guardrails) live in configuration or in a small adapter, so a switch touches one place.</p></div>
+    <div class="card"><h4>Gateways count as providers</h4><p>Many enterprises route every call through an internal LLM gateway for keys, quotas and audit. If it speaks the OpenAI API, point <code>spring.ai.openai.base-url</code> at it and nothing else changes.</p></div>
+    <div class="card"><h4>Fallback across providers</h4><p>With two clients, a fallback is ordinary code: catch the outage from the primary and retry the request on the secondary. See <a data-deck="ai" data-slide="Resilience: retries, timeouts and fallbacks">resilience</a> for the full pattern.</p></div>
+  </div>
+</section>

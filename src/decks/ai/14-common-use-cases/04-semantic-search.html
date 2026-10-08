@@ -1,0 +1,84 @@
+<section class="slide" data-sec="Common use cases" data-title="Semantic search">
+  <h2>Semantic search: retrieval without generation is often the whole feature</h2>
+  <p class="dek">Many "AI search" requests do not need a chat model at all. Users want to type "warm light for a reading corner" and get lamps, or "parcel says delivered but isn't here" and get the right help article. Embedding-based search over a vector store delivers that with no hallucination risk, millisecond latency and almost no per-query cost. Add a generated answer on top only if users need one.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProductSearchController.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.search;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+class ProductSearchController {
+
+    record Hit(String sku, String name, String category, double score) {}
+
+    private final VectorStore vectorStore;
+
+    ProductSearchController(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    @GetMapping("/api/products/search")
+    List&lt;Hit&gt; search(@RequestParam @NotBlank @Size(max = 200) String q,
+                     @RequestParam(required = false) String category,
+                     @RequestParam(defaultValue = "12") @Min(1) @Max(50) int limit) {
+        var f = new FilterExpressionBuilder();
+        var filter = category == null
+                ? f.eq("inStock", true)
+                : f.and(f.eq("inStock", true), f.eq("category", category));
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                        .query(q)
+                        .topK(limit)
+                        .similarityThreshold(0.3)
+                        .filterExpression(filter.build())
+                        .build())
+                .stream()
+                .map(ProductSearchController::toHit)
+                .toList();
+    }
+
+    private static Hit toHit(Document d) {
+        var md = d.getMetadata();
+        return new Hit((String) md.get("sku"), (String) md.get("name"),
+                (String) md.get("category"), d.getScore() == null ? 0 : d.getScore());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Sample response (illustrative) · GET /api/products/search?q=warm light for a reading corner</div>
+<pre><code class="language-json">[
+  { "sku": "LMP-01", "name": "Brass desk lamp", "category": "lighting", "score": 0.71 },
+  { "sku": "LMP-02", "name": "Arc floor lamp", "category": "lighting", "score": 0.68 },
+  { "sku": "BLB-07", "name": "Warm white bulb 2700K", "category": "lighting", "score": 0.55 }
+]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Make it production-grade</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Exact SKUs and brand names</td><td>Hybrid search: keyword plus vector, fused</td></tr>
+            <tr><td>Fresh index</td><td>Re-index on product change events, not nightly only</td></tr>
+            <tr><td>Business ranking</td><td>Blend similarity with stock, margin or popularity after retrieval</td></tr>
+            <tr><td>Latency</td><td>Cache embeddings of frequent queries; the query embedding is the slow part</td></tr>
+            <tr><td>Quality</td><td>Track zero-result and no-click searches; label them; tune</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Say it in the interview</span>"Semantic search is the lowest-risk AI feature: embeddings and a vector store, no generation. I'd ship it with hybrid retrieval for exact terms, metadata filters, and click-through metrics before adding any generated answers."</div>
+    </div>
+  </div>
+</section>

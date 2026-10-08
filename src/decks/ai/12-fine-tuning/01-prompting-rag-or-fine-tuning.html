@@ -1,0 +1,26 @@
+<section class="slide" data-sec="Fine-tuning" data-title="Prompting, RAG or fine-tuning?">
+  <h2>Fine-tune for behaviour you cannot prompt; retrieve for knowledge you cannot train</h2>
+  <p class="dek">Fine-tuning continues training a model on your examples so it adopts a behaviour by default: a format, a tone, a narrow classification skill, a domain's phrasing. It does not reliably teach facts, it is out of date the moment your data changes, and it adds a training pipeline to operate. Choose it only when prompting and retrieval have been measured and found wanting.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Need</th><th>Prompting + few-shot</th><th>RAG</th><th>Fine-tuning</th></tr></thead>
+      <tbody>
+        <tr><td>Answer from company documents that change weekly</td><td>No: does not fit</td><td><b>Yes</b></td><td>No: stale, unreliable recall</td></tr>
+        <tr><td>Cite sources a user can check</td><td>No</td><td><b>Yes</b></td><td>No</td></tr>
+        <tr><td>Per-user access control on knowledge</td><td>No</td><td><b>Yes</b>, filters</td><td>No: everything is in the weights</td></tr>
+        <tr><td>Consistent output format or house style</td><td><b>Usually enough</b></td><td>No</td><td>Yes, when prompts get long</td></tr>
+        <tr><td>A narrow classifier at very high volume</td><td>Works, costly per call</td><td>No</td><td><b>Yes</b>: a small tuned model can match a large prompted one</td></tr>
+        <tr><td>Domain jargon and phrasing (claims codes, legal style)</td><td>Partly</td><td>Partly</td><td><b>Yes</b></td></tr>
+        <tr><td>Lower latency and cost by distilling a big model into a small one</td><td>No</td><td>No</td><td><b>Yes</b></td></tr>
+        <tr><td>Time to first version</td><td>Hours</td><td>Days</td><td>Weeks, plus data curation</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>They combine</h4><p>A tuned model that writes in your support style, answering from passages retrieved at run time, is a common end state. Fine-tuning shapes <i>how</i> it answers; RAG decides <i>what</i> it knows.</p></div>
+    <div class="card"><h4>The data is the work</h4><p>Hundreds to thousands of high-quality input/output pairs, reviewed, free of personal data, covering the edge cases. If you cannot assemble them, you cannot fine-tune, and the effort usually pays off better as an evaluation set.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"RAG for knowledge, fine-tuning for behaviour. I'd fine-tune when a long prompt with many examples is the only thing holding quality up and the volume makes it expensive, or to distil a large model into a cheaper one for one task."</div>
+  </div>
+</section>

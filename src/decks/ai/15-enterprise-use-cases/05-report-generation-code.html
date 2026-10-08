@@ -1,0 +1,135 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Automated report generation: code">
+  <h2>The weekly report job: snapshot, draft, number check, save for approval</h2>
+  <p class="dek">The job is a plain scheduled Spring component. <code>JdbcClient</code> queries build a typed snapshot with values already rounded for display, the model turns it into a structured draft, and a checker rejects any draft containing a figure that is not in the snapshot. Approved drafts are published by a separate step that only a person can trigger.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WeeklyReportJob.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.reports;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
+
+@Component
+class WeeklyReportJob {
+
+    record CategorySales(String category, BigDecimal revenueK, BigDecimal changePct) {}
+
+    record MetricsSnapshot(BigDecimal revenueK, BigDecimal revenueChangePct, long orders,
+                           BigDecimal returnRatePct, List&lt;CategorySales&gt; topCategories) {}
+
+    record Section(String heading, String body) {}
+
+    record ReportDraft(String headline, List&lt;Section&gt; sections, List&lt;String&gt; caveats) {}
+
+    interface Drafts {
+        void saveForApproval(LocalDate weekStart, MetricsSnapshot data, ReportDraft draft);
+    }
+
+    private static final Pattern NUMBER = Pattern.compile("\\d[\\d,]*(?:\\.\\d+)?");
+
+    private final JdbcClient jdbc;
+    private final ChatClient chatClient;
+    private final JsonMapper json;
+    private final Drafts drafts;
+
+    WeeklyReportJob(JdbcClient jdbc, ChatClient.Builder builder, JsonMapper json, Drafts drafts) {
+        this.jdbc = jdbc;
+        this.json = json;
+        this.drafts = drafts;
+        this.chatClient = builder
+                .defaultSystem("""
+                        You write Acme Retail's weekly trading commentary for store managers.
+                        Use ONLY numbers that appear in the data, copied exactly; never
+                        calculate, round, convert or estimate. Do not mention dates.
+                        Explain the biggest movements first. Add caveats for anything unusual.""")
+                .build();
+    }
+
+    @Scheduled(cron = "0 0 6 * * MON", zone = "Europe/London")
+    void run() {
+        LocalDate weekStart = LocalDate.now().with(TemporalAdjusters.previous(DayOfWeek.MONDAY));
+        MetricsSnapshot data = snapshot(weekStart);
+        ReportDraft draft = draft(data);
+        if (!unknownNumbers(draft, data).isEmpty()) {
+            draft = draft(data);                                    // one retry
+            List&lt;String&gt; unknown = unknownNumbers(draft, data);
+            if (!unknown.isEmpty()) {
+                throw new IllegalStateException("Draft has numbers not in the data: " + unknown);
+            }
+        }
+        drafts.saveForApproval(weekStart, data, draft);             // status DRAFT
+    }
+
+    MetricsSnapshot snapshot(LocalDate weekStart) {
+        BigDecimal revenue = jdbc.sql("""
+                        SELECT COALESCE(SUM(total), 0) FROM orders
+                        WHERE placed_at &gt;= :from AND placed_at &lt; :to""")
+                .param("from", weekStart).param("to", weekStart.plusWeeks(1))
+                .query(BigDecimal.class).single();
+        // … the same pattern for the previous week, orders, returns and categories
+        return new MetricsSnapshot(thousands(revenue), BigDecimal.ZERO, 0, BigDecimal.ZERO, List.of());
+    }
+
+    ReportDraft draft(MetricsSnapshot data) {
+        return chatClient.prompt()
+                .user(u -&gt; u.text("Data (the only source of numbers):\n{data}")
+                        .param("data", json.writeValueAsString(data)))
+                .call()
+                .entity(ReportDraft.class);
+    }
+
+    /** Every number in the draft must appear in the data; small counts ("top 3") are allowed. */
+    List&lt;String&gt; unknownNumbers(ReportDraft draft, MetricsSnapshot data) {
+        Set&lt;String&gt; allowed = numbers(json.writeValueAsString(data)).collect(Collectors.toSet());
+        String text = draft.headline() + " "
+                + draft.sections().stream().map(s -&gt; s.heading() + " " + s.body())
+                        .collect(Collectors.joining(" "))
+                + " " + String.join(" ", draft.caveats());
+        return numbers(text)
+                .filter(n -&gt; !allowed.contains(n))
+                .filter(n -&gt; new BigDecimal(n).compareTo(BigDecimal.TEN) &gt; 0)
+                .distinct()
+                .toList();
+    }
+
+    private static java.util.stream.Stream&lt;String&gt; numbers(String text) {
+        return NUMBER.matcher(text).results().map(MatchResult::group)
+                .map(n -&gt; new BigDecimal(n.replace(",", "")).stripTrailingZeros().toPlainString());
+    }
+
+    private static BigDecimal thousands(BigDecimal value) {
+        return value.divide(BigDecimal.valueOf(1000), 1, RoundingMode.HALF_UP);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">unknownNumbers(…) on four drafts · run on the code above</div>
+<pre><code class="language-plaintext">data: {"revenueK":412.6,"revenueChangePct":8.3,"orders":5120,"returnRatePct":4.1,
+       "topCategories":[{"category":"lighting","revenueK":96.2,"changePct":14.5}]}
+
+"Revenue rose 8.3% to £412.6k on 5,120 orders; returns 4.1%.
+ Lighting led with £96.2k, up 14.5%."                         → []
+"Revenue rose 8.3% to £412.6k, beating last year's £380k."   → [380]
+"Revenue rose 8.3% to £412.60k across the top 3 categories." → []
+"Revenue rose 8.3% to £412.6k, about 9% above plan."         → []   ← slips through</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">The check is a net, not a proof</span>It catches invented and recalculated figures, the most damaging error, but the small-count allowance lets "about 9% above plan" through, and it cannot tell whether "rose" should have been "fell". Tighten it where it matters (for example, check every number followed by %), and keep the human approval step. Track how often drafts are rejected or heavily edited; that is the quality metric.</div>
+      <div class="note tip"><span class="lbl">Pre-round in code</span>Models round and convert units when they think it reads better. Give them display-ready values (412.6 in thousands, 8.3 per cent) and forbid conversions, so the exact-match check stays meaningful.</div>
+    </div>
+  </div>
+</section>

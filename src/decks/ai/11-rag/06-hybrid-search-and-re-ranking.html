@@ -1,0 +1,101 @@
+<section class="slide" data-sec="RAG" data-title="Hybrid search and re-ranking">
+  <h2>Combine keyword and vector search, then let a re-ranker pick the best few</h2>
+  <p class="dek">Vector search finds paraphrases but is weak on exact tokens: SKUs, error codes, policy numbers, names. Keyword search (BM25) is the opposite. Hybrid retrieval runs both and merges the rankings, usually with reciprocal rank fusion (RRF). A re-ranker, a model that scores each question–passage pair directly, then reorders the merged list so only the best few reach the prompt.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 280" role="img" aria-label="The query 'error E-4012 on refund' goes to two retrievers in parallel. Keyword search with BM25 finds passages containing E-4012. Vector search finds passages about failed refunds in general. Reciprocal rank fusion merges the two ranked lists: each document scores one over sixty plus its rank in each list, summed. The top twenty go to a re-ranker, a cross-encoder model that reads the query and each passage together and scores relevance. The top five go into the prompt.">
+          <rect x="140" y="10" width="160" height="30" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="220" y="30" text-anchor="middle" font-size="10" fill="currentColor">"error E-4012 on refund"</text>
+          <line x1="190" y1="40" x2="105" y2="66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="250" y1="40" x2="335" y2="66" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="10" y="70" width="190" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="105" y="90" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Keyword (BM25)</text>
+          <text x="105" y="106" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">exact: "E-4012" runbook</text>
+          <text x="105" y="118" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">Postgres FTS, Elasticsearch</text>
+          <rect x="240" y="70" width="190" height="56" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="335" y="90" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Vector search</text>
+          <text x="335" y="106" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">meaning: "refund failed"</text>
+          <text x="335" y="118" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">VectorStore</text>
+          <line x1="105" y1="126" x2="190" y2="152" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="335" y1="126" x2="250" y2="152" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="110" y="156" width="220" height="40" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5"></rect>
+          <text x="220" y="173" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Reciprocal rank fusion</text>
+          <text x="220" y="188" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">score = Σ 1 / (60 + rank)</text>
+          <line x1="220" y1="196" x2="220" y2="214" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <rect x="110" y="218" width="220" height="40" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="220" y="235" text-anchor="middle" font-size="10.5" font-weight="600" fill="currentColor">Re-ranker: top 20 → top 5</text>
+          <text x="220" y="250" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.8">cross-encoder reads query + passage</text>
+          <text x="220" y="276" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">→ into the prompt</text>
+        </svg>
+      </div>
+    </figure>
+    <div class="codewrap">
+      <div class="codelabel">HybridDocumentRetriever.java</div>
+<pre><code class="language-java">package com.acme.ai.rag;
+
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.Query;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+
+/** Vector + keyword search merged with reciprocal rank fusion. */
+class HybridDocumentRetriever implements DocumentRetriever {
+
+    /** Your full-text search: PostgreSQL tsvector, Elasticsearch, OpenSearch… */
+    interface KeywordSearch {
+        List&lt;Document&gt; search(String text, int limit);
+    }
+
+    private static final int K = 60;          // the usual RRF constant
+
+    private final VectorStore vectorStore;
+    private final KeywordSearch keywordSearch;
+    private final int candidates;
+    private final int topK;
+
+    HybridDocumentRetriever(VectorStore vectorStore, KeywordSearch keywordSearch,
+                            int candidates, int topK) {
+        this.vectorStore = vectorStore;
+        this.keywordSearch = keywordSearch;
+        this.candidates = candidates;
+        this.topK = topK;
+    }
+
+    @Override
+    public List&lt;Document&gt; retrieve(Query query) {
+        List&lt;Document&gt; semantic = vectorStore.similaritySearch(
+                SearchRequest.builder().query(query.text()).topK(candidates).build());
+        List&lt;Document&gt; lexical = keywordSearch.search(query.text(), candidates);
+
+        Map&lt;String, Double&gt; score = new HashMap&lt;&gt;();
+        Map&lt;String, Document&gt; byId = new HashMap&lt;&gt;();
+        for (List&lt;Document&gt; ranking : List.of(semantic, lexical)) {
+            for (int rank = 0; rank &lt; ranking.size(); rank++) {
+                Document d = ranking.get(rank);
+                byId.putIfAbsent(d.getId(), d);
+                score.merge(d.getId(), 1.0 / (K + rank + 1), Double::sum);
+            }
+        }
+        return score.entrySet().stream()
+                .sorted(Map.Entry.&lt;String, Double&gt;comparingByValue(Comparator.reverseOrder()))
+                .limit(topK)
+                .map(e -&gt; byId.get(e.getKey()))
+                .toList();
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Plug it in</h4><p><code>RetrievalAugmentationAdvisor.builder().documentRetriever(new HybridDocumentRetriever(...))</code>. A re-ranker is a <code>DocumentPostProcessor</code> that calls a re-ranking model (Cohere Rerank, a cross-encoder you host, or an LLM judging relevance) and keeps the top few.</p></div>
+    <div class="card"><h4>Why RRF</h4><p>BM25 scores and cosine similarities are on different scales and cannot be added. RRF uses only ranks, needs no tuning beyond the constant, and is the default fusion in most search engines.</p></div>
+    <div class="card"><h4>When it pays off</h4><p>Product catalogues, IT runbooks, legal and policy texts: anywhere users type identifiers. Measure on questions containing codes and names; that is where pure vector search fails silently.</p></div>
+  </div>
+</section>

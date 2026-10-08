@@ -1,0 +1,78 @@
+<section class="slide" data-sec="Spring AI overview" data-title="Response metadata and token usage">
+  <h2>Every response tells you what it cost; read it and record it</h2>
+  <p class="dek"><code>content()</code> throws the metadata away. When you need the model id, finish reason or token counts, ask for the <code>ChatResponse</code>, or for <code>responseEntity()</code> to get a typed result and the metadata together. Spring AI also records the same numbers as Micrometer metrics, so dashboards and alerts come for free.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">UsageAwareSummarizer.java</div>
+<pre><code class="language-java">package com.acme.ai.usage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.stereotype.Service;
+
+@Service
+class UsageAwareSummarizer {
+
+    private static final Logger log = LoggerFactory.getLogger(UsageAwareSummarizer.class);
+
+    record Summary(String title, String body) {}
+
+    private final ChatClient chatClient;
+
+    UsageAwareSummarizer(ChatClient.Builder builder) {
+        this.chatClient = builder.build();
+    }
+
+    String summarize(String text) {
+        ChatResponse response = chatClient.prompt()
+                .system("Summarise in at most five sentences.")
+                .user(text)
+                .call()
+                .chatResponse();
+
+        Usage usage = response.getMetadata().getUsage();
+        String finish = response.getResult().getMetadata().getFinishReason();
+        log.info("model={} in={} out={} finish={}",
+                response.getMetadata().getModel(),
+                usage.getPromptTokens(), usage.getCompletionTokens(), finish);
+
+        if ("LENGTH".equalsIgnoreCase(finish)) {      // cut off by maxTokens
+            log.warn("summary truncated; raise the output budget");
+        }
+        return response.getResult().getOutput().getText();
+    }
+
+    /** Typed result and metadata in one call. */
+    Summary summarizeTyped(String text) {
+        ResponseEntity&lt;ChatResponse, Summary&gt; result = chatClient.prompt()
+                .user(u -&gt; u.text("Summarise this with a title: {text}").param("text", text))
+                .call()
+                .responseEntity(Summary.class);
+        log.info("total tokens={}", result.response().getMetadata().getUsage().getTotalTokens());
+        return result.entity();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Metric (Micrometer)</th><th>Type</th><th>Useful tags</th></tr></thead>
+          <tbody>
+            <tr><td><code>gen_ai.client.token.usage</code></td><td>counter</td><td><code>gen_ai.token.type</code> = input · output · total, <code>gen_ai.request.model</code>, <code>gen_ai.system</code></td></tr>
+            <tr><td><code>gen_ai.client.operation</code></td><td>timer</td><td><code>gen_ai.operation.name</code> (chat, embedding), model, provider</td></tr>
+            <tr><td><code>spring.ai.chat.client</code></td><td>timer</td><td>one per <code>ChatClient</code> call, advisors included</td></tr>
+            <tr><td><code>spring.ai.advisor</code></td><td>timer</td><td>time spent in each advisor</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Cost per feature, not per app</span>Token metrics are tagged by model, not by business feature. To answer "what does the support bot cost?", add your own tag: wrap calls in an observation with a <code>feature</code> key, or log the usage with the feature name as above and aggregate in your log platform.</div>
+      <div class="note warn"><span class="lbl">Finish reasons to alert on</span><code>LENGTH</code> means the answer was cut off by the output limit. A content-filter finish means the provider refused or redacted. Both look like a normal 200 to your HTTP client; only the metadata tells you. Exact values vary by provider, so compare case-insensitively.</div>
+      <div class="note"><span class="lbl">Prompt caching shows up here too</span><code>Usage</code> exposes <code>getCacheReadInputTokens()</code> and <code>getCacheWriteInputTokens()</code>. If the read count stays at zero on repeated, identical prefixes, something in your prompt changes on every call.</div>
+    </div>
+  </div>
+</section>

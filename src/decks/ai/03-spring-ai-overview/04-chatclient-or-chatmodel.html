@@ -1,0 +1,70 @@
+<section class="slide" data-sec="Spring AI overview" data-title="ChatClient or ChatModel">
+  <h2>Use <code>ChatClient</code>; drop to <code>ChatModel</code> only when you are building plumbing</h2>
+  <p class="dek"><code>ChatModel</code> is one round trip to a provider: a <code>Prompt</code> in, a <code>ChatResponse</code> out. <code>ChatClient</code> wraps it with defaults, advisors, the tool-calling loop, templates and structured output. In Spring AI 2.0 the difference is sharper than before: the tool loop moved out of the model and into <code>ChatClient</code>'s advisor chain.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ModelLevelExamples.java · the same question, two ways</div>
+<pre><code class="language-java">package com.acme.ai.levels;
+
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.stereotype.Component;
+
+@Component
+class ModelLevelExamples {
+
+    private final ChatModel chatModel;
+    private final ChatClient chatClient;
+
+    ModelLevelExamples(ChatModel chatModel, ChatClient.Builder builder) {
+        this.chatModel = chatModel;
+        this.chatClient = builder.build();
+    }
+
+    /** Low level: you assemble the Prompt and unwrap the response. */
+    String withChatModel(String question) {
+        Prompt prompt = new Prompt(
+                List.of(new SystemMessage("Answer in one sentence."),
+                        new UserMessage(question)),
+                ChatOptions.builder().maxTokens(200).build());
+        ChatResponse response = chatModel.call(prompt);
+        return response.getResult().getOutput().getText();
+    }
+
+    /** High level: the same request, plus everything advisors add. */
+    String withChatClient(String question) {
+        return chatClient.prompt()
+                .system("Answer in one sentence.")
+                .user(question)
+                .options(ChatOptions.builder().maxTokens(200))
+                .call()
+                .content();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th></th><th><code>ChatClient</code></th><th><code>ChatModel</code></th></tr></thead>
+          <tbody>
+            <tr><td>Advisors (memory, RAG…)</td><td>Yes</td><td>No</td></tr>
+            <tr><td>Runs tool calls for you</td><td>Yes, <code>ToolCallingAdvisor</code></td><td>No: returns the tool request</td></tr>
+            <tr><td>Structured output</td><td><code>.entity(Type.class)</code></td><td>By hand with a converter</td></tr>
+            <tr><td>Templates and defaults</td><td>Yes</td><td>No</td></tr>
+            <tr><td>Options</td><td>Partial; merged with defaults</td><td>Complete per call</td></tr>
+            <tr><td>Use it for</td><td>Application features</td><td>Custom advisors, frameworks, tests of a provider</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl"><span class="tag w">1.x</span> a behaviour change</span>In Spring AI 1.x, <code>ChatModel.call()</code> executed tool calls internally. In 2.0 it returns the model's raw response, tool requests included. Code that called <code>ChatModel</code> directly and relied on tools now needs <code>ChatClient</code>, or a loop driven by <code>ToolCallingManager</code>.</div>
+      <div class="note"><span class="lbl">Options are builders now</span><code>.options(…)</code> on <code>ChatClient</code> takes a <code>ChatOptions.Builder</code>, not a built instance, so Spring AI can merge your partial options with the client's defaults. <code>Prompt</code> still takes a built <code>ChatOptions</code>.</div>
+    </div>
+  </div>
+</section>

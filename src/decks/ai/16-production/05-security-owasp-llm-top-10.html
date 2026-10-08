@@ -1,0 +1,28 @@
+<section class="slide" data-sec="Production" data-title="Security: the OWASP LLM Top 10">
+  <h2>Security: map the OWASP Top 10 for LLM applications onto your Spring code</h2>
+  <p class="dek">The OWASP Top 10 for LLM Applications (2025 edition) is the checklist security teams will use to review your feature. Each risk maps to a control you have already seen in this tab. Walking through the list with the control that answers each item is a strong interview answer and a good design-review agenda.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Risk</th><th>In practice</th><th>Control in a Spring AI application</th></tr></thead>
+      <tbody>
+        <tr><td>LLM01 Prompt injection</td><td>Instructions hidden in user input, documents, tool results</td><td>Delimit and label untrusted text; least-privilege tools; confirm side effects; validate outputs</td></tr>
+        <tr><td>LLM02 Sensitive information disclosure</td><td>PII or secrets in prompts, logs, answers</td><td>Redaction advisor before memory; content kept out of telemetry; access filters on retrieval</td></tr>
+        <tr><td>LLM03 Supply chain</td><td>Unvetted models, MCP servers, plugins, datasets</td><td>Approved providers and model ids; vetted MCP servers; dependency scanning</td></tr>
+        <tr><td>LLM04 Data and model poisoning</td><td>Malicious content in the RAG corpus or training data</td><td>Ingest only from trusted sources; review fine-tuning data; provenance metadata</td></tr>
+        <tr><td>LLM05 Improper output handling</td><td>Model output rendered as HTML, run as SQL or shell</td><td>Treat output as untrusted: escape, structured output, never execute it directly</td></tr>
+        <tr><td>LLM06 Excessive agency</td><td>Tools that can do more than the use case needs</td><td>Per-role tool sets; <code>ToolContext</code> identity; pending actions; tool limits</td></tr>
+        <tr><td>LLM07 System prompt leakage</td><td>Users extract the system prompt and the secrets in it</td><td>Assume prompts are public; no credentials, internal URLs or rules that only work if secret</td></tr>
+        <tr><td>LLM08 Vector and embedding weaknesses</td><td>Cross-tenant retrieval; stale ACLs</td><td>Filters from the principal; ACL sync; isolation tests</td></tr>
+        <tr><td>LLM09 Misinformation</td><td>Confident, wrong answers acted on</td><td>Grounding with citations; "I don't know"; evaluation; human review for high stakes</td></tr>
+        <tr><td>LLM10 Unbounded consumption</td><td>Cost or capacity exhausted by loops or abuse</td><td>Input size limits, rate limits, token budgets, tool-call limits, timeouts</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Data handling with providers</h4><p>Use enterprise terms with no training on your data and a defined retention period; choose the region; prefer a cloud platform or self-hosted model where data must not leave your boundary.</p></div>
+    <div class="card"><h4>Secrets</h4><p>API keys from a vault, injected as environment variables or Spring Cloud config, rotated, scoped per environment. Never in <code>application.yml</code> in the repository, and never in a prompt.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I treat the model as an untrusted component: everything it reads may be hostile and everything it writes is unvalidated input. Identity, authorisation and limits live in code around it, and I can walk the OWASP LLM list control by control."</div>
+  </div>
+</section>

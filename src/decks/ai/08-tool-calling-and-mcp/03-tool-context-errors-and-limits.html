@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Tool calling and MCP" data-title="Tool results, errors and limits">
+  <h2>What goes back to the model: results, error messages, and when to stop</h2>
+  <p class="dek">A tool's return value is serialised to JSON and sent to the model as a tool message. An exception is caught and its <i>message</i> is sent instead, so the model can apologise or try something else. <code>returnDirect</code> skips the second model call and hands the result straight to your code. Limits stop a confused model from looping.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">The tool exchange from the previous slide · verified on Spring AI 2.0.1 with a stub model</div>
+<pre><code class="language-plaintext">call 1 → model    SYSTEM, USER "Where is order 1042?", tools [getOrderStatus, recentOrders]
+model  → app      tool call getOrderStatus {"orderId":"1042"}
+app    → tool     getOrderStatus("1042", ToolContext{customerId=cust-7})
+call 2 → model    … + TOOL {"orderId":"1042","status":"SHIPPED","carrier":"DHL",
+                            "estimatedDelivery":"2026-10-08"}
+model  → app      "It shipped with DHL and should arrive on 8 October."
+
+same request as customer cust-9 (not the owner):
+call 2 → model    … + TOOL "No order 1042 for this customer"     ← the exception message
+
+chat memory after the turn: USER question + final ASSISTANT answer only
+
+returnDirect tool (below): 1 model call, and content() is the tool's JSON
+  {"orderId":"1042","labelUrl":"https://acme.example/labels/1042-cust-7"}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">ReturnLabelTools.java · returnDirect</div>
+<pre><code class="language-java">package com.acme.ai.tools;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
+
+@Component
+class ReturnLabelTools {
+
+    record ReturnLabel(String orderId, String labelUrl) {}
+
+    interface Returns {
+        ReturnLabel createLabel(String orderId, String customerId);
+    }
+
+    private final Returns returns;
+
+    ReturnLabelTools(Returns returns) {
+        this.returns = returns;
+    }
+
+    /** The label goes straight back to the caller; the model does not rephrase it. */
+    @Tool(description = "Creates a prepaid return label for one of the current customer's orders.",
+          returnDirect = true)
+    ReturnLabel createReturnLabel(@ToolParam(description = "Order id") String orderId,
+                                  ToolContext context) {
+        return returns.createLabel(orderId, (String) context.getContext().get("customerId"));
+    }
+}</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">application.yml · errors and limits</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    tools:
+      throw-exception-on-error: false   # default: message goes to the model
+      limits:
+        max-total-tool-calls: 10        # default 150
+        max-calls-per-tool-default: 3   # default 40
+        on-limit-exceeded: return-error-response   # or throw (default)</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Situation</th><th>Do this</th></tr></thead>
+          <tbody>
+            <tr><td>Expected failure (not found, not allowed)</td><td>Throw with a short, user-safe message; the model explains it. Never put stack traces, SQL or internal ids in the message: the model may repeat it.</td></tr>
+            <tr><td>Unexpected failure (database down)</td><td>Set <code>throw-exception-on-error: true</code>, or rethrow from a wrapper, so it reaches your error handling and alerts instead of becoming a polite apology.</td></tr>
+            <tr><td>Result the user should see verbatim</td><td><code>returnDirect = true</code>: a label URL, a generated file id. One model call saved.</td></tr>
+            <tr><td>Huge result (a 5,000-row report)</td><td>Return a summary or the top rows; the whole result goes into the next prompt and is billed.</td></tr>
+            <tr><td>Model loops between tools</td><td>Lower the limits; return <code>return-error-response</code> so the model can wrap up instead of failing the request.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Tool results are untrusted input too</span>A tool that reads an e-mail, a web page or a supplier's document returns text written by someone else, and it goes into the prompt. Indirect prompt injection usually arrives this way: see <a data-deck="ai" data-slide="Prompt injection and defences">defences</a>.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,92 @@
+<section class="slide" data-sec="Production" data-title="Guardrails">
+  <h2>Guardrails: cheap checks before the model, strict checks after it</h2>
+  <p class="dek">Guardrails are checks around the model call that block, rewrite or escalate. Input guards stop abusive, off-topic or oversized requests before you pay for them. Output guards stop harmful content, broken formats, unapproved links and leaked data from reaching users. Layer them from cheapest to most expensive, and log every block: blocks are both a security signal and a quality signal.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">GuardedAssistant.java</div>
+<pre><code class="language-java">package com.acme.ai.ops;
+
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SafeGuardAdvisor;
+import org.springframework.ai.moderation.Moderation;
+import org.springframework.ai.moderation.ModerationModel;
+import org.springframework.ai.moderation.ModerationPrompt;
+import org.springframework.ai.moderation.ModerationResult;
+import org.springframework.core.Ordered;
+import org.springframework.stereotype.Service;
+
+@Service
+class GuardedAssistant {
+
+    sealed interface Reply permits Answer, Blocked {}
+    record Answer(String text) implements Reply {}
+    record Blocked(String reason) implements Reply {}
+
+    private static final Pattern LINK_HOST = Pattern.compile("https?://([\\w.-]+)");
+    private static final Set&lt;String&gt; APPROVED_HOSTS = Set.of("acme.example", "help.acme.example");
+
+    private final ChatClient chatClient;
+    private final ModerationModel moderation;
+
+    GuardedAssistant(ChatClient.Builder builder, ModerationModel moderation) {
+        this.chatClient = builder
+                .defaultSystem("You are Acme Retail's assistant. Link only to acme.example pages.")
+                .defaultAdvisors(SafeGuardAdvisor.builder()                 // cheapest: a word list
+                        .sensitiveWords(List.of("ignore previous instructions", "reveal your system prompt"))
+                        .failureResponse("I can't help with that request.")
+                        .order(Ordered.HIGHEST_PRECEDENCE)
+                        .build())
+                .build();
+        this.moderation = moderation;
+    }
+
+    Reply ask(String question) {
+        if (question.length() &gt; 4_000) {
+            return new Blocked("too long");                                  // free
+        }
+        if (flagged(question)) {
+            return new Blocked("input flagged by moderation");               // cheap model
+        }
+        String text = chatClient.prompt().user(question).call().content();
+        if (flagged(text)) {
+            return new Blocked("output flagged by moderation");
+        }
+        boolean foreignLink = LINK_HOST.matcher(text).results()
+                .map(m -&gt; m.group(1).toLowerCase())
+                .anyMatch(host -&gt; !APPROVED_HOSTS.contains(host));
+        if (foreignLink) {
+            return new Blocked("answer links to an unapproved site");       // exfiltration guard
+        }
+        return new Answer(text);
+    }
+
+    private boolean flagged(String text) {
+        Moderation result = moderation.call(new ModerationPrompt(text)).getResult().getOutput();
+        return result.getResults().stream().anyMatch(ModerationResult::isFlagged);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Guard</th><th>Catches</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Size, rate and format limits</td><td>Abuse, accidental pastes, cost attacks</td><td>Free</td></tr>
+            <tr><td><code>SafeGuardAdvisor</code> word list</td><td>Known bad phrases; trivially bypassed</td><td>Free</td></tr>
+            <tr><td>Moderation model (<code>ModerationModel</code>)</td><td>Hate, harassment, self-harm, violence</td><td>Low; a separate fast model</td></tr>
+            <tr><td>Topic classifier (small LLM)</td><td>Off-topic and out-of-scope requests</td><td>Low</td></tr>
+            <tr><td>Structured output + validation</td><td>Malformed or out-of-range answers</td><td>Free to cheap</td></tr>
+            <tr><td>Grounding and citation checks</td><td>Unsupported claims</td><td>Medium</td></tr>
+            <tr><td>Human review</td><td>High-stakes outputs, sampled outputs</td><td>People's time</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Guardrails reduce risk; they do not remove it</span>Word lists and classifiers are bypassable, and output guards see only the text, not the consequences. The controls that hold under attack are structural: what the tools can do, whose data retrieval can reach, and which actions need a person.</div>
+      <div class="note"><span class="lbl">Streaming changes output guards</span>When you stream, users see text before an output check can run. Stream only where the risk is low, buffer and check for sensitive use cases, or moderate in chunks and cut the stream when a chunk is flagged.</div>
+    </div>
+  </div>
+</section>

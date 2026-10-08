@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Fine-tuning" data-title="Evaluating and operating tuned models">
+  <h2>A tuned model is a release artefact: evaluate it, version it, and plan its replacement</h2>
+  <p class="dek">A fine-tuning job produces a new model that your application depends on, built from a dataset that will age. Treat it like a build output: compare it with the base model on the same held-out set, promote it through environments, keep the old version ready for rollback, and know when you will retrain or retire it.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Before promoting a tuned model</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li>Beats the <b>base model with your best prompt</b> on the held-out set, by a margin worth the extra cost and pipeline.</li>
+        <li>No regression on general prompts and on safety checks (refusals, toxicity, leakage of training examples).</li>
+        <li>Latency and price per call measured; tuned models are often priced higher per token, or need your own GPUs.</li>
+        <li>Model id, dataset version, base model and evaluation scores recorded together in a model registry or release notes.</li>
+        <li>Rollout behind configuration: a property switches between versions, so rollback is a config change.</li>
+      </ul>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Ongoing risk</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>Data drift: products, policies, tone change</td><td>Monitor live quality (feedback, escalations) per model version; retrain on a schedule or on drop</td></tr>
+          <tr><td>Base model deprecated by the provider</td><td>Keep the dataset and pipeline reproducible; budget for re-tuning on the successor</td></tr>
+          <tr><td>A newer base model beats your tuned one, untuned</td><td>Re-run the comparison whenever a new base model ships; retire tuning that no longer pays</td></tr>
+          <tr><td>Training data subject to erasure requests</td><td>Track example provenance; rebuild without the removed data</td></tr>
+          <tr><td>Cost creep</td><td>Compare cost per resolved task, not per token, against the prompted alternative</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>A common, sensible outcome</h4><p>Many teams build the dataset and evaluation set, compare a tuned small model with a prompted large one, and keep the prompted one because the difference does not justify the pipeline. The evaluation set is still the most valuable thing they built.</p></div>
+    <div class="card"><h4>Where tuning clearly wins</h4><p>High-volume, narrow, stable tasks: routing, extraction in a fixed format, house-style rewriting. Distilling such a task into a small model can cut cost and latency several-fold.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I treat a fine-tuned model like a dependency release: versioned dataset, held-out evaluation against the prompted baseline, config-switch rollout, and a plan for drift and base-model deprecation."</div>
+  </div>
+</section>

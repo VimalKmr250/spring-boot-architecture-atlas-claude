@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Production" data-title="Observability">
+  <h2>Observe tokens, latency, errors and quality, per feature, with content kept out of logs</h2>
+  <p class="dek">Spring AI instruments <code>ChatClient</code>, advisors, models, tools and vector stores with Micrometer, so metrics and traces appear as soon as Actuator and a tracing bridge are on the classpath. Two things are yours to add: a business dimension (which feature spent the tokens?) and quality signals (did the answer help?). Prompt and completion content stays out of telemetry by default; keep it that way unless a reviewed decision says otherwise.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">application.yml</div>
+<pre><code class="language-yaml">management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, prometheus
+  tracing:
+    sampling:
+      probability: 0.1          # 10% of requests traced end to end
+spring:
+  ai:
+    chat:
+      observations:
+        log-prompt: false       # the defaults: content stays out of
+        log-completion: false   # logs and spans
+      client:
+        observations:
+          log-prompt: false
+    tools:
+      observations:
+        include-content: false  # tool arguments and results</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">One traced request · span tree, illustrative timings</div>
+<pre><code class="language-plaintext">POST /api/support/c-91/messages                         2.84 s
+└─ ChatClient call                                       2.81 s
+   ├─ advisor MessageChatMemoryAdvisor                   0.01 s
+   ├─ advisor QuestionAnswerAdvisor  (vector search)     0.09 s
+   ├─ chat gpt-5-mini   in 2,912  out 41  (tool call)    1.10 s
+   ├─ execute_tool orderStatus                           0.12 s
+   └─ chat gpt-5-mini   in 3,006  out 63                 1.43 s</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">AiUsageMetrics.java · tokens per business feature</div>
+<pre><code class="language-java">package com.acme.ai.ops;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AiUsageMetrics {
+
+    private final MeterRegistry registry;
+
+    AiUsageMetrics(MeterRegistry registry) {
+        this.registry = registry;
+    }
+
+    /** Call with every ChatResponse; feature is low-cardinality, e.g. "support-bot". */
+    public void record(String feature, ChatResponse response) {
+        Usage usage = response.getMetadata().getUsage();
+        String model = response.getMetadata().getModel();
+        count(feature, model, "input", usage.getPromptTokens());
+        count(feature, model, "output", usage.getCompletionTokens());
+    }
+
+    private void count(String feature, String model, String type, Integer tokens) {
+        if (tokens == null) {
+            return;
+        }
+        Counter.builder("acme.ai.tokens")
+                .tag("feature", feature)
+                .tag("model", model == null ? "unknown" : model)
+                .tag("type", type)
+                .register(registry)
+                .increment(tokens);
+    }
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Alert on</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>p95 latency per feature</td><td>Provider slowdowns show here first</td></tr>
+            <tr><td>Error rate by type (429, 5xx, timeout)</td><td>Quota exhaustion vs outage need different responses</td></tr>
+            <tr><td>Tokens per request, trending up</td><td>Growing history, bigger contexts, a tool loop</td></tr>
+            <tr><td>Thumbs-down and escalation rate</td><td>Quality regressions have no stack trace</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

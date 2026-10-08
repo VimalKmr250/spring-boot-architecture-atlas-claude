@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Structured output" data-title="Lists, generic types and native output">
+  <h2>Generic types need a type reference; strict schemas need the provider's help</h2>
+  <p class="dek">Java erases generics at runtime, so <code>List&lt;LineItem&gt;.class</code> does not exist. Pass a <code>ParameterizedTypeReference</code> instead, or wrap the list in a record. And by default the schema is only a polite request in the prompt: with <code>useProviderStructuredOutput()</code> Spring AI hands it to the provider's native JSON-schema mode, where the model's decoding is constrained to valid output.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">InvoiceExtractor.java</div>
+<pre><code class="language-java">package com.acme.ai.structured;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.converter.ListOutputConverter;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.stereotype.Service;
+
+@Service
+class InvoiceExtractor {
+
+    record LineItem(String sku, String description, int quantity, BigDecimal unitPrice) {}
+
+    record Invoice(String supplier, String invoiceNumber, LocalDate issued,
+                   String currency, List&lt;LineItem&gt; lines, BigDecimal total) {}
+
+    private final ChatClient chatClient;
+
+    InvoiceExtractor(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        Extract data exactly as written in the document.
+                        Use ISO dates (yyyy-MM-dd) and ISO 4217 currency codes.
+                        Use null for anything that is not present.""")
+                .build();
+    }
+
+    /** A record that contains a list: the simplest shape. */
+    Invoice invoice(String text) {
+        return chatClient.prompt()
+                .user(text)
+                .call()
+                .entity(Invoice.class, spec -&gt; spec.useProviderStructuredOutput());
+    }
+
+    /** A top-level generic type needs a ParameterizedTypeReference. */
+    List&lt;LineItem&gt; lineItems(String text) {
+        return chatClient.prompt()
+                .user(text)
+                .call()
+                .entity(new ParameterizedTypeReference&lt;List&lt;LineItem&gt;&gt;() {});
+    }
+
+    /** Just strings: a comma-separated list is cheaper than JSON. */
+    List&lt;String&gt; keywords(String text) {
+        return chatClient.prompt()
+                .user(u -&gt; u.text("Five search keywords for: {text}").param("text", text))
+                .call()
+                .entity(new ListOutputConverter());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th></th><th>Format instructions (default)</th><th>Native (<code>useProviderStructuredOutput</code>)</th></tr></thead>
+          <tbody>
+            <tr><td>How</td><td>Schema appended to the prompt as text</td><td>Schema sent as the provider's response format</td></tr>
+            <tr><td>Guarantee</td><td>Usually valid; can break on long or odd inputs</td><td>Output constrained to the schema by the provider</td></tr>
+            <tr><td>Providers</td><td>Any chat model</td><td>Those whose options support an output schema: OpenAI, Anthropic, Ollama, among others</td></tr>
+            <tr><td>Schema limits</td><td>None beyond the model's understanding</td><td>Providers restrict keywords (some formats, recursion); test complex types</td></tr>
+            <tr><td>Tokens</td><td>Schema text costs input tokens each call</td><td>Often cheaper; some providers cache compiled schemas</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Valid JSON is not correct data</span>Native mode guarantees the <i>shape</i>. It does not stop the model from putting the wrong number in a valid field, inventing a SKU, or summing the total incorrectly. Validate business rules in code: see <a data-deck="ai" data-slide="Validating structured output">validation</a>.</div>
+      <div class="note"><span class="lbl">Design the record for the model</span>Flat beats deep. Clear field names beat abbreviations. Enums beat free strings. A nullable field with "null if not present" beats a required one the model must invent. A record designed this way is also easier to evaluate.</div>
+      <div class="note warn"><span class="lbl">Money and dates</span>Ask for <code>BigDecimal</code> amounts and ISO dates, and say which currency and format. Then recompute the total from the lines in code and compare: an extraction that does not add up goes to review.</div>
+    </div>
+  </div>
+</section>

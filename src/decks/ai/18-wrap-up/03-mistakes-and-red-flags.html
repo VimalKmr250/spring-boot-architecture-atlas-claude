@@ -1,0 +1,36 @@
+<section class="slide" data-sec="Wrap-up" data-title="Common mistakes and red flags">
+  <h2>Mistakes that sink AI projects, and phrases that sink interviews</h2>
+  <p class="dek">The left column is what goes wrong in real projects; every item has a slide in this tab with the fix. The right column is what interviewers hear as a red flag, with what to say instead.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>In projects</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>No evaluation set.</b> Changes judged by a few hand-picked questions; regressions found by customers.</li>
+        <li><b>Retrieval without access control.</b> Every employee can read every document through the assistant.</li>
+        <li><b>The model chooses whose data it touches.</b> Customer ids as tool arguments instead of <code>ToolContext</code>.</li>
+        <li><b>Free-text parsing.</b> Regular expressions over prose instead of <code>.entity()</code> and validation.</li>
+        <li><b>Unbounded loops and retries.</b> Default retry settings and no tool limits on a user-facing path.</li>
+        <li><b>Prompts in string concatenation.</b> Untracked, untested, with volatile values that defeat caching.</li>
+        <li><b>Stale indexes.</b> Deleted or updated documents still answering questions months later.</li>
+        <li><b>One shared <code>ChatClient.Builder</code></b> mutated for several clients, mixing their system prompts.</li>
+        <li><b>Prompts and answers in logs</b> by default, with personal data and confidential context.</li>
+        <li><b>Fine-tuning to add knowledge</b> that RAG would have provided, current and cited.</li>
+      </ul>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Red flag in an interview</th><th>Say instead</th></tr></thead>
+        <tbody>
+          <tr><td>"Set temperature to 0 to stop hallucinations."</td><td>"Ground answers in retrieved sources, require citations, allow 'I don't know', and measure faithfulness."</td></tr>
+          <tr><td>"The system prompt tells it not to reveal other customers' data."</td><td>"The retrieval filter and tool authorisation make other customers' data unreachable."</td></tr>
+          <tr><td>"We'll fine-tune it on our documents."</td><td>"RAG for knowledge; fine-tuning only for behaviour, after evaluation."</td></tr>
+          <tr><td>"It worked in my testing."</td><td>"It scores 0.91 on a 150-question golden set that runs in CI."</td></tr>
+          <tr><td>"We'll use an agent."</td><td>"A routing workflow; an agent only for the open-ended investigation step, bounded."</td></tr>
+          <tr><td>"The model calculates the totals."</td><td>"Code computes figures; the model explains them, and a check rejects any number not in the data."</td></tr>
+          <tr><td>"We just call the OpenAI API."</td><td>"Behind <code>ChatClient</code>, with timeouts, a fallback, metrics and a budget."</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

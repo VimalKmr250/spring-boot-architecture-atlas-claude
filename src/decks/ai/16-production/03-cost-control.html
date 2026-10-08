@@ -1,0 +1,90 @@
+<section class="slide" data-sec="Production" data-title="Cost control">
+  <h2>Cost control: fewer tokens, cheaper tokens, cached tokens, and a budget per user</h2>
+  <p class="dek">LLM cost is tokens times price, and both are under your control. Most savings come from sending less (trimmed history, fewer and better chunks), routing easy work to small models, and reusing work through caching. A per-user or per-tenant budget turns a runaway loop or an abusive client from an invoice surprise into an error message.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Lever</th><th>How in Spring AI</th><th>Typical effect</th></tr></thead>
+        <tbody>
+          <tr><td>Route by task</td><td>Separate <code>ChatClient</code>s; small model for classify, extract, route</td><td>Often the largest saving</td></tr>
+          <tr><td>Trim input</td><td>Smaller memory window, summaries, lower top-K, higher threshold</td><td>Input is most of the bill</td></tr>
+          <tr><td>Cap output</td><td><code>maxTokens</code> / <code>maxCompletionTokens</code>; ask for short formats</td><td>Bounds worst cases</td></tr>
+          <tr><td>Provider prompt caching</td><td>Stable prefix first; Anthropic <code>cache-options</code>; OpenAI caches long prefixes automatically and accepts a <code>prompt-cache-key</code></td><td>Cached input billed at a fraction of the normal price</td></tr>
+          <tr><td>Semantic cache</td><td>Answer repeated questions from a cache of similar ones (<code>spring-ai-redis-semantic-cache</code>, or your own advisor)</td><td>FAQ-heavy traffic</td></tr>
+          <tr><td>Batch APIs</td><td>Provider batch endpoints for offline jobs</td><td>About half price, hours of latency</td></tr>
+          <tr><td>Budgets and limits</td><td>Tool-call limits; a budget advisor (right)</td><td>Stops runaway spend</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">TokenBudgetAdvisor.java</div>
+<pre><code class="language-java">package com.acme.ai.ops;
+
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.core.Ordered;
+
+/** Daily token budget per user. In production keep the counters in Redis, not in memory. */
+public class TokenBudgetAdvisor implements BaseAdvisor {
+
+    public static final String USER = "budget.user";
+
+    public static class BudgetExceededException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        BudgetExceededException(String user) {
+            super("Daily AI budget used up for " + user);
+        }
+    }
+
+    private final long dailyTokens;
+    private final Map&lt;String, AtomicLong&gt; spent = new ConcurrentHashMap&lt;&gt;();
+
+    public TokenBudgetAdvisor(long dailyTokens) {
+        this.dailyTokens = dailyTokens;
+    }
+
+    @Override
+    public ChatClientRequest before(ChatClientRequest request, AdvisorChain chain) {
+        String user = (String) request.context().get(USER);
+        if (user != null &amp;&amp; counter(user).get() &gt;= dailyTokens) {
+            throw new BudgetExceededException(user);       // no model call is made
+        }
+        return request;
+    }
+
+    @Override
+    public ChatClientResponse after(ChatClientResponse response, AdvisorChain chain) {
+        String user = (String) response.context().get(USER);
+        if (user != null &amp;&amp; response.chatResponse() != null) {
+            Usage usage = response.chatResponse().getMetadata().getUsage();
+            Integer total = usage == null ? null : usage.getTotalTokens();
+            if (total != null) {
+                counter(user).addAndGet(total);
+            }
+        }
+        return response;
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 50;            // first in, last out
+    }
+
+    private AtomicLong counter(String user) {
+        return spent.computeIfAbsent(user + "|" + LocalDate.now(), k -&gt; new AtomicLong());
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Usage</span><code>.advisors(new TokenBudgetAdvisor(200_000))</code> on the client, and <code>.advisors(a -&gt; a.param(TokenBudgetAdvisor.USER, userId))</code> per request. Map <code>BudgetExceededException</code> to HTTP 429 with a friendly message. It sits outside the tool loop, and that is fine: verified on Spring AI 2.0.1, the final response's usage is the sum of every model call in the loop (a tool call plus the answer at 110 tokens each reported 220). With a 300-token budget, the third request was refused before any model call.</div>
+</section>

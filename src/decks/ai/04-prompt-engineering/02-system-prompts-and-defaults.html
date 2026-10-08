@@ -1,0 +1,68 @@
+<section class="slide" data-sec="Prompt engineering" data-title="System prompts and defaults">
+  <h2>Keep system prompts in resources, fill them from configuration</h2>
+  <p class="dek">A system prompt is configuration that happens to be prose. Keep it in a file under <code>src/main/resources/prompts</code>, review changes in pull requests, and fill the parts that differ per environment or brand from <code>@ConfigurationProperties</code>. Org-wide defaults that every client should get, such as a logging advisor, belong in a <code>ChatClientBuilderCustomizer</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SupportClientConfig.java</div>
+<pre><code class="language-java">package com.acme.ai.prompts;
+
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClientBuilderCustomizer;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+
+@ConfigurationProperties("acme.support")
+record SupportProperties(String companyName, String tone, Resource systemPrompt) {}
+
+@Configuration
+@EnableConfigurationProperties(SupportProperties.class)
+class SupportClientConfig {
+
+    /** Applied to every auto-configured ChatClient.Builder in the app. */
+    @Bean
+    ChatClientBuilderCustomizer loggingDefaults() {
+        return builder -&gt; builder.defaultAdvisors(new SimpleLoggerAdvisor());
+    }
+
+    @Bean
+    ChatClient supportChatClient(ChatClient.Builder builder, SupportProperties props) {
+        return builder
+                .defaultSystem(s -&gt; s.text(props.systemPrompt())
+                        .param("company", props.companyName())
+                        .param("tone", props.tone()))
+                .build();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">src/main/resources/prompts/support-system.st</div>
+<pre><code class="language-plaintext">You are the customer support assistant for {company}.
+Your tone is {tone}.
+
+Answer only questions about orders, deliveries, returns and
+Acme products. For anything else, say politely that you can
+only help with Acme orders and products.
+
+Never invent order details, prices or policies. If the
+information you were given does not answer the question,
+say so and offer to connect the customer with a person.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml</div>
+<pre><code class="language-yaml">acme:
+  support:
+    company-name: Acme Retail
+    tone: friendly and concise
+    system-prompt: classpath:prompts/support-system.st</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Keep volatile values out of the system prompt</span>Today's date, the user's name or a request id in the system message make every prompt different, so the provider cannot reuse its cached prefix and you pay full price for the same 1,500 tokens on every call. Put per-request values in the user message, after the stable part.</div>
+      <div class="note"><span class="lbl">Templates use <code>{braces}</code></span>The default renderer is StringTemplate. A prompt that contains literal JSON braces needs different delimiters: see <a data-deck="ai" data-slide="Prompt templates">Prompt templates</a>.</div>
+    </div>
+  </div>
+</section>

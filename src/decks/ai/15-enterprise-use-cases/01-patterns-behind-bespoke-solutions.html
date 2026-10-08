@@ -1,0 +1,23 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Patterns behind bespoke solutions">
+  <h2>Four solutions enterprises build for themselves, and what they share</h2>
+  <p class="dek">Beyond generic chat, the AI features enterprises fund are tied to their own data and processes: an assistant over internal knowledge, reports written from live numbers, documents checked against policy, and recommendations shaped by customer behaviour. Each gets a design slide and a code slide. They look different, but they are built from the same few parts, and the parts that make them safe are the same too.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Solution</th><th>Core technique</th><th>The model's job</th><th>Code's job</th><th>Human's job</th></tr></thead>
+      <tbody>
+        <tr><td>Internal knowledge assistant</td><td>Permission-aware RAG over many sources</td><td>Answer from retrieved passages, cite them</td><td>Connectors, ACL sync, filters, citations</td><td>Fix content gaps it reveals</td></tr>
+        <tr><td>Automated report generation</td><td>Tools/SQL for numbers, LLM for narrative</td><td>Explain the numbers it is given</td><td>Compute every figure; verify none was invented</td><td>Approve before distribution</td></tr>
+        <tr><td>Compliance checking</td><td>Extraction + policy retrieval + LLM-as-judge</td><td>Compare clause with rule, quote evidence</td><td>Deterministic checks; verify quotes; audit log</td><td>Decide on every finding</td></tr>
+        <tr><td>Personalised recommendations</td><td>Embedding candidates + LLM re-rank</td><td>Order a short list and explain it</td><td>Candidate generation, business rules, A/B tests</td><td>Set the rules and targets</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2x2">
+    <div class="card"><h4>The model never owns the facts</h4><p>Numbers come from queries, policies from a versioned store, recommendations from your catalogue. The model reads, compares and writes; code checks what it wrote against the sources.</p></div>
+    <div class="card"><h4>Identity flows end to end</h4><p>The user's SSO identity scopes retrieval, tools and data access. A report job runs as a service identity with read-only access to exactly the tables it needs.</p></div>
+    <div class="card"><h4>A person signs off where it matters</h4><p>Compliance findings and outbound reports are drafts until approved. The system makes people faster, not absent, which is also what makes it approvable by risk and legal teams.</p></div>
+    <div class="card"><h4>Everything is recorded</h4><p>Inputs, retrieved sources, model and prompt versions, outputs and approvals, so any answer can be explained months later in an audit.</p></div>
+  </div>
+</section>
