@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Automated report generation: design">
+  <h2>Automated reports: code computes every number, the model only explains them</h2>
+  <p class="dek">Weekly sales commentary, monthly operations reviews, board-pack narratives: analysts spend days turning dashboards into prose. An LLM drafts that prose in seconds, but a single invented percentage destroys trust in the whole report. The design rule is absolute: figures come from queries into a typed snapshot, the model writes only from the snapshot, code verifies that every number in the draft exists in the snapshot, and a person approves before it is sent.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 220" role="img" aria-label="A scheduler triggers the weekly job. SQL queries against the warehouse compute a typed metrics snapshot: revenue, orders, returns rate, top categories, week on week changes. The snapshot and the house style guide go to the model, which writes a structured draft: headline, sections and caveats. A validator extracts every number from the draft and checks that each one appears in the snapshot; any unknown number rejects the draft and retries once. The draft is saved for review; an analyst edits and approves; only then is it published by email and PDF. Snapshot, draft, model version and approver are archived.">
+        <g font-size="10" fill="currentColor">
+          <rect x="10" y="70" width="100" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="60" y="94" text-anchor="middle" font-weight="600">@Scheduled</text><text x="60" y="110" text-anchor="middle" font-size="9" opacity="0.8">Mon 06:00</text>
+          <rect x="140" y="56" width="150" height="84" rx="6" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="215" y="78" text-anchor="middle" font-weight="600">SQL → snapshot</text><text x="215" y="96" text-anchor="middle" font-size="9" opacity="0.85">revenue, orders, returns</text><text x="215" y="110" text-anchor="middle" font-size="9" opacity="0.85">week-on-week deltas</text><text x="215" y="124" text-anchor="middle" font-size="9" opacity="0.85">computed in code</text>
+          <rect x="320" y="56" width="130" height="84" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="385" y="80" text-anchor="middle" font-weight="600">Model</text><text x="385" y="98" text-anchor="middle" font-size="9" opacity="0.85">writes narrative</text><text x="385" y="112" text-anchor="middle" font-size="9" opacity="0.85">from the snapshot only</text><text x="385" y="126" text-anchor="middle" font-size="9" opacity="0.85">structured draft</text>
+          <rect x="480" y="56" width="140" height="84" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.55"></rect>
+          <text x="550" y="78" text-anchor="middle" font-weight="600">Number check</text><text x="550" y="96" text-anchor="middle" font-size="9" opacity="0.85">every figure in the draft</text><text x="550" y="110" text-anchor="middle" font-size="9" opacity="0.85">must exist in the snapshot</text><text x="550" y="124" text-anchor="middle" font-size="9" opacity="0.85">else retry once, then fail</text>
+          <rect x="650" y="56" width="110" height="84" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="705" y="80" text-anchor="middle" font-weight="600">Analyst</text><text x="705" y="98" text-anchor="middle" font-size="9" opacity="0.85">edits, approves</text><text x="705" y="112" text-anchor="middle" font-size="9" opacity="0.85">status: DRAFT →</text><text x="705" y="126" text-anchor="middle" font-size="9" opacity="0.85">APPROVED</text>
+          <rect x="790" y="70" width="100" height="56" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="840" y="94" text-anchor="middle" font-weight="600">Publish</text><text x="840" y="110" text-anchor="middle" font-size="9" opacity="0.8">email, PDF</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="110" y1="98" x2="137" y2="98" marker-end="url(#arw)"></line><line x1="290" y1="98" x2="317" y2="98" marker-end="url(#arw)"></line>
+          <line x1="450" y1="98" x2="477" y2="98" marker-end="url(#arw)"></line><line x1="620" y1="98" x2="647" y2="98" marker-end="url(#arw)"></line>
+          <line x1="760" y1="98" x2="787" y2="98" marker-end="url(#arw)"></line>
+        </g>
+        <path d="M550 140 C 550 172, 385 172, 385 143" fill="none" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <text x="468" y="182" text-anchor="middle" font-size="9" fill="#D26A3F">unknown number → regenerate</text>
+        <text x="450" y="208" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">Archived per run: snapshot, prompt version, model id, draft, edits, approver.</text>
+        <text x="215" y="40" text-anchor="middle" font-size="9" fill="#3AA79B">source of truth</text>
+        <text x="705" y="40" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.75">accountable person</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Why not let the model query?</h4><p>Text-to-SQL is tempting, but a wrong join produces a plausible wrong number with no signal. For recurring reports, fixed and reviewed queries are cheaper, faster and auditable. Keep text-to-SQL for ad-hoc analyst exploration with the generated SQL shown.</p></div>
+    <div class="card"><h4>What the model is good at here</h4><p>Choosing what matters this week, explaining movements in plain language, consistent structure and tone, and adapting the same snapshot for executives, store managers and finance.</p></div>
+    <div class="card"><h4>Caveats are a feature</h4><p>Ask for a caveats section: data gaps, unusual events, metrics that moved for known reasons. Analysts trust drafts that admit uncertainty more than drafts that sound certain.</p></div>
+  </div>
+</section>

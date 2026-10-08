@@ -1,0 +1,116 @@
+<section class="slide" data-sec="Enterprise use cases" data-title="Personalised recommendations: code">
+  <h2>Candidates from the vector store, a short re-rank by the model, SKUs checked in code</h2>
+  <p class="dek"><code>VectorStore</code> searches by text, so the "taste query" is built from the names of the products the customer engaged with most recently; its embedding lands near similar products. Filters exclude what they already own. The model then picks and explains a few items from that shortlist, and any SKU it returns that was not a candidate is discarded.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">RecommendationService.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.recommend;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.stereotype.Service;
+
+@Service
+class RecommendationService {
+
+    record Interaction(String sku, String productName, String kind) {}     // VIEWED, BOUGHT
+
+    record Pick(String sku, String reason) {}
+
+    record Picks(List&lt;Pick&gt; picks) {}
+
+    record Recommendation(String sku, String name, String reason) {}
+
+    interface History {
+        List&lt;Interaction&gt; recent(String customerId, int limit);
+    }
+
+    private final VectorStore products;
+    private final History history;
+    private final ChatClient chatClient;
+
+    RecommendationService(VectorStore products, History history, ChatClient.Builder builder) {
+        this.products = products;
+        this.history = history;
+        this.chatClient = builder
+                .defaultSystem("""
+                        You are a home-furnishing stylist for Acme Retail. Choose items from the
+                        candidate list only. Each reason must refer to the customer's history.""")
+                .build();
+    }
+
+    List&lt;Recommendation&gt; recommend(String customerId, int howMany) {
+        List&lt;Interaction&gt; recent = history.recent(customerId, 10);
+        if (recent.isEmpty()) {
+            return List.of();                                  // cold start: popular items instead
+        }
+        String tasteQuery = recent.stream().map(Interaction::productName)
+                .collect(Collectors.joining(", "));
+        List&lt;Object&gt; owned = recent.stream().filter(i -&gt; i.kind().equals("BOUGHT"))
+                .map(i -&gt; (Object) i.sku()).toList();
+
+        var f = new FilterExpressionBuilder();
+        var filter = owned.isEmpty() ? f.eq("inStock", true)
+                : f.and(f.eq("inStock", true), f.nin("sku", owned));
+        List&lt;Document&gt; candidates = products.similaritySearch(SearchRequest.builder()
+                .query(tasteQuery).topK(20).filterExpression(filter.build()).build());
+        Map&lt;String, Document&gt; bySku = candidates.stream().collect(Collectors.toMap(
+                d -&gt; (String) d.getMetadata().get("sku"), Function.identity(), (a, b) -&gt; a));
+
+        String list = candidates.stream()
+                .map(d -&gt; d.getMetadata().get("sku") + " | " + d.getText().lines().findFirst().orElse(""))
+                .collect(Collectors.joining("\n"));
+        String past = recent.stream().map(i -&gt; i.kind() + ": " + i.productName())
+                .collect(Collectors.joining("\n"));
+
+        Picks picks = chatClient.prompt()
+                .user(u -&gt; u.text("""
+                        Customer history:
+                        {past}
+
+                        Candidates (SKU | name):
+                        {list}
+
+                        Pick the {n} best candidates for this customer.""")
+                        .param("past", past).param("list", list).param("n", howMany))
+                .call()
+                .entity(Picks.class);
+
+        return picks.picks().stream()
+                .filter(p -&gt; bySku.containsKey(p.sku()))           // drop invented SKUs
+                .limit(howMany)
+                .map(p -&gt; new Recommendation(p.sku(),
+                        bySku.get(p.sku()).getText().lines().findFirst().orElse(""), p.reason()))
+                .toList();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Verified with a stub model and an in-memory catalogue</div>
+<pre><code class="language-plaintext">history:   BOUGHT oak dining table, VIEWED oak dining chairs
+candidates exclude the table (nin sku), include chairs and a sideboard
+model picks: OAK-CHR-2 ✓, OAK-SBD-1 ✓, XYZ-999 (not a candidate)
+returned:    OAK-CHR-2, OAK-SBD-1          ← XYZ-999 dropped</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Sample response (illustrative)</div>
+<pre><code class="language-json">[
+  { "sku": "OAK-CHR-2", "name": "Oak dining chair, pair",
+    "reason": "Matches the oak dining table you bought, and you viewed these chairs twice." },
+  { "sku": "OAK-SBD-1", "name": "Oak sideboard",
+    "reason": "Same oak finish as your table, with storage for a dining room." }
+]</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Keep the LLM off the hot path</span>Compute recommendations asynchronously (on a new purchase, or nightly for active customers), cache them, and serve from the cache. The page never waits for a model, and the cost is per customer per day, not per page view.</div>
+    </div>
+  </div>
+</section>

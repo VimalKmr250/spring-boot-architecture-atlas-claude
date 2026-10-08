@@ -1,0 +1,83 @@
+<section class="slide" data-sec="Common use cases" data-title="Sentiment and classification at scale">
+  <h2>Classifying millions of texts: small model, closed labels, batches, and a labelled sample</h2>
+  <p class="dek">Sentiment analysis, topic tagging and intent detection are classification: a closed set of labels per item. At scale the economics dominate. Use the smallest model that meets your accuracy target, an enum so outputs cannot drift, several items per call to share the instructions, and a labelled sample to measure accuracy per class, because overall accuracy hides the class that matters.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ReviewSentimentClassifier.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.sentiment;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class ReviewSentimentClassifier {
+
+    enum Sentiment { POSITIVE, NEUTRAL, NEGATIVE, MIXED }
+
+    enum Aspect { DELIVERY, QUALITY, PRICE, SERVICE, ASSEMBLY, OTHER }
+
+    record Review(String id, String text) {}
+
+    record Label(String id, Sentiment sentiment, List&lt;Aspect&gt; aspects) {}
+
+    record LabelBatch(List&lt;Label&gt; labels) {}
+
+    private static final int BATCH = 25;
+
+    private final ChatClient chatClient;
+
+    ReviewSentimentClassifier(ChatClient.Builder builder) {
+        this.chatClient = builder
+                .defaultSystem("""
+                        Label each customer review. One label per input line, same id.
+                        MIXED means clearly positive and negative points together.""")
+                .build();
+    }
+
+    List&lt;Label&gt; classify(List&lt;Review&gt; reviews) {
+        List&lt;Label&gt; out = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; reviews.size(); i += BATCH) {
+            List&lt;Review&gt; batch = reviews.subList(i, Math.min(i + BATCH, reviews.size()));
+            String lines = batch.stream()
+                    .map(r -&gt; r.id() + "\t" + r.text().replaceAll("\\s+", " "))
+                    .collect(Collectors.joining("\n"));
+            LabelBatch result = chatClient.prompt()
+                    .user(u -&gt; u.text("Reviews (id TAB text):\n{lines}").param("lines", lines))
+                    .call()
+                    .entity(LabelBatch.class);
+
+            // never trust the batch blindly: keep only ids we sent, flag the rest
+            Map&lt;String, Label&gt; byId = result.labels().stream()
+                    .collect(Collectors.toMap(Label::id, Function.identity(), (a, b) -&gt; a));
+            for (Review r : batch) {
+                out.add(byId.getOrDefault(r.id(), new Label(r.id(), null, List.of())));
+            }
+        }
+        return out;   // labels with a null sentiment go to a retry or review queue
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Option</th><th>Cost per 1M reviews</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>Embeddings + k-NN on labelled examples</td><td>Lowest</td><td>Stable labels, plenty of labelled data</td></tr>
+            <tr><td>Small chat model, batched as here</td><td>Low</td><td>Labels change, nuance matters, little labelled data</td></tr>
+            <tr><td>Provider batch API (asynchronous)</td><td>About half of synchronous</td><td>Nightly jobs that can wait hours</td></tr>
+            <tr><td>Fine-tuned small model</td><td>Low per call, plus training</td><td>Very high volume, stable task</td></tr>
+            <tr><td>Frontier model per review</td><td>Highest</td><td>Only for the low-confidence remainder</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Measure per class</span>A classifier that is 92% accurate overall can still miss half of the NEGATIVE reviews, which are the ones operations care about. Keep a few hundred human-labelled reviews, report precision and recall per label, and re-check monthly and after any model or prompt change.</div>
+      <div class="note warn"><span class="lbl">Batches fail differently</span>A malformed batch loses 25 labels at once, and models sometimes skip or merge lines. Match results to ids, as above; retry missing ones individually; cap batch size by tokens, not just count.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,44 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="Embeddings in one picture">
+  <h2>An embedding turns meaning into a position, so "similar" becomes "near"</h2>
+  <p class="dek">An embedding model reads a piece of text and returns a fixed-length list of numbers, for example 1,536 floats. Texts with similar meaning land close together, even when they share no words. That one property powers semantic search, RAG, deduplication, clustering and recommendations. The full treatment is in <a data-deck="ai" data-slide="What an embedding is">Embeddings</a>.</p>
+
+  <div class="split">
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 440 300" role="img" aria-label="A two-dimensional picture of embedding space. Three clusters: refunds (I want my money back, refund for a damaged item, return and reimburse), delivery (where is my parcel, tracking not updating, late shipment) and accounts (reset my password, cannot log in). A query, 'can I get reimbursed for a broken lamp?', lands inside the refund cluster although it shares almost no words with those sentences. Its nearest neighbour, 'refund, damaged item', has a cosine similarity of about 0.86.">
+          <line x1="30" y1="270" x2="420" y2="270" stroke="currentColor" stroke-opacity="0.3"></line>
+          <line x1="30" y1="270" x2="30" y2="14" stroke="currentColor" stroke-opacity="0.3"></line>
+          <text x="410" y="288" text-anchor="end" font-size="9" fill="currentColor" opacity="0.6">(1,536 dimensions, drawn in 2)</text>
+
+          <ellipse cx="300" cy="80" rx="105" ry="56" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.5" stroke-dasharray="4 3"></ellipse>
+          <text x="300" y="36" text-anchor="middle" font-size="10" font-weight="600" fill="#D26A3F">refunds</text>
+          <g font-size="9" fill="currentColor"><circle cx="250" cy="70" r="3.5" fill="currentColor"></circle><text x="257" y="73">"I want my money back"</text>
+          <circle cx="286" cy="102" r="3.5" fill="currentColor"></circle><text x="293" y="105">"refund, damaged item"</text>
+          <circle cx="330" cy="62" r="3.5" fill="currentColor"></circle><text x="337" y="65">"return and reimburse"</text></g>
+
+          <ellipse cx="120" cy="200" rx="88" ry="48" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></ellipse>
+          <text x="120" y="164" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">delivery</text>
+          <g font-size="9" fill="currentColor"><circle cx="72" cy="188" r="3.5" fill="currentColor"></circle><text x="79" y="191">"where is my parcel"</text>
+          <circle cx="96" cy="214" r="3.5" fill="currentColor"></circle><text x="103" y="217">"tracking not updating"</text>
+          <circle cx="62" cy="234" r="3.5" fill="currentColor"></circle><text x="69" y="237">"late shipment"</text></g>
+
+          <ellipse cx="330" cy="222" rx="80" ry="32" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="4 3"></ellipse>
+          <text x="330" y="200" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">accounts</text>
+          <g font-size="9" fill="currentColor"><circle cx="286" cy="222" r="3.5" fill="currentColor"></circle><text x="293" y="225">"reset my password"</text>
+          <circle cx="300" cy="242" r="3.5" fill="currentColor"></circle><text x="307" y="245">"cannot log in"</text></g>
+
+          <circle cx="262" cy="134" r="5" fill="#3AA79B"></circle>
+          <line x1="264" y1="129" x2="284" y2="107" stroke="#3AA79B" stroke-width="1.3" stroke-dasharray="3 2"></line>
+          <text x="274" y="140" font-size="9.5" fill="#3AA79B" font-weight="600">query: "can I get reimbursed</text>
+          <text x="274" y="152" font-size="9.5" fill="#3AA79B" font-weight="600">for a broken lamp?"</text>
+          <text x="274" y="166" font-size="9" fill="currentColor" opacity="0.8">nearest: cosine 0.86</text>
+        </svg>
+      </div>
+    </figure>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card"><h4>Cosine similarity</h4><p>The usual measure of "near": the cosine of the angle between two vectors. 1 means the same direction (same meaning), around 0 means unrelated. Most embedding models return vectors of length 1, so cosine and dot product give the same ranking.</p></div>
+      <div class="card"><h4>Why not keyword search?</h4><p>"Reimbursed for a broken lamp" shares no keywords with "refund for a damaged item". Embeddings match meaning, synonyms and paraphrases, across languages if the model is multilingual. Keyword search still wins on exact codes, SKUs and names, which is why production systems often combine both.</p></div>
+      <div class="card"><h4>Embedding models are not chat models</h4><p>They are smaller, much cheaper per token, and produce vectors, not text. You must embed documents and queries with the <b>same</b> model: vectors from two models live in different spaces and cannot be compared.</p></div>
+    </div>
+  </div>
+</section>

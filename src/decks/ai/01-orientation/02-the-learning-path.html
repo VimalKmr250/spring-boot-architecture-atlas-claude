@@ -1,0 +1,73 @@
+<section class="slide" data-sec="Orientation" data-title="The learning path">
+  <h2>Six steps from a first prompt to a feature you can run in production</h2>
+  <p class="dek">Each step adds one capability and one new kind of risk. Most teams that struggle with AI features skipped a step: they built retrieval before they could get typed output, or shipped an agent before they could measure a single call. The sections of this tab follow the same order.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Six steps left to right. One: call a model, with ChatClient, options and streaming. Two: shape the input and output, with prompts, templates and structured output. Three: remember and act, with advisors, chat memory and tools. Four: ground the model in your data, with embeddings, a vector store and RAG. Five: adapt the model, with fine-tuning and agentic workflows. Six: run it in production, with observability, cost control, guardrails and tests. Under the steps, the risk each one adds: wrong or made-up answers, unparseable output, runaway tool calls, leaking documents across users, cost and drift, and silent quality regressions.">
+        <g font-size="11" fill="currentColor">
+          <rect x="6" y="30" width="134" height="96" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="73" y="54" text-anchor="middle" font-weight="600">1 · Call a model</text>
+          <text x="73" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">ChatClient</text>
+          <text x="73" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">options, streaming</text>
+          <text x="73" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">token usage</text>
+
+          <rect x="157" y="30" width="134" height="96" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="224" y="54" text-anchor="middle" font-weight="600">2 · Shape it</text>
+          <text x="224" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">prompts, templates</text>
+          <text x="224" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">structured output</text>
+          <text x="224" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">into records</text>
+
+          <rect x="308" y="30" width="134" height="96" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="375" y="54" text-anchor="middle" font-weight="600">3 · Remember, act</text>
+          <text x="375" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">advisor chain</text>
+          <text x="375" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">chat memory</text>
+          <text x="375" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">tools and MCP</text>
+
+          <rect x="459" y="30" width="134" height="96" rx="8" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.6"></rect>
+          <text x="526" y="54" text-anchor="middle" font-weight="600">4 · Ground it</text>
+          <text x="526" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">embeddings</text>
+          <text x="526" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">vector stores</text>
+          <text x="526" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">RAG + evaluation</text>
+
+          <rect x="610" y="30" width="134" height="96" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="677" y="54" text-anchor="middle" font-weight="600">5 · Adapt it</text>
+          <text x="677" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">fine-tuning</text>
+          <text x="677" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">agentic workflows</text>
+          <text x="677" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">(only when needed)</text>
+
+          <rect x="761" y="30" width="134" height="96" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="828" y="54" text-anchor="middle" font-weight="600">6 · Run it</text>
+          <text x="828" y="76" text-anchor="middle" font-size="9.5" opacity="0.8">metrics, traces, cost</text>
+          <text x="828" y="91" text-anchor="middle" font-size="9.5" opacity="0.8">guardrails, security</text>
+          <text x="828" y="106" text-anchor="middle" font-size="9.5" opacity="0.8">tests and evals</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.4">
+          <line x1="141" y1="78" x2="154" y2="78" marker-end="url(#arw)"></line>
+          <line x1="292" y1="78" x2="305" y2="78" marker-end="url(#arw)"></line>
+          <line x1="443" y1="78" x2="456" y2="78" marker-end="url(#arw)"></line>
+          <line x1="594" y1="78" x2="607" y2="78" marker-end="url(#arw)"></line>
+          <line x1="745" y1="78" x2="758" y2="78" marker-end="url(#arw)"></line>
+        </g>
+        <text x="6" y="160" font-size="9.5" fill="currentColor" opacity="0.65" font-family="IBM Plex Mono, monospace">THE RISK EACH STEP ADDS</text>
+        <g font-size="9.5" fill="#D26A3F" text-anchor="middle">
+          <text x="73" y="184">made-up answers</text><text x="73" y="198">surprise bills</text>
+          <text x="224" y="184">unparseable output</text><text x="224" y="198">prompt injection</text>
+          <text x="375" y="184">runaway tool loops</text><text x="375" y="198">unsafe side effects</text>
+          <text x="526" y="184">documents leaking</text><text x="526" y="198">across users</text>
+          <text x="677" y="184">training cost</text><text x="677" y="198">and drift</text>
+          <text x="828" y="184">silent quality</text><text x="828" y="198">regressions</text>
+        </g>
+        <line x1="6" y1="222" x2="894" y2="222" stroke="currentColor" stroke-opacity="0.25"></line>
+        <text x="450" y="242" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Steps 1–4 cover most enterprise features. Step 5 is optional. Step 6 is never optional.</text>
+      </svg>
+    </div>
+    <figcaption>Copper marks the step most enterprise projects are really about: answering from your own documents and data. Teal marks the step most of them underestimate.</figcaption>
+  </figure>
+
+  <div class="grid3">
+    <div class="card"><h4>Start with the cheapest lever</h4><p>A better prompt costs minutes. Retrieval costs days. Fine-tuning costs weeks and a training budget. Move to the next lever only when you can show, with an evaluation set, that the current one is not enough.</p></div>
+    <div class="card"><h4>Treat the model as an unreliable dependency</h4><p>It is a remote service that is slow, priced per token, rate limited and sometimes wrong. Everything you know about calling payment providers applies: timeouts, retries, fallbacks, idempotency, metrics.</p></div>
+    <div class="card"><h4>Typed boundaries everywhere</h4><p>Free text goes in and free text comes out. Your code should only ever see records it can validate. That one habit removes most of the "it worked in the demo" bugs.</p></div>
+  </div>
+</section>

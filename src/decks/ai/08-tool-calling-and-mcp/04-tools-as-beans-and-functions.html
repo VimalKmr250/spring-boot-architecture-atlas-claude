@@ -1,0 +1,115 @@
+<section class="slide" data-sec="Tool calling and MCP" data-title="Tools as beans and functions">
+  <h2>Functions as tools, and choosing the tool set per user</h2>
+  <p class="dek">When a tool wraps an existing service, a <code>FunctionToolCallback</code> bean is often cleaner than annotating that service. Either way, in Spring AI 2.0 a model can only call tools you attach to the request or client: there is no global registry it can reach by name. That makes per-user tool sets, built from the user's roles, the natural place to enforce least privilege.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">InventoryToolConfig.java</div>
+<pre><code class="language-java">package com.acme.ai.tools.beans;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+
+@Configuration
+class InventoryToolConfig {
+
+    record StockQuery(
+            @ToolParam(description = "Product SKU, for example LMP-01") String sku,
+            @ToolParam(description = "Warehouse code; omit for all warehouses",
+                       required = false) String warehouse) {}
+
+    record StockLevel(String sku, int available) {}
+
+    record AdjustStock(@ToolParam(description = "Product SKU") String sku,
+                       @ToolParam(description = "Units to add (negative to remove)") int delta) {}
+
+    interface Inventory {
+        StockLevel level(String sku, String warehouse);
+        StockLevel adjust(String sku, int delta);
+    }
+
+    @Bean
+    ToolCallback stockLevelTool(Inventory inventory) {
+        return FunctionToolCallback
+                .builder("stockLevel", (StockQuery q) -&gt; inventory.level(q.sku(), q.warehouse()))
+                .description("Current available stock of one product")
+                .inputType(StockQuery.class)
+                .build();
+    }
+
+    @Bean
+    ToolCallback adjustStockTool(Inventory inventory) {
+        return FunctionToolCallback
+                .builder("adjustStock", (AdjustStock a) -&gt; inventory.adjust(a.sku(), a.delta()))
+                .description("Corrects the stock count of one product after a manual recount")
+                .inputType(AdjustStock.class)
+                .build();
+    }
+}
+
+@Service
+class StoreOpsAssistant {
+
+    private final ChatClient chatClient;
+    private final ToolCallback stockLevel;
+    private final ToolCallback adjustStock;
+
+    StoreOpsAssistant(ChatClient.Builder builder,
+                      @Qualifier("stockLevelTool") ToolCallback stockLevel,
+                      @Qualifier("adjustStockTool") ToolCallback adjustStock) {
+        this.chatClient = builder.defaultSystem("You help Acme store staff with stock questions.").build();
+        this.stockLevel = stockLevel;
+        this.adjustStock = adjustStock;
+    }
+
+    String ask(String question, Authentication user) {
+        List&lt;ToolCallback&gt; tools = new ArrayList&lt;&gt;(List.of(stockLevel));    // everyone can read
+        boolean manager = user.getAuthorities().stream()
+                .anyMatch(a -&gt; a.getAuthority().equals("ROLE_STORE_MANAGER"));
+        if (manager) {
+            tools.add(adjustStock);                                         // only managers can write
+        }
+        return chatClient.prompt().user(question).tools(tools.toArray()).call().content();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Generated schema for stockLevel · Spring AI 2.0.1</div>
+<pre><code class="language-json">{
+  "type" : "object",
+  "properties" : {
+    "sku" : { "type" : "string",
+              "description" : "Product SKU, for example LMP-01" },
+    "warehouse" : { "type" : "string",
+                    "description" : "Warehouse code; omit for all warehouses" }
+  },
+  "required" : [ "sku" ],
+  "additionalProperties" : false
+}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Way to declare a tool</th><th>Use when</th></tr></thead>
+          <tbody>
+            <tr><td><code>@Tool</code> methods + <code>.tools(object)</code></td><td>Tools written for the assistant, several per class</td></tr>
+            <tr><td><code>FunctionToolCallback</code> bean</td><td>Wrapping an existing service without touching it</td></tr>
+            <tr><td><code>MethodToolCallbackProvider</code></td><td>Exposing a bean's <code>@Tool</code> methods as a <code>ToolCallbackProvider</code></td></tr>
+            <tr><td>MCP tool callbacks</td><td>Tools that live in another service: <a data-deck="ai" data-slide="MCP: tools as a protocol">MCP</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl"><span class="tag w">1.x</span> no more tools by name</span>2.0 removed <code>toolNames(...)</code>, <code>defaultToolNames(...)</code> and the resolver that looked tools up among all beans. Attach tools explicitly with <code>tools(...)</code> or <code>defaultTools(...)</code>, which accept <code>@Tool</code> objects, <code>ToolCallback</code>s and providers; the <code>toolCallbacks(...)</code> variants are deprecated for removal in 2.0. A global fallback can be re-enabled with <code>spring.ai.tools.resolution.fallback.enabled=true</code>, but it widens what a fooled model can call; leave it off.</div>
+      <div class="note tip"><span class="lbl">Read tools and write tools</span>Separate them, as here. Read tools can be broadly available; write tools go only to roles that may perform the action anyway, and should be idempotent, audited, and in many cases create a request a person confirms.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,93 @@
+<section class="slide" data-sec="RAG" data-title="Evaluating RAG">
+  <h2>Measure retrieval and generation separately, on a fixed set of real questions</h2>
+  <p class="dek">"It looks good" is not a quality bar. Build a golden set of 50–200 real questions, each with the passage that answers it or a note that it is unanswerable. Run it on every change to prompts, chunking, models or thresholds. Score retrieval (did the right passage come back?) apart from generation (was the answer faithful and relevant?), because the fixes are different.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">PolicyAssistantEvaluationTest.java · runs against a real model</div>
+<pre><code class="language-java">package com.acme.ai.rag;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.evaluation.FactCheckingEvaluator;
+import org.springframework.ai.chat.evaluation.RelevancyEvaluator;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.evaluation.EvaluationRequest;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@Tag("eval")                                            // not part of the fast build
+@SpringBootTest
+@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
+class PolicyAssistantEvaluationTest {
+
+    /** In practice: a JSON file of real questions taken from support tickets. */
+    record Case(String question, String expectedSourceId, boolean answerable) {}
+
+    static final List&lt;Case&gt; GOLDEN = List.of(
+            new Case("Can I return a sofa after three weeks?", "returns-policy", true),
+            new Case("How do I book a collection for a wardrobe?", "large-items", true),
+            new Case("Do gift cards expire?", "gift-cards", true),
+            new Case("What is your CEO's salary?", null, false));
+
+    @Autowired VectorStore vectorStore;
+    @Autowired CitedAnswerService assistant;
+    @Autowired ChatClient.Builder judge;                  // ideally a different, stronger model
+
+    @Test
+    void retrievalFindsTheRightSource() {
+        long hits = GOLDEN.stream().filter(Case::answerable).filter(c -&gt; vectorStore
+                .similaritySearch(SearchRequest.builder().query(c.question()).topK(5).build())
+                .stream().anyMatch(d -&gt; c.expectedSourceId().equals(d.getMetadata().get("sourceId"))))
+                .count();
+        double recallAt5 = (double) hits / GOLDEN.stream().filter(Case::answerable).count();
+        assertThat(recallAt5).isGreaterThanOrEqualTo(0.9);
+    }
+
+    @Test
+    void answersAreRelevantAndSupported() {
+        var relevancy = RelevancyEvaluator.builder().chatClientBuilder(judge).build();
+        var facts = FactCheckingEvaluator.builder(judge).build();
+        int passed = 0, total = 0;
+        for (Case c : GOLDEN) {
+            var answer = assistant.ask(c.question());
+            total++;
+            if (!c.answerable()) {                         // must decline, with no sources
+                if (answer.sources().isEmpty()) passed++;
+                continue;
+            }
+            List&lt;Document&gt; context = vectorStore.similaritySearch(
+                    SearchRequest.builder().query(c.question()).topK(5).build());
+            var request = new EvaluationRequest(c.question(), context, answer.text());
+            if (relevancy.evaluate(request).isPass() &amp;&amp; facts.evaluate(request).isPass()) passed++;
+        }
+        assertThat((double) passed / total).isGreaterThanOrEqualTo(0.85);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Metric</th><th>Question it answers</th><th>If it is low</th></tr></thead>
+          <tbody>
+            <tr><td>Recall@K</td><td>Is the right passage in the top K?</td><td>Chunking, embedding model, hybrid search, query rewriting</td></tr>
+            <tr><td>Context precision</td><td>How much of what we retrieved is relevant?</td><td>Threshold, top-K, re-ranking</td></tr>
+            <tr><td>Faithfulness</td><td>Is every claim supported by the context? (<code>FactCheckingEvaluator</code>)</td><td>Grounding prompt, citations, smaller context</td></tr>
+            <tr><td>Answer relevancy</td><td>Does it answer the question asked? (<code>RelevancyEvaluator</code>)</td><td>Prompt, query transformation, model</td></tr>
+            <tr><td>Refusal correctness</td><td>Declines unanswerable questions, answers answerable ones</td><td>Threshold, escape-hatch wording</td></tr>
+            <tr><td>Latency, tokens per answer</td><td>Can we afford it at peak?</td><td>Fewer chunks, smaller model, fewer stages</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">LLM-as-judge, with care</span>Evaluator models are themselves models: use a strong judge, check a sample of its verdicts by hand, and keep the judge fixed while you compare changes. Pass/fail from a judge is a trend signal, not ground truth.</div>
+      <div class="note"><span class="lbl">Where it runs</span>Fast unit tests (stub model) on every commit; this evaluation nightly and before any prompt, model or chunking change is released, with the scores stored so you can see trends.</div>
+    </div>
+  </div>
+</section>

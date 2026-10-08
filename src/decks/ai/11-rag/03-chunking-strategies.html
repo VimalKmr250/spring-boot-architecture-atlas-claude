@@ -1,0 +1,75 @@
+<section class="slide" data-sec="RAG" data-title="Chunking strategies">
+  <h2>Chunking decides what can be found: cut along the document's own structure</h2>
+  <p class="dek">A chunk is the unit of retrieval: it is embedded as one vector and pasted into the prompt as one passage. Too small, and a chunk lacks the context to answer anything ("it must be returned within 30 days" — what must?). Too large, and its vector averages several topics, so it matches nothing well, while every retrieved chunk costs prompt tokens. Splitting on headings, sections and paragraphs beats splitting on a token count alone.</p>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Strategy</th><th>How</th><th>Good for</th></tr></thead>
+        <tbody>
+          <tr><td>Fixed tokens</td><td><code>TokenTextSplitter</code>: N tokens, cut at a sentence end</td><td>Uniform prose; the baseline to beat</td></tr>
+          <tr><td>Structure-aware</td><td>Split on headings or sections first, then subdivide long sections</td><td>Policies, manuals, wikis, contracts</td></tr>
+          <tr><td>Page-based</td><td><code>PagePdfDocumentReader</code>: one chunk per page</td><td>PDFs where users need page citations</td></tr>
+          <tr><td>Parent–child</td><td>Embed small chunks; send their parent section to the model</td><td>Precise matching with enough context to answer</td></tr>
+          <tr><td>Overlap</td><td>Repeat the last 10–20% of a chunk at the start of the next</td><td>Prose where answers span boundaries (<code>TokenTextSplitter</code> has no overlap option: write a splitter)</td></tr>
+          <tr><td>Contextual headers</td><td>Prefix each chunk with document title and section path</td><td>Short chunks that would be ambiguous alone</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">HeadingAwareSplitter.java</div>
+<pre><code class="language-java">package com.acme.ai.rag.ingest;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.transformer.splitter.TextSplitter;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+
+/**
+ * Splits Markdown-like text at headings, prefixes every chunk with its heading,
+ * and only cuts long sections further by token count.
+ */
+class HeadingAwareSplitter extends TextSplitter {
+
+    private final TokenTextSplitter longSections = TokenTextSplitter.builder()
+            .withChunkSize(400)
+            .build();
+
+    @Override
+    protected List&lt;String&gt; splitText(String text) {
+        List&lt;String&gt; chunks = new ArrayList&lt;&gt;();
+        String heading = "";
+        StringBuilder section = new StringBuilder();
+        for (String line : text.split("\n")) {
+            if (line.startsWith("#")) {
+                flush(heading, section, chunks);
+                heading = line.replaceFirst("^#+\\s*", "");
+                section.setLength(0);
+            } else {
+                section.append(line).append('\n');
+            }
+        }
+        flush(heading, section, chunks);
+        return chunks;
+    }
+
+    private void flush(String heading, StringBuilder section, List&lt;String&gt; out) {
+        String body = section.toString().strip();
+        if (body.isEmpty()) {
+            return;
+        }
+        for (Document part : longSections.split(new Document(body))) {
+            out.add(heading.isEmpty() ? part.getText() : heading + "\n" + part.getText());
+        }
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Starting numbers</h4><p>300–500 tokens per chunk, top-K of 4–8, for policy-style prose. FAQ entries and product records: one item per chunk, whatever its size. Then tune on your evaluation set, not by eye.</p></div>
+    <div class="card"><h4>Clean before you split</h4><p>Headers, footers, page numbers, cookie banners and navigation menus repeated on every page become thousands of near-identical chunks that crowd out real content. Strip them in a transformer before splitting.</p></div>
+    <div class="card"><h4>Tables and code</h4><p>Splitting a table mid-row destroys it. Keep tables whole, or convert each row to a sentence ("Plan Gold: 30-day returns, free collection") before embedding.</p></div>
+  </div>
+</section>

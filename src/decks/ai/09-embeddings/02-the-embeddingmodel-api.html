@@ -1,0 +1,89 @@
+<section class="slide" data-sec="Embeddings" data-title="The EmbeddingModel API">
+  <h2><code>EmbeddingModel</code>: text in, <code>float[]</code> out, batched when you can</h2>
+  <p class="dek">The embedding starter auto-configures an <code>EmbeddingModel</code> bean for the provider selected by <code>spring.ai.model.embedding</code>. Most of the time a vector store calls it for you. Use it directly for similarity checks, deduplication, clustering, or ranking a small candidate list where a vector store would be overkill.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SimilarityService.java</div>
+<pre><code class="language-java">package com.acme.ai.embeddings;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.IntStream;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.stereotype.Service;
+
+@Service
+class SimilarityService {
+
+    record Scored(String text, double score) {}
+
+    private final EmbeddingModel embeddingModel;
+
+    SimilarityService(EmbeddingModel embeddingModel) {
+        this.embeddingModel = embeddingModel;
+    }
+
+    double similarity(String a, String b) {
+        List&lt;float[]&gt; v = embeddingModel.embed(List.of(a, b));   // one request, two vectors
+        return cosine(v.get(0), v.get(1));
+    }
+
+    /** Ranks a few hundred candidates in memory; beyond that, use a vector store. */
+    List&lt;Scored&gt; rank(String query, List&lt;String&gt; candidates) {
+        float[] q = embeddingModel.embed(query);
+        List&lt;float[]&gt; vectors = embeddingModel.embed(candidates);
+        return IntStream.range(0, candidates.size())
+                .mapToObj(i -&gt; new Scored(candidates.get(i), cosine(q, vectors.get(i))))
+                .sorted(Comparator.comparingDouble(Scored::score).reversed())
+                .toList();
+    }
+
+    /** Token usage is on the response, as for chat. */
+    int tokensFor(List&lt;String&gt; texts) {
+        EmbeddingResponse response = embeddingModel.embedForResponse(texts);
+        return response.getMetadata().getUsage().getPromptTokens();
+    }
+
+    static double cosine(float[] a, float[] b) {
+        if (a.length != b.length) {
+            throw new IllegalArgumentException("Different dimensions: vectors from different models?");
+        }
+        double dot = 0, normA = 0, normB = 0;
+        for (int i = 0; i &lt; a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">application.yml · OpenAI, with shortened vectors</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    model:
+      embedding: openai
+    openai:
+      embedding:
+        model: text-embedding-3-small   # 1,536 dimensions by default
+        dimensions: 512                 # truncate: 3× less storage, small quality loss</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application-ollama.yml · local</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    model:
+      embedding: ollama
+    ollama:
+      embedding:
+        model: nomic-embed-text         # 768 dimensions</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Dimensions are part of your schema</span>A vector column has a fixed size. Switching from OpenAI (1,536) to the Ollama profile (768), or changing <code>dimensions</code>, means a new table or index and re-embedding every document. Profiles that use different embedding models must not share a vector store.</div>
+      <div class="note tip"><span class="lbl">Batch, cache, and embed once</span>Embedding is cheap per token but adds up over millions of chunks. Send texts in batches, store the vectors, and re-embed only when the text or the model changes. Keep a hash of the embedded text next to the vector so you can tell.</div>
+    </div>
+  </div>
+</section>

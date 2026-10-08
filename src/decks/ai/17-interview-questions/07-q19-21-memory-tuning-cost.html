@@ -1,0 +1,22 @@
+<section class="slide" data-sec="Interview questions" data-title="Q19–21 · Memory, fine-tuning and cost">
+  <h2>Three questions on state, adaptation and money</h2>
+  <p class="dek">These questions check that you know the model is stateless, that you can tell a knowledge problem from a behaviour problem, and that you think about cost before the invoice arrives.</p>
+
+  <article class="q"><header><i>Q19</i><h3>The model is stateless. How does chat memory work in Spring AI?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Memory means resending relevant history on every call. <code>MessageChatMemoryAdvisor</code> loads the conversation's messages from <code>ChatMemory</code> before the call and saves the new user message and answer after it. <code>MessageWindowChatMemory</code> keeps the last 20 messages by default, and a <code>ChatMemoryRepository</code> stores them: in memory by default, or JDBC, Redis, Cassandra, MongoDB or Neo4j. The conversation id is passed per request with <code>ChatMemory.CONVERSATION_ID</code>.</div>
+    <p class="deeper"><b>Go deeper:</b> In 2.0 the id is mandatory; without it the call fails with "conversationId cannot be null". Issue ids on the server and check ownership on every request. History is a cost and privacy decision: size the window, summarise older turns with a small model for long sessions, redact before storing, and expire conversations on a retention schedule. The memory advisor sits outside the tool loop, so one turn is stored as a question and a final answer.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="How chat memory works">How memory works</a><a data-deck="ai" data-slide="Conversation memory in code">In code</a><a data-deck="ai" data-slide="Window, summary or vector memory">Strategies</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q20</i><h3>When would you fine-tune instead of using RAG?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>RAG for knowledge, fine-tuning for behaviour. If the model lacks facts, especially facts that change or need per-user access control and citations, RAG is the answer; fine-tuning does not reliably teach facts and goes stale. I fine-tune when I need a consistent format, style or narrow skill that a long few-shot prompt only just achieves at high volume, or to distil a large model into a cheaper one for one task, and only after an evaluation shows prompting is not enough.</div>
+    <p class="deeper"><b>Go deeper:</b> Name the methods: supervised fine-tuning, LoRA and QLoRA adapters for open-weight models, preference tuning, distillation; hosted tuning APIs versus self-hosted. The cost is mostly data: hundreds to thousands of curated, consented, redacted examples with a held-out set. Operate the tuned model like a release: versioned, compared with the prompted baseline, rolled out by config, re-checked when a new base model ships.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Prompting, RAG or fine-tuning?">Prompting, RAG or fine-tuning?</a><a data-deck="ai" data-slide="The adaptation ladder">The adaptation ladder</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q21</i><h3>How do you keep LLM costs under control?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Measure first: token usage per feature and per model. Then send fewer tokens (smaller history window, fewer and better chunks, capped output), use cheaper tokens (route classification and extraction to a small model), and reuse work (provider prompt caching with a stable prefix, a semantic cache for repeated questions, batch APIs for offline jobs). Finally bound the worst case with tool-call limits, timeouts and a per-user token budget.</div>
+    <p class="deeper"><b>Go deeper:</b> Input tokens usually dominate because system prompt, context and history are resent every turn. Judge cost per resolved task, not per call: a cheap model that needs three attempts is not cheaper. A budget advisor can refuse a request before the model call; on Spring AI 2.0, the final response's usage already sums every call in the tool loop.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="ai" data-slide="Cost control">Cost control</a><a data-deck="ai" data-slide="Tokens and context windows">Estimating</a></p>
+  </div></article>
+</section>

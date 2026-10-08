@@ -1,0 +1,65 @@
+<section class="slide" data-sec="Embeddings" data-title="Embeddings beyond RAG">
+  <h2>Embeddings solve problems without calling a chat model at all</h2>
+  <p class="dek">Many useful features need only vectors and arithmetic: no prompt, no generation, no hallucination, and a cost of fractions of a cent per thousand items. Before reaching for a chat model, ask whether "find similar", "group similar" or "which known category is this nearest to" answers the question.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TicketDeduplicator.java</div>
+<pre><code class="language-java">package com.acme.ai.embeddings;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+class TicketDeduplicator {
+
+    record Ticket(String id, String text) {}
+
+    record Duplicate(String ticketId, String duplicateOf, double score) {}
+
+    private final EmbeddingModel embeddingModel;
+    private final double threshold;
+
+    TicketDeduplicator(EmbeddingModel embeddingModel,
+                       @Value("${acme.dedup.threshold:0.92}") double threshold) {
+        this.embeddingModel = embeddingModel;
+        this.threshold = threshold;   // tuned on labelled pairs, per model
+    }
+
+    /** Pairwise within one batch: fine for an hourly batch of a few thousand tickets. */
+    List&lt;Duplicate&gt; findDuplicates(List&lt;Ticket&gt; tickets) {
+        List&lt;float[]&gt; vectors = embeddingModel.embed(tickets.stream().map(Ticket::text).toList());
+        List&lt;Duplicate&gt; duplicates = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; tickets.size(); i++) {
+            for (int j = 0; j &lt; i; j++) {
+                double score = SimilarityService.cosine(vectors.get(i), vectors.get(j));
+                if (score &gt;= threshold) {
+                    duplicates.add(new Duplicate(tickets.get(i).id(), tickets.get(j).id(), score));
+                    break;                     // link to the earliest match only
+                }
+            }
+        }
+        return duplicates;
+    }
+}</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Feature</th><th>How</th><th>Scale-up path</th></tr></thead>
+        <tbody>
+          <tr><td>Duplicate detection</td><td>Cosine above a tuned threshold, as here</td><td>Vector store query per new item</td></tr>
+          <tr><td>Semantic search</td><td>Nearest neighbours of the query vector</td><td>Vector store with metadata filters</td></tr>
+          <tr><td>Classification by example</td><td>Label of the nearest labelled examples (k-NN), or of the nearest class centroid</td><td>Cheaper than a chat call; add an LLM only for low-confidence items</td></tr>
+          <tr><td>Topic discovery</td><td>Cluster vectors (k-means, HDBSCAN), then ask a model to name each cluster</td><td>Batch job over a week of tickets</td></tr>
+          <tr><td>Recommendations</td><td>Items near what the user viewed or bought</td><td><a data-deck="ai" data-slide="Personalised recommendations: design">Recommendations use case</a></td></tr>
+          <tr><td>Anomaly hints</td><td>Items far from every cluster</td><td>Flag for human review</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say it in the interview</span>"Not every AI feature needs generation. For deduplication, routing to known categories or 'more like this', embeddings plus a threshold are cheaper, faster, deterministic for a given model, and easy to evaluate. I bring in a chat model when I need language out, not just a decision."</div>
+</section>

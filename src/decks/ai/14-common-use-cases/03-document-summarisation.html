@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Common use cases" data-title="Document summarisation">
+  <h2>Summarisation: stuff it when it fits, map-reduce when it does not</h2>
+  <p class="dek">If a document fits comfortably in the context window, one call with a structured output is simplest and sees the whole text. For documents too long for the window, or when you want a cheap model and parallelism, use map-reduce: summarise each part independently, then combine the partial summaries. Either way, ask for a typed summary with the fields your readers need, not "a summary".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DocumentSummarizer.java</div>
+<pre><code class="language-java">package com.acme.ai.usecases.summary;
+
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.stereotype.Service;
+
+@Service
+class DocumentSummarizer {
+
+    record Summary(String title, String overview, List&lt;String&gt; keyPoints,
+                   List&lt;String&gt; obligations, List&lt;String&gt; openQuestions) {}
+
+    private static final int STUFF_LIMIT_TOKENS = 60_000;
+
+    private static final String MAP = """
+            Summarise this part of a longer document in at most 8 bullet points.
+            Keep names, numbers, dates and obligations exactly as written.
+            Do not add anything that is not in the text.""";
+
+    private static final String REDUCE = """
+            Combine these partial summaries of one document into a single summary.
+            Remove duplicates; keep every obligation, date and amount.""";
+
+    private final ChatClient chatClient;
+    private final TokenTextSplitter splitter = TokenTextSplitter.builder()
+            .withChunkSize(STUFF_LIMIT_TOKENS / 4)
+            .withMaxNumChunks(200)
+            .build();
+
+    DocumentSummarizer(ChatClient.Builder builder) {
+        this.chatClient = builder.build();
+    }
+
+    Summary summarize(String text) {
+        List&lt;Document&gt; parts = splitter.split(new Document(text));
+        if (parts.size() &lt;= 4) {                                  // fits: one call, whole text
+            return chatClient.prompt().system(REDUCE).user(text).call().entity(Summary.class);
+        }
+        List&lt;String&gt; partials;
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {   // map, in parallel
+            List&lt;Future&lt;String&gt;&gt; futures = parts.stream()
+                    .map(p -&gt; pool.submit(() -&gt; chatClient.prompt()
+                            .system(MAP).user(p.getText()).call().content()))
+                    .toList();
+            partials = futures.stream().map(DocumentSummarizer::join).toList();
+        }
+        return chatClient.prompt()                                  // reduce
+                .system(REDUCE)
+                .user(String.join("\n\n---\n\n", partials))
+                .call()
+                .entity(Summary.class);
+    }
+
+    private static String join(Future&lt;String&gt; f) {
+        try {
+            return f.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException(e.getCause());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Strategy</th><th>Pros</th><th>Cons</th></tr></thead>
+          <tbody>
+            <tr><td>Stuff (one call)</td><td>Sees everything; simplest; cross-references survive</td><td>Long inputs cost more and recall drops in the middle</td></tr>
+            <tr><td>Map-reduce</td><td>Any length; parallel; cheap model for the map step</td><td>Loses links between parts; one extra step</td></tr>
+            <tr><td>Refine (sequential)</td><td>Each step sees the running summary</td><td>Slow: no parallelism; early mistakes propagate</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">Summaries are read by people who will not check the source</span>Ask for exact figures and dates, forbid additions, and keep the structure fixed so readers know where to look. For contracts or medical text, show which section each key point came from.</div>
+      <div class="note"><span class="lbl">Evaluate coverage, not prose</span>For a sample of documents, list the facts a summary must contain, then score how many each summary includes and whether it adds anything unsupported. A fact-checking evaluator with the source as context automates the second half.</div>
+      <div class="note warn"><span class="lbl">Watch the bill</span>Summarising every inbound PDF with a frontier model adds up quickly. Route by length and importance: a small model for routine documents, the large one for contracts over a threshold value.</div>
+    </div>
+  </div>
+</section>

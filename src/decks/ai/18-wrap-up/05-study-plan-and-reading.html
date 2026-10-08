@@ -1,0 +1,39 @@
+<section class="slide" data-sec="Wrap-up" data-title="Study plan and further reading">
+  <h2>A three-week plan from first prompt to interview-ready</h2>
+  <p class="dek">Reading is not enough; build one small application that grows through the plan. Run it with the <code>ollama</code> profile so experiments cost nothing, and switch to a hosted model when you want to compare quality. By the end you will have code to talk about, numbers you measured yourself, and answers to every question in this tab.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Days</th><th>Build</th><th>Read in this tab</th></tr></thead>
+      <tbody>
+        <tr><td>1–2</td><td>Project setup; an <code>/ask</code> endpoint; print token usage per call</td><td>LLM fundamentals, Spring AI overview</td></tr>
+        <tr><td>3–4</td><td>A system prompt in a resource file with a template test; a review classifier returning an enum record</td><td>Prompt engineering, structured output</td></tr>
+        <tr><td>5–6</td><td>A redaction advisor; JDBC chat memory with conversation ids and an ownership check</td><td>Advisors, chat memory</td></tr>
+        <tr><td>7–8</td><td>Two <code>@Tool</code> methods using <code>ToolContext</code>; tool limits; one test with a stub model that returns a tool call</td><td>Tool calling and MCP</td></tr>
+        <tr><td>9–11</td><td>Ingest 30 real documents into pgvector; QA advisor with a tenant filter; an isolation test</td><td>Embeddings, vector stores, RAG</td></tr>
+        <tr><td>12–13</td><td>A 30-question golden set; measure recall@5 and faithfulness; change chunking and compare</td><td>RAG evaluation and failure modes</td></tr>
+        <tr><td>14–15</td><td>A routing workflow and an evaluator–optimiser loop</td><td>Agentic patterns</td></tr>
+        <tr><td>16–18</td><td>Metrics dashboard, timeouts and a fallback, a token budget, streaming</td><td>Production</td></tr>
+        <tr><td>19–21</td><td>Answer all 24 questions aloud; write one design (knowledge assistant) on a whiteboard</td><td>Interview questions, use cases, wrap-up</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Further reading</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><a href="https://docs.spring.io/spring-ai/reference/" target="_blank" rel="noopener">Spring AI reference documentation</a>, especially ChatClient, Advisors, Tool Calling, RAG and the upgrade notes</li>
+        <li><a href="https://spring.io/blog/2026/06/12/spring-ai-2-0-0-GA-available-now/" target="_blank" rel="noopener">Spring AI 2.0.0 GA announcement</a></li>
+        <li><a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener">Model Context Protocol</a> specification and guides</li>
+        <li><a href="https://genai.owasp.org/llm-top-10/" target="_blank" rel="noopener">OWASP Top 10 for LLM Applications</a></li>
+        <li><a href="https://github.com/pgvector/pgvector" target="_blank" rel="noopener">pgvector</a> README: index types and tuning</li>
+        <li>Your providers' documentation on models, pricing, rate limits, prompt caching and data retention</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Elsewhere in the atlas</span>The <a data-deck="sb" data-slide="What this tab covers">Spring Boot tab</a> covers the auto-configuration, Actuator and security machinery Spring AI builds on, and the <a data-deck="hld" data-sec="Orientation">System design tab</a> covers the caching, rate limiting and asynchronous patterns that AI services reuse.</div>
+      <div class="note"><span class="lbl">What to bring to an interview</span>One system you built, its numbers (latency, cost per request, evaluation score), one thing that went wrong and how you found it, and the controls you would add next. That story answers more questions than any definition.</div>
+    </div>
+  </div>
+</section>

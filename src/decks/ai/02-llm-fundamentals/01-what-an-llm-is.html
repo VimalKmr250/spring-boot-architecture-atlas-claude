@@ -1,0 +1,59 @@
+<section class="slide" data-sec="LLM fundamentals" data-title="What an LLM is">
+  <h2>An LLM predicts the next token, over and over, and nothing else</h2>
+  <p class="dek">A large language model is a neural network trained on a huge amount of text to answer one question: given these tokens, what token is likely to come next? Instruction tuning and human feedback then teach it to follow instructions and hold a conversation. Everything that looks like reasoning, memory or knowledge comes out of that one loop.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 270" role="img" aria-label="The generation loop. The input text 'Where is order 1042? It' is split into tokens and passed to the model. The model outputs a probability for every token in its vocabulary: ' ships' 0.38, ' was' 0.21, ' left' 0.14, ' is' 0.11 and so on. The sampler picks one token, here ' ships', using temperature and top-p. The chosen token is appended to the input and the loop runs again, until a stop token or the max-tokens limit is reached.">
+        <rect x="10" y="40" width="200" height="86" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="110" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Input so far</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor">
+          <rect x="22" y="76" width="44" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="44" y="89" text-anchor="middle">Where</text>
+          <rect x="70" y="76" width="22" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="81" y="89" text-anchor="middle">is</text>
+          <rect x="96" y="76" width="40" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="116" y="89" text-anchor="middle">order</text>
+          <rect x="140" y="76" width="34" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="157" y="89" text-anchor="middle">104</text>
+          <rect x="178" y="76" width="22" height="18" rx="3" fill="currentColor" fill-opacity="0.08"></rect><text x="189" y="89" text-anchor="middle">2?</text>
+          <rect x="22" y="100" width="26" height="18" rx="3" fill="#D26A3F" fill-opacity="0.18"></rect><text x="35" y="113" text-anchor="middle">It</text>
+        </g>
+        <line x1="210" y1="83" x2="262" y2="83" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+        <text x="236" y="76" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">token ids</text>
+
+        <rect x="266" y="30" width="170" height="106" rx="10" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.6"></rect>
+        <text x="351" y="64" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">Transformer</text>
+        <text x="351" y="82" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">billions of weights,</text>
+        <text x="351" y="96" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">fixed after training</text>
+        <text x="351" y="118" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.65">attention over every token</text>
+        <line x1="436" y1="83" x2="488" y2="83" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="492" y="20" width="196" height="132" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="590" y="40" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Next-token probabilities</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor">
+          <text x="504" y="62">" ships"</text><rect x="572" y="53" width="80" height="11" fill="#D26A3F" fill-opacity="0.7"></rect><text x="658" y="62">.38</text>
+          <text x="504" y="80">" was"</text><rect x="572" y="71" width="44" height="11" fill="currentColor" fill-opacity="0.35"></rect><text x="622" y="80">.21</text>
+          <text x="504" y="98">" left"</text><rect x="572" y="89" width="29" height="11" fill="currentColor" fill-opacity="0.35"></rect><text x="607" y="98">.14</text>
+          <text x="504" y="116">" is"</text><rect x="572" y="107" width="23" height="11" fill="currentColor" fill-opacity="0.35"></rect><text x="601" y="116">.11</text>
+          <text x="504" y="138" opacity="0.6">…100k+ more</text>
+        </g>
+        <line x1="688" y1="83" x2="740" y2="83" stroke="#8A94A3" stroke-width="1.4" marker-end="url(#arw)"></line>
+
+        <rect x="744" y="44" width="146" height="78" rx="8" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <text x="817" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">Sampler</text>
+        <text x="817" y="86" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">temperature, top-p</text>
+        <text x="817" y="108" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">→ " ships"</text>
+
+        <path d="M817 122 C 817 220, 120 230, 40 124" fill="none" stroke="#D26A3F" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arwA)"></path>
+        <text x="450" y="214" text-anchor="middle" font-size="10" fill="#D26A3F">append the chosen token and run the whole thing again</text>
+        <text x="450" y="250" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">stops at an end-of-text token, a stop sequence, or max tokens · each loop is one output token, so output length drives latency</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="grid2x2">
+    <div class="card"><h4>It is a function, not a database</h4><p>Text in, text out, nothing kept between calls. It does not look facts up; it produces text that is <i>likely</i> given its training. That is why it can be fluent and wrong at the same time.</p></div>
+    <div class="card"><h4>Its knowledge is frozen</h4><p>The weights stop changing at a training cutoff. Your orders, your policies and yesterday's price change are not in there, and never will be. You supply them in the prompt: that is what RAG and tools do.</p></div>
+    <div class="card"><h4>Every word costs a step</h4><p>Input tokens are processed in parallel, so a long prompt is relatively cheap in time. Output tokens are produced one at a time, so a long answer is slow. Ask for short, structured answers when you can.</p></div>
+    <div class="card"><h4>Your application does the rest</h4><p>Memory, retrieval, tool execution, validation, security and retries all live in your code. Spring AI's job is to make that code look like the rest of your Spring application.</p></div>
+  </div>
+
+  <div class="note tip"><span class="lbl">Say it in the interview</span>"An LLM is a next-token predictor: stateless, trained once, with knowledge frozen at a cutoff. So I treat it as a reasoning and language engine, and I bring the facts, the memory and the actions from my own systems."</div>
+</section>

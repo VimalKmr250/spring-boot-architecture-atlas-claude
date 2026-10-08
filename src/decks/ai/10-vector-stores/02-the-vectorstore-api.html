@@ -1,0 +1,104 @@
+<section class="slide" data-sec="Vector stores" data-title="The VectorStore API">
+  <h2><code>VectorStore</code>: add documents, search by meaning, filter by metadata</h2>
+  <p class="dek">A <code>Document</code> is text plus a metadata map plus an id. <code>add()</code> embeds the text with the configured <code>EmbeddingModel</code> and stores all three. <code>similaritySearch()</code> embeds the query and returns the nearest documents, each with a score, after applying a metadata filter. The same code runs on PgVector, Redis, Elasticsearch, Qdrant and a dozen other stores.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProductIndex.java</div>
+<pre><code class="language-java">package com.acme.ai.vectors;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.stereotype.Service;
+
+@Service
+class ProductIndex {
+
+    record Product(String sku, String name, String description,
+                   String category, BigDecimal price, boolean inStock) {}
+
+    private final VectorStore vectorStore;
+
+    ProductIndex(VectorStore vectorStore) {
+        this.vectorStore = vectorStore;
+    }
+
+    /** A stable id per SKU makes add() an upsert: re-indexing replaces, never duplicates. */
+    static String idFor(String sku) {
+        return UUID.nameUUIDFromBytes(sku.getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    void index(List&lt;Product&gt; products) {
+        vectorStore.add(products.stream().map(p -&gt; Document.builder()
+                .id(idFor(p.sku()))
+                .text(p.name() + "\n" + p.description())        // what gets embedded
+                .metadata(Map.of(
+                        "sku", p.sku(),
+                        "category", p.category(),
+                        "price", p.price().doubleValue(),
+                        "inStock", p.inStock()))
+                .build()).toList());
+    }
+
+    List&lt;Document&gt; search(String query, String category, double maxPrice) {
+        var f = new FilterExpressionBuilder();
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                .query(query)
+                .topK(10)                      // default is 4
+                .similarityThreshold(0.35)     // drop weak matches (default accepts all)
+                .filterExpression(f.and(
+                        f.and(f.eq("category", category), f.lte("price", maxPrice)),
+                        f.eq("inStock", true)).build())
+                .build());
+    }
+
+    /** The same filter in the portable text syntax. */
+    List&lt;Document&gt; searchLighting(String query) {
+        return vectorStore.similaritySearch(SearchRequest.builder()
+                .query(query)
+                .topK(10)
+                .filterExpression("category == 'lighting' &amp;&amp; price &lt;= 80 &amp;&amp; inStock == true")
+                .build());
+    }
+
+    void remove(String sku) {
+        vectorStore.delete(List.of(idFor(sku)));
+    }
+
+    void removeCategory(String category) {
+        vectorStore.delete(new FilterExpressionBuilder().eq("category", category).build());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Filter expression syntax (portable)</div>
+<pre><code class="language-plaintext">category == 'lighting'                     equality, also !=
+price &lt;= 80 &amp;&amp; price &gt; 20                   &lt; &lt;= &gt; &gt;=, AND
+region in ['EU', 'UK']                      IN, NIN
+tenant == 'acme' &amp;&amp; (year &gt;= 2024 || pinned == true)
+NOT (status == 'archived')
+discontinuedAt IS NULL                      IS NULL, IS NOT NULL</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Concern</th><th>Practice</th></tr></thead>
+          <tbody>
+            <tr><td>Ids</td><td>Deterministic ids (from SKU, document path + chunk number) so re-ingestion upserts. PgVector's default id type is UUID, hence <code>nameUUIDFromBytes</code>.</td></tr>
+            <tr><td>Metadata</td><td>Only what you filter or cite on: tenant, source, ACL groups, dates, language. Every key is stored on every vector.</td></tr>
+            <tr><td>Scores</td><td><code>Document.getScore()</code> on results; log them to tune the threshold.</td></tr>
+            <tr><td>Embedded text</td><td>Embed what users will search for (name + description), not internal codes; keep codes in metadata for exact filters.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Upserts, verified</span>On PgVector, <code>add()</code> runs <code>INSERT … ON CONFLICT (id) DO UPDATE</code> (checked in the 2.0.1 jar), so the same id overwrites content, metadata and embedding.</div>
+    </div>
+  </div>
+</section>

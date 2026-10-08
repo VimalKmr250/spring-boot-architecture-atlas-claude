@@ -1,0 +1,26 @@
+<section class="slide" data-sec="Vector stores" data-title="Choosing a vector store">
+  <h2>Choose the store your team can operate, then check it meets the numbers</h2>
+  <p class="dek">Spring AI 2.0 ships starters for more than twenty vector stores behind one <code>VectorStore</code> interface, so the decision is reversible in code, though not in data: switching means re-indexing. Start from what you already run and what your security team has approved; move to a dedicated engine when scale, query rate or hybrid search demand it.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Store</th><th>Pick it when</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>PgVector</td><td>You run PostgreSQL; want transactions, joins and one backup story</td><td>Index memory at very large scale; tune HNSW and filters</td></tr>
+        <tr><td>Elasticsearch / OpenSearch</td><td>You already have a search cluster; need keyword + vector (hybrid) search and rich filters</td><td>Cluster operations; licence and version differences</td></tr>
+        <tr><td>Redis</td><td>Low latency, moderate size, and Redis is already in your stack (also semantic caching)</td><td>Memory cost; persistence settings</td></tr>
+        <tr><td>MongoDB Atlas</td><td>Your documents already live in MongoDB</td><td>Atlas-only vector search</td></tr>
+        <tr><td>Qdrant · Milvus · Weaviate</td><td>Dedicated engine: hundreds of millions of vectors, high QPS, advanced filtering</td><td>Another system to run, secure and back up</td></tr>
+        <tr><td>Pinecone</td><td>Fully managed, no operations</td><td>Data leaves your network; per-usage pricing</td></tr>
+        <tr><td>Azure AI Search · Bedrock Knowledge Bases · S3 Vectors</td><td>All-in on one cloud; managed ingestion and IAM integration</td><td>Cloud lock-in; less control over chunking and ranking</td></tr>
+        <tr><td><code>SimpleVectorStore</code></td><td>Unit tests, demos, a few thousand documents in memory</td><td>Not for production: no persistence guarantees, linear search</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>The questions to ask</h4><p>How many vectors in two years? Queries per second at peak? Do filters need to be fast and selective? Is hybrid keyword search needed? Where must the data reside? Who is on call for it?</p></div>
+    <div class="card"><h4>Keep the source of truth elsewhere</h4><p>A vector store is a derived index, like a search index. Keep original documents and metadata in their system of record so any index can be rebuilt from scratch, with a new model or a new store.</p></div>
+    <div class="card"><h4>Say it in the interview</h4><p>"I'd start with pgvector because we already run PostgreSQL and it keeps vectors next to the data with one security model. If we need hybrid search or outgrow it, the <code>VectorStore</code> abstraction lets us move to Elasticsearch or Qdrant with a re-index, not a rewrite."</p></div>
+  </div>
+</section>

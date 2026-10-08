@@ -1,0 +1,37 @@
+<section class="slide" data-sec="Agentic patterns" data-title="When to build an agent, and how to contain it">
+  <h2>Build an agent only when the path is unknowable, and fence it in when you do</h2>
+  <p class="dek">An agent trades predictability for flexibility. That trade is worth it for investigation-style tasks: diagnosing why an order is stuck across five systems, researching a supplier, triaging an incident. It is a poor trade for anything you can already describe as steps. When you do build one, the controls matter more than the prompt.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Four questions before building an agent</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Complexity</dt><dd>Is the task multi-step and impossible to specify in advance? If you can write the flowchart, write a workflow.</dd>
+        <dt>Value</dt><dd>Does the outcome justify several times the cost and latency of a workflow?</dd>
+        <dt>Capability</dt><dd>Has a model shown, on your evaluation tasks, that it can do this reliably?</dd>
+        <dt>Cost of error</dt><dd>Can mistakes be caught before they reach a customer or a ledger: review, tests, dry-runs, rollback?</dd>
+      </dl>
+      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px">A "no" to any of them means a simpler design: a workflow, a single call, or plain code.</p>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Control</th><th>In a Spring AI agent</th></tr></thead>
+        <tbody>
+          <tr><td>Step and cost budget</td><td><code>spring.ai.tools.limits.max-total-tool-calls</code>; a token budget checked in an advisor; a wall-clock timeout on the request</td></tr>
+          <tr><td>Least privilege</td><td>Read-only tools by default; write tools per role; MCP tool filters</td></tr>
+          <tr><td>Human in the loop</td><td>Write tools create pending actions; a person approves</td></tr>
+          <tr><td>Dry-run mode</td><td>Tools that report what they <i>would</i> do; promote to live after review</td></tr>
+          <tr><td>Observability</td><td>A trace per run: every model call and <code>execute_tool</code> span, with token usage</td></tr>
+          <tr><td>Evaluation</td><td>A task suite with expected end states, run before every prompt, tool or model change</td></tr>
+          <tr><td>Kill switch</td><td>A feature flag that turns the agent off without a deployment</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>A safe first agent</h4><p>An internal "why is this order stuck?" investigator: read-only tools over order, payment, warehouse and carrier systems, used by support staff who read its findings before acting. High value, contained risk.</p></div>
+    <div class="card"><h4>A risky first agent</h4><p>A customer-facing agent that can issue refunds and change addresses autonomously. Same technology, far higher cost of error; build the workflow version first.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I start with workflows because they are testable. I reach for an agent only for genuinely open-ended tasks, and then I bound it: tool and token limits, read-only by default, human approval for side effects, tracing, and an evaluation suite."</div>
+  </div>
+</section>

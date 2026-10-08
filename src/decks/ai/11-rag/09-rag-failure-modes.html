@@ -1,0 +1,28 @@
+<section class="slide" data-sec="RAG" data-title="RAG failure modes">
+  <h2>When a RAG answer is wrong, find which stage failed before changing anything</h2>
+  <p class="dek">A wrong answer has one of three causes: the right passage was not in the store, it was in the store but not retrieved, or it was retrieved but the model did not use it properly. Log the retrieved chunk ids and scores with every answer, and the first diagnostic question becomes a lookup instead of a guess.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>"I don't know" for a documented answer</td><td>Document never ingested, failed parsing, or filtered out by ACL metadata</td><td>Ingestion metrics per source; search the store for the passage directly</td></tr>
+        <tr><td>Right document, wrong passage</td><td>Chunks too large or split mid-topic</td><td>Structure-aware chunking; smaller chunks with parent context</td></tr>
+        <tr><td>Misses codes, SKUs, names</td><td>Pure vector search</td><td>Hybrid search with keyword retrieval</td></tr>
+        <tr><td>Follow-up questions fail ("and for sofas?")</td><td>Query searched without conversation history</td><td><code>CompressionQueryTransformer</code></td></tr>
+        <tr><td>Answers from an outdated policy</td><td>Old chunks never deleted; several versions retrieved</td><td>Idempotent ingestion by source id; version metadata; filter on status</td></tr>
+        <tr><td>Confident answer not in the sources</td><td>Weak grounding instruction; irrelevant chunks in context</td><td>Citation contract; higher threshold; fact-checking evaluation</td></tr>
+        <tr><td>Contradictory answer</td><td>Two sources disagree</td><td>Prefer newest by date metadata; tell the model which source wins; fix the content</td></tr>
+        <tr><td>Another team's or tenant's content quoted</td><td>Missing or stale access filter</td><td>Filter from the principal on every search; ACL sync; isolation test</td></tr>
+        <tr><td>Slow answers</td><td>Too many stages, chunks or tokens</td><td>Fewer chunks, a smaller model for transforms, streaming, caching</td></tr>
+        <tr><td>Quality drops after a "small" change</td><td>No regression testing</td><td>Golden set in CI with thresholds</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Retrieval is usually the problem</h4><p>In most RAG systems, the majority of bad answers trace back to retrieval and ingestion, not the model. Teams that swap models first spend money without fixing anything.</p></div>
+    <div class="card"><h4>Make the evidence visible</h4><p>Return the sources with every answer and record them with the conversation. A support agent who can click the cited passage fixes trust problems faster than any prompt change.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I debug RAG stage by stage: was it ingested, was it retrieved, was it used. Each stage has its own metric, recall at K for retrieval and faithfulness for generation, so I change the stage that is failing, not the model."</div>
+  </div>
+</section>

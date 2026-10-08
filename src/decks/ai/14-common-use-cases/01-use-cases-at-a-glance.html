@@ -1,0 +1,23 @@
+<section class="slide" data-sec="Common use cases" data-title="Common use cases at a glance">
+  <h2>Five common use cases, and the building blocks each one needs</h2>
+  <p class="dek">Most LLM features in enterprise applications are one of a handful of shapes. Recognising the shape tells you which building blocks you need, which model tier is enough, and which risk to design against first. The next five slides build each one with Spring AI.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Use case</th><th>Building blocks</th><th>Model tier</th><th>First risk to design for</th><th>Measure</th></tr></thead>
+      <tbody>
+        <tr><td><a data-deck="ai" data-slide="Customer support chatbot">Support chatbot</a></td><td>Memory, RAG, tools, streaming, escalation</td><td>Small to mid; frontier for hard cases</td><td>Invented policies; actions for the wrong customer</td><td>Resolution rate, escalation rate, CSAT</td></tr>
+        <tr><td><a data-deck="ai" data-slide="Document summarisation">Document summarisation</a></td><td>Splitting, map-reduce, structured output</td><td>Small for map, mid for reduce</td><td>Omitted key facts; summaries that add claims</td><td>Coverage of key facts, faithfulness</td></tr>
+        <tr><td><a data-deck="ai" data-slide="Semantic search">Semantic search</a></td><td>Embeddings, vector store, filters, hybrid</td><td>Embedding model only</td><td>Missing exact matches; stale index</td><td>Recall@K, click-through, zero-result rate</td></tr>
+        <tr><td><a data-deck="ai" data-slide="Code generation and review assistant">Code generation and review</a></td><td>Structured output, repository context, CI checks</td><td>Frontier or code-specialised</td><td>Insecure or non-compiling code accepted</td><td>Acceptance rate, build pass rate, defects</td></tr>
+        <tr><td><a data-deck="ai" data-slide="Sentiment and classification at scale">Sentiment and classification</a></td><td>Enums, batching, embeddings or small model</td><td>Smallest that passes</td><td>Silent drift in label quality</td><td>Accuracy on a labelled sample, per class</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Start where the data is clean</h4><p>Summarisation and classification over existing text need no tools, no memory and no customer exposure: ideal first projects that build the team's evaluation and operations habits.</p></div>
+    <div class="card"><h4>Customer-facing comes later</h4><p>A support chatbot touches every risk at once. Ship it after you can measure retrieval quality, enforce tool permissions and escalate reliably.</p></div>
+    <div class="card"><h4>Every use case needs a baseline</h4><p>Before the model: what does keyword search, a rules engine or the current manual process achieve? The LLM feature has to beat it on your metric, not on a demo.</p></div>
+  </div>
+</section>

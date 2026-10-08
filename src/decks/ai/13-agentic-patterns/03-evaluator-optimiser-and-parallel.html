@@ -1,0 +1,102 @@
+<section class="slide" data-sec="Agentic patterns" data-title="Evaluator–optimiser and parallel calls">
+  <h2>Let one call critique another, and run independent calls at the same time</h2>
+  <p class="dek">The evaluator–optimiser pattern pairs a generator with a reviewer that checks the draft against explicit criteria and returns structured feedback; the generator revises until the review passes or a round limit is hit. Parallelisation sends independent calls at once, so ten section summaries take as long as the slowest one. Java 21's virtual threads make the parallel part ordinary blocking code.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProductCopyStudio.java</div>
+<pre><code class="language-java">package com.acme.ai.agents;
+
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class ProductCopyStudio {
+
+    record Review(boolean approved, List&lt;String&gt; issues) {}
+
+    record Result(String copy, int rounds, boolean approved) {}
+
+    private static final int MAX_ROUNDS = 3;
+
+    private final ChatClient writer;
+    private final ChatClient reviewer;
+
+    ProductCopyStudio(ChatClient.Builder builder) {
+        this.writer = builder.clone()
+                .defaultSystem("You write product descriptions for Acme Retail. 60–90 words.")
+                .build();
+        this.reviewer = builder.clone()
+                .defaultSystem("""
+                        You review product copy. Approve only if ALL hold:
+                        1. Every claim is supported by the product facts.
+                        2. No superlatives ("best", "revolutionary").
+                        3. 60–90 words, mentions the warranty.
+                        List each failed rule as an issue.""")
+                .build();
+    }
+
+    /** Evaluator–optimiser: draft, review, revise; bounded. */
+    Result write(String productFacts) {
+        String copy = writer.prompt().user("Product facts:\n" + productFacts).call().content();
+        for (int round = 1; round &lt;= MAX_ROUNDS; round++) {
+            Review review = reviewer.prompt()
+                    .user("Facts:\n" + productFacts + "\n\nCopy:\n" + copy)
+                    .call()
+                    .entity(Review.class);
+            if (review.approved()) {
+                return new Result(copy, round, true);
+            }
+            copy = writer.prompt()
+                    .user("Product facts:\n" + productFacts + "\n\nRevise this copy:\n" + copy
+                            + "\n\nFix these issues:\n- " + String.join("\n- ", review.issues()))
+                    .call()
+                    .content();
+        }
+        return new Result(copy, MAX_ROUNDS, false);    // a person finishes it
+    }
+
+    /** Parallelisation: one virtual thread per product, results in input order. */
+    List&lt;Result&gt; writeAll(List&lt;String&gt; productFacts) throws InterruptedException {
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            List&lt;Future&lt;Result&gt;&gt; futures = productFacts.stream()
+                    .map(facts -&gt; pool.submit(() -&gt; write(facts)))
+                    .toList();
+            return futures.stream().map(ProductCopyStudio::join).toList();
+        }
+    }
+
+    private static Result join(Future&lt;Result&gt; future) {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException(e.getCause());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note tip"><span class="lbl">Make the criteria checkable</span>"Is it good?" produces vague reviews. Numbered rules with yes/no outcomes produce issues the writer can act on, and give you a pass rate to track. Rules a program can check, such as word count, should be checked in code instead.</div>
+      <div class="note warn"><span class="lbl">Bound everything</span>A round limit, a fallback to a person, and a provider rate limit in mind: 50 products × up to 7 calls each is 350 calls in a burst. Cap concurrency (a <code>Semaphore</code>, or Spring's <code>@ConcurrencyLimit</code>) to stay under your quota.</div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Pattern</th><th>Good for</th></tr></thead>
+          <tbody>
+            <tr><td>Evaluator–optimiser</td><td>Marketing copy, translations, code generation with tests as the evaluator, policy-compliant replies</td></tr>
+            <tr><td>Sectioning (parallel)</td><td>Summarising each chapter of a long document, then merging</td></tr>
+            <tr><td>Voting (parallel)</td><td>Running a sensitive classifier three times and taking the majority</td></tr>
+            <tr><td>Different reviewer model</td><td>Avoids a model approving its own blind spots</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

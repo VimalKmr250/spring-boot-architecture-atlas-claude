@@ -288,14 +288,15 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
 .xrefs a:hover{color:var(--accent);border-color:var(--accent)}
 
 .t-abbr{display:none}
-/* Eight tabs need about 1,525px with every label and the brand's subtitle, and about 1,365px
-   without the subtitle, so the header sheds detail in steps as the window narrows. Each step
-   leaves room for a desktop scrollbar, which media queries count as part of the width. Below
-   the last step the tab strip scrolls sideways rather than overflowing. */
-@media (max-width:1545px){
+/* Nine tabs need about 1,550px with every label and the brand's subtitle, and about 1,405px
+   without the subtitle (measured with the widest slide counter, "105 / 105"), so the header
+   sheds detail in steps as the window narrows. Each step leaves room for a desktop scrollbar,
+   which media queries count as part of the width. Below the last step the tab strip scrolls
+   sideways rather than overflowing. */
+@media (max-width:1575px){
   .brand span{display:none}
 }
-@media (max-width:1380px){
+@media (max-width:1430px){
   .t-full{display:none}
   .t-abbr{display:inline}
   .tabs button{padding:6px 10px}

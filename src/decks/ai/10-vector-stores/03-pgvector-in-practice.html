@@ -1,0 +1,79 @@
+<section class="slide" data-sec="Vector stores" data-title="PgVector in practice">
+  <h2>PgVector: vectors in the PostgreSQL you already run</h2>
+  <p class="dek">For most enterprises the first vector store should be the database they already operate, back up and secure. The <code>pgvector</code> extension adds a <code>vector</code> column type and HNSW indexes to PostgreSQL; Spring AI's PgVector starter maps <code>VectorStore</code> onto one table. Let the starter create the schema on a laptop; in production, own it with Flyway like every other table.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">pom.xml (excerpt)</div>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.ai&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-ai-starter-vector-store-pgvector&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;   &lt;!-- starts compose.yaml with the app in development --&gt;
+  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-boot-docker-compose&lt;/artifactId&gt;
+  &lt;optional&gt;true&lt;/optional&gt;
+&lt;/dependency&gt;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">compose.yaml</div>
+<pre><code class="language-yaml">services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: acme
+      POSTGRES_USER: acme
+      POSTGRES_PASSWORD: secret
+    ports: ["5432"]
+    labels:
+      # the image is not called "postgres", so tell Boot what it is
+      org.springframework.boot.service-connection: postgres</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">application.yml</div>
+<pre><code class="language-yaml">spring:
+  ai:
+    vectorstore:
+      pgvector:
+        dimensions: 1536              # must match the embedding model
+        index-type: hnsw              # default
+        distance-type: cosine-distance
+        initialize-schema: false      # Flyway owns it
+        schema-validation: true       # fail fast if the table does not match</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">src/main/resources/db/migration/V7__vector_store.sql</div>
+<pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- the shape Spring AI 2.0.1 creates itself, made explicit
+CREATE TABLE IF NOT EXISTS vector_store (
+    id        uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    content   text,
+    metadata  json,
+    embedding vector(1536)
+);
+
+CREATE INDEX IF NOT EXISTS vector_store_embedding_idx
+    ON vector_store USING hnsw (embedding vector_cosine_ops);
+
+-- serves metadata filters, which run as JSONPath on metadata::jsonb
+CREATE INDEX IF NOT EXISTS vector_store_metadata_idx
+    ON vector_store USING gin ((metadata::jsonb) jsonb_path_ops);</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">A filter as PgVector runs it · Spring AI 2.0.1</div>
+<pre><code class="language-plaintext">tenant == 'acme' &amp;&amp; category in ['lighting','textiles'] &amp;&amp; price &lt;= 80
+→ metadata::jsonb @@ '$."tenant" == "acme" &amp;&amp; ($."category" == "lighting"
+     || $."category" == "textiles") &amp;&amp; $."price" &lt;= 80'::jsonpath</code></pre>
+      </div>
+      <div class="grid2">
+        <div class="card"><h4>When PgVector is enough</h4><p>Up to tens of millions of vectors, transactional updates next to your business data, joins and backups you already understand. Most internal assistants never outgrow it.</p></div>
+        <div class="card"><h4>When to look further</h4><p>Hundreds of millions of vectors, very high query rates, built-in hybrid keyword search, or a team that does not run PostgreSQL. See <a data-deck="ai" data-slide="Choosing a vector store">choosing a store</a>.</p></div>
+      </div>
+    </div>
+  </div>
+</section>

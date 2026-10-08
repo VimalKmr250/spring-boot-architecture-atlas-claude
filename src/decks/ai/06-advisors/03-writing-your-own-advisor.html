@@ -1,0 +1,96 @@
+<section class="slide" data-sec="Advisors" data-title="Writing your own advisor">
+  <h2>A custom advisor: redact personal data before anything else sees it</h2>
+  <p class="dek">Implement <code>BaseAdvisor</code> when you only need to change the request on the way in or the response on the way out: it supplies both the blocking and the streaming paths from your <code>before</code> and <code>after</code>. Implement <code>CallAdvisor</code> and <code>StreamAdvisor</code> directly when you need to wrap the call, for example to time it, retry it, or skip the model entirely.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">PiiRedactionAdvisor.java</div>
+<pre><code class="language-java">package com.acme.ai.advisors;
+
+import java.util.regex.Pattern;
+import org.springframework.ai.chat.client.ChatClientRequest;
+import org.springframework.ai.chat.client.ChatClientResponse;
+import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.core.Ordered;
+
+/** Masks e-mail addresses, card numbers and phone numbers in the user's message. */
+public class PiiRedactionAdvisor implements BaseAdvisor {
+
+    public static final String REDACTED_COUNT = "pii.redacted.count";
+
+    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+");
+    private static final Pattern CARD = Pattern.compile("\\b\\d(?:[ -]?\\d){12,18}\\b");
+    private static final Pattern PHONE = Pattern.compile("\\+?\\d[\\d ()-]{7,}\\d");
+
+    @Override
+    public ChatClientRequest before(ChatClientRequest request, AdvisorChain chain) {
+        int[] count = {0};
+        Prompt redacted = request.prompt().augmentUserMessage(user -&gt; user.mutate()
+                .text(redact(user.getText(), count))
+                .build());
+        return request.mutate()
+                .prompt(redacted)
+                .context(REDACTED_COUNT, count[0])     // visible to later advisors
+                .build();
+    }
+
+    @Override
+    public ChatClientResponse after(ChatClientResponse response, AdvisorChain chain) {
+        return response;                               // nothing to undo on the way out
+    }
+
+    /** Before memory (HIGHEST + 200), so raw values are never stored either. */
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 100;
+    }
+
+    static String redact(String text, int[] count) {
+        String out = text;
+        for (var rule : new Object[][] {{CARD, "[CARD]"}, {EMAIL, "[EMAIL]"}, {PHONE, "[PHONE]"}}) {
+            var matcher = ((Pattern) rule[0]).matcher(out);
+            StringBuilder sb = new StringBuilder();
+            while (matcher.find()) {
+                count[0]++;
+                matcher.appendReplacement(sb, (String) rule[1]);
+            }
+            out = matcher.appendTail(sb).toString();
+        }
+        return out;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Register it (excerpt)</div>
+<pre><code class="language-java">ChatClient client = builder
+        .defaultAdvisors(new PiiRedactionAdvisor(),
+                         MessageChatMemoryAdvisor.builder(chatMemory).build())
+        .build();</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">What the model receives · verified on Spring AI 2.0.1 with a stub model</div>
+<pre><code class="language-plaintext">user wrote:  Refund to anna.k@example.com or call +44 20 7946 0958.
+             Card 4111 1111 1111 1111 was charged twice.
+model sees:  Refund to [EMAIL] or call [PHONE].
+             Card [CARD] was charged twice.
+context:     pii.redacted.count = 3</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl">
+          <thead><tr><th>Good uses for a custom advisor</th></tr></thead>
+          <tbody>
+            <tr><td>Redaction and data-classification checks</td></tr>
+            <tr><td>Per-tenant or per-user token budgets: check before, count after</td></tr>
+            <tr><td>A semantic cache: answer from a cache of similar questions, skip the model</td></tr>
+            <tr><td>Adding the user's locale, plan or permissions to the system message</td></tr>
+            <tr><td>Audit records: who asked what, which documents were used</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Regex is a floor, not a ceiling</span>Patterns catch well-formed e-mails and card numbers. Names, addresses and free-text identifiers need a proper PII detection service. Treat this advisor as the place where that service is called, not as the whole solution.</div>
+    </div>
+  </div>
+</section>
