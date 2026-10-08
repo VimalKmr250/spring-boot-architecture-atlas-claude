@@ -1,0 +1,86 @@
+<section class="slide" data-sec="Generics" data-title="Type erasure">
+  <h2>Generics are checked by the compiler and erased from the objects, but not from the declarations</h2>
+  <p class="dek">javac checks every type argument, inserts the casts, then compiles <code>List&lt;String&gt;</code> and <code>List&lt;Integer&gt;</code> to the same <code>ArrayList</code> class. That kept Java 5 binary-compatible with older code. At run time an object does not know its type argument. Fields, method signatures and superclass declarations keep theirs in the class file, which is how Jackson and Spring recover them.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Erasure.java · what is erased, and what survives</div>
+<pre><code class="language-java">import java.lang.reflect.*;
+import java.util.*;
+
+public class Erasure {
+    static List&lt;String&gt; names = new ArrayList&lt;&gt;();               // declarations keep their types
+
+    record Money(long cents) implements Comparable&lt;Money&gt; {
+        @Override public int compareTo(Money o) { return Long.compare(cents, o.cents); }
+    }
+
+    // A "super type token": a subclass records its type argument in the class file.
+    abstract static class TypeRef&lt;T&gt; {
+        final Type type = ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
+    }
+
+    static &lt;T&gt; T[] newArray(Class&lt;T&gt; type, int n) {               // new T[n] does not compile
+        @SuppressWarnings("unchecked")
+        T[] array = (T[]) Array.newInstance(type, n);             // so pass the Class in
+        return array;
+    }
+
+    public static void main(String[] args) throws Exception {
+        List&lt;String&gt; strings = new ArrayList&lt;&gt;();
+        List&lt;Integer&gt; numbers = new ArrayList&lt;&gt;();
+        System.out.println("same class at run time: " + (strings.getClass() == numbers.getClass())
+                + " (" + strings.getClass().getName() + ")");
+
+        Field f = Erasure.class.getDeclaredField("names");
+        System.out.println("field type " + f.getType().getName() + ", generic type " + f.getGenericType());
+
+        Type t = new TypeRef&lt;Map&lt;String, List&lt;Integer&gt;&gt;&gt;() { }.type;
+        System.out.println("captured by the token: " + t);
+
+        for (Method m : Money.class.getDeclaredMethods())
+            if (m.getName().equals("compareTo"))
+                System.out.println("compareTo(" + m.getParameterTypes()[0].getSimpleName() + ") bridge=" + m.isBridge());
+
+        String[] slots = newArray(String.class, 2);
+        System.out.println("array made at run time: " + slots.getClass().getSimpleName() + " length " + slots.length);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Erasure.java</div>
+<pre><code class="language-plaintext">same class at run time: true (java.util.ArrayList)
+field type java.util.List, generic type java.util.List&lt;java.lang.String&gt;
+captured by the token: java.util.Map&lt;java.lang.String, java.util.List&lt;java.lang.Integer&gt;&gt;
+compareTo(Money) bridge=false
+compareTo(Object) bridge=true
+array made at run time: String[] length 2</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Line</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Same class</td><td>One <code>ArrayList</code> class serves every type argument. There is no <code>ArrayList&lt;String&gt;.class</code>.</td></tr>
+            <tr><td>Generic type</td><td>The field's declaration keeps <code>List&lt;String&gt;</code> as a signature attribute, readable by reflection.</td></tr>
+            <tr><td>The token</td><td>An anonymous subclass of <code>TypeRef&lt;…&gt;</code> fixes the argument in its superclass declaration. Jackson's <code>TypeReference</code> and Spring's <code>ParameterizedTypeReference</code> use this trick.</td></tr>
+            <tr><td>Bridge method</td><td><code>compareTo(Money)</code> erases differently from <code>Comparable.compareTo(Object)</code>, so javac adds a synthetic <code>compareTo(Object)</code> that casts and delegates.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Because of erasure, you cannot</th><th>Do this instead</th></tr></thead>
+      <tbody>
+        <tr><td>Write <code>new T()</code> or <code>new T[n]</code></td><td>Pass a <code>Class&lt;T&gt;</code>, a <code>Supplier&lt;T&gt;</code> or an <code>IntFunction&lt;T[]&gt;</code>, as <code>newArray</code> and <code>toArray(String[]::new)</code> do</td></tr>
+        <tr><td>Test <code>o instanceof List&lt;String&gt;</code></td><td>Test <code>instanceof List&lt;?&gt;</code>, then check the elements</td></tr>
+        <tr><td>Overload <code>f(List&lt;String&gt;)</code> and <code>f(List&lt;Integer&gt;)</code></td><td>Give them different names: both erase to <code>f(List)</code>, which is a compile error</td></tr>
+        <tr><td>Use a primitive as a type argument</td><td>Box it, or use <code>IntStream</code>, <code>int[]</code>, or a primitive collection library</td></tr>
+        <tr><td>Catch a generic exception type, or read <code>T</code> in a static context</td><td>Keep type parameters on instances and methods</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

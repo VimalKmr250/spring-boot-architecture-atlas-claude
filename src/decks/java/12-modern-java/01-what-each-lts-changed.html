@@ -1,0 +1,28 @@
+<section class="slide" data-sec="Modern Java" data-title="What each LTS changed">
+  <h2>Java ships every six months, and the LTS releases are the ones codebases actually upgrade between</h2>
+  <p class="dek">Since Java 10 there has been a feature release every March and September, and every two years one of them is a long-term-support release: 11, 17, 21 and 25 after 8. Most teams move from LTS to LTS, so what matters in practice is what changed between two of them. The table groups each step's non-LTS releases with the LTS that follows.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Release</th><th>Language</th><th>Library</th><th>JVM and tools</th></tr></thead>
+      <tbody>
+        <tr><td class="num">8 · 2014 · LTS</td><td>Lambdas, method references, default and static interface methods</td><td>Streams, <code>Optional</code>, <code>java.time</code>, <code>CompletableFuture</code></td><td>Metaspace replaces PermGen; <code>HashMap</code> tree bins</td></tr>
+        <tr><td class="num">9, 10</td><td>Private interface methods; <code>var</code> for locals (10)</td><td><code>List.of</code>, <code>Set.of</code>, <code>Map.of</code>; <code>copyOf</code> (10); <code>VarHandle</code>; Flow; <code>StackWalker</code></td><td>Modules (JPMS); JShell; G1 by default; compact strings; container awareness (10)</td></tr>
+        <tr><td class="num">11 · 2018 · LTS</td><td><code>var</code> in lambda parameters</td><td><code>HttpClient</code>; <code>String.isBlank</code>, <code>lines</code>, <code>strip</code>, <code>repeat</code>; <code>Files.readString</code></td><td>Run a single source file; JFR open-sourced; Java EE and CORBA modules removed</td></tr>
+        <tr><td class="num">12 to 16</td><td>Switch expressions (14), text blocks (15), records and <code>instanceof</code> patterns (16)</td><td><code>Collectors.teeing</code> (12), <code>Stream.toList</code> (16)</td><td>Helpful NPE messages (14); ZGC and Shenandoah production-ready (15); Nashorn removed (15)</td></tr>
+        <tr><td class="num">17 · 2021 · LTS</td><td>Sealed classes</td><td><code>RandomGenerator</code>; context-specific deserialization filters</td><td>JDK internals strongly encapsulated; the Security Manager deprecated</td></tr>
+        <tr><td class="num">18 to 20</td><td></td><td><code>ExecutorService.close</code>, <code>Future.state</code>, <code>HashMap.newHashMap</code> (19)</td><td>UTF-8 by default and a simple web server (18); finalization deprecated (18); <code>Thread.stop</code> disabled (20)</td></tr>
+        <tr><td class="num">21 · 2023 · LTS</td><td>Pattern matching for <code>switch</code>, record patterns</td><td>Sequenced collections; <code>Math.clamp</code>; <code>StringBuilder.repeat</code></td><td>Virtual threads; generational ZGC</td></tr>
+        <tr><td class="num">22 to 24</td><td>Unnamed variables <code>_</code> (22); Markdown doc comments (23)</td><td>Foreign Function and Memory API (22); Stream Gatherers, Class-File API (24)</td><td>Multi-file source programs (22); ZGC generational only, <code>synchronized</code> no longer pins (24)</td></tr>
+        <tr><td class="num">25 · 2025 · LTS</td><td>Compact source files and instance <code>main</code>, module imports, flexible constructor bodies</td><td>Scoped values; key derivation API; <code>java.lang.IO</code></td><td>Compact object headers; generational Shenandoah; AOT method profiling; the 32-bit x86 port removed</td></tr>
+        <tr><td class="num">26, 27</td><td colspan="3">Feature releases, March and September 2026. Every program in this tab was also run on JDK 26, with the same results apart from timings and counts that vary from run to run.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">The interview version</span>"What changed since 8 that you use?" Name one thing per LTS and why it mattered: <code>var</code> and <code>HttpClient</code> by 11; records, text blocks and sealed types by 17; virtual threads and pattern-matching <code>switch</code> by 21; scoped values and compact headers in 25. Then say which one your last project upgraded to, and what broke.</div>
+    <div class="note warn"><span class="lbl">What breaks on upgrade</span>Reflection into JDK internals: 16 and 17 closed them, so old libraries fail with <code>InaccessibleObjectException</code> until updated. Removed modules: <code>javax.xml.bind</code> and friends went in 11. And the class file version: libraries built for a newer JDK will not load on an older one.</div>
+    <div class="note"><span class="lbl">Preview features</span>A feature can preview for several releases before it is final, and needs <code>--enable-preview</code> at compile and run time until then. Structured concurrency is still in preview in 25. This tab uses only final features, and tags each with its release.</div>
+  </div>
+</section>

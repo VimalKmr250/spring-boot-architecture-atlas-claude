@@ -1,0 +1,131 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Deadlock, livelock and thread dumps">
+  <h2>A deadlock is a cycle of threads each holding the lock the next one needs, and the JVM can find it</h2>
+  <p class="dek">Thread 1 holds account A's lock and waits for B's; thread 2 holds B's and waits for A's. Neither can move, and nothing will ever time out. A deadlock needs four conditions at once: exclusive locks, holding one while waiting for another, no way to take a lock away, and a cycle. Breaking any one prevents it. In practice you break the cycle with a global lock order.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Deadlock.java · a guaranteed deadlock, detected, then the ordered fix</div>
+<pre><code class="language-java">import java.lang.management.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class Deadlock {
+    static final class Account {
+        final String id;
+        final ReentrantLock lock = new ReentrantLock();
+        long balance = 100;
+        Account(String id) { this.id = id; }
+    }
+
+    // Locks in argument order: transfer(a, b) and transfer(b, a) can deadlock.
+    static void transferUnordered(Account from, Account to, CyclicBarrier bothHoldFirst) throws Exception {
+        from.lock.lock();
+        try {
+            bothHoldFirst.await();                         // make the bad interleaving certain
+            to.lock.lock();
+            try { from.balance -= 10; to.balance += 10; } finally { to.lock.unlock(); }
+        } finally { from.lock.unlock(); }
+    }
+
+    // Always lock in one global order, here by id: no cycle is possible.
+    static void transferOrdered(Account from, Account to) {
+        Account first = from.id.compareTo(to.id) &lt; 0 ? from : to;
+        Account second = first == from ? to : from;
+        first.lock.lock();
+        try {
+            second.lock.lock();
+            try { from.balance -= 10; to.balance += 10; } finally { second.lock.unlock(); }
+        } finally { first.lock.unlock(); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Account a = new Account("ACC-A"), b = new Account("ACC-B");
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        Thread t1 = Thread.ofPlatform().name("transfer-A-to-B").daemon().start(() -&gt; {
+            try { transferUnordered(a, b, barrier); } catch (Exception e) { }
+        });
+        Thread t2 = Thread.ofPlatform().name("transfer-B-to-A").daemon().start(() -&gt; {
+            try { transferUnordered(b, a, barrier); } catch (Exception e) { }
+        });
+
+        ThreadMXBean mx = ManagementFactory.getThreadMXBean();
+        long[] ids;
+        while ((ids = mx.findDeadlockedThreads()) == null) Thread.sleep(10);
+        for (ThreadInfo info : mx.getThreadInfo(ids)) {
+            String lock = info.getLockName().replaceAll("@[0-9a-f]+", "");
+            System.out.println(info.getThreadName() + " is " + info.getThreadState() + " on " + lock
+                    + ", held by " + info.getLockOwnerName());
+        }
+        System.out.println("both still alive: " + (t1.isAlive() &amp;&amp; t2.isAlive()));
+
+        Account c = new Account("ACC-C"), d = new Account("ACC-D");
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; 10_000; i++) {
+                pool.submit(() -&gt; transferOrdered(c, d));
+                pool.submit(() -&gt; transferOrdered(d, c));
+            }
+        }
+        System.out.println("ordered locking: 20,000 opposite transfers finished, balances " + c.balance + " and " + d.balance);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Deadlock.java</div>
+<pre><code class="language-plaintext">transfer-A-to-B is WAITING on java.util.concurrent.locks.ReentrantLock$NonfairSync, held by transfer-B-to-A
+transfer-B-to-A is WAITING on java.util.concurrent.locks.ReentrantLock$NonfairSync, held by transfer-A-to-B
+both still alive: true
+ordered locking: 20,000 opposite transfers finished, balances 100 and 100</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Stuck.java · the same deadlock with synchronized, left running</div>
+<pre><code class="language-java">public class Stuck {
+    static final Object ACC_A = new Object(), ACC_B = new Object();
+    public static void main(String[] args) throws Exception {
+        Thread t1 = new Thread(() -&gt; { synchronized (ACC_A) { pause(); synchronized (ACC_B) { } } }, "transfer-A-to-B");
+        Thread t2 = new Thread(() -&gt; { synchronized (ACC_B) { pause(); synchronized (ACC_A) { } } }, "transfer-B-to-A");
+        t1.start(); t2.start(); t1.join();
+    }
+    static void pause() { try { Thread.sleep(200); } catch (InterruptedException e) { } }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">jstack &lt;pid&gt; on the running Stuck · the deadlock section, JDK 25</div>
+<pre><code class="language-plaintext">Found one Java-level deadlock:
+=============================
+"transfer-A-to-B":
+  waiting to lock monitor 0x000001ff55dce890 (object 0x0000000714c1eeb8, a java.lang.Object),
+  which is held by "transfer-B-to-A"
+
+"transfer-B-to-A":
+  waiting to lock monitor 0x000001ff55dcdfa0 (object 0x0000000714c1eea8, a java.lang.Object),
+  which is held by "transfer-A-to-B"
+
+Java stack information for the threads listed above:
+===================================================
+"transfer-A-to-B":
+	at Stuck.lambda$main$0(Stuck.java:4)
+	- waiting to lock &lt;0x0000000714c1eeb8&gt; (a java.lang.Object)
+	- locked &lt;0x0000000714c1eea8&gt; (a java.lang.Object)
+	at Stuck$$Lambda/0x000000000b040210.run(Unknown Source)
+	at java.lang.Thread.runWith(java.base@25.0.2/Thread.java:1487)
+	at java.lang.Thread.run(java.base@25.0.2/Thread.java:1474)
+"transfer-B-to-A":
+	at Stuck.lambda$main$1(Stuck.java:5)
+	- waiting to lock &lt;0x0000000714c1eea8&gt; (a java.lang.Object)
+	- locked &lt;0x0000000714c1eeb8&gt; (a java.lang.Object)
+	at Stuck$$Lambda/0x000000000b040438.run(Unknown Source)
+	at java.lang.Thread.runWith(java.base@25.0.2/Thread.java:1487)
+	at java.lang.Thread.run(java.base@25.0.2/Thread.java:1474)
+
+Found 1 deadlock.</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Preventing it</h4><p><b>Lock order:</b> always acquire in one global order, by id as in <code>transferOrdered</code>. <b>Timeouts:</b> <code>tryLock(timeout)</code>, release everything and retry. <b>Fewer locks:</b> one lock per aggregate, or a single-threaded owner fed through a queue. The database version, row locks taken in different orders, has the same cure.</p></div>
+    <div class="card"><h4>Finding it</h4><p><code>jcmd &lt;pid&gt; Thread.print</code> or <code>jstack &lt;pid&gt;</code> prints "Found one Java-level deadlock" with every thread in the cycle. <code>ThreadMXBean.findDeadlockedThreads()</code> sees <code>ReentrantLock</code> cycles too, which is why the demo above found one with no <code>synchronized</code> in it. Take three dumps a few seconds apart for anything slow.</p></div>
+    <div class="card"><h4>Its relatives</h4><p><b>Livelock:</b> threads keep reacting to each other and get nowhere, such as two <code>tryLock</code> loops backing off in step; add random back-off. <b>Starvation:</b> a thread never gets the lock or the CPU. <b>Pool starvation:</b> tasks in a bounded pool block on other tasks queued in the same pool, and every thread waits.</p></div>
+  </div>
+</section>

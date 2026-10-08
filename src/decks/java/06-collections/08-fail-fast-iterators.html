@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Collections" data-title="Fail-fast iterators">
+  <h2>Change a collection while iterating it and the iterator throws, except when it silently skips</h2>
+  <p class="dek">Every non-concurrent collection counts its structural changes in a field called <code>modCount</code>. An iterator remembers the count it started with and checks it on each <code>next()</code>; a mismatch throws <code>ConcurrentModificationException</code>. The name misleads: one thread is enough. And the check is best-effort, as the second case below shows.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FailFast.java · what throws, what silently skips, and the safe ways</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+
+public class FailFast {
+    public static void main(String[] args) {
+        List&lt;String&gt; basket = new ArrayList&lt;&gt;(List.of("tea", "milk", "sugar", "eggs"));
+        try {
+            for (String item : basket)
+                if (item.equals("milk")) basket.remove(item);           // structural change mid-loop
+        } catch (ConcurrentModificationException e) {
+            System.out.println("remove(\"milk\") in for-each: ConcurrentModificationException");
+        }
+
+        List&lt;String&gt; quiet = new ArrayList&lt;&gt;(List.of("tea", "milk", "sugar", "eggs"));
+        List&lt;String&gt; visited = new ArrayList&lt;&gt;();
+        for (String item : quiet) {
+            visited.add(item);
+            if (item.equals("sugar")) quiet.remove(item);              // the second-to-last element
+        }
+        System.out.println("remove(\"sugar\"): no exception, visited " + visited + ", left " + quiet);
+
+        List&lt;String&gt; viaIterator = new ArrayList&lt;&gt;(List.of("tea", "milk", "sugar", "eggs"));
+        for (Iterator&lt;String&gt; it = viaIterator.iterator(); it.hasNext(); )
+            if (it.next().startsWith("s")) it.remove();                // the iterator's own remove
+        List&lt;String&gt; viaRemoveIf = new ArrayList&lt;&gt;(List.of("tea", "milk", "sugar", "eggs"));
+        viaRemoveIf.removeIf(s -&gt; s.length() == 3);
+        System.out.println("Iterator.remove " + viaIterator + ", removeIf " + viaRemoveIf);
+
+        ListIterator&lt;String&gt; li = viaIterator.listIterator();
+        while (li.hasNext()) {
+            String s = li.next();
+            li.set(s.toUpperCase());
+            if (s.equals("tea")) li.add("lemon");                      // insert after the current one
+        }
+        System.out.println("ListIterator set/add " + viaIterator);
+
+        Map&lt;String, Integer&gt; stock = new HashMap&lt;&gt;(Map.of("tea", 0, "milk", 4, "eggs", 0));
+        try {
+            for (String sku : stock.keySet()) if (stock.get(sku) == 0) stock.remove(sku);
+        } catch (ConcurrentModificationException e) {
+            System.out.println("HashMap remove during keySet loop: ConcurrentModificationException");
+        }
+        stock.entrySet().removeIf(e -&gt; e.getValue() == 0);
+        System.out.println("entrySet().removeIf " + stock);
+
+        Map&lt;String, Integer&gt; live = new ConcurrentHashMap&lt;&gt;(Map.of("a", 1, "b", 2));
+        for (String key : live.keySet()) live.put(key + key, 0);       // weakly consistent: no exception
+        System.out.println("ConcurrentHashMap put during iteration: size " + live.size());
+
+        List&lt;String&gt; listeners = new CopyOnWriteArrayList&lt;&gt;(List.of("audit", "email"));
+        int seen = 0;
+        for (String l : listeners) { listeners.add(l + "-copy"); seen++; }   // iterates a snapshot
+        System.out.println("CopyOnWriteArrayList: iterated " + seen + ", now holds " + listeners.size());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · FailFast.java</div>
+<pre><code class="language-plaintext">remove("milk") in for-each: ConcurrentModificationException
+remove("sugar"): no exception, visited [tea, milk, sugar], left [tea, milk, eggs]
+Iterator.remove [tea, milk, eggs], removeIf [milk, sugar, eggs]
+ListIterator set/add [TEA, lemon, MILK, EGGS]
+HashMap remove during keySet loop: ConcurrentModificationException
+entrySet().removeIf {milk=4}
+ConcurrentHashMap put during iteration: size 4
+CopyOnWriteArrayList: iterated 2, now holds 4</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl">Why "sugar" did not throw</span>For-each calls <code>hasNext()</code> before every <code>next()</code>, and <code>ArrayList.hasNext()</code> is just <code>cursor != size</code>. Removing the second-to-last element makes <code>size</code> 3 just as <code>cursor</code> reaches 3, so the loop ends. <code>next()</code>, which does the check, is never called, and <code>eggs</code> is never visited. No exception, wrong result.</div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>To change while iterating</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Remove matching elements</td><td><code>removeIf</code> <span class="tag a">8</span>, or <code>Iterator.remove()</code></td></tr>
+            <tr><td>Replace or insert in a list</td><td><code>ListIterator.set</code>, <code>add</code>; or <code>replaceAll</code></td></tr>
+            <tr><td>Remove map entries</td><td><code>entrySet().removeIf</code>, or <code>computeIfPresent</code> returning <code>null</code></td></tr>
+            <tr><td>Add to what you iterate</td><td>Collect into a new list, then <code>addAll</code> after the loop</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">Fail-fast is not a safety net</span>The Javadoc calls the exception best-effort: use it to find bugs, never to rely on for correctness. Between threads a plain collection may not throw at all, and give wrong data or corrupt itself instead. That needs a concurrent collection or a lock, not an iterator check.</div>
+    <div class="note tip"><span class="lbl">Weakly consistent and snapshot iterators</span><code>ConcurrentHashMap</code>'s iterators never throw and may or may not show changes made during the loop: it grew to 4 entries while being iterated. <code>CopyOnWriteArrayList</code> iterates the array as it was when the loop started, so it saw 2 elements and the list ended with 4.</div>
+  </div>
+</section>

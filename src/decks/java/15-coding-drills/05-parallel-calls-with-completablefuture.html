@@ -1,0 +1,78 @@
+<section class="slide" data-sec="Coding drills" data-title="Parallel calls with CompletableFuture">
+  <h2>Drill: "a product page needs price, stock and reviews; call them in parallel, within 300 ms"</h2>
+  <p class="dek">The question is really about failure. Price is required: without it the page cannot render, so a late price is an error. Stock and reviews are optional: a failure or a timeout should give a fallback, not a broken page. The answer starts all three calls at once, gives each its own policy, and combines them, so the page takes as long as its slowest permitted wait.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ParallelCalls.java · three services, three failure policies, one deadline</div>
+<pre><code class="language-java">import java.util.concurrent.*;
+
+public class ParallelCalls {
+    record ProductPage(long priceCents, int stock, String reviews) { }
+
+    static final ExecutorService IO = Executors.newFixedThreadPool(8, Thread.ofPlatform().name("io-", 1).factory());
+
+    static &lt;T&gt; CompletableFuture&lt;T&gt; call(String name, long ms, T result, boolean fails) {
+        return CompletableFuture.supplyAsync(() -&gt; {
+            try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            if (fails) throw new IllegalStateException(name + " is down");
+            return result;
+        }, IO);
+    }
+
+    static ProductPage load(boolean stockDown) {
+        CompletableFuture&lt;Long&gt; price = call("pricing", 150, 1299L, false)
+                .orTimeout(300, TimeUnit.MILLISECONDS);                       // required: fail if late
+        CompletableFuture&lt;Integer&gt; stock = call("inventory", 100, 7, stockDown)
+                .exceptionally(ex -&gt; -1);                                     // optional: -1 means unknown
+        CompletableFuture&lt;String&gt; reviews = call("reviews", 800, "4.6 stars", false)
+                .completeOnTimeout("reviews unavailable", 300, TimeUnit.MILLISECONDS);   // optional: default
+        return price.thenCombine(stock, (p, s) -&gt; new long[] {p, s})
+                .thenCombine(reviews, (ps, r) -&gt; new ProductPage(ps[0], (int) ps[1], r))
+                .join();
+    }
+
+    public static void main(String[] args) {
+        load(false);                                                        // warm up the pool
+        for (boolean stockDown : new boolean[] {false, true}) {
+            long t0 = System.nanoTime();
+            ProductPage page = load(stockDown);
+            long ms = Math.round((System.nanoTime() - t0) / 1e8) * 100;
+            System.out.println(page + " in ~" + ms + " ms" + (stockDown ? " (inventory failed)" : ""));
+        }
+        try {
+            call("pricing", 600, 1L, false).orTimeout(300, TimeUnit.MILLISECONDS).join();
+        } catch (CompletionException e) {
+            System.out.println("a required call past its deadline: " + e.getCause().getClass().getSimpleName());
+        }
+        IO.shutdownNow();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ParallelCalls.java · times rounded to 100 ms</div>
+<pre><code class="language-plaintext">ProductPage[priceCents=1299, stock=7, reviews=reviews unavailable] in ~300 ms
+ProductPage[priceCents=1299, stock=-1, reviews=reviews unavailable] in ~300 ms (inventory failed)
+a required call past its deadline: TimeoutException</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Call</th><th>Policy</th><th>Method</th></tr></thead>
+          <tbody>
+            <tr><td>Pricing, 150 ms</td><td>Required: fail the page if it is late</td><td><code>orTimeout(300 ms)</code></td></tr>
+            <tr><td>Inventory, 100 ms</td><td>Optional: unknown stock if it fails</td><td><code>exceptionally(ex -&gt; -1)</code></td></tr>
+            <tr><td>Reviews, 800 ms</td><td>Optional: a placeholder if it is late</td><td><code>completeOnTimeout(…, 300 ms)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><span class="lbl">Reading the result</span>Both pages took about 300 ms: the reviews call is slow, so the page waits for its deadline and uses the placeholder. Sequential calls would have taken 150 + 100 + 800 = 1,050 ms. The second page shows the inventory failure absorbed as <code>stock=-1</code>.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Use your own executor</span>These calls block, so they run on a dedicated <code>IO</code> pool, never the common <code>ForkJoinPool</code>. Name its threads, size it for the calls in flight, and shut it down. With virtual threads, <code>Executors.newVirtualThreadPerTaskExecutor()</code> fits too.</div>
+    <div class="note tip"><span class="lbl">Follow-ups to expect</span>"Cancel the slow call when we give up": <code>orTimeout</code> completes the future but does not stop the work, so pass a timeout to the HTTP client too. "Retry pricing once": compose with <code>exceptionallyCompose</code> <span class="tag a">12</span>. "Add a circuit breaker": that is Resilience4j's job.</div>
+    <div class="note"><span class="lbl">The mechanisms</span><a data-deck="cj" data-slide="CompletableFuture: composition">composition</a> and <a data-deck="cj" data-slide="CompletableFuture: errors and threads">errors and threads</a>. At architecture level, the reference deck's <a data-deck="deck" data-slide="Resilience">resilience</a> slide sets the same timeouts and fallbacks per dependency.</div>
+  </div>
+</section>

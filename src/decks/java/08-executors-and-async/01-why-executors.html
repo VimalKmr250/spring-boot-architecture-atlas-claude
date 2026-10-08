@@ -1,0 +1,98 @@
+<section class="slide" data-sec="Executors and async" data-title="Why executors">
+  <h2>An executor separates submitting work from running it, so threads become a resource you size once</h2>
+  <p class="dek">A platform thread costs an OS thread, a reserved stack and tens of microseconds to start. Creating one per task pays that every time, and lets the load decide how many threads exist. An <code>ExecutorService</code> keeps a set of threads and a queue, so the same 10,000 tasks start 8 threads instead of 10,000. The factory methods in <code>Executors</code> each make a different trade-off, and some hide an unbounded queue or an unbounded thread count.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WhyExecutors.java · thread per task against a pool, named threads, what each factory builds</div>
+<pre><code class="language-java">import java.lang.management.ManagementFactory;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class WhyExecutors {
+    static long threadsStarted() { return ManagementFactory.getThreadMXBean().getTotalStartedThreadCount(); }
+
+    static String describe(ExecutorService e) {
+        if (!(e instanceof ThreadPoolExecutor p)) return e.getClass().getSimpleName();
+        int cap = p.getQueue().remainingCapacity();
+        return String.format("core %d, max %s, queue %s (capacity %s)", p.getCorePoolSize(),
+                p.getMaximumPoolSize() == Integer.MAX_VALUE ? "unbounded" : p.getMaximumPoolSize(),
+                p.getQueue().getClass().getSimpleName(), cap == Integer.MAX_VALUE ? "unbounded" : cap);
+    }
+
+    public static void main(String[] args) throws Exception {
+        int tasks = 10_000;
+        long before = threadsStarted(), t0 = System.nanoTime();
+        List&lt;Thread&gt; started = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; tasks; i++) {
+            Thread t = new Thread(() -&gt; Math.sqrt(42));
+            t.start();
+            started.add(t);
+        }
+        for (Thread t : started) t.join();
+        System.out.printf("new Thread per task: %,d threads started, %d ms%n",
+                threadsStarted() - before, (System.nanoTime() - t0) / 1_000_000);
+
+        before = threadsStarted();
+        t0 = System.nanoTime();
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; tasks; i++) pool.submit(() -&gt; Math.sqrt(42));
+        }                                                      // close() waits for every task (19+)
+        System.out.printf("fixed pool of 8:     %,d threads started, %d ms (one run)%n",
+                threadsStarted() - before, (System.nanoTime() - t0) / 1_000_000);
+
+        ThreadFactory named = Thread.ofPlatform().name("order-worker-", 1).factory();
+        Set&lt;String&gt; names = new ConcurrentSkipListSet&lt;&gt;();
+        try (ExecutorService pool = Executors.newFixedThreadPool(3, named)) {
+            for (int i = 0; i &lt; 30; i++) pool.submit(() -&gt; names.add(Thread.currentThread().getName()));
+        }
+        System.out.println("named threads that ran 30 tasks: " + names);
+
+        try (ExecutorService fixed = Executors.newFixedThreadPool(4);
+             ExecutorService cached = Executors.newCachedThreadPool();
+             ExecutorService scheduled = Executors.newScheduledThreadPool(2);
+             ExecutorService stealing = Executors.newWorkStealingPool();
+             ExecutorService virtual = Executors.newVirtualThreadPerTaskExecutor()) {
+            System.out.println("newFixedThreadPool(4)       " + describe(fixed));
+            System.out.println("newCachedThreadPool()       " + describe(cached));
+            System.out.println("newScheduledThreadPool(2)   " + describe(scheduled));
+            System.out.println("newWorkStealingPool()       " + describe(stealing));
+            System.out.println("newVirtualThreadPerTask...  " + describe(virtual));
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · WhyExecutors.java · the timings vary by run</div>
+<pre><code class="language-plaintext">new Thread per task: 10,000 threads started, 1185 ms
+fixed pool of 8:     8 threads started, 67 ms (one run)
+named threads that ran 30 tasks: [order-worker-1, order-worker-2, order-worker-3]
+newFixedThreadPool(4)       core 4, max 4, queue LinkedBlockingQueue (capacity unbounded)
+newCachedThreadPool()       core 0, max unbounded, queue SynchronousQueue (capacity 0)
+newScheduledThreadPool(2)   core 2, max unbounded, queue DelayedWorkQueue (capacity unbounded)
+newWorkStealingPool()       ForkJoinPool
+newVirtualThreadPerTask...  ThreadPerTaskExecutor</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Factory</th><th>What it hides</th></tr></thead>
+          <tbody>
+            <tr><td><code>newFixedThreadPool(n)</code></td><td>An unbounded queue. Under overload it grows until <code>OutOfMemoryError</code>, and latency grows with it.</td></tr>
+            <tr><td><code>newSingleThreadExecutor()</code></td><td>The same unbounded queue, with one thread: tasks run strictly in order.</td></tr>
+            <tr><td><code>newCachedThreadPool()</code></td><td>No queue and no thread limit: a burst of slow tasks creates a thread for each one.</td></tr>
+            <tr><td><code>newScheduledThreadPool(n)</code></td><td>A delay queue; see <a data-deck="cj" data-slide="Scheduled executors">scheduled executors</a>.</td></tr>
+            <tr><td><code>newWorkStealingPool()</code></td><td>A <code>ForkJoinPool</code> sized to the cores, for CPU-bound work.</td></tr>
+            <tr><td><code>newVirtualThreadPerTaskExecutor()</code> <span class="tag a">21</span></td><td>A new virtual thread per task: no queue, no limit. Bound the resource it calls instead.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Build production pools by hand</span><code>new ThreadPoolExecutor(…)</code> with a bounded queue, a named <code>ThreadFactory</code> and an explicit rejection policy makes overload visible as rejections instead of a growing heap. The <a data-deck="cj" data-slide="ThreadPoolExecutor anatomy">next slide</a> takes one apart.</div>
+    <div class="note tip"><span class="lbl">Name your threads</span>A thread dump full of <code>pool-7-thread-3</code> says nothing. <code>Thread.ofPlatform().name("order-worker-", 1).factory()</code> <span class="tag a">21</span> makes the dump, the logs and the profiler point at the right pool.</div>
+    <div class="note"><span class="lbl">close() and Spring</span><code>ExecutorService</code> is <code>AutoCloseable</code> since 19: <code>close()</code> shuts down and waits, so try-with-resources works. In Spring, configure <code>ThreadPoolTaskExecutor</code> beans and name the one <code>@Async</code> uses: see <a data-deck="sb" data-slide="Async, scheduling, caching, testing">async and scheduling</a>.</div>
+  </div>
+</section>

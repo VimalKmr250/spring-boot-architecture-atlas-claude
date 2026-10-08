@@ -1,0 +1,105 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Atomics and CAS">
+  <h2>Compare-and-set updates a value without a lock, by retrying whenever it loses a race</h2>
+  <p class="dek">A CAS is one CPU instruction (<code>lock cmpxchg</code> on x86): if the value is still what I read, set it to my new value, and tell me whether that worked. Wrap it in a loop and you have a lock-free update. Under heavy contention many threads keep failing and retrying, which is what <code>LongAdder</code> avoids by giving each thread its own cell to increment.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Atomics.java · a CAS loop, the helpers, LongAdder, ABA, VarHandle</div>
+<pre><code class="language-java">import java.lang.invoke.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+
+public class Atomics {
+    static final AtomicLong highest = new AtomicLong(Long.MIN_VALUE);
+
+    static void recordMax(long value) {              // the compare-and-set loop
+        long current;
+        do {
+            current = highest.get();
+            if (value &lt;= current) return;
+        } while (!highest.compareAndSet(current, value));   // lost a race: read again, retry
+    }
+
+    static final class Seat {                        // CAS on an ordinary field, via a VarHandle
+        volatile String holder;
+        static final VarHandle HOLDER;
+        static {
+            try { HOLDER = MethodHandles.lookup().findVarHandle(Seat.class, "holder", String.class); }
+            catch (ReflectiveOperationException e) { throw new ExceptionInInitializerError(e); }
+        }
+        boolean claim(String who) { return HOLDER.compareAndSet(this, null, who); }
+    }
+
+    static long time(int threads, Runnable work) throws InterruptedException {
+        long t0 = System.nanoTime();
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int i = 0; i &lt; threads; i++) pool.submit(work);
+        }
+        return (System.nanoTime() - t0) / 1_000_000;
+    }
+
+    public static void main(String[] args) throws Exception {
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; 10_000; i++) { long v = (i * 7919L) % 10_007; pool.submit(() -&gt; recordMax(v)); }
+        }
+        System.out.println("max recorded by 10,000 racing tasks: " + highest.get());
+
+        AtomicInteger stock = new AtomicInteger(5);
+        int left = stock.updateAndGet(s -&gt; s &gt; 0 ? s - 1 : s);          // never below zero
+        int total = stock.accumulateAndGet(10, Integer::sum);
+        System.out.println("updateAndGet " + left + ", accumulateAndGet " + total);
+
+        AtomicLong atomic = new AtomicLong();
+        LongAdder adder = new LongAdder();
+        int threads = 8, each = 5_000_000;
+        long atomicMs = time(threads, () -&gt; { for (int i = 0; i &lt; each; i++) atomic.incrementAndGet(); });
+        long adderMs = time(threads, () -&gt; { for (int i = 0; i &lt; each; i++) adder.increment(); });
+        System.out.printf("8 threads x 5M increments: AtomicLong %,d in %d ms, LongAdder %,d in %d ms (one run)%n",
+                atomic.get(), atomicMs, adder.sum(), adderMs);
+
+        // ABA: the value went A -&gt; B -&gt; A, and a plain CAS cannot tell.
+        AtomicReference&lt;String&gt; top = new AtomicReference&lt;&gt;("A");
+        AtomicStampedReference&lt;String&gt; stamped = new AtomicStampedReference&lt;&gt;("A", 0);
+        String seen = top.get();
+        int[] stampHolder = new int[1];
+        String seenStamped = stamped.get(stampHolder);
+        top.set("B"); top.set("A");                                     // another thread's changes
+        stamped.set("B", 1); stamped.set("A", 2);
+        System.out.println("plain CAS after A-&gt;B-&gt;A: " + top.compareAndSet(seen, "C")
+                + ", stamped CAS: " + stamped.compareAndSet(seenStamped, "C", stampHolder[0], stampHolder[0] + 1));
+
+        Seat seat = new Seat();
+        System.out.println("VarHandle CAS: alice " + seat.claim("alice") + ", bob " + seat.claim("bob") + ", holder " + seat.holder);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Atomics.java · the timings vary by run</div>
+<pre><code class="language-plaintext">max recorded by 10,000 racing tasks: 10006
+updateAndGet 4, accumulateAndGet 14
+8 threads x 5M increments: AtomicLong 40,000,000 in 897 ms, LongAdder 40,000,000 in 110 ms (one run)
+plain CAS after A-&gt;B-&gt;A: true, stamped CAS: false
+VarHandle CAS: alice true, bob false, holder alice</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Use it for</th></tr></thead>
+          <tbody>
+            <tr><td><code>AtomicInteger</code>, <code>AtomicLong</code></td><td>A counter or sequence that is also read often; <code>incrementAndGet</code>, <code>compareAndSet</code></td></tr>
+            <tr><td><code>LongAdder</code>, <code>LongAccumulator</code></td><td>Hot counters written by many threads and read rarely: metrics, request counts</td></tr>
+            <tr><td><code>AtomicReference&lt;V&gt;</code></td><td>Swapping an immutable object: a config snapshot, a lock-free stack's top</td></tr>
+            <tr><td><code>AtomicStampedReference</code></td><td>The same, when A → B → A must be detected</td></tr>
+            <tr><td><code>VarHandle</code> <span class="tag a">9</span></td><td>CAS on a field of your own class, with no wrapper object per instance</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">The function may run twice</span><code>updateAndGet</code> and <code>accumulateAndGet</code> retry the function each time the CAS fails, so it must be pure: no logging, no I/O, no counters of its own. <code>ConcurrentHashMap.compute</code> is the opposite case: it locks the bin and calls the function exactly once, so there the rule is to keep the function short.</div>
+    <div class="note"><span class="lbl">ABA</span>The plain CAS succeeded because the value was <code>A</code> again, although two changes happened in between. That matters when the value stands for a version of something, such as a lock-free stack's top node. A stamp, or a fresh object for every state, makes each change distinct.</div>
+    <div class="note tip"><span class="lbl">When a lock is better</span>Several variables that must change together, an invariant across fields, or long critical sections. A CAS covers one memory location. LongAdder's <code>sum()</code> is not an atomic snapshot either: it adds the cells while they keep changing.</div>
+  </div>
+</section>

@@ -1,0 +1,114 @@
+<section class="slide" data-sec="Exceptions" data-title="try-with-resources and finally">
+  <h2>try-with-resources closes in reverse order and keeps both failures; finally keeps only the last</h2>
+  <p class="dek">When the body throws and then <code>close()</code> throws too, there are two exceptions and one can propagate. try-with-resources <span class="tag a">7</span> propagates the body's, which is the one that explains what happened, and attaches the other with <code>addSuppressed</code>. A hand-written <code>finally</code> lets the close failure replace the original, so the log shows the symptom and loses the cause.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Resources.java · close order, suppressed exceptions, two finally traps</div>
+<pre><code class="language-java">public class Resources {
+    static final class Res implements AutoCloseable {
+        private final String name;
+        private final boolean failOnClose;
+        Res(String name, boolean failOnClose) {
+            this.name = name;
+            this.failOnClose = failOnClose;
+            System.out.println("open  " + name);
+        }
+        @Override public void close() {
+            System.out.println("close " + name);
+            if (failOnClose) throw new IllegalStateException("close " + name + " failed");
+        }
+    }
+
+    static void withResources() {
+        try (Res conn = new Res("connection", false);
+             Res stmt = new Res("statement", true)) {        // closed first: reverse order
+            System.out.println("body  uses " + conn.name + " and " + stmt.name);
+            throw new RuntimeException("query failed");
+        }
+    }
+
+    static void withFinally() {                               // the pre-Java 7 way
+        Res stmt = new Res("statement", true);
+        try {
+            throw new RuntimeException("query failed");
+        } finally {
+            stmt.close();                                     // its exception replaces the real one
+        }
+    }
+
+    static int returnsFromFinally() {
+        try {
+            throw new IllegalStateException("lost forever");
+        } finally {
+            return -1;                                        // discards the exception
+        }
+    }
+
+    static String finallyOnReturn() {
+        try {
+            return "from try";
+        } finally {
+            System.out.println("finally runs before the return completes");
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            withResources();
+        } catch (RuntimeException e) {
+            System.out.println("caught: " + e.getMessage());
+            for (Throwable s : e.getSuppressed()) System.out.println("  suppressed: " + s.getMessage());
+        }
+        try {
+            withFinally();
+        } catch (RuntimeException e) {
+            System.out.println("caught: " + e.getMessage() + " (the query failure is gone)");
+        }
+        System.out.println("returnsFromFinally() = " + returnsFromFinally());
+        System.out.println(finallyOnReturn());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Resources.java</div>
+<pre><code class="language-plaintext">open  connection
+open  statement
+body  uses connection and statement
+close statement
+close connection
+caught: query failed
+  suppressed: close statement failed
+open  statement
+close statement
+caught: close statement failed (the query failure is gone)
+returnsFromFinally() = -1
+finally runs before the return completes
+from try</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac --release 21 -Xlint:all · Resources.java</div>
+<pre><code class="language-plaintext">Resources.java:38: warning: [finally] finally clause cannot complete normally
+        }
+        ^
+1 warning</code></pre>
+      </div>
+      <div class="panel">
+        <h3>The rules</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li>Resources close in <b>reverse order</b> of opening, after the body and before that <code>try</code>'s own <code>catch</code> and <code>finally</code> run.</li>
+          <li>A resource whose constructor threw was never opened, so it is not closed; the ones opened before it are.</li>
+          <li>An effectively final variable can be the resource: <code>try (conn)</code> <span class="tag a">9</span>.</li>
+          <li><code>finally</code> runs on normal exit, on exceptions and on <code>return</code>. It does not run on <code>System.exit</code>, a JVM crash or <code>kill -9</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">return in finally</span>A <code>return</code>, <code>break</code> or <code>throw</code> in <code>finally</code> throws away whatever exception was in flight. <code>returnsFromFinally</code> returned <code>-1</code>, and nobody ever learns about the failure. javac's <code>[finally]</code> lint is the only warning you get.</div>
+    <div class="note warn"><span class="lbl">Write close() to be idempotent</span><code>Closeable.close</code> must do nothing if called twice; <code>AutoCloseable.close</code> is only encouraged to. Wrappers often close what they wrap, so the inner resource can be closed twice.</div>
+    <div class="note tip"><span class="lbl">Everything that holds a handle</span>Streams, readers, JDBC connections and statements, <code>Files.lines</code>, <code>ExecutorService</code> <span class="tag a">19</span>, <code>HttpClient</code> <span class="tag a">21</span>. A leak of any of them shows up as "too many open files" or an exhausted pool, hours later: see <a data-deck="cj" data-slide="Resource and memory bugs">resource and memory bugs</a>.</div>
+  </div>
+</section>

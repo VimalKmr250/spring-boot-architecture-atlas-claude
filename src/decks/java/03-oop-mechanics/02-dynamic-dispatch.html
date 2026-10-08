@@ -1,0 +1,86 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Dynamic dispatch">
+  <h2>Five invoke instructions, and how a virtual call finds the method it runs</h2>
+  <p class="dek">javac compiles every method call into one of five bytecodes. Only <code>invokevirtual</code> and <code>invokeinterface</code> choose the method at run time, from the receiver's class. The JIT then removes most of that cost: a call site that only ever sees one class becomes a direct call, and usually an inlined one.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Dispatch.java · one call of each kind</div>
+<pre><code class="language-java">import java.util.function.LongSupplier;
+
+interface Priced { long price(); }
+
+public class Dispatch {
+    static class Item implements Priced {
+        public long price() { return 100; }
+        private long cost() { return 60; }
+        long margin() { return price() - cost(); }
+    }
+    static class Discounted extends Item {
+        @Override public long price() { return super.price() - 10; }
+    }
+    static long tax(long amount) { return amount / 5; }
+
+    public static void main(String[] args) {
+        Item item = new Discounted();
+        Priced priced = item;
+        long a = item.price();                     // class type: invokevirtual
+        long b = priced.price();                   // interface type: invokeinterface
+        long c = tax(a);                           // static: invokestatic
+        long m = item.margin();
+        LongSupplier later = () -&gt; a * 2;          // lambda: invokedynamic
+        String line = "price=" + a;                // concatenation: invokedynamic
+        System.out.println(a + " " + b + " " + c + " " + m + " " + later.getAsLong() + " " + line);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">javap -c -p Dispatch Dispatch$Item Dispatch$Discounted · the invoke lines</div>
+<pre><code class="language-plaintext">         4: invokespecial #11                 // Method Dispatch$Discounted."&lt;init&gt;":()V
+        11: invokevirtual #12                 // Method Dispatch$Item.price:()J
+        16: invokeinterface #18,  1           // InterfaceMethod Priced.price:()J
+        24: invokestatic  #21                 // Method tax:(J)J
+        30: invokevirtual #27                 // Method Dispatch$Item.margin:()J
+        36: invokedynamic #30,  0             // InvokeDynamic #0:getAsLong:(J)Ljava/util/function/LongSupplier;
+        44: invokedynamic #34,  0             // InvokeDynamic #1:makeConcatWithConstants:(J)Ljava/lang/String;
+        63: invokeinterface #44,  1           // InterfaceMethod java/util/function/LongSupplier.getAsLong:()J
+        70: invokedynamic #48,  0             // InvokeDynamic #2:makeConcatWithConstants:(JJJJJLjava/lang/String;)Ljava/lang/String;
+        75: invokevirtual #51                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+         1: invokevirtual #11                 // Method price:()J
+         5: invokevirtual #17                 // Method cost:()J
+         1: invokespecial #7                  // Method Dispatch$Item.price:()J</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Dispatch.java</div>
+<pre><code class="language-plaintext">90 90 18 30 180 price=90</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Instruction</th><th>Emitted for</th><th>Target chosen</th></tr></thead>
+        <tbody>
+          <tr><td><code>invokestatic</code></td><td>Static methods</td><td>Once, when the call is linked</td></tr>
+          <tr><td><code>invokespecial</code></td><td>Constructors and <code>super.m()</code></td><td>Exactly the named method, with no lookup: <code>super.price()</code> above</td></tr>
+          <tr><td><code>invokevirtual</code></td><td>Calls through a class type, including private methods since JDK 11 (<code>cost</code> above)</td><td>Per call, from the receiver's class: a vtable slot</td></tr>
+          <tr><td><code>invokeinterface</code></td><td>Calls through an interface type</td><td>Per call: an itable search, since one class can implement many interfaces</td></tr>
+          <tr><td><code>invokedynamic</code></td><td>Lambdas, string concatenation <span class="tag a">9</span>, record methods, pattern <code>switch</code></td><td>On first execution a bootstrap method links the call site; later calls go straight there</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>What the JIT does with a virtual call</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Monomorphic</b> (one class seen): a class check, then the method inlined.</li>
+          <li><b>Bimorphic</b> (two): two checks, both inlined.</li>
+          <li><b>Megamorphic</b> (three or more): a real vtable or itable call, and no inlining.</li>
+          <li>If only one implementation is loaded, class hierarchy analysis inlines it with no check, and deoptimises if a subclass loads later. <code>final</code> is not needed for speed.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">Where this shows up</span>Hot loops over many implementations of one interface, such as serializers, rule engines and visitors, pay for megamorphic calls. Typical service code does not. More on compilation in <a data-deck="cj" data-slide="The JIT compiler">the JIT compiler</a>.</div>
+    </div>
+  </div>
+</section>

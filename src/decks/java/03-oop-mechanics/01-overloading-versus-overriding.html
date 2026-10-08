@@ -1,0 +1,87 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Overloading versus overriding">
+  <h2>The compiler picks an overload from static types; the JVM picks an override from the object</h2>
+  <p class="dek">Overloading means several methods with one name and different parameters; javac chooses one at compile time from the <b>declared</b> types of the arguments. Overriding means a subclass replacing an inherited method; the JVM chooses at run time from the <b>actual</b> class of the receiver. Mixing the two up explains most "why did it call that one?" questions.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Overloads.java · overload resolution, overrides, hiding, covariant returns</div>
+<pre><code class="language-java">public class Overloads {
+    static String pay(Object o)  { return "pay(Object)"; }
+    static String pay(Number n)  { return "pay(Number)"; }
+    static String pay(Integer i) { return "pay(Integer)"; }
+    static String pay(long l)    { return "pay(long)"; }
+    static String pay(int... xs) { return "pay(int...)"; }
+
+    static class Shape {
+        String name = "shape";
+        String area() { return "Shape.area"; }
+        Shape copy() { return new Shape(); }
+        static String kind() { return "Shape.kind"; }
+    }
+    static class Circle extends Shape {
+        String name = "circle";                       // hides the field: no override
+        @Override String area() { return "Circle.area"; }
+        @Override Circle copy() { return new Circle(); }   // covariant return type
+        static String kind() { return "Circle.kind"; }     // hides the static method
+    }
+
+    public static void main(String[] args) {
+        int i = 5;
+        short s = 5;
+        Object boxed = 5;
+        System.out.println("pay(int 5)     -&gt; " + pay(i));        // widening beats boxing
+        System.out.println("pay(short 5)   -&gt; " + pay(s));
+        System.out.println("pay(Integer 5) -&gt; " + pay(Integer.valueOf(5)));
+        System.out.println("pay(Object 5)  -&gt; " + pay(boxed));    // the static type decides
+        System.out.println("pay()          -&gt; " + pay());
+
+        Shape shape = new Circle();
+        System.out.println("shape.area()   -&gt; " + shape.area());  // runtime type decides
+        System.out.println("shape.name     -&gt; " + shape.name);    // fields: static type
+        System.out.println("shape.copy()   -&gt; " + shape.copy().getClass().getSimpleName());
+        System.out.println("Shape.kind()   -&gt; " + Shape.kind() + ", Circle.kind() -&gt; " + Circle.kind());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Overloads.java</div>
+<pre><code class="language-plaintext">pay(int 5)     -&gt; pay(long)
+pay(short 5)   -&gt; pay(long)
+pay(Integer 5) -&gt; pay(Integer)
+pay(Object 5)  -&gt; pay(Object)
+pay()          -&gt; pay(int...)
+shape.area()   -&gt; Circle.area
+shape.name     -&gt; shape
+shape.copy()   -&gt; Circle
+Shape.kind()   -&gt; Shape.kind, Circle.kind() -&gt; Circle.kind</code></pre>
+      </div>
+      <div class="panel">
+        <h3>How javac picks an overload</h3>
+        <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Phase 1:</b> methods applicable by subtyping or widening alone. No boxing, no varargs.</li>
+          <li><b>Phase 2:</b> only if phase 1 found nothing, allow boxing and unboxing.</li>
+          <li><b>Phase 3:</b> only then, allow varargs.</li>
+        </ol>
+        <p style="margin-top:8px;color:var(--text-2);font-size:14px">Within a phase the most specific method wins, and a tie is a compile error. That is why <code>pay(5)</code> calls <code>pay(long)</code>: widening is phase 1 and boxing to <code>Integer</code> is phase 2. And <code>pay(boxed)</code> calls <code>pay(Object)</code> although the object is an <code>Integer</code>: overload choice never looks at the runtime class.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th></th><th>Overloading</th><th>Overriding</th></tr></thead>
+        <tbody>
+          <tr><td>Chosen</td><td>At compile time, from argument types</td><td>At run time, from the receiver's class</td></tr>
+          <tr><td>Signature</td><td>Same name, different parameters. The return type plays no part.</td><td>Same name and parameters. The return type may be a subtype (covariant).</td></tr>
+          <tr><td>Access</td><td>Anything</td><td>Same or wider: <code>public</code> cannot become <code>protected</code></td></tr>
+          <tr><td>Checked exceptions</td><td>Anything</td><td>None new or broader than the overridden method's</td></tr>
+          <tr><td><code>static</code>, <code>private</code>, <code>final</code></td><td>Can all be overloaded</td><td>Static methods are hidden, private ones are not inherited, final ones are locked</td></tr>
+          <tr><td>Fields</td><td colspan="2">Never polymorphic. A subclass field with the same name hides the other, and the static type picks: <code>shape.name</code> is <code>"shape"</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note bad"><span class="lbl">Always write @Override</span>Mistype the parameter, as in <code>equals(Order other)</code>, and you have written an overload. It compiles, and <code>HashSet</code> keeps calling <code>Object.equals(Object)</code>. With <code>@Override</code> the same mistake is a compile error. <a data-deck="cj" data-slide="Equality and hashing bugs">Equality and hashing bugs</a> shows it failing.</div>
+  </div>
+</section>

@@ -1,0 +1,126 @@
+<section class="slide" data-sec="Exceptions" data-title="The exception hierarchy">
+  <h2>Checked exceptions are a compiler rule, not a JVM one, and Errors are not yours to catch</h2>
+  <p class="dek">Everything throwable descends from <code>Throwable</code>, which splits into <code>Error</code>, meaning the JVM itself is in trouble, and <code>Exception</code>. javac forces every caller to catch or declare an <code>Exception</code>, unless it is a <code>RuntimeException</code>. The JVM never checks this. That is why Kotlin, and Lombok's <code>@SneakyThrows</code>, can throw an <code>IOException</code> that no signature declares.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 360" role="img" aria-label="The Throwable hierarchy. Throwable has two children, Error and Exception. Error has VirtualMachineError, with OutOfMemoryError and StackOverflowError, and LinkageError, with NoClassDefFoundError and ExceptionInInitializerError. Exception has the checked exceptions IOException with FileNotFoundException, SQLException, InterruptedException, TimeoutException and ExecutionException, and RuntimeException, whose unchecked subclasses include NullPointerException, IllegalArgumentException with NumberFormatException, IllegalStateException, ClassCastException, IndexOutOfBoundsException, ConcurrentModificationException, UnsupportedOperationException and UncheckedIOException. Throwable, Exception and the checked group are marked checked; Error, RuntimeException and their subclasses are unchecked.">
+        <g stroke="currentColor" stroke-opacity="0.35" stroke-width="1.2">
+          <line x1="450" y1="38" x2="170" y2="80"></line><line x1="450" y1="38" x2="640" y2="80"></line>
+          <line x1="170" y1="110" x2="105" y2="150"></line><line x1="170" y1="110" x2="275" y2="150"></line>
+          <line x1="640" y1="110" x2="495" y2="150"></line><line x1="640" y1="110" x2="705" y2="150"></line>
+        </g>
+        <g font-size="12" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="385" y="8" width="130" height="30" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="28">Throwable</text>
+          <rect x="110" y="80" width="120" height="30" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="170" y="100">Error</text>
+          <rect x="575" y="80" width="130" height="30" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="640" y="100">Exception</text>
+        </g>
+        <g font-size="11" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="20" y="150" width="170" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="105" y="168">VirtualMachineError</text>
+          <rect x="200" y="150" width="150" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="275" y="168">LinkageError</text>
+          <rect x="620" y="150" width="170" height="28" rx="5" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="705" y="168">RuntimeException</text>
+        </g>
+        <rect x="395" y="150" width="200" height="150" rx="7" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-opacity="0.8" stroke-dasharray="5 4"></rect>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="30" y="200">OutOfMemoryError</text><text x="30" y="220">StackOverflowError</text>
+          <text x="206" y="200">NoClassDefFoundError</text><text x="206" y="220">ExceptionInInitializerError</text>
+          <text x="409" y="178">IOException</text><text x="423" y="196">FileNotFoundException</text>
+          <text x="409" y="216">SQLException</text><text x="409" y="236">InterruptedException</text>
+          <text x="409" y="256">TimeoutException</text><text x="409" y="276">ExecutionException</text>
+          <text x="630" y="200">NullPointerException</text><text x="630" y="218">IllegalArgumentException</text>
+          <text x="644" y="236">NumberFormatException</text><text x="630" y="254">IllegalStateException</text>
+          <text x="630" y="272">ClassCastException</text><text x="630" y="290">IndexOutOfBoundsException</text>
+          <text x="630" y="308">ConcurrentModificationException</text><text x="630" y="326">UnsupportedOperationException</text>
+          <text x="630" y="344">UncheckedIOException</text>
+        </g>
+        <rect x="30" y="282" width="12" height="12" rx="2" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <text x="50" y="292" font-size="10.5" fill="currentColor">checked: the caller must catch it or declare it</text>
+        <rect x="30" y="306" width="12" height="12" rx="2" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <text x="50" y="316" font-size="10.5" fill="currentColor">unchecked: Error, RuntimeException and their subclasses</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Hierarchy.java · ancestry, a failing static initialiser, multi-catch</div>
+<pre><code class="language-java">import java.io.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class Hierarchy {
+    static String chain(Class&lt;?&gt; c) {
+        List&lt;String&gt; names = new ArrayList&lt;&gt;();
+        for (Class&lt;?&gt; k = c; k != Object.class; k = k.getSuperclass()) names.add(k.getSimpleName());
+        return String.join(" &lt; ", names);
+    }
+
+    static class TaxTable {                                   // a static initialiser that fails
+        static final Map&lt;String, Integer&gt; RATES = load();
+        static Map&lt;String, Integer&gt; load() { throw new IllegalStateException("rates file missing"); }
+    }
+
+    static int parseQuantity(String raw) throws IOException {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException | NullPointerException e) {   // multi-catch: unrelated types
+            throw new IOException("bad quantity: " + raw, e);
+        }
+    }
+
+    public static void main(String[] args) {
+        for (Class&lt;?&gt; c : List.of(FileNotFoundException.class, InterruptedException.class,
+                TimeoutException.class, NumberFormatException.class, ConcurrentModificationException.class,
+                UncheckedIOException.class, OutOfMemoryError.class, StackOverflowError.class))
+            System.out.println(chain(c));
+
+        for (int attempt = 1; attempt &lt;= 2; attempt++) {
+            try {
+                System.out.println(TaxTable.RATES);
+            } catch (Throwable t) {
+                System.out.println("attempt " + attempt + ": " + t.getClass().getSimpleName() + ": " + t.getMessage()
+                        + (t.getCause() != null ? " / cause: " + t.getCause().getMessage() : ""));
+            }
+        }
+
+        try {
+            parseQuantity("12x");
+        } catch (IOException e) {
+            System.out.println(e.getMessage() + " &lt;- " + e.getCause());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Hierarchy.java</div>
+<pre><code class="language-plaintext">FileNotFoundException &lt; IOException &lt; Exception &lt; Throwable
+InterruptedException &lt; Exception &lt; Throwable
+TimeoutException &lt; Exception &lt; Throwable
+NumberFormatException &lt; IllegalArgumentException &lt; RuntimeException &lt; Exception &lt; Throwable
+ConcurrentModificationException &lt; RuntimeException &lt; Exception &lt; Throwable
+UncheckedIOException &lt; RuntimeException &lt; Exception &lt; Throwable
+OutOfMemoryError &lt; VirtualMachineError &lt; Error &lt; Throwable
+StackOverflowError &lt; VirtualMachineError &lt; Error &lt; Throwable
+attempt 1: ExceptionInInitializerError: null / cause: rates file missing
+attempt 2: NoClassDefFoundError: Could not initialize class Hierarchy$TaxTable / cause: Exception java.lang.IllegalStateException: rates file missing [in thread "main"]
+bad quantity: 12x &lt;- java.lang.NumberFormatException: For input string: "12x"</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Use</th><th>For</th></tr></thead>
+          <tbody>
+            <tr><td>Checked</td><td>A condition the caller can reasonably handle, at a boundary that can fail: I/O, a remote call, a timeout.</td></tr>
+            <tr><td>Unchecked</td><td>Programming errors (<code>IllegalArgumentException</code>, <code>IllegalStateException</code>) and failures no caller can fix. Spring translates checked JDBC exceptions into unchecked <code>DataAccessException</code>s for this reason.</td></tr>
+            <tr><td>Error</td><td>Do not catch it, except once at the top of a thread to log it. After an <code>OutOfMemoryError</code> the program may be in an inconsistent state.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note bad"><span class="lbl">A failed static initialiser is permanent</span>The first access throws <code>ExceptionInInitializerError</code> with the real cause. Every later access throws <code>NoClassDefFoundError: Could not initialize class</code>, and the class stays unusable until the JVM restarts. Recent JDKs attach the first failure as the cause; older ones leave you only the second error, so search the log for the first.</div>
+    <div class="note tip"><span class="lbl">Multi-catch</span><code>catch (NumberFormatException | NullPointerException e)</code> <span class="tag a">7</span> handles unrelated types in one block; listing a type together with its subclass is a compile error. Catch blocks are tried in order, so a subclass must come before its superclass, or it does not compile.</div>
+  </div>
+</section>

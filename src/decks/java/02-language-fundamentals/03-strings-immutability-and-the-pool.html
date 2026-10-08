@@ -1,0 +1,110 @@
+<section class="slide" data-sec="Language fundamentals" data-title="Strings: immutability and the pool">
+  <h2>Strings never change, so the JVM can share them, pool the literals and cache the hash</h2>
+  <p class="dek">Every method that seems to modify a <code>String</code> returns a new one. That one rule makes strings safe to share between threads, safe as map keys, and safe to pass to security checks. It also explains the two classic traps: <code>==</code> that works only for literals, and <code>+=</code> in a loop that copies the whole string on every pass.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Strings.java · identity, the pool, compact strings, concatenation cost</div>
+<pre><code class="language-java">import java.lang.management.ManagementFactory;
+
+public class Strings {
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+    static long allocated() { return MX.getCurrentThreadAllocatedBytes(); }
+
+    public static void main(String[] args) {
+        String a = "order";
+        String b = "order";
+        String c = new String("order");
+        String d = "ord" + "er";                 // folded by javac into "order"
+        final String prefix = "ord";
+        String e = prefix + "er";                // a constant too: prefix is final
+        String part = "ord";
+        String f = part + "er";                  // built at run time
+        System.out.println("a == b            " + (a == b));
+        System.out.println("a == new String   " + (a == c));
+        System.out.println("a == \"ord\"+\"er\"   " + (a == d));
+        System.out.println("a == final+\"er\"   " + (a == e));
+        System.out.println("a == part+\"er\"    " + (a == f));
+        System.out.println("a == f.intern()   " + (a == f.intern()));
+        System.out.println("a.equals(c)       " + a.equals(c));
+
+        String s = "total";
+        s.concat("!");                           // returns a new string, discarded
+        s.toUpperCase();
+        System.out.println("still             " + s);
+
+        System.out.println("\"Aa\".hashCode()   " + "Aa".hashCode() + ", \"BB\".hashCode() " + "BB".hashCode());
+
+        long before = allocated();
+        String latin = "a".repeat(1_000);
+        long latinBytes = allocated() - before;
+        before = allocated();
+        String euro = "€".repeat(1_000);
+        long euroBytes = allocated() - before;
+        System.out.println("1000 x 'a' allocates " + latinBytes + " bytes, 1000 x '€' " + euroBytes
+                + " (lengths " + latin.length() + ", " + euro.length() + ")");
+
+        before = allocated();
+        String joined = "";
+        for (int i = 0; i &lt; 5_000; i++) joined += i + ",";
+        long plusBytes = allocated() - before;
+        before = allocated();
+        var builder = new StringBuilder();
+        for (int i = 0; i &lt; 5_000; i++) builder.append(i).append(',');
+        String built = builder.toString();
+        long builderBytes = allocated() - before;
+        System.out.printf("+= in a loop: %,d bytes; StringBuilder: %,d bytes; same result: %b%n",
+                plusBytes, builderBytes, joined.equals(built));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Strings.java</div>
+<pre><code class="language-plaintext">a == b            true
+a == new String   false
+a == "ord"+"er"   true
+a == final+"er"   true
+a == part+"er"    false
+a == f.intern()   true
+a.equals(c)       true
+still             total
+"Aa".hashCode()   2112, "BB".hashCode() 2112
+1000 x 'a' allocates 1040 bytes, 1000 x '€' 2088 (lengths 1000, 1000)
++= in a loop: 57,759,736 bytes; StringBuilder: 98,032 bytes; same result: true</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Line</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>a == b</code></td><td>Both literals resolve to the one pooled instance.</td></tr>
+            <tr><td><code>new String</code></td><td>Always a new object, never the pooled one.</td></tr>
+            <tr><td><code>"ord" + "er"</code>, <code>final</code></td><td>Constant expressions: javac folds them into the literal <code>"order"</code>.</td></tr>
+            <tr><td><code>part + "er"</code></td><td>Built at run time, so a new object. <code>intern()</code> returns the pooled copy.</td></tr>
+            <tr><td>1,040 vs 2,088 bytes</td><td>Compact strings <span class="tag a">since 9</span>: a Latin-1 string stores one byte per character, anything else two.</td></tr>
+            <tr><td>57.8 MB vs 98 KB</td><td>Each <code>+=</code> copies everything so far: O(n²) bytes for n appends.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Added</th><th>String API worth knowing</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag a">11</span></td><td><code>isBlank</code>, <code>strip</code> (Unicode-aware, unlike <code>trim</code>), <code>lines</code>, <code>repeat</code></td></tr>
+          <tr><td><span class="tag a">12</span></td><td><code>indent</code>, <code>transform</code></td></tr>
+          <tr><td><span class="tag a">15</span></td><td>Text blocks, <code>formatted</code>, <code>stripIndent</code>, <code>translateEscapes</code></td></tr>
+          <tr><td><span class="tag a">21</span></td><td><code>indexOf(ch, from, to)</code>, <code>splitWithDelimiters</code>, <code>StringBuilder.repeat</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid2">
+      <div class="note bad"><span class="lbl">== on strings</span>Literals are pooled, so <code>==</code> passes tests that compare literals. A string from a request, a file or a database is a new object, and the same comparison fails. Use <code>equals</code>, or <code>"ACTIVE".equals(status)</code> when <code>status</code> may be null.</div>
+      <div class="note tip"><span class="lbl">Where the pool lives</span>In the heap since Java 7, so pooled strings are collected like anything else. Calling <code>intern()</code> yourself is rarely worth it; G1's <code>-XX:+UseStringDeduplication</code> shares duplicate backing arrays without code changes.</div>
+    </div>
+  </div>
+</section>

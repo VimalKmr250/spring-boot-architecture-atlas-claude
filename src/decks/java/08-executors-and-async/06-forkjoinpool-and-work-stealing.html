@@ -1,0 +1,102 @@
+<section class="slide" data-sec="Executors and async" data-title="ForkJoinPool and work stealing">
+  <h2>ForkJoinPool splits work recursively and lets idle threads steal it, so every core stays busy</h2>
+  <p class="dek">A fork/join task splits itself in two until the pieces are small, forks one half and computes the other. Each worker keeps its forked tasks in its own deque and works from the top. A worker with nothing to do steals from the bottom of someone else's deque, where the oldest and largest pieces are. Parallel streams and <code>CompletableFuture</code>'s default executor both run on this machinery, in the common pool.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Worker 1's deque holds four tasks: the range 0 to 5 million at the base, then 5 to 7.5 million, then 7.5 to 8.75 million, then 8.75 to 9.4 million at the top. Worker 1 pushes and pops at the top. Worker 2, which is idle, steals the oldest and largest task, 0 to 5 million, from the base.">
+        <rect x="20" y="40" width="500" height="130" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="36" y="62" font-size="11.5" font-weight="600" fill="currentColor" font-family="IBM Plex Mono, monospace">worker-1 · its deque</text>
+        <g font-size="10.5" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="40" y="96" width="100" height="30" rx="5" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></rect><text x="90" y="115">[0, 5M)</text>
+          <rect x="150" y="96" width="100" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="200" y="115">[5M, 7.5M)</text>
+          <rect x="260" y="96" width="110" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="315" y="115">[7.5M, 8.75M)</text>
+          <rect x="380" y="96" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="440" y="115">[8.75M, 9.4M)</text>
+        </g>
+        <text x="40" y="150" font-size="10" fill="currentColor" opacity="0.8">base: oldest, largest</text>
+        <text x="500" y="150" text-anchor="end" font-size="10" fill="currentColor" opacity="0.8">top: fork() pushes, the owner pops (LIFO)</text>
+        <rect x="600" y="40" width="280" height="130" rx="8" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B"></rect>
+        <text x="616" y="62" font-size="11.5" font-weight="600" fill="currentColor" font-family="IBM Plex Mono, monospace">worker-2 · idle</text>
+        <text x="616" y="96" font-size="10.5" fill="currentColor">takes from the base of another</text>
+        <text x="616" y="112" font-size="10.5" fill="currentColor">worker's deque (FIFO), so one steal</text>
+        <text x="616" y="128" font-size="10.5" fill="currentColor">brings a lot of work</text>
+        <path d="M 600 70 C 420 8, 160 14, 92 93" fill="none" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></path>
+        <text x="340" y="28" text-anchor="middle" font-size="10.5" fill="#D26A3F">steal</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ForkJoin.java · a RecursiveTask, and the pool that parallel streams use</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.stream.LongStream;
+
+public class ForkJoin {
+    static final LongAdder TASKS = new LongAdder();
+
+    static final class Sum extends RecursiveTask&lt;Long&gt; {
+        private static final long serialVersionUID = 1L;
+        static final int THRESHOLD = 10_000;
+        private final long[] data;
+        private final int from, to;
+        Sum(long[] data, int from, int to) { this.data = data; this.from = from; this.to = to; }
+
+        @Override protected Long compute() {
+            TASKS.increment();
+            if (to - from &lt;= THRESHOLD) {                     // small enough: just do it
+                long s = 0;
+                for (int i = from; i &lt; to; i++) s += data[i];
+                return s;
+            }
+            int mid = (from + to) &gt;&gt;&gt; 1;
+            Sum left = new Sum(data, from, mid), right = new Sum(data, mid, to);
+            left.fork();                                      // push onto this worker's deque
+            long r = right.compute();                         // work on the other half ourselves
+            return left.join() + r;                           // often run by us, sometimes stolen
+        }
+    }
+
+    public static void main(String[] args) {
+        long[] data = LongStream.rangeClosed(1, 10_000_000).toArray();
+        ForkJoinPool pool = new ForkJoinPool(8);
+        long total = pool.invoke(new Sum(data, 0, data.length));
+        System.out.printf("sum %,d from %,d tasks; steals: %,d (varies by run)%n", total, TASKS.sum(), pool.getStealCount());
+        pool.close();
+
+        Set&lt;String&gt; threads = new ConcurrentSkipListSet&lt;&gt;();
+        long parallel = LongStream.rangeClosed(1, 2_000_000).parallel()
+                .peek(i -&gt; threads.add(Thread.currentThread().getName().replaceAll("\\d+$", "N")))
+                .sum();
+        System.out.println("parallel stream sum " + parallel + " ran on " + threads);
+        System.out.println("common pool parallelism " + ForkJoinPool.getCommonPoolParallelism()
+                + " (cores - 1; the caller thread joins in)");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ForkJoin.java · the steal count varies by run</div>
+<pre><code class="language-plaintext">sum 50,000,005,000,000 from 2,047 tasks; steals: 28 (varies by run)
+parallel stream sum 2000001000000 ran on [ForkJoinPool.commonPool-worker-N, main]
+common pool parallelism 19 (cores - 1; the caller thread joins in)</code></pre>
+      </div>
+      <div class="panel">
+        <h3>Writing a fork/join task</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Fork one half, compute the other.</b> Forking both and joining both leaves the current worker idle.</li>
+          <li><b>Pick a threshold.</b> Too small and task overhead dominates; too large and cores sit idle at the end. 10,000 elements gave 2,047 tasks here.</li>
+          <li><b>Join in reverse order of forking</b>, so the worker usually pops its own task instead of waiting.</li>
+          <li><code>RecursiveTask&lt;V&gt;</code> returns a value; <code>RecursiveAction</code> does not.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">Do not block in it</span>Fork/join assumes tasks compute. A task that waits on I/O or a lock holds a worker, and the common pool has only cores − 1 of them for the whole JVM. If blocking is unavoidable, wrap it in <code>ForkJoinPool.managedBlock</code> so the pool can add a thread meanwhile.</div>
+    <div class="note tip"><span class="lbl">Parallel streams</span>The output shows a parallel stream running on common-pool workers and on <code>main</code>: the calling thread joins in, which is why the pool is sized to cores − 1. When that helps and when it hurts is on <a data-deck="st" data-slide="How a parallel stream runs">how a parallel stream runs</a>.</div>
+  </div>
+</section>

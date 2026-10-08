@@ -1,0 +1,93 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Thread-safety strategies">
+  <h2>Thread safety comes from not sharing, not mutating, or synchronising, in that order of preference</h2>
+  <p class="dek">State that only one thread can reach needs no protection. State that never changes needs none either. Only shared, mutable state needs locks, atomics or concurrent collections, and each piece of it is a place where bugs and contention gather. The best concurrent design keeps that part small, and publishes everything else safely.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SafetyStrategies.java · a ThreadLocal leaking between pooled tasks, and the safe shapes</div>
+<pre><code class="language-java">import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class SafetyStrategies {
+    static final ThreadLocal&lt;String&gt; CURRENT_USER = new ThreadLocal&lt;&gt;();
+
+    static String handle(String user, boolean cleanUp) {
+        if (user != null) CURRENT_USER.set(user);
+        try {
+            return "request for " + user + " runs as " + CURRENT_USER.get();
+        } finally {
+            if (cleanUp) CURRENT_USER.remove();               // always, in finally
+        }
+    }
+
+    // Immutable and safely published through a final field: shareable as it is.
+    record PriceList(Map&lt;String, Long&gt; cents) {
+        PriceList { cents = Map.copyOf(cents); }
+    }
+
+    // Shared, mutable, published safely: a concurrent map in a final field.
+    static final Map&lt;String, Long&gt; VIEWS = new ConcurrentHashMap&lt;&gt;();
+
+    // DateTimeFormatter is immutable and thread-safe; SimpleDateFormat is neither.
+    static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    public static void main(String[] args) throws Exception {
+        try (ExecutorService pool = Executors.newSingleThreadExecutor()) {   // one reused thread
+            System.out.println(pool.submit(() -&gt; handle("alice", false)).get());
+            System.out.println(pool.submit(() -&gt; handle(null, false)).get() + "  &lt;- leaked from the last task");
+        }
+        try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
+            System.out.println(pool.submit(() -&gt; handle("alice", true)).get());
+            System.out.println(pool.submit(() -&gt; handle(null, true)).get());
+        }
+
+        var prices = new PriceList(Map.of("tea", 250L, "milk", 120L));
+        List&lt;String&gt; totals = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (String sku : List.of("tea", "milk", "tea")) {
+                pool.submit(() -&gt; {
+                    long sum = 0;                                  // stack-confined: no sharing at all
+                    for (int i = 0; i &lt; 3; i++) sum += prices.cents().get(sku);
+                    totals.add(sku + "=" + sum);
+                    VIEWS.merge(sku, 1L, Long::sum);
+                });
+            }
+        }
+        Collections.sort(totals);
+        System.out.println("totals " + totals + ", views " + new TreeMap&lt;&gt;(VIEWS)
+                + ", parsed " + LocalDate.parse("2026-10-07", ISO).getDayOfWeek());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · SafetyStrategies.java</div>
+<pre><code class="language-plaintext">request for alice runs as alice
+request for null runs as alice  &lt;- leaked from the last task
+request for alice runs as alice
+request for null runs as null
+totals [milk=360, tea=750, tea=750], views {milk=1, tea=2}, parsed WEDNESDAY</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Strategy</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Stack confinement</td><td>Locals belong to one call on one thread: <code>sum</code> above is safe with no effort.</td></tr>
+            <tr><td>Thread confinement</td><td><code>ThreadLocal</code>, or one owner thread fed through a queue (the actor style).</td></tr>
+            <tr><td>Immutability</td><td>Records with copied components, final fields, <code>List.copyOf</code>: <code>PriceList</code>.</td></tr>
+            <tr><td>Thread-safe types</td><td>Concurrent collections, atomics, <code>DateTimeFormatter</code> instead of <code>SimpleDateFormat</code>.</td></tr>
+            <tr><td>Locking</td><td>A lock around each invariant that spans more than one variable.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">ThreadLocal in a pool</span>Pool threads live for the whole application, so a value set by one task is still there for the next one, here another user's identity. In an application server the same leak pins a whole web app's class loader in memory after a redeploy. Set and <code>remove()</code> in the same <code>try</code> / <code>finally</code>.</div>
+    <div class="note warn"><span class="lbl">Publishing safely</span>An object handed to another thread through a plain field may be seen half-built. Safe routes: a static initialiser, a <code>volatile</code> or <code>AtomicReference</code> field, a <code>final</code> field of a properly constructed object, a concurrent collection, or a lock both threads use.</div>
+    <div class="note tip"><span class="lbl">ScopedValue replaces most ThreadLocals</span>Final in JDK 25 (JEP 506): a value bound for the duration of one call, inherited by subtasks forked in a <code>StructuredTaskScope</code>, and impossible to leak because it is unbound when the call returns. With a million virtual threads, a <code>ThreadLocal</code> also means a million copies. See <a data-deck="cj" data-slide="Virtual threads under the hood">virtual threads under the hood</a>.</div>
+  </div>
+</section>

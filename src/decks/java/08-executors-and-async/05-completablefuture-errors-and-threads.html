@@ -1,0 +1,99 @@
+<section class="slide" data-sec="Executors and async" data-title="CompletableFuture: errors and threads">
+  <h2>Failures travel down the chain wrapped in CompletionException, and each step runs on whatever thread is at hand</h2>
+  <p class="dek">When a stage throws, every dependent stage completes exceptionally too, until one of them handles it. Three methods do the handling, and they differ in whether they can change the outcome. The other half of the story is threads: a non-async step runs on the thread that completed the previous one, or on the caller if that had already happened, and an async step with no executor runs in the common <code>ForkJoinPool</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CfErrors.java · recovering, timing out, and which thread runs what</div>
+<pre><code class="language-java">import java.util.concurrent.*;
+
+public class CfErrors {
+    static String thread() { return Thread.currentThread().getName(); }
+
+    static CompletableFuture&lt;Integer&gt; failing() {
+        return CompletableFuture.supplyAsync(() -&gt; { throw new IllegalStateException("inventory down"); });
+    }
+
+    public static void main(String[] args) throws Exception {
+        int recovered = failing().exceptionally(ex -&gt; {
+            System.out.println("exceptionally sees " + ex.getClass().getSimpleName() + " wrapping " + ex.getCause().getMessage());
+            return 0;                                                   // a fallback value
+        }).join();
+        System.out.println("recovered to " + recovered);
+
+        String handled = failing().handle((value, ex) -&gt; ex == null ? "stock " + value : "fallback").join();
+        System.out.println("handle -&gt; " + handled);
+
+        try {
+            failing().whenComplete((v, ex) -&gt; System.out.println("whenComplete sees the failure but cannot fix it")).join();
+        } catch (CompletionException e) {
+            System.out.println("join() throws CompletionException, cause " + e.getCause().getMessage());
+        }
+        try {
+            failing().get();
+        } catch (ExecutionException e) {
+            System.out.println("get() throws ExecutionException, cause " + e.getCause().getMessage());
+        }
+
+        CompletableFuture&lt;String&gt; never = new CompletableFuture&lt;&gt;();
+        try {
+            never.orTimeout(100, TimeUnit.MILLISECONDS).join();         // Java 9
+        } catch (CompletionException e) {
+            System.out.println("orTimeout: " + e.getCause().getClass().getSimpleName());
+        }
+        System.out.println("completeOnTimeout: " + new CompletableFuture&lt;String&gt;()
+                .completeOnTimeout("cached price", 100, TimeUnit.MILLISECONDS).join());
+
+        System.out.println("supplyAsync with no executor runs on: " + CompletableFuture.supplyAsync(CfErrors::thread).join());
+        CompletableFuture&lt;String&gt; done = CompletableFuture.completedFuture("x");
+        System.out.println("thenApply on a completed future runs on: " + done.thenApply(v -&gt; thread()).join());
+        CompletableFuture&lt;String&gt; later = CompletableFuture.supplyAsync(() -&gt; {
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "y";
+        });
+        CompletableFuture&lt;String&gt; after = later.thenApply(v -&gt; thread());
+        System.out.println("thenApply registered before completion runs on: " + after.join());
+        System.out.println("thenApplyAsync runs on: " + done.thenApplyAsync(v -&gt; thread()).join());
+        System.out.println("common pool parallelism: " + ForkJoinPool.commonPool().getParallelism()
+                + " on " + Runtime.getRuntime().availableProcessors() + " cores");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · CfErrors.java</div>
+<pre><code class="language-plaintext">exceptionally sees CompletionException wrapping inventory down
+recovered to 0
+handle -&gt; fallback
+whenComplete sees the failure but cannot fix it
+join() throws CompletionException, cause inventory down
+get() throws ExecutionException, cause inventory down
+orTimeout: TimeoutException
+completeOnTimeout: cached price
+supplyAsync with no executor runs on: ForkJoinPool.commonPool-worker-1
+thenApply on a completed future runs on: main
+thenApply registered before completion runs on: ForkJoinPool.commonPool-worker-1
+thenApplyAsync runs on: ForkJoinPool.commonPool-worker-1
+common pool parallelism: 19 on 20 cores</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Method</th><th>Runs when</th><th>Can change the outcome</th></tr></thead>
+          <tbody>
+            <tr><td><code>exceptionally(fn)</code></td><td>Only on failure</td><td>Yes: returns a fallback value</td></tr>
+            <tr><td><code>handle((v, ex) -&gt; …)</code></td><td>Always</td><td>Yes: maps either outcome to a new value</td></tr>
+            <tr><td><code>whenComplete((v, ex) -&gt; …)</code></td><td>Always</td><td>No: for logging and metrics; the failure carries on</td></tr>
+            <tr><td><code>exceptionallyCompose</code> <span class="tag a">12</span></td><td>Only on failure</td><td>Yes: with another async call, such as a fallback service</td></tr>
+            <tr><td><code>orTimeout</code>, <code>completeOnTimeout</code> <span class="tag a">9</span></td><td>When time runs out</td><td>Fail with <code>TimeoutException</code>, or complete with a default</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Unwrap before you inspect</span>A failure from an async stage arrives wrapped: <code>exceptionally</code> saw a <code>CompletionException</code> whose cause was the real <code>IllegalStateException</code>. <code>join</code> throws that unchecked wrapper, <code>get</code> a checked <code>ExecutionException</code>. Test <code>ex.getCause()</code>, not <code>ex</code>.</div>
+    <div class="note bad"><span class="lbl">Blocking work in the common pool</span>With no executor, <code>supplyAsync</code> uses the common pool: 19 threads on this 20-core machine, shared with every parallel stream in the JVM. Twenty slow HTTP calls there stall everything else. Pass an executor for anything that blocks, as <code>CfCompose</code> does with <code>IO</code>.</div>
+    <div class="note tip"><span class="lbl">cancel does not interrupt</span><code>CompletableFuture.cancel(true)</code> completes the future with a <code>CancellationException</code> but does not interrupt the thread running the task, which carries on. If the work must stop, check a flag or use a <code>Future</code> from an <code>ExecutorService</code>.</div>
+  </div>
+</section>

@@ -1,0 +1,101 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Enums with behaviour">
+  <h2>An enum is a fixed set of singleton objects, so it can carry fields, behaviour and a checked switch</h2>
+  <p class="dek">Each constant is created once, when the enum class is initialised, and no code can create another, not even reflection or deserialization. Constants can hold fields, and each can override methods. Two habits cause the bugs: storing <code>ordinal()</code>, and assuming every constant's class is the enum's class.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Enums.java · state machine, stable codes, EnumSet and EnumMap</div>
+<pre><code class="language-java">import java.util.*;
+
+public class Enums {
+    enum Status {
+        PLACED("P") {
+            @Override Status next() { return PAID; }
+        },
+        PAID("A") {
+            @Override Status next() { return SHIPPED; }
+        },
+        SHIPPED("S") {
+            @Override Status next() { return this; }
+            @Override boolean isFinal() { return true; }
+        };
+
+        private final String code;                         // a stable code for storage
+        Status(String code) { this.code = code; }          // constructors are always private
+        abstract Status next();                            // each constant implements it
+        boolean isFinal() { return false; }
+
+        private static final Map&lt;String, Status&gt; BY_CODE = new HashMap&lt;&gt;();
+        static { for (Status s : values()) BY_CODE.put(s.code, s); }
+        static Status fromCode(String code) {
+            Status s = BY_CODE.get(code);
+            if (s == null) throw new IllegalArgumentException("unknown status code " + code);
+            return s;
+        }
+    }
+
+    enum Region { NORTH, EAST, SOUTH, WEST }
+
+    public static void main(String[] args) {
+        for (Status s = Status.PLACED; ; s = s.next()) {
+            System.out.println(s + " ordinal=" + s.ordinal() + " code=" + s.code
+                    + " class=" + s.getClass().getName());
+            if (s.isFinal()) break;
+        }
+        System.out.println("fromCode(\"A\") = " + Status.fromCode("A"));
+        try {
+            Status.valueOf("paid");
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+        }
+        System.out.println("values() is a new array each call: " + (Status.values() != Status.values()));
+
+        EnumSet&lt;Region&gt; south = EnumSet.range(Region.EAST, Region.WEST);
+        EnumMap&lt;Region, Integer&gt; orders = new EnumMap&lt;&gt;(Region.class);
+        orders.put(Region.WEST, 12);
+        orders.put(Region.NORTH, 7);
+        System.out.println("range " + south + ", complement " + EnumSet.complementOf(south) + ", map " + orders);
+
+        Status s = Status.PAID;
+        String label = switch (s) {                         // exhaustive over the constants
+            case PLACED -&gt; "awaiting payment";
+            case PAID -&gt; "packing";
+            case SHIPPED -&gt; "on its way";
+        };
+        System.out.println(label + "; PAID compareTo SHIPPED = " + Status.PAID.compareTo(Status.SHIPPED));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Enums.java</div>
+<pre><code class="language-plaintext">PLACED ordinal=0 code=P class=Enums$Status$1
+PAID ordinal=1 code=A class=Enums$Status$2
+SHIPPED ordinal=2 code=S class=Enums$Status$3
+fromCode("A") = PAID
+No enum constant Enums.Status.paid
+values() is a new array each call: true
+range [EAST, SOUTH, WEST], complement [NORTH], map {NORTH=7, WEST=12}
+packing; PAID compareTo SHIPPED = -1</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Fact</th><th>Consequence</th></tr></thead>
+          <tbody>
+            <tr><td>A constant with a body is an anonymous subclass</td><td><code>getClass()</code> is <code>Enums$Status$1</code>. Use <code>getDeclaringClass()</code> to get <code>Status</code>.</td></tr>
+            <tr><td><code>ordinal()</code> is the declaration position</td><td>Insert a constant and every stored ordinal now means something else. Store a stable code or the name.</td></tr>
+            <tr><td><code>valueOf</code> matches the exact name</td><td>Wrong case or an unknown value throws <code>IllegalArgumentException</code>. Map external codes yourself.</td></tr>
+            <tr><td><code>values()</code> clones an array per call</td><td>Cache it, or build a lookup map once, as <code>BY_CODE</code> does.</td></tr>
+            <tr><td><code>compareTo</code> uses ordinal order</td><td>Declare constants in a meaningful order, or do not rely on it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Ordinals in the database</span>JPA's <code>EnumType.ORDINAL</code> stores 0, 1, 2. Someone adds <code>CANCELLED</code> between <code>PLACED</code> and <code>PAID</code>, and every paid order is now cancelled. Use <code>EnumType.STRING</code> or an <code>AttributeConverter</code> with a code.</div>
+    <div class="note good"><span class="lbl">EnumSet and EnumMap</span>An <code>EnumSet</code> is a bit vector: one <code>long</code> for up to 64 constants. An <code>EnumMap</code> is an array indexed by ordinal. Both iterate in declaration order and beat <code>HashSet</code> and <code>HashMap</code> for enum keys.</div>
+    <div class="note tip"><span class="lbl">The safest singleton</span>A single-constant enum cannot be duplicated by reflection or serialization, which breaks the other singleton forms. See <a data-deck="lld" data-slide="Singleton: the safe ways">singleton, the safe ways</a>.</div>
+  </div>
+</section>

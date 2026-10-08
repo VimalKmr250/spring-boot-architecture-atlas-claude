@@ -1,0 +1,106 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="synchronized, wait and notify">
+  <h2>synchronized is a re-entrant lock on an object, and wait and notify are its waiting room</h2>
+  <p class="dek">Every object has a monitor. A <code>synchronized</code> block takes it on entry and releases it on exit, even when an exception leaves the block, and each release happens-before the next acquire. <code>wait()</code> releases the monitor and sleeps until another thread calls <code>notify</code> or <code>notifyAll</code> on the same object. Together they build any blocking structure, which is why the JDK built <code>BlockingQueue</code> so you do not have to.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WaitNotify.java · a bounded buffer from one monitor, re-entrancy, the owner rule</div>
+<pre><code class="language-java">import java.util.*;
+
+public class WaitNotify {
+    // A bounded buffer built from the monitor alone.
+    static final class Buffer&lt;T&gt; {
+        private final Deque&lt;T&gt; items = new ArrayDeque&lt;&gt;();
+        private final int capacity;
+        private int maxSeen;
+        Buffer(int capacity) { this.capacity = capacity; }
+
+        synchronized void put(T item) throws InterruptedException {
+            while (items.size() == capacity) wait();   // a loop, never an if
+            items.addLast(item);
+            maxSeen = Math.max(maxSeen, items.size());
+            notifyAll();                               // wake consumers (and other producers)
+        }
+        synchronized T take() throws InterruptedException {
+            while (items.isEmpty()) wait();
+            T item = items.removeFirst();
+            notifyAll();
+            return item;
+        }
+        synchronized int maxSeen() { return maxSeen; }
+    }
+
+    static final class Counter {
+        private int n;
+        synchronized void add() { n++; }
+        synchronized void addTwice() { add(); add(); }   // re-entrant: the same thread holds the lock
+        synchronized int get() { return n; }
+    }
+
+    public static void main(String[] args) throws Exception {
+        var buffer = new Buffer&lt;Integer&gt;(2);
+        List&lt;Integer&gt; consumed = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        Thread producer = new Thread(() -&gt; {
+            try {
+                for (int i = 1; i &lt;= 20; i++) buffer.put(i);
+                buffer.put(-1);
+                buffer.put(-1);                            // one stop signal per consumer
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+        Runnable consumer = () -&gt; {
+            try {
+                for (int item; (item = buffer.take()) != -1; ) consumed.add(item);
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        };
+        Thread c1 = new Thread(consumer), c2 = new Thread(consumer);
+        producer.start(); c1.start(); c2.start();
+        producer.join(); c1.join(); c2.join();
+        List&lt;Integer&gt; sorted = new ArrayList&lt;&gt;(consumed);
+        Collections.sort(sorted);
+        System.out.println("consumed " + sorted.size() + " items, sum " + sorted.stream().mapToInt(i -&gt; i).sum()
+                + ", buffer never held more than " + buffer.maxSeen());
+
+        var counter = new Counter();
+        counter.addTwice();
+        System.out.println("re-entrant addTwice: " + counter.get());
+
+        Object monitor = new Object();
+        try {
+            monitor.wait();                                // without holding the monitor
+        } catch (IllegalMonitorStateException e) {
+            System.out.println("IllegalMonitorStateException: " + e.getMessage());
+        }
+        synchronized (monitor) {
+            System.out.println("holdsLock inside synchronized: " + Thread.holdsLock(monitor));
+            monitor.wait(10);                              // releases the monitor while it waits
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · WaitNotify.java</div>
+<pre><code class="language-plaintext">consumed 20 items, sum 210, buffer never held more than 2
+re-entrant addTwice: 2
+IllegalMonitorStateException: current thread is not owner
+holdsLock inside synchronized: true</code></pre>
+      </div>
+      <div class="panel">
+        <h3>The rules</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li>A <code>synchronized</code> instance method locks <code>this</code>; a static one locks the <code>Class</code> object. They are different locks.</li>
+          <li>The lock is <b>re-entrant</b>: the thread that holds it can enter it again, so <code>addTwice</code> calling <code>add</code> works.</li>
+          <li>Call <code>wait</code>, <code>notify</code> and <code>notifyAll</code> only while holding that object's monitor, or get <code>IllegalMonitorStateException</code>.</li>
+          <li><b>Always wait in a loop</b> that rechecks the condition. Wakeups can be spurious, and another thread may take the item between the notify and your return from <code>wait</code>.</li>
+          <li>Prefer <code>notifyAll</code>. <code>notify</code> wakes one arbitrary waiter, which may be a producer when only a consumer can make progress.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Lock on a private object</span>Locking <code>this</code> in a public class lets any caller take your lock too. Use <code>private final Object lock = new Object()</code>. Never lock a string literal or a boxed number: they are shared across the JVM, and javac's lint flags the boxed case (<code>[synchronization]</code> on JDK 21, <code>[identity]</code> on 25), as <a data-deck="cj" data-slide="Concurrency bugs in real code">concurrency bugs</a> shows.</div>
+    <div class="note tip"><span class="lbl">Virtual threads and synchronized</span>On JDK 21 to 23, blocking inside <code>synchronized</code> pinned a virtual thread to its carrier. JDK 24 removed that (JEP 491), so <code>synchronized</code> is fine again on 24 and later. <a data-deck="cj" data-slide="Virtual threads under the hood">Virtual threads under the hood</a> measures both.</div>
+    <div class="note"><span class="lbl">When to use it today</span><code>synchronized</code> is still the simplest correct lock for short critical sections. For waiting, use <code>BlockingQueue</code>, <code>CountDownLatch</code> or a <code>Condition</code>. Hand-written <code>wait</code> and <code>notify</code> belong in interviews and in libraries.</div>
+  </div>
+</section>

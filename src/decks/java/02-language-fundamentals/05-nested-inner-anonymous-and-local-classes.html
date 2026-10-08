@@ -1,0 +1,76 @@
+<section class="slide" data-sec="Language fundamentals" data-title="Nested, inner, anonymous and local classes">
+  <h2>Four kinds of nested class, and the hidden reference the inner ones carry</h2>
+  <p class="dek">A class declared inside another is either <b>static nested</b>, an ordinary class that happens to live in another's namespace, or one of the three <b>inner</b> kinds: member, local and anonymous. Created in an instance context, an inner class gets a hidden field pointing at the outer object. That field is what lets it read outer state, and it is also how an inner class keeps a large object alive by accident.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Nested.java · all four kinds, and a lambda for contrast</div>
+<pre><code class="language-java">import java.lang.reflect.Field;
+import java.util.function.Supplier;
+
+public class Nested {
+    private int openOrders = 3;
+
+    static class Totals {                          // static nested: no outer instance
+        String hello() { return "static nested: needs no Nested instance"; }
+    }
+
+    class Inner {                                  // inner: tied to one Nested instance
+        String hello() { return "inner reads the outer field: openOrders=" + openOrders; }
+    }
+
+    Supplier&lt;String&gt; anonymous() {
+        return new Supplier&lt;&gt;() {                  // a class, so 'this' is the anonymous object
+            @Override public String get() { return "anonymous: this is " + this.getClass().getName(); }
+        };
+    }
+
+    Supplier&lt;String&gt; lambda() {
+        return () -&gt; "lambda: this is " + this.getClass().getName();   // the enclosing Nested
+    }
+
+    public static void main(String[] args) {
+        Nested outer = new Nested();
+        System.out.println(new Totals().hello());
+        Nested.Inner inner = outer.new Inner();
+        System.out.println(inner.hello());
+        for (Field f : Inner.class.getDeclaredFields())
+            System.out.println("hidden field in Inner: " + f);
+        System.out.println(outer.anonymous().get());
+        System.out.println(outer.lambda().get());
+
+        int base = 10;                             // effectively final, so it can be captured
+        record Line(String sku, int qty) { }       // local records are implicitly static
+        class Pricer { int total(Line l) { return base + l.qty(); } }
+        System.out.println("local class: " + new Pricer().total(new Line("SKU-1", 5)));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Nested.java</div>
+<pre><code class="language-plaintext">static nested: needs no Nested instance
+inner reads the outer field: openOrders=3
+hidden field in Inner: final Nested Nested$Inner.this$0
+anonymous: this is Nested$1
+lambda: this is Nested
+local class: 15</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl">this$0 is a strong reference</span>A listener, a cache entry or a task built from an inner class keeps its whole outer object reachable for as long as it lives itself. Since JDK 18, javac leaves the field out when the inner class never uses the outer instance. Declare nested classes <code>static</code> unless they really need it.</div>
+      <div class="note tip"><span class="lbl">this in a lambda</span>An anonymous class is a class, so <code>this</code> is the anonymous object (<code>Nested$1</code>). A lambda is not a class you declare: <code>this</code> inside it is the enclosing instance, and it captures that instance only if it uses it.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Kind</th><th>Outer instance</th><th>Captures locals</th><th>Use it for</th></tr></thead>
+      <tbody>
+        <tr><td>Static nested</td><td>None</td><td>No</td><td>Builders, entries, helper types that belong to one class. The default.</td></tr>
+        <tr><td>Inner (member)</td><td>Yes, <code>this$0</code></td><td>No</td><td>Objects that are views of the outer one: an iterator over a collection's array.</td></tr>
+        <tr><td>Local class</td><td>In an instance method</td><td>Effectively final ones</td><td>A named helper used in one method. Local records, enums and interfaces are implicitly static.</td></tr>
+        <tr><td>Anonymous class</td><td>In an instance method</td><td>Effectively final ones</td><td>A one-off implementation of an interface with several methods or with state. One <code>.class</code> file per site.</td></tr>
+        <tr><td>Lambda</td><td>Only if used</td><td>Effectively final ones</td><td>Any functional interface: see <a data-deck="st" data-slide="The functional interfaces streams take">the functional interfaces</a>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

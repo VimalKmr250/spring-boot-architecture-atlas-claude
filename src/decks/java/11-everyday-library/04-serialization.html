@@ -1,0 +1,103 @@
+<section class="slide" data-sec="Everyday library" data-title="Serialization">
+  <h2>Java serialization rebuilds objects without calling their constructors, which makes untrusted input dangerous</h2>
+  <p class="dek">A class that implements <code>Serializable</code> can be written as bytes and read back. Reading it back allocates the object and fills its fields from the stream, and skips the class's constructors, so any validation they contain never runs. Records are the exception: they are rebuilt through their canonical constructor. On bytes from outside, deserialization can be made to build objects whose side effects run code. Filter it, or use another format.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SerializationDemo.java · transient, constructors, records, a filter</div>
+<pre><code class="language-java">import java.io.*;
+import java.util.HexFormat;
+
+public class SerializationDemo {
+    static class Customer implements Serializable {
+        private static final long serialVersionUID = 1L;    // pin it, or any change breaks old data
+        final String name;
+        transient String sessionToken;                       // never written
+        Customer(String name, String token) {
+            this.name = name;
+            this.sessionToken = token;
+            System.out.println("  Customer constructor ran");
+        }
+    }
+
+    record Money(long cents, String currency) implements Serializable {
+        Money {
+            if (cents &lt; 0) throw new IllegalArgumentException("negative: " + cents);
+            System.out.println("  Money canonical constructor ran");
+        }
+    }
+
+    static byte[] write(Object o) throws IOException {
+        var bytes = new ByteArrayOutputStream();
+        try (var out = new ObjectOutputStream(bytes)) { out.writeObject(o); }
+        return bytes.toByteArray();
+    }
+
+    static Object read(byte[] data, ObjectInputFilter filter) throws IOException, ClassNotFoundException {
+        try (var in = new ObjectInputStream(new ByteArrayInputStream(data))) {
+            if (filter != null) in.setObjectInputFilter(filter);
+            return in.readObject();
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        System.out.println("creating and writing a Customer:");
+        byte[] customer = write(new Customer("Ana", "secret-123"));
+        System.out.println("  " + customer.length + " bytes, starting " + HexFormat.of().formatHex(customer, 0, 4).toUpperCase());
+        System.out.println("reading it back:");
+        Customer back = (Customer) read(customer, null);
+        System.out.println("  name " + back.name + ", sessionToken " + back.sessionToken + "  (no constructor ran)");
+
+        System.out.println("creating and writing a Money record:");
+        byte[] money = write(new Money(1250, "EUR"));
+        System.out.println("reading it back:");
+        System.out.println("  " + read(money, null) + "  (records are rebuilt through the canonical constructor)");
+
+        ObjectInputFilter onlyMoney = ObjectInputFilter.Config.createFilter("SerializationDemo$Money;java.lang.*;!*");
+        System.out.println("with a filter that allows only Money: " + read(money, onlyMoney));
+        try {
+            read(customer, onlyMoney);
+        } catch (InvalidClassException e) {
+            System.out.println("Customer through the same filter: InvalidClassException: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · SerializationDemo.java</div>
+<pre><code class="language-plaintext">creating and writing a Customer:
+  Customer constructor ran
+  81 bytes, starting ACED0005
+reading it back:
+  name Ana, sessionToken null  (no constructor ran)
+creating and writing a Money record:
+  Money canonical constructor ran
+reading it back:
+  Money canonical constructor ran
+  Money[cents=1250, currency=EUR]  (records are rebuilt through the canonical constructor)
+  Money canonical constructor ran
+with a filter that allows only Money: Money[cents=1250, currency=EUR]
+Customer through the same filter: InvalidClassException: filter status: REJECTED</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Piece</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>Serializable</code></td><td>A marker interface: no methods, just permission</td></tr>
+            <tr><td><code>serialVersionUID</code></td><td>The class's version. Leave it out and the serialization runtime computes one from the class's shape, so adding a method breaks every stored object with <code>InvalidClassException</code>.</td></tr>
+            <tr><td><code>transient</code></td><td>Not written; the field reads back as its default, <code>null</code> above</td></tr>
+            <tr><td><code>readObject</code>, <code>readResolve</code></td><td>Private hooks to validate fields, or to replace the object read, as singletons do</td></tr>
+            <tr><td><code>ObjectInputFilter</code> <span class="tag a">9</span></td><td>An allow-list of classes and limits on depth and size, checked before anything is built</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Never deserialize untrusted bytes</span>A crafted stream can chain classes already on your classpath (the "gadget chain") so that merely reading it runs a command. This was the 2015 Apache Commons Collections vulnerability, and it led to JEP 290's filters in Java 9 and the context-specific filters of JEP 415 in 17. Set <code>jdk.serialFilter</code> JVM-wide, as an allow-list.</div>
+    <div class="note warn"><span class="lbl">No constructor means no validation</span>A class that checks its arguments in the constructor can still be read back holding values the constructor would reject. Validate again in <code>readObject</code>, or make it a record, whose canonical constructor runs on every read: above it ran once on creation and once for each of the two reads.</div>
+    <div class="note tip"><span class="lbl">Prefer an explicit format</span>JSON with Jackson, Protocol Buffers or Avro: a schema you control, readable by other languages, and no code run while parsing. Java serialization still hides in HTTP session replication, some caches, and RMI. Those are worth finding and replacing.</div>
+  </div>
+</section>

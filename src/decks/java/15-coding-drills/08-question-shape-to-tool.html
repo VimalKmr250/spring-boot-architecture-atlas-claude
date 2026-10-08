@@ -1,0 +1,35 @@
+<section class="slide" data-sec="Coding drills" data-title="Question shape to tool">
+  <h2>Read the question for its shape, and the Java tool follows</h2>
+  <p class="dek">Most core-Java coding prompts are one of about twenty shapes in disguise. Spot the shape in the first minute and the first line of the answer is already decided. This table is the one to revise from the night before.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>If the question says</th><th>Reach for</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>"…an immutable / value object"</td><td>A record, or a final class with copies in and out</td><td>Mutable components; <code>Date</code>; arrays</td></tr>
+        <tr><td>"…as a map key" or "…in a set"</td><td><code>equals</code> and <code>hashCode</code> from the same immutable fields</td><td><code>equals(MyType)</code> overloads; mutable fields</td></tr>
+        <tr><td>"…sorted by X, then Y"</td><td><code>Comparator.comparing(…).thenComparing(…)</code></td><td><code>a - b</code> comparators; ties that drop <code>TreeSet</code> elements</td></tr>
+        <tr><td>"…the k largest / most frequent"</td><td>A min-heap <code>PriorityQueue</code> of size k</td><td>Sorting everything when n is huge</td></tr>
+        <tr><td>"…least recently used cache"</td><td><code>LinkedHashMap</code> in access order with <code>removeEldestEntry</code></td><td>It is not thread-safe, even for reads</td></tr>
+        <tr><td>"…nearest price band / slot"</td><td><code>TreeMap.floorEntry</code>, <code>ceilingKey</code></td><td>A chain of <code>if</code>s</td></tr>
+        <tr><td>"…a stack" or "…a queue"</td><td><code>ArrayDeque</code></td><td><code>Stack</code>, <code>LinkedList</code>, <code>remove(0)</code> on an <code>ArrayList</code></td></tr>
+        <tr><td>"…thread-safe singleton"</td><td>An enum, or the holder idiom</td><td>Double-checked locking without <code>volatile</code></td></tr>
+        <tr><td>"…count from many threads"</td><td><code>LongAdder</code>, <code>AtomicLong</code>, <code>ConcurrentHashMap.merge</code></td><td><code>volatile</code> and <code>++</code>; <code>get</code> then <code>put</code></td></tr>
+        <tr><td>"…threads take turns / print in order"</td><td>Semaphores in a ring, or a lock with one <code>Condition</code> per thread</td><td><code>if</code> around <code>wait</code>; a final thread that never wakes the other</td></tr>
+        <tr><td>"…producer and consumer"</td><td>A bounded <code>BlockingQueue</code>, with poison pills to stop</td><td>Unbounded queues; <code>wait</code>/<code>notify</code> by hand</td></tr>
+        <tr><td>"…at most N at a time"</td><td><code>Semaphore</code></td><td>A missing <code>release</code> in <code>finally</code></td></tr>
+        <tr><td>"…wait for all N tasks"</td><td><code>invokeAll</code>, <code>CompletableFuture.allOf</code>, <code>CountDownLatch</code></td><td>Starting each task only after the last finished</td></tr>
+        <tr><td>"…call services in parallel, with a timeout"</td><td><code>CompletableFuture</code> on your own executor, <code>orTimeout</code>, <code>completeOnTimeout</code></td><td>The common pool; timeouts that do not stop the work</td></tr>
+        <tr><td>"…run every N seconds"</td><td><code>ScheduledExecutorService</code></td><td><code>Timer</code>; a task exception that silently ends the schedule</td></tr>
+        <tr><td>"…rate limiter"</td><td>A token bucket refilled from <code>System.nanoTime</code></td><td>A timer thread per client</td></tr>
+        <tr><td>"…parse dates / money"</td><td><code>java.time</code> with an explicit zone; <code>BigDecimal</code> from strings</td><td><code>SimpleDateFormat</code> shared; <code>double</code>; <code>YYYY</code></td></tr>
+        <tr><td>"…read a big file"</td><td><code>Files.lines</code> in try-with-resources, or a <code>BufferedReader</code></td><td><code>readAllLines</code> on gigabytes; an unclosed stream</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">Where each one is built</span>The LLD tab builds the LRU cache and the rate limiter in full: <a data-deck="lld" data-slide="Thread-safe LRU cache: code">LRU cache</a>, <a data-deck="lld" data-slide="Token-bucket rate limiter">rate limiter</a>. The concurrency rows come from <a data-deck="cj" data-slide="Choosing a concurrency tool">choosing a concurrency tool</a>.</div>
+    <div class="note"><span class="lbl">After this tab</span>Rehearse the answers out loud with the <a data-deck="cj" data-slide="Q1–3 · Fundamentals">interview questions</a>, and take the system-level version of the same ideas into the <a data-deck="hld" data-slide="What this deck is">system design tab</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Language fundamentals" data-title="final, static and initialisation order">
+  <h2>Initialisation runs in a fixed order, and a constructor that calls an overridable method sees null</h2>
+  <p class="dek">A class is initialised once, lazily, the first time it is really used: static initialisers in source order, superclass first. Each <code>new</code> then runs the superclass constructor, then this class's field initialisers and instance blocks in source order, then the rest of the constructor. A method called from the superclass constructor runs before the subclass has assigned a single field.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">InitOrder.java · numbered in the order the lines run</div>
+<pre><code class="language-java">public class InitOrder {
+    static String log(String step, String value) { System.out.println(step); return value; }
+    static void log(String step) { System.out.println(step); }
+
+    static class Base {
+        static { log("1  Base static block"); }
+        private final String tag = log("3  Base field initialiser", "B");
+        { log("4  Base instance block"); }
+        Base() {
+            log("5  Base constructor body, tag=" + tag);
+            describe();                          // calls the subclass override
+        }
+        void describe() { log("   Base.describe"); }
+    }
+
+    static class Order extends Base {
+        static final String PREFIX = "ORD-";     // compile-time constant: inlined by javac
+        static String region = log("2  Order static field", "EU");
+        private final String id = log("7  Order field initialiser", PREFIX + 1);
+        Order() { log("8  Order constructor body, id=" + id); }
+        @Override void describe() { log("6  Order.describe sees id=" + id); }
+    }
+
+    public static void main(String[] args) {
+        log("main reads Order.PREFIX = " + Order.PREFIX + " (no class initialised yet)");
+        log("-- new Order()");
+        new Order();
+        log("-- new Order() again: no static lines this time");
+        new Order();
+        log("Order.region was set once: " + Order.region);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · InitOrder.java</div>
+<pre><code class="language-plaintext">main reads Order.PREFIX = ORD- (no class initialised yet)
+-- new Order()
+1  Base static block
+2  Order static field
+3  Base field initialiser
+4  Base instance block
+5  Base constructor body, tag=B
+6  Order.describe sees id=null
+7  Order field initialiser
+8  Order constructor body, id=ORD-1
+-- new Order() again: no static lines this time
+3  Base field initialiser
+4  Base instance block
+5  Base constructor body, tag=B
+6  Order.describe sees id=null
+7  Order field initialiser
+8  Order constructor body, id=ORD-1
+Order.region was set once: EU</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl">Line 6: id=null</span><code>Base()</code> calls <code>describe()</code>, which dispatches to <code>Order.describe</code> before <code>Order</code>'s field initialiser has run. Never call an overridable method from a constructor. javac 21 can catch it: <code>-Xlint:this-escape</code> warns when a public class's constructor lets <code>this</code> escape to code a subclass could override.</div>
+      <div class="note tip"><span class="lbl">The first line: no initialisation</span><code>PREFIX</code> is a compile-time constant, so javac copied <code>"ORD-"</code> into <code>main</code>. Reading it does not touch <code>Order</code>. The catch: change a constant and every class that uses it must be recompiled, or it keeps the old value.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Modifier</th><th>On</th><th>Means</th><th>Does not mean</th></tr></thead>
+      <tbody>
+        <tr><td><code>final</code></td><td>local, parameter</td><td>Assigned once. Lambdas and inner classes may capture only final or effectively final locals.</td><td>That the object it refers to is immutable</td></tr>
+        <tr><td><code>final</code></td><td>field</td><td>Assigned exactly once, by the end of the constructor. The memory model guarantees other threads see it fully set once construction finishes (<a data-deck="cj" data-slide="Happens-before">happens-before</a>).</td><td>A <code>final List</code> cannot be modified</td></tr>
+        <tr><td><code>final</code></td><td>method, class</td><td>Cannot be overridden, cannot be extended: <code>String</code>, the wrappers and every record are final.</td><td>Faster: the JIT inlines non-final methods as well</td></tr>
+        <tr><td><code>static</code></td><td>field, method</td><td>One per class (per class loader), shared by every instance. Static methods are hidden, never overridden.</td><td>Thread-safe: a static mutable field is shared state</td></tr>
+        <tr><td><code>static</code></td><td>nested class</td><td>No hidden reference to an outer instance: the default for nested types.</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
