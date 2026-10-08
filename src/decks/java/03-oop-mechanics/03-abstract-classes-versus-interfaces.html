@@ -1,0 +1,108 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Abstract classes versus interfaces">
+  <h2>Interfaces carry behaviour since Java 8; abstract classes still own the state and the constructor</h2>
+  <p class="dek">Default, static and private methods let an interface ship code, so "an interface has no implementation" is out of date. What an interface still cannot have is instance state or a constructor, which means it cannot protect an invariant. When two interfaces supply the same default, three rules decide which one runs, and if none applies the class must choose.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Interfaces.java · default-method conflicts, and what only a class can do</div>
+<pre><code class="language-java">public class Interfaces {
+    interface Shippable {
+        int MAX_KG = 30;                                    // implicitly public static final
+        default String label() { return "ship: " + describe(); }
+        private String describe() { return "parcel up to " + MAX_KG + " kg"; }   // since 9
+        static Shippable standard() { return new Shippable() { }; }             // since 8
+    }
+    interface Giftable {
+        default String label() { return "gift"; }
+    }
+
+    // Two defaults with the same signature: the class must choose.
+    static class Order implements Shippable, Giftable {
+        @Override public String label() { return Shippable.super.label() + " + " + Giftable.super.label(); }
+    }
+
+    // Rule 1: a method from a class beats any default.
+    static class Base { public String label() { return "Base.label"; } }
+    static class Special extends Base implements Giftable { }
+
+    // Rule 2: the more specific interface wins.
+    interface FragileGift extends Giftable {
+        @Override default String label() { return "fragile gift"; }
+    }
+    static class Vase implements Giftable, FragileGift { }
+
+    // Abstract classes keep state and constructors; interfaces cannot.
+    abstract static class Payment {
+        private final long cents;
+        protected Payment(long cents) {
+            if (cents &lt;= 0) throw new IllegalArgumentException("cents must be positive");
+            this.cents = cents;
+        }
+        final String receipt() { return method() + " " + cents; }   // template method
+        abstract String method();
+    }
+    static class Card extends Payment {
+        Card(long cents) { super(cents); }
+        @Override String method() { return "card"; }
+    }
+
+    public static void main(String[] args) {
+        System.out.println(new Order().label());
+        System.out.println(new Special().label());
+        System.out.println(new Vase().label());
+        System.out.println(Shippable.standard().label());
+        System.out.println(new Card(1250).receipt());
+        try {
+            new Card(0);
+        } catch (IllegalArgumentException e) {
+            System.out.println("rejected: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Interfaces.java</div>
+<pre><code class="language-plaintext">ship: parcel up to 30 kg + gift
+Base.label
+fragile gift
+ship: parcel up to 30 kg
+card 1250
+rejected: cents must be positive</code></pre>
+      </div>
+      <div class="panel">
+        <h3>Which default runs</h3>
+        <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>A class wins.</b> A method inherited from a superclass beats any default: <code>Special</code> prints <code>Base.label</code>.</li>
+          <li><b>The more specific interface wins.</b> <code>FragileGift</code> extends <code>Giftable</code>, so its default is used.</li>
+          <li><b>Otherwise it does not compile.</b> Override the method, and call <code>Shippable.super.label()</code> to reuse one.</li>
+        </ol>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac · DefaultConflict.java, the same Order without its override</div>
+<pre><code class="language-plaintext">DefaultConflict.java:4: error: types Shippable and Giftable are incompatible;
+    static class Order implements Shippable, Giftable { }       // no override: which label()?
+           ^
+  class Order inherits unrelated defaults for label() from types Shippable and Giftable
+1 error</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th></th><th>Abstract class</th><th>Interface</th></tr></thead>
+        <tbody>
+          <tr><td>Instance fields</td><td>Yes, of any visibility</td><td>No. Fields are <code>public static final</code> constants.</td></tr>
+          <tr><td>Constructor</td><td>Yes, so it can validate and enforce invariants</td><td>No</td></tr>
+          <tr><td>Method bodies</td><td>Any</td><td><code>default</code> and <code>static</code> <span class="tag a">8</span>, <code>private</code> <span class="tag a">9</span></td></tr>
+          <tr><td>How many</td><td>One superclass</td><td>Any number</td></tr>
+          <tr><td>Lambdas</td><td>No</td><td>Yes, if it has exactly one abstract method</td></tr>
+          <tr><td>Use it for</td><td>A family that shares state and a fixed algorithm (template method)</td><td>A capability unrelated classes can offer; the type your callers depend on</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">The design question</span>Which one to reach for in a model, and why composition usually beats both, is on <a data-deck="lld" data-slide="Composition over inheritance; interface or abstract class">composition over inheritance</a> in the LLD tab. A common shape uses both: an interface as the type, and an abstract class that implements it as an optional convenience, as <code>List</code> and <code>AbstractList</code> do.</div>
+  </div>
+</section>

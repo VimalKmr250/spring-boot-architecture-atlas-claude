@@ -1,0 +1,45 @@
+<section class="slide" data-sec="Orientation" data-title="What this tab covers">
+  <h2>Core Java: the language, the collections, concurrency and the JVM, with the failure behind each</h2>
+  <p class="lede">A reference for the parts of Java that every Spring Boot service stands on and every Java interview probes: how the language resolves types and methods, how the collections work inside, how threads share memory, what the executors and concurrent collections do, and what the JVM does with your code at run time. Every claim comes with a program that shows it, and the output that program printed.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">90</span><p>slides in fifteen sections. Concurrency, the largest part, takes 22 of them: the memory model, locks, atomics, executors, <code>CompletableFuture</code>, virtual threads and the concurrent collections.</p></div>
+    <div class="card lift"><span class="bignum">30</span><p>interview questions, each with a 30-second answer and a follow-up, and eight coding drills solved in code that checks itself: an immutable class, a <code>HashMap</code> from scratch, two threads in turn, and more.</p></div>
+    <div class="card lift"><span class="bignum">25</span><p>JDK 25, the current LTS, runs every program; the code compiles for Java 21. Anything added after Java 8 carries a <span class="tag a">since</span> tag with its release.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The fifteen sections</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Orientation</dt><dd>this slide, topics by interview level, and an index of every slide</dd>
+        <dt>Language</dt><dd>primitives and boxing, pass-by-value, strings, initialisation order, nested classes, the <code>Object</code> contract, immutability</dd>
+        <dt>OOP mechanics</dt><dd>overloading and overriding, dispatch, interfaces, records, sealed types, enums</dd>
+        <dt>Generics</dt><dd>erasure, wildcards and PECS, inference, the unchecked traps</dd>
+        <dt>Exceptions</dt><dd>the hierarchy, try-with-resources, designing exceptions</dd>
+        <dt>Collections</dt><dd>choosing one, <code>ArrayList</code>, <code>HashMap</code> inside, ordered maps, sets, queues, iterators, unmodifiable views</dd>
+        <dt>Concurrency</dt><dd>threads, the memory model, happens-before, <code>volatile</code>, locks, atomics, deadlock, safety strategies</dd>
+        <dt>Executors and async</dt><dd>thread pools, futures, <code>CompletableFuture</code>, fork/join, scheduling, virtual threads</dd>
+        <dt>Concurrent collections</dt><dd><code>ConcurrentHashMap</code>, copy-on-write, blocking queues, synchronizers, choosing a tool</dd>
+        <dt>The JVM</dt><dd>bytecode, class loading, memory areas, GC roots, the JIT, object layout, reflection and proxies</dd>
+        <dt>Everyday library</dt><dd><code>java.time</code>, numbers, files, serialization</dd>
+        <dt>Modern Java</dt><dd>what each LTS changed, the new syntax, Java 25</dd>
+        <dt>Pitfalls</dt><dd>equality, concurrency and resource bugs as reviewers meet them</dd>
+        <dt>Interview questions</dt><dd>thirty questions, three per slide</dd>
+        <dt>Coding drills</dt><dd>eight problems, solved and tested</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>How to use it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each topic is its own section.</li>
+          <li>Preparing for an interview? Start with <a data-deck="cj" data-slide="Topics by interview level">topics by interview level</a>, then the questions and the drills. Every answer links back to the slide that goes deeper.</li>
+          <li>Looking something up? <a data-deck="cj" data-slide="The language and library on one page">The one-page index</a> links every slide by topic.</li>
+          <li>Other tabs go further on neighbouring ground: lambdas and <code>Optional</code> in <b>Java streams</b>, design patterns in <b>Low-level design</b>, container memory and GC tuning in <b>Spring Boot</b>. This tab links to them rather than repeating them.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">How the code is written</span>A code label that starts with a file name, such as <code>HashMapPeek.java</code>, is a complete Java file. It compiles with <code>javac --release 21 -Xlint:all</code> without warnings, except where the slide shows the warning or the error on purpose, and the compiler's real output is then shown beside it. The block labelled <b>Output on JDK 25</b> is what that file printed; a label says so when timings or counts vary between runs. <code>Java25.java</code> compiles with <code>--release 25</code>. Every program was also run on JDK 26.</div>
+    </div>
+  </div>
+</section>

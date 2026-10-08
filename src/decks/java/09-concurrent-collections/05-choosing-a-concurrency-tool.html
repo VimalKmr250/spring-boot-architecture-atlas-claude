@@ -1,0 +1,34 @@
+<section class="slide" data-sec="Concurrent collections" data-title="Choosing a concurrency tool">
+  <h2>Name the problem first; the tool follows from it</h2>
+  <p class="dek">Most concurrency questions, in interviews and in code review, reduce to a handful of needs. Each need has one tool that fits it and one tool people reach for instead, which is usually where the bug comes from. Read the right-hand column as the list of things to look for in a review.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>I need to</th><th>Use</th><th>Instead of</th></tr></thead>
+      <tbody>
+        <tr><td>Stop a worker loop from another thread</td><td><code>volatile boolean</code>, or interrupt it</td><td>A plain field, which the loop may never re-read</td></tr>
+        <tr><td>Count events from many threads</td><td><code>LongAdder</code>; <code>AtomicLong</code> if read often</td><td><code>volatile long</code> and <code>++</code></td></tr>
+        <tr><td>Update one value from its old value</td><td><code>AtomicReference.updateAndGet</code> with an immutable value</td><td>Read, compute, then <code>set</code></td></tr>
+        <tr><td>Keep an invariant across several fields</td><td><code>synchronized</code> or <code>ReentrantLock</code> around every access</td><td>Making each field <code>volatile</code></td></tr>
+        <tr><td>Wait for a lock, but not forever</td><td><code>ReentrantLock.tryLock(timeout)</code></td><td><code>synchronized</code>, which cannot time out</td></tr>
+        <tr><td>Share a map between threads</td><td><code>ConcurrentHashMap</code> with <code>merge</code> and <code>compute</code></td><td><code>HashMap</code>, or <code>get</code> then <code>put</code></td></tr>
+        <tr><td>Load a cache entry once per key</td><td><code>computeIfAbsent</code></td><td><code>containsKey</code>, then <code>put</code></td></tr>
+        <tr><td>Share a list that is read far more than written</td><td><code>CopyOnWriteArrayList</code></td><td><code>synchronizedList</code>, iterated without its lock</td></tr>
+        <tr><td>Hand work from producers to consumers</td><td>A bounded <code>BlockingQueue</code></td><td>A list and <code>wait</code> / <code>notify</code></td></tr>
+        <tr><td>Limit concurrent calls to a dependency</td><td><code>Semaphore</code>, or a sized connection pool</td><td>A small thread pool used as a limiter</td></tr>
+        <tr><td>Run tasks in the background</td><td>A <code>ThreadPoolExecutor</code> with a bounded queue and named threads</td><td><code>new Thread</code> per task, or <code>newFixedThreadPool</code>'s unbounded queue</td></tr>
+        <tr><td>Handle many blocking I/O tasks at once</td><td>Virtual threads <span class="tag a">21</span></td><td>A platform pool of hundreds of threads</td></tr>
+        <tr><td>Split CPU-bound work across cores</td><td><code>ForkJoinPool</code>, or a parallel stream</td><td>More threads than cores</td></tr>
+        <tr><td>Compose async calls with timeouts and fallbacks</td><td><code>CompletableFuture</code> on your own executor</td><td>Blocking <code>get()</code> calls in sequence</td></tr>
+        <tr><td>Run something periodically</td><td><code>ScheduledExecutorService</code>, with a try/catch in the task</td><td><code>java.util.Timer</code></td></tr>
+        <tr><td>Wait for N things to finish</td><td><code>invokeAll</code>, <code>allOf</code> or <code>CountDownLatch</code></td><td>Polling a counter in a loop</td></tr>
+        <tr><td>Carry per-request context</td><td><code>ScopedValue</code> <span class="tag a">25</span>, or a <code>ThreadLocal</code> removed in <code>finally</code></td><td>A <code>ThreadLocal</code> that is never removed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">The order to think in</span>Can it be unshared? Can it be immutable? Is there a thread-safe class that already does this? Only then: which lock, and what exactly does it protect. Write that last answer in a comment beside the lock.</div>
+    <div class="note"><span class="lbl">Where the designs live</span>The LLD tab uses these tools in full designs: <a data-deck="lld" data-slide="Thread-safe LRU cache: code">a thread-safe LRU cache</a> and <a data-deck="lld" data-slide="Token-bucket rate limiter">a token-bucket rate limiter</a>. The interview questions on <a data-deck="cj" data-slide="Q19–21 · Locks and synchronizers">locks and synchronizers</a> test the choices on this page.</div>
+  </div>
+</section>

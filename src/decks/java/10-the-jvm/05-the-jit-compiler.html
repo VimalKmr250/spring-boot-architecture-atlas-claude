@@ -1,0 +1,108 @@
+<section class="slide" data-sec="The JVM" data-title="The JIT compiler">
+  <h2>The JIT compiles what runs hot, optimises it with what it has seen, and undoes it when it was wrong</h2>
+  <p class="dek">HotSpot starts every method in the interpreter and counts calls and loop iterations. Hot methods are compiled by C1, which also records which types and branches actually occur, and then by C2, which uses that profile to inline, unroll loops and remove allocations. The first call below took milliseconds; the two-thousandth took tens of microseconds. That gap is why a freshly started service is slow, and why naive benchmarks lie.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Jit.java · warm-up, and an allocation the JIT removes</div>
+<pre><code class="language-java">import java.lang.management.ManagementFactory;
+
+public class Jit {
+    record Point(double x, double y) {
+        double length() { return Math.sqrt(x * x + y * y); }
+    }
+
+    static double walk(int steps) {                 // one Point per step, and none escapes it
+        double total = 0;
+        for (int i = 0; i &lt; steps; i++) {
+            Point p = new Point(i, i + 1);
+            total += p.length();
+        }
+        return total;
+    }
+
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+
+    public static void main(String[] args) {
+        long[] nanos = new long[5];
+        double sink = 0;
+        for (int round = 0; round &lt; 2_000; round++) {
+            long t0 = System.nanoTime();
+            sink += walk(10_000);
+            long ns = System.nanoTime() - t0;
+            if (round == 0) nanos[0] = ns;
+            if (round == 1) nanos[1] = ns;
+            if (round == 10) nanos[2] = ns;
+            if (round == 100) nanos[3] = ns;
+            if (round == 1_999) nanos[4] = ns;
+        }
+        System.out.printf("walk(10,000) took %d, %d, %d, %d, %d microseconds on runs 1, 2, 11, 101, 2000%n",
+                nanos[0] / 1_000, nanos[1] / 1_000, nanos[2] / 1_000, nanos[3] / 1_000, nanos[4] / 1_000);
+
+        long before = MX.getCurrentThreadAllocatedBytes();
+        sink += walk(1_000_000);
+        long bytes = MX.getCurrentThreadAllocatedBytes() - before;
+        System.out.printf("walk(1,000,000) once warm allocated %,d bytes for 1,000,000 Points (sink %.0f)%n", bytes, Math.floor(sink));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Jit.java · the timings vary by run</div>
+<pre><code class="language-plaintext">walk(10,000) took 22959, 1226, 238, 37, 23 microseconds on runs 1, 2, 11, 101, 2000
+walk(1,000,000) once warm allocated 0 bytes for 1,000,000 Points (sink 848528141247)</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output with -XX:-DoEscapeAnalysis</div>
+<pre><code class="language-plaintext">walk(10,000) took 1126, 495, 145, 79, 121 microseconds on runs 1, 2, 11, 101, 2000
+walk(1,000,000) once warm allocated 32,000,000 bytes for 1,000,000 Points (sink 848528141247)</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">-XX:+PrintCompilation · the lines for Jit's own methods</div>
+<pre><code class="language-plaintext">67   90       3       Jit$Point::&lt;init&gt; (15 bytes)
+67   91       3       Jit$Point::length (23 bytes)
+67   92       4       Jit$Point::&lt;init&gt; (15 bytes)
+68   90       3       Jit$Point::&lt;init&gt; (15 bytes)   made not entrant: not used
+68   93       4       Jit$Point::length (23 bytes)
+68   91       3       Jit$Point::length (23 bytes)   made not entrant: not used
+71   94 %     3       Jit::walk @ 4 (40 bytes)
+72   95       3       Jit::walk (40 bytes)
+72   96 %     4       Jit::walk @ 4 (40 bytes)
+76   94 %     3       Jit::walk @ 4 (40 bytes)   made not entrant: OSR invalidation of lower level
+76   97       4       Jit::walk (40 bytes)
+78   95       3       Jit::walk (40 bytes)   made not entrant: not used</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>In the PrintCompilation lines</th><th>Means</th></tr></thead>
+        <tbody>
+          <tr><td>First two columns</td><td>Milliseconds since start, then the compile task's id</td></tr>
+          <tr><td>Tier <code>3</code>, then <code>4</code></td><td>C1 with profiling, then C2. Tier 0 is the interpreter; tiers 1 and 2 are rarely used C1 variants.</td></tr>
+          <tr><td><code>%</code> and <code>@ 4</code></td><td>On-stack replacement: the loop at bytecode index 4 was compiled while <code>walk</code> was still running, and the frame switched over mid-loop.</td></tr>
+          <tr><td><code>made not entrant</code></td><td>That compiled version is retired: replaced by a better tier, or invalidated because an assumption stopped holding (deoptimisation).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Optimisation</th><th>Here</th></tr></thead>
+        <tbody>
+          <tr><td>Inlining</td><td><code>Point.length()</code> and the constructor were compiled into <code>walk</code>, which is what lets the next one work.</td></tr>
+          <tr><td>Escape analysis</td><td>No <code>Point</code> leaves its iteration, so C2 kept its fields in registers: 0 bytes allocated, against 32 MB with the analysis switched off.</td></tr>
+          <tr><td>Speculation</td><td>Calls are inlined for the classes seen so far, behind a cheap check; a new class arriving triggers deoptimisation.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Why naive benchmarks lie</span>A loop timed with <code>System.nanoTime</code> measures the interpreter, then a compile, then code that may have removed the work entirely because its result is unused. Use JMH, which forks JVMs, warms up, and consumes results with a <code>Blackhole</code>.</div>
+    <div class="note warn"><span class="lbl">Warm-up in production</span>The first requests after a deploy run interpreted and trigger compiles that compete for CPU. Send synthetic traffic before marking an instance ready, or keep enough capacity that slow instances do not matter.</div>
+    <div class="note tip"><span class="lbl">Starting warmer</span>Class data sharing, and Project Leyden's AOT cache, store loaded classes and, from JDK 25, method profiles from a training run (JEPs 483, 514, 515). GraalVM native image compiles everything ahead of time. Both are on <a data-deck="sb" data-slide="Startup time">startup time</a>.</div>
+  </div>
+</section>

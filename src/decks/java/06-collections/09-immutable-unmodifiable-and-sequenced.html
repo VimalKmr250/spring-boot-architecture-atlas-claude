@@ -1,0 +1,100 @@
+<section class="slide" data-sec="Collections" data-title="Immutable, unmodifiable and sequenced">
+  <h2>An unmodifiable view still changes underneath you; an immutable copy never does</h2>
+  <p class="dek"><code>Collections.unmodifiableList</code> wraps a list and blocks writes through the wrapper only: the owner of the original can still change it, and the view shows every change. <code>List.of</code> and <code>List.copyOf</code> build lists that nobody can change. They also reject <code>null</code>, which surprises people the first time <code>contains(null)</code> throws. Java 21 gave the ordered collections one shared interface for their ends.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Unmodifiable.java · views, copies, their classes, the sequenced methods</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.stream.*;
+
+public class Unmodifiable {
+    static String name(Object o) { return o.getClass().getName().replace("java.util.", ""); }
+
+    public static void main(String[] args) {
+        List&lt;String&gt; source = new ArrayList&lt;&gt;(List.of("a", "b"));
+        List&lt;String&gt; view = Collections.unmodifiableList(source);
+        List&lt;String&gt; copy = List.copyOf(source);
+        source.add("c");
+        System.out.println("after source.add(c): view " + view + ", copy " + copy);
+        try { view.add("x"); } catch (UnsupportedOperationException e) { System.out.println("view.add -&gt; UnsupportedOperationException"); }
+
+        try { List.of("x", null); } catch (NullPointerException e) { System.out.println("List.of(\"x\", null) -&gt; NullPointerException"); }
+        try { List.of("x").contains(null); } catch (NullPointerException e) { System.out.println("List.of(\"x\").contains(null) -&gt; NullPointerException"); }
+        System.out.println("Stream.toList keeps nulls: " + Stream.of("x", null).toList());
+
+        System.out.println("List.of(1, 2)               " + name(List.of(1, 2)));
+        System.out.println("List.of(1, 2, 3)            " + name(List.of(1, 2, 3)));
+        System.out.println("Stream.toList()             " + name(Stream.of(1).toList()));
+        System.out.println("Collectors.toList()         " + name(Stream.of(1).collect(Collectors.toList())) + " (mutable, but not promised)");
+        System.out.println("Collections.unmodifiableList " + name(view));
+        List&lt;Integer&gt; fixed = List.of(1, 2, 3);
+        System.out.println("List.copyOf of an immutable list is the same object: " + (List.copyOf(fixed) == fixed));
+
+        List&lt;String&gt; steps = new ArrayList&lt;&gt;(List.of("placed", "paid", "shipped"));
+        System.out.println("getFirst " + steps.getFirst() + ", getLast " + steps.getLast() + ", reversed " + steps.reversed());
+        steps.reversed().addFirst("delivered");                       // a view: writes go to steps
+        steps.addFirst("created");
+        System.out.println("after reversed().addFirst and addFirst: " + steps);
+
+        LinkedHashMap&lt;String, Integer&gt; recent = new LinkedHashMap&lt;&gt;();
+        recent.put("b", 2);
+        recent.put("c", 3);
+        recent.putFirst("a", 1);
+        System.out.println("LinkedHashMap " + recent + ", firstEntry " + recent.firstEntry()
+                + ", pollLastEntry " + recent.pollLastEntry() + ", reversed keys " + recent.sequencedKeySet().reversed());
+        try { List.of().getFirst(); } catch (NoSuchElementException e) { System.out.println("List.of().getFirst() -&gt; NoSuchElementException"); }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Unmodifiable.java</div>
+<pre><code class="language-plaintext">after source.add(c): view [a, b, c], copy [a, b]
+view.add -&gt; UnsupportedOperationException
+List.of("x", null) -&gt; NullPointerException
+List.of("x").contains(null) -&gt; NullPointerException
+Stream.toList keeps nulls: [x, null]
+List.of(1, 2)               ImmutableCollections$List12
+List.of(1, 2, 3)            ImmutableCollections$ListN
+Stream.toList()             ImmutableCollections$ListN
+Collectors.toList()         ArrayList (mutable, but not promised)
+Collections.unmodifiableList Collections$UnmodifiableRandomAccessList
+List.copyOf of an immutable list is the same object: true
+getFirst placed, getLast shipped, reversed [shipped, paid, placed]
+after reversed().addFirst and addFirst: [created, placed, paid, shipped, delivered]
+LinkedHashMap {a=1, b=2, c=3}, firstEntry a=1, pollLastEntry c=3, reversed keys [b, a]
+List.of().getFirst() -&gt; NoSuchElementException</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Made by</th><th>Changes?</th><th>Nulls</th></tr></thead>
+          <tbody>
+            <tr><td><code>Collections.unmodifiableList(l)</code></td><td>Follows <code>l</code></td><td>Whatever <code>l</code> holds</td></tr>
+            <tr><td><code>List.of(…)</code> <span class="tag a">9</span></td><td>Never</td><td>Rejected, even by <code>contains</code></td></tr>
+            <tr><td><code>List.copyOf(c)</code> <span class="tag a">10</span></td><td>Never: a snapshot</td><td>Rejected</td></tr>
+            <tr><td><code>stream.toList()</code> <span class="tag a">16</span></td><td>Never</td><td>Allowed</td></tr>
+            <tr><td><code>Collectors.toUnmodifiableList()</code> <span class="tag a">10</span></td><td>Never</td><td>Rejected</td></tr>
+            <tr><td><code>Collectors.toList()</code></td><td>Mutable today, but no promise</td><td>Allowed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Sequenced interface <span class="tag a">21</span></th><th>Methods</th><th>Implemented by</th></tr></thead>
+        <tbody>
+          <tr><td><code>SequencedCollection</code></td><td><code>getFirst</code>, <code>getLast</code>, <code>addFirst</code>, <code>addLast</code>, <code>removeFirst</code>, <code>removeLast</code>, <code>reversed</code></td><td><code>List</code>, <code>Deque</code>, <code>LinkedHashSet</code>, <code>SortedSet</code></td></tr>
+          <tr><td><code>SequencedMap</code></td><td><code>firstEntry</code>, <code>lastEntry</code>, <code>pollFirstEntry</code>, <code>pollLastEntry</code>, <code>putFirst</code>, <code>putLast</code>, <code>sequencedKeySet</code>, <code>reversed</code></td><td><code>LinkedHashMap</code>, <code>SortedMap</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid2">
+      <div class="note warn"><span class="lbl">reversed() is a view</span>Writes through it go to the original: <code>steps.reversed().addFirst("delivered")</code> appended to <code>steps</code>. On an empty collection, <code>getFirst</code> throws <code>NoSuchElementException</code> rather than returning <code>null</code>.</div>
+      <div class="note tip"><span class="lbl">Set.of and Map.of order</span>Their iteration order is randomised once per JVM run, on purpose, so that no code comes to depend on it. A test that passes on your machine and fails in CI with the same data is often this.</div>
+    </div>
+  </div>
+</section>

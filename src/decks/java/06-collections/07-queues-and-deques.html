@@ -1,0 +1,92 @@
+<section class="slide" data-sec="Collections" data-title="Queues and deques">
+  <h2>ArrayDeque is the stack and the queue; PriorityQueue is a heap that only looks sorted at the top</h2>
+  <p class="dek"><code>ArrayDeque</code> is a circular array with O(1) operations at both ends, which makes it the right stack, the right FIFO queue and the right double-ended queue. <code>PriorityQueue</code> is a binary heap stored in an array: the smallest element (by its comparator) is always at the head, while the rest are only partly ordered. Every queue method comes in two forms, one that throws and one that returns a special value.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Queues.java · stacks, FIFO, heaps, top-k, the two method families</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+
+public class Queues {
+    record Task(String name, int priority) { }
+
+    public static void main(String[] args) {
+        Deque&lt;String&gt; stack = new ArrayDeque&lt;&gt;();
+        stack.push("a"); stack.push("b"); stack.push("c");
+        Stack&lt;String&gt; legacy = new Stack&lt;&gt;();
+        legacy.push("a"); legacy.push("b"); legacy.push("c");
+        System.out.println("ArrayDeque as stack " + stack + ", pop " + stack.pop());
+        System.out.println("java.util.Stack     " + legacy + ", pop " + legacy.pop() + "  (iterates bottom first)");
+
+        Queue&lt;String&gt; fifo = new ArrayDeque&lt;&gt;(List.of("first", "second", "third"));
+        System.out.println("queue poll " + fifo.poll() + ", peek " + fifo.peek() + ", left " + fifo);
+
+        PriorityQueue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;(List.of(7, 3, 9, 1, 4, 8));
+        System.out.print("PriorityQueue toString " + heap + ", poll order");
+        while (!heap.isEmpty()) System.out.print(" " + heap.poll());
+        System.out.println();
+
+        int k = 3;
+        PriorityQueue&lt;Integer&gt; topK = new PriorityQueue&lt;&gt;();       // a min-heap holding the k largest
+        for (int n : new int[] {5, 12, 3, 41, 8, 27, 19}) {
+            topK.offer(n);
+            if (topK.size() &gt; k) topK.poll();                      // drop the smallest
+        }
+        List&lt;Integer&gt; largest = new ArrayList&lt;&gt;(topK);
+        largest.sort(Comparator.reverseOrder());
+        System.out.println("top 3 " + largest);
+
+        PriorityQueue&lt;Task&gt; work = new PriorityQueue&lt;&gt;(Comparator.comparingInt(Task::priority).reversed()
+                .thenComparing(Task::name));
+        work.addAll(List.of(new Task("email", 1), new Task("refund", 5), new Task("invoice", 5), new Task("audit", 3)));
+        System.out.print("by priority:");
+        while (!work.isEmpty()) System.out.print(" " + work.poll().name());
+        System.out.println();
+
+        Queue&lt;String&gt; empty = new ArrayDeque&lt;&gt;();
+        System.out.println("empty: poll " + empty.poll() + ", peek " + empty.peek());
+        try { empty.remove(); } catch (NoSuchElementException e) { System.out.println("empty: remove -&gt; NoSuchElementException"); }
+        try { empty.offer(null); } catch (NullPointerException e) { System.out.println("ArrayDeque.offer(null) -&gt; NullPointerException"); }
+
+        Queue&lt;String&gt; bounded = new ArrayBlockingQueue&lt;&gt;(1);
+        bounded.add("x");
+        System.out.println("full: offer " + bounded.offer("y"));
+        try { bounded.add("y"); } catch (IllegalStateException e) { System.out.println("full: add -&gt; " + e.getMessage()); }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Queues.java</div>
+<pre><code class="language-plaintext">ArrayDeque as stack [c, b, a], pop c
+java.util.Stack     [a, b, c], pop c  (iterates bottom first)
+queue poll first, peek second, left [second, third]
+PriorityQueue toString [1, 3, 8, 7, 4, 9], poll order 1 3 4 7 8 9
+top 3 [41, 27, 19]
+by priority: invoice refund audit email
+empty: poll null, peek null
+empty: remove -&gt; NoSuchElementException
+ArrayDeque.offer(null) -&gt; NullPointerException
+full: offer false
+full: add -&gt; Queue full</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Operation</th><th>Throws</th><th>Returns a value</th><th>As a stack</th></tr></thead>
+          <tbody>
+            <tr><td>Insert</td><td><code>add(e)</code></td><td><code>offer(e)</code> → <code>false</code></td><td><code>push(e)</code></td></tr>
+            <tr><td>Remove the head</td><td><code>remove()</code></td><td><code>poll()</code> → <code>null</code></td><td><code>pop()</code></td></tr>
+            <tr><td>Look at the head</td><td><code>element()</code></td><td><code>peek()</code> → <code>null</code></td><td><code>peek()</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">java.util.Stack</span>It extends <code>Vector</code>, so every call takes a lock, and it inherits <code>get(i)</code> and <code>add(i, e)</code>, which let code reach past the top. It even iterates bottom first, so its <code>toString</code> is the reverse of <code>ArrayDeque</code>'s. Use <code>Deque&lt;E&gt; stack = new ArrayDeque&lt;&gt;()</code>.</div>
+    <div class="note warn"><span class="lbl">The heap is not sorted</span><code>toString</code> printed <code>[1, 3, 8, 7, 4, 9]</code>: the array in heap order, where each parent is no larger than its children. Only repeated <code>poll</code> gives sorted order, at O(log n) each. Iterating a <code>PriorityQueue</code>, or streaming it, gives the heap order.</div>
+    <div class="note tip"><span class="lbl">Top k in O(n log k)</span>Keep a min-heap of size k and evict its smallest whenever it overflows; what remains are the k largest. Interviewers ask for it constantly: <a data-deck="dsa" data-sec="11 · Heap / top K" data-slide="Mechanics">heap and top-k</a> in the DSA tab has the problems. <code>ArrayDeque</code> rejects <code>null</code>, because <code>poll</code> uses <code>null</code> to mean empty.</div>
+  </div>
+</section>

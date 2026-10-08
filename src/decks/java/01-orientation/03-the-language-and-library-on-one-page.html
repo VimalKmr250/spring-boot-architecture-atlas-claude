@@ -1,0 +1,80 @@
+<section class="slide" data-sec="Orientation" data-title="The language and library on one page">
+  <h2>Every slide in the tab, grouped by topic, with the one fact each proves</h2>
+  <p class="dek">Use this as the tab's index. Each link opens the slide; the note beside it is the fact the slide's program demonstrates, so you can revise from this page alone and open a slide when a fact surprises you.</p>
+
+  <div class="grid3">
+    <div class="card"><h4>Language fundamentals</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Primitives, wrappers and autoboxing">Boxing</a>: <code>Integer</code>s cache −128 to 127, so <code>==</code> works until it does not</li>
+      <li><a data-deck="cj" data-slide="Pass-by-value, stack and heap">Pass-by-value</a>: a reference is copied, never the variable</li>
+      <li><a data-deck="cj" data-slide="Strings: immutability and the pool">Strings</a>: <code>+=</code> in a loop, 57.8 MB against 98 KB</li>
+      <li><a data-deck="cj" data-slide="final, static and initialisation order">Initialisation order</a>: a constructor's virtual call sees <code>null</code></li>
+      <li><a data-deck="cj" data-slide="Nested, inner, anonymous and local classes">Nested classes</a>: inner ones hold <code>this$0</code></li>
+      <li><a data-deck="cj" data-slide="The Object contract">The Object contract</a>: equal objects, different buckets</li>
+      <li><a data-deck="cj" data-slide="Writing an immutable class">Immutable classes</a>: copy in, nothing mutable out</li>
+    </ul></div>
+    <div class="card"><h4>OOP, generics, exceptions</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Overloading versus overriding">Overloading</a>: widening beats boxing</li>
+      <li><a data-deck="cj" data-slide="Dynamic dispatch">Dispatch</a>: five invoke instructions</li>
+      <li><a data-deck="cj" data-slide="Abstract classes versus interfaces">Interfaces</a>: three rules for default conflicts</li>
+      <li><a data-deck="cj" data-slide="Records in depth">Records</a>: arrays compare by identity</li>
+      <li><a data-deck="cj" data-slide="Sealed types and pattern matching">Sealed types</a>: a missing case does not compile</li>
+      <li><a data-deck="cj" data-slide="Enums with behaviour">Enums</a>: never store the ordinal</li>
+      <li><a data-deck="cj" data-slide="Type erasure">Erasure</a>, <a data-deck="cj" data-slide="Bounds, wildcards and PECS">PECS</a>, <a data-deck="cj" data-slide="Generic methods and inference">inference</a>, <a data-deck="cj" data-slide="Generics traps">traps</a></li>
+      <li><a data-deck="cj" data-slide="The exception hierarchy">Hierarchy</a>, <a data-deck="cj" data-slide="try-with-resources and finally">try-with-resources</a>, <a data-deck="cj" data-slide="Designing exceptions">design</a></li>
+    </ul></div>
+    <div class="card"><h4>Collections</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Which collection for which job">Choosing</a>: three classes cover most code</li>
+      <li><a data-deck="cj" data-slide="ArrayList versus LinkedList">ArrayList and LinkedList</a>: 4 bytes against 24 per element</li>
+      <li><a data-deck="cj" data-slide="HashMap internals: hashing and buckets">HashMap buckets</a>: the low bits pick the bucket</li>
+      <li><a data-deck="cj" data-slide="HashMap internals: resize and treeify">Resize and treeify</a>: the 11th collision makes a tree</li>
+      <li><a data-deck="cj" data-slide="LinkedHashMap, TreeMap and NavigableMap">Ordered maps</a>: an LRU cache in eight lines</li>
+      <li><a data-deck="cj" data-slide="Sets, and comparators consistent with equals">Sets</a>: a length comparator deletes data</li>
+      <li><a data-deck="cj" data-slide="Queues and deques">Queues</a>, <a data-deck="cj" data-slide="Fail-fast iterators">iterators</a>, <a data-deck="cj" data-slide="Immutable, unmodifiable and sequenced">unmodifiable</a>, <a data-deck="cj" data-slide="Arrays and Collections utilities">utilities</a></li>
+    </ul></div>
+    <div class="card"><h4>Concurrency</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Threads, states and interrupts">Threads</a>: an interrupt is a request</li>
+      <li><a data-deck="cj" data-slide="The Java Memory Model">Memory model</a>: a plain flag never seen</li>
+      <li><a data-deck="cj" data-slide="Happens-before">Happens-before</a>: both reads 0, tens of thousands of times</li>
+      <li><a data-deck="cj" data-slide="volatile">volatile</a>: visible, not atomic</li>
+      <li><a data-deck="cj" data-slide="synchronized, wait and notify">synchronized</a>, <a data-deck="cj" data-slide="Explicit locks">explicit locks</a>, <a data-deck="cj" data-slide="Atomics and CAS">atomics</a></li>
+      <li><a data-deck="cj" data-slide="Deadlock, livelock and thread dumps">Deadlock</a>: <code>jstack</code> finds the cycle</li>
+      <li><a data-deck="cj" data-slide="Thread-safety strategies">Safety strategies</a>: a <code>ThreadLocal</code> leaks between tasks</li>
+    </ul></div>
+    <div class="card"><h4>Executors and concurrent collections</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Why executors">Executors</a> and <a data-deck="cj" data-slide="ThreadPoolExecutor anatomy">pool anatomy</a>: queue first, then extra threads</li>
+      <li><a data-deck="cj" data-slide="Callable, Future and shutdown">Futures</a>: an unread failure vanishes</li>
+      <li><a data-deck="cj" data-slide="CompletableFuture: composition">Composition</a> and <a data-deck="cj" data-slide="CompletableFuture: errors and threads">errors</a></li>
+      <li><a data-deck="cj" data-slide="ForkJoinPool and work stealing">Fork/join</a>, <a data-deck="cj" data-slide="Scheduled executors">scheduling</a></li>
+      <li><a data-deck="cj" data-slide="Virtual threads under the hood">Virtual threads</a>: pinned on 21, not on 25</li>
+      <li><a data-deck="cj" data-slide="ConcurrentHashMap internals">ConcurrentHashMap</a>, <a data-deck="cj" data-slide="Copy-on-write and lock-free collections">copy-on-write</a>, <a data-deck="cj" data-slide="The BlockingQueue family">blocking queues</a>, <a data-deck="cj" data-slide="Synchronizers">synchronizers</a></li>
+      <li><a data-deck="cj" data-slide="Choosing a concurrency tool">Choosing a tool</a>: one table</li>
+    </ul></div>
+    <div class="card"><h4>The JVM</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="From source to running code">Bytecode</a>: version 65 is Java 21</li>
+      <li><a data-deck="cj" data-slide="Class loading">Class loading</a>: two loaders, two classes</li>
+      <li><a data-deck="cj" data-slide="Runtime memory areas">Memory areas</a>: each OOM names its area</li>
+      <li><a data-deck="cj" data-slide="GC roots and reference types">GC roots</a>: cycles are collected</li>
+      <li><a data-deck="cj" data-slide="The JIT compiler">The JIT</a>: escape analysis, 0 bytes against 32 MB</li>
+      <li><a data-deck="cj" data-slide="Object layout and memory cost">Object layout</a>: compact headers halve <code>Object</code></li>
+      <li><a data-deck="cj" data-slide="Reflection, annotations and proxies">Proxies</a>: self-invocation skips them</li>
+    </ul></div>
+    <div class="card"><h4>Everyday library and modern Java</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="java.time">java.time</a>: a 23-hour day</li>
+      <li><a data-deck="cj" data-slide="Numbers that bite">Numbers</a>: <code>2.0</code> is not <code>equals</code> to <code>2.00</code></li>
+      <li><a data-deck="cj" data-slide="I/O and NIO.2">Files</a>: ZoÃ« from the wrong charset</li>
+      <li><a data-deck="cj" data-slide="Serialization">Serialization</a>: no constructor runs</li>
+      <li><a data-deck="cj" data-slide="What each LTS changed">Each LTS</a>, <a data-deck="cj" data-slide="The new syntax on one slide">new syntax</a>, <a data-deck="cj" data-slide="Java 25 features and their status">Java 25</a></li>
+    </ul></div>
+    <div class="card"><h4>Pitfalls</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Equality and hashing bugs">Equality</a>: seven ways to get <code>null</code></li>
+      <li><a data-deck="cj" data-slide="Concurrency bugs in real code">Concurrency</a>: six races, forced</li>
+      <li><a data-deck="cj" data-slide="Resource and memory bugs">Resources</a>: leaks and waste, measured</li>
+    </ul></div>
+    <div class="card"><h4>Interview prep</h4><ul class="tight">
+      <li><a data-deck="cj" data-slide="Q1–3 · Fundamentals">Questions 1–30</a>, three per slide</li>
+      <li><a data-deck="cj" data-slide="How to answer a Java coding question">How to answer</a> a coding question</li>
+      <li><a data-deck="cj" data-slide="Spot the bug">Spot the bug</a>: five snippets</li>
+      <li><a data-deck="cj" data-slide="Question shape to tool">Question shape to tool</a>: the revision table</li>
+    </ul></div>
+  </div>
+</section>

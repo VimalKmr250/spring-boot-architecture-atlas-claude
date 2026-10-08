@@ -1,0 +1,93 @@
+<section class="slide" data-sec="Generics" data-title="Generic methods and inference">
+  <h2>Generic methods declare their own type parameters, and inference fills them in from the call</h2>
+  <p class="dek">A generic method puts <code>&lt;T&gt;</code> before its return type and can be generic in a class that is not. javac infers <code>T</code> from the arguments and from the type the result is assigned to (target typing), which is what lets <code>Comparator.comparing(String::length)</code> compile without a single type written. <code>var</code> uses the same inference, and with a diamond it falls back to <code>Object</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Inference.java · inference, witnesses, var, self-typed builders</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.function.*;
+
+public class Inference {
+    static &lt;T&gt; T firstOr(List&lt;? extends T&gt; items, T fallback) {
+        return items.isEmpty() ? fallback : items.get(0);
+    }
+
+    static &lt;K, V extends Comparable&lt;? super V&gt;&gt; Optional&lt;K&gt; keyOfMax(Map&lt;K, V&gt; map) {
+        return map.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey);
+    }
+
+    // A self-referential bound lets a base builder return the subclass type.
+    abstract static class Builder&lt;B extends Builder&lt;B&gt;&gt; {
+        final Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();
+        B with(String k, String v) { fields.put(k, v); return self(); }
+        abstract B self();
+    }
+    static final class OrderBuilder extends Builder&lt;OrderBuilder&gt; {
+        OrderBuilder express() { fields.put("shipping", "express"); return this; }
+        @Override OrderBuilder self() { return this; }
+    }
+
+    public static void main(String[] args) {
+        String s = firstOr(List.of(), "none");                 // T inferred as String
+        Number n = firstOr(List.of(1, 2), 2.5);                // T inferred from both: Number
+        System.out.println(s + " " + n);
+
+        List&lt;String&gt; empty = Collections.&lt;String&gt;emptyList();  // an explicit type witness
+        System.out.println("witness " + empty + ", max key " + keyOfMax(Map.of("a", 3, "b", 9)));
+
+        var orders = new ArrayList&lt;String&gt;();                  // var + explicit type argument
+        var anything = new ArrayList&lt;&gt;();                      // var + diamond: ArrayList&lt;Object&gt;
+        anything.add(1);
+        anything.add("two");
+        orders.add("ORD-1");
+        System.out.println("var with diamond holds " + anything + ", orders " + orders);
+
+        Comparator&lt;String&gt; byLength = Comparator.comparing(String::length);  // target typing
+        Function&lt;Integer, String&gt; label = i -&gt; "#" + i;
+        System.out.println(byLength.compare("aa", "b") + " " + label.apply(7));
+
+        Iterator&lt;Integer&gt; countdown = new Iterator&lt;&gt;() {        // diamond on anonymous classes: 9
+            int left = 3;
+            @Override public boolean hasNext() { return left &gt; 0; }
+            @Override public Integer next() { return left--; }
+        };
+        while (countdown.hasNext()) System.out.print(countdown.next() + " ");
+        System.out.println();
+
+        var order = new OrderBuilder().with("id", "ORD-7").express().with("note", "gift");
+        System.out.println(order.getClass().getSimpleName() + " " + order.fields);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Inference.java</div>
+<pre><code class="language-plaintext">none 1
+witness [], max key Optional[b]
+var with diamond holds [1, two], orders [ORD-1]
+1 #7
+3 2 1 
+OrderBuilder {id=ORD-7, shipping=express, note=gift}</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Call</th><th>What javac inferred</th></tr></thead>
+          <tbody>
+            <tr><td><code>firstOr(List.of(), "none")</code></td><td><code>T = String</code>, from the fallback</td></tr>
+            <tr><td><code>firstOr(List.of(1, 2), 2.5)</code></td><td><code>T = Number</code>: the most specific type that fits <code>Integer</code> and <code>Double</code></td></tr>
+            <tr><td><code>Collections.&lt;String&gt;emptyList()</code></td><td>Nothing: the witness states <code>T</code>. Needed only when there is no target type, such as in a chained call</td></tr>
+            <tr><td><code>var anything = new ArrayList&lt;&gt;()</code></td><td><code>ArrayList&lt;Object&gt;</code>, so it accepts <code>1</code> and <code>"two"</code></td></tr>
+            <tr><td><code>new OrderBuilder().with(…).express()</code></td><td><code>with</code> returns <code>B = OrderBuilder</code>, so <code>express()</code> is still reachable</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">var and the diamond</span><code>var</code> <span class="tag a">10</span> takes its type from the right-hand side, and a diamond with no target type infers <code>Object</code>. Write the type argument on one side: <code>var orders = new ArrayList&lt;String&gt;()</code>.</div>
+    <div class="note tip"><span class="lbl">Self-referential bounds</span><code>B extends Builder&lt;B&gt;</code> lets a base class return the subclass type from fluent methods. The JDK uses the same shape in <code>Enum&lt;E extends Enum&lt;E&gt;&gt;</code> and <code>Comparable&lt;T&gt;</code> bounds.</div>
+    <div class="note"><span class="lbl">When inference gives up</span>Long chains such as <code>Comparator.comparing(o -&gt; o.total()).reversed()</code> lose the target type, because <code>reversed()</code> is called on the result before anything is assigned. Use a method reference, a typed lambda parameter or a witness. The <a data-deck="st" data-slide="Method references and Comparator combinators">comparator slide</a> shows the fix.</div>
+  </div>
+</section>

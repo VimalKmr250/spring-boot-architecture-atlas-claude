@@ -1,0 +1,121 @@
+<section class="slide" data-sec="The JVM" data-title="Runtime memory areas">
+  <h2>Each thread has its own stack; everything else is shared, and each area fails with its own error</h2>
+  <p class="dek">The JVM's memory is not just the heap. Each thread has a stack of frames holding its locals and operands. The heap holds every object. Metaspace holds class metadata, the code cache holds JIT-compiled code, and direct buffers, thread stacks and the GC's own structures live outside the heap altogether. When one area runs out, the error message names it, and the message tells you where to look.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 230" role="img" aria-label="Per thread: a program counter, a JVM stack of frames such as main, placeOrder and total, each holding local variables and an operand stack, and a native stack. Shared: the heap, split into the young generation with Eden and two survivor spaces and the old generation, sized by Xmx or MaxRAMPercentage; Metaspace for class metadata, sized by MaxMetaspaceSize; the code cache for compiled code, sized by ReservedCodeCacheSize; and native memory for direct buffers, thread stacks and GC structures, with direct buffers capped by MaxDirectMemorySize and stacks sized by Xss.">
+        <rect x="20" y="20" width="270" height="196" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="36" y="42" font-size="11.5" font-weight="600" fill="currentColor">per thread</text>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="36" y="54" width="238" height="22" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="46" y="69">program counter</text>
+          <rect x="36" y="84" width="238" height="96" rx="5" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.8"></rect><text x="46" y="100">JVM stack (-Xss)</text>
+          <rect x="48" y="108" width="214" height="20" rx="3" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="56" y="122">frame: total()</text>
+          <rect x="48" y="132" width="214" height="20" rx="3" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="56" y="146">frame: placeOrder()</text>
+          <rect x="48" y="156" width="214" height="20" rx="3" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="56" y="170">frame: main()</text>
+          <rect x="36" y="188" width="238" height="22" rx="4" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.35"></rect><text x="46" y="203">native stack</text>
+        </g>
+        <rect x="320" y="20" width="560" height="96" rx="8" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-opacity="0.8"></rect>
+        <text x="336" y="42" font-size="11.5" font-weight="600" fill="currentColor">heap · -Xmx, or -XX:MaxRAMPercentage in a container</text>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace" text-anchor="middle">
+          <rect x="336" y="54" width="250" height="50" rx="5" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <rect x="344" y="64" width="128" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="408" y="84">Eden</text>
+          <rect x="478" y="64" width="50" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="503" y="84">S0</text>
+          <rect x="532" y="64" width="50" height="32" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="557" y="84">S1</text>
+          <rect x="598" y="54" width="268" height="50" rx="5" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="732" y="84">old generation</text>
+        </g>
+        <text x="461" y="114" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">young generation: new objects</text>
+        <g font-size="10.5" fill="currentColor">
+          <rect x="320" y="132" width="175" height="84" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="332" y="152" font-weight="600">Metaspace</text><text x="332" y="170">class metadata</text><text x="332" y="194" font-family="IBM Plex Mono, monospace" font-size="9.5">-XX:MaxMetaspaceSize</text>
+          <rect x="512" y="132" width="175" height="84" rx="8" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="524" y="152" font-weight="600">Code cache</text><text x="524" y="170">JIT-compiled code</text><text x="524" y="194" font-family="IBM Plex Mono, monospace" font-size="9.5">-XX:ReservedCodeCacheSize</text>
+          <rect x="705" y="132" width="175" height="84" rx="8" fill="#3AA79B" fill-opacity="0.07" stroke="#3AA79B"></rect>
+          <text x="717" y="152" font-weight="600">Other native memory</text><text x="717" y="170">direct buffers, thread</text><text x="717" y="186">stacks, GC structures</text><text x="717" y="206" font-family="IBM Plex Mono, monospace" font-size="9.5">-XX:MaxDirectMemorySize</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">MemoryAreas.java · the pools, then four of the ways to run out</div>
+<pre><code class="language-java">// Run with: java -Xmx64m -XX:MaxDirectMemorySize=1m MemoryAreas.java
+import java.lang.management.*;
+import java.nio.ByteBuffer;
+import java.util.*;
+
+public class MemoryAreas {
+    static int depth;
+    static void recurse() { depth++; recurse(); }
+
+    public static void main(String[] args) {
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans())
+            System.out.printf("%-8s %s%n", pool.getType() == MemoryType.HEAP ? "heap" : "non-heap", pool.getName());
+
+        try {
+            recurse();
+        } catch (StackOverflowError e) {
+            System.out.println("StackOverflowError after about " + (depth / 1_000) * 1_000 + " frames (varies with -Xss and the JIT)");
+        }
+
+        List&lt;long[]&gt; hoard = new ArrayList&lt;&gt;();
+        try {
+            while (true) hoard.add(new long[1_000_000]);          // 8 MB each, all kept reachable
+        } catch (OutOfMemoryError e) {
+            int held = hoard.size();
+            hoard = null;                                         // release it so the program can go on
+            System.out.println("OutOfMemoryError: " + e.getMessage() + " (after " + held + " x 8 MB)");
+        }
+        try {
+            long[] huge = new long[Integer.MAX_VALUE];
+            System.out.println(huge.length);
+        } catch (OutOfMemoryError e) {
+            System.out.println("OutOfMemoryError: " + e.getMessage());
+        }
+        try {
+            ByteBuffer.allocateDirect(2 * 1024 * 1024);           // off-heap, capped by MaxDirectMemorySize
+        } catch (OutOfMemoryError e) {
+            System.out.println("OutOfMemoryError: " + e.getMessage());
+        }
+        MemoryUsage heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+        System.out.println("heap max " + heap.getMax() / (1024 * 1024) + " MB, set by -Xmx64m");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · MemoryAreas.java · the frame count varies by run</div>
+<pre><code class="language-plaintext">non-heap CodeHeap 'non-nmethods'
+non-heap Metaspace
+non-heap CodeHeap 'profiled nmethods'
+non-heap Compressed Class Space
+heap     G1 Eden Space
+heap     G1 Old Gen
+heap     G1 Survivor Space
+non-heap CodeHeap 'non-profiled nmethods'
+StackOverflowError after about 23000 frames (varies with -Xss and the JIT)
+OutOfMemoryError: Java heap space (after 7 x 8 MB)
+OutOfMemoryError: Requested array size exceeds VM limit
+OutOfMemoryError: Cannot reserve 2097152 bytes of direct buffer memory (allocated: 0, limit: 1048576)
+heap max 64 MB, set by -Xmx64m</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>The message says</th><th>Look at</th></tr></thead>
+          <tbody>
+            <tr><td><code>Java heap space</code></td><td>A leak or an undersized heap: take a heap dump (<code>-XX:+HeapDumpOnOutOfMemoryError</code>)</td></tr>
+            <tr><td><code>GC overhead limit exceeded</code></td><td>Parallel GC spent nearly all its time collecting and recovered almost nothing: the same causes</td></tr>
+            <tr><td><code>Metaspace</code></td><td>Too many classes: generated proxies, or a class loader leak after redeploys</td></tr>
+            <tr><td><code>Requested array size exceeds VM limit</code></td><td>An array near <code>Integer.MAX_VALUE</code> elements, usually a bug in a size calculation</td></tr>
+            <tr><td><code>Cannot reserve … direct buffer memory</code></td><td>Off-heap buffers from Netty, NIO or a driver, past <code>MaxDirectMemorySize</code></td></tr>
+            <tr><td><code>unable to create native thread</code></td><td>OS or container limits on threads or memory, not the heap</td></tr>
+            <tr><td><code>StackOverflowError</code></td><td>Recursion without a base case, or a very deep but valid one: raise <code>-Xss</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note tip"><span class="lbl">In a container, heap is not the whole bill</span>The process uses the heap plus Metaspace, code cache, thread stacks, direct buffers and the GC's own structures. A container sized to exactly <code>-Xmx</code> gets killed by the kernel with no Java error at all. The Spring Boot tab works through the sizing: <a data-deck="sb" data-slide="JVM memory">JVM memory</a>.</div>
+</section>

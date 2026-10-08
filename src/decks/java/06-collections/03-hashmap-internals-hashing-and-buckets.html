@@ -1,0 +1,144 @@
+<section class="slide" data-sec="Collections" data-title="HashMap internals: hashing and buckets">
+  <h2>A HashMap is an array of buckets, and the key's hash picks one bucket to search</h2>
+  <p class="dek"><code>put</code> and <code>get</code> do the same three steps. Call <code>hashCode()</code>. Mix the high 16 bits into the low 16. Keep the low bits as the array index. Then only that one bucket is searched, comparing the stored hash first and calling <code>equals</code> only when the hashes match. That is why a lookup is O(1) on average, and why <code>equals</code> and <code>hashCode</code> must agree.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="On the left, the key SKU-17 goes through hashCode, giving minus 1846906634, then the spread step h xor h shifted right by 16, then a mask with 16 minus 1, giving bucket 12. On the right, a table of 16 buckets. Bucket 0 holds a chain of banana, Aa, BB, plum and the null key. Bucket 1 holds apple and cherry. Bucket 12 holds SKU-17. The other buckets are empty.">
+        <text x="170" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Finding the bucket</text>
+        <g font-size="11" fill="currentColor" font-family="IBM Plex Mono, monospace" text-anchor="middle">
+          <rect x="20" y="30" width="300" height="30" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="170" y="50">key "SKU-17"</text>
+          <rect x="20" y="85" width="300" height="30" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="170" y="105">hashCode() = -1846906634</text>
+          <rect x="20" y="140" width="300" height="30" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect><text x="170" y="160">spread: h ^ (h &gt;&gt;&gt; 16)</text>
+          <rect x="20" y="195" width="300" height="30" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="170" y="215">index: spread &amp; (16 - 1) = 12</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="170" y1="60" x2="170" y2="81" marker-end="url(#arw)"></line>
+          <line x1="170" y1="115" x2="170" y2="136" marker-end="url(#arw)"></line>
+          <line x1="170" y1="170" x2="170" y2="191" marker-end="url(#arw)"></line>
+        </g>
+        <line x1="320" y1="210" x2="416" y2="193" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+
+        <text x="440" y="22" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor" font-family="IBM Plex Mono, monospace">table[16]</text>
+        <g fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35">
+          <rect x="420" y="30" width="40" height="13"></rect><rect x="420" y="43" width="40" height="13"></rect>
+          <rect x="420" y="56" width="40" height="13"></rect><rect x="420" y="69" width="40" height="13"></rect>
+          <rect x="420" y="82" width="40" height="13"></rect><rect x="420" y="95" width="40" height="13"></rect>
+          <rect x="420" y="108" width="40" height="13"></rect><rect x="420" y="121" width="40" height="13"></rect>
+          <rect x="420" y="134" width="40" height="13"></rect><rect x="420" y="147" width="40" height="13"></rect>
+          <rect x="420" y="160" width="40" height="13"></rect><rect x="420" y="173" width="40" height="13"></rect>
+          <rect x="420" y="199" width="40" height="13"></rect><rect x="420" y="212" width="40" height="13"></rect>
+          <rect x="420" y="225" width="40" height="13"></rect>
+        </g>
+        <rect x="420" y="186" width="40" height="13" fill="#D26A3F" fill-opacity="0.2" stroke="#D26A3F"></rect>
+        <g font-size="9" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace" text-anchor="end">
+          <text x="414" y="40">0</text><text x="414" y="53">1</text><text x="414" y="66">2</text><text x="414" y="79">3</text>
+          <text x="414" y="92">4</text><text x="414" y="105">5</text><text x="414" y="118">6</text><text x="414" y="131">7</text>
+          <text x="414" y="144">8</text><text x="414" y="157">9</text><text x="414" y="170">10</text><text x="414" y="183">11</text>
+          <text x="414" y="196">12</text><text x="414" y="209">13</text><text x="414" y="222">14</text><text x="414" y="235">15</text>
+        </g>
+        <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace" text-anchor="middle">
+          <rect x="470" y="30" width="62" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="501" y="40">banana</text>
+          <rect x="545" y="30" width="34" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="562" y="40">Aa</text>
+          <rect x="592" y="30" width="34" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="609" y="40">BB</text>
+          <rect x="639" y="30" width="46" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="662" y="40">plum</text>
+          <rect x="698" y="30" width="42" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="719" y="40">null</text>
+          <rect x="470" y="43" width="52" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="496" y="53">apple</text>
+          <rect x="535" y="43" width="58" height="13" rx="3" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="564" y="53">cherry</text>
+          <rect x="470" y="186" width="62" height="13" rx="3" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F"></rect><text x="501" y="196">SKU-17</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1">
+          <line x1="460" y1="36" x2="467" y2="36"></line><line x1="532" y1="36" x2="542" y2="36" marker-end="url(#arw)"></line>
+          <line x1="579" y1="36" x2="589" y2="36" marker-end="url(#arw)"></line><line x1="626" y1="36" x2="636" y2="36" marker-end="url(#arw)"></line>
+          <line x1="685" y1="36" x2="695" y2="36" marker-end="url(#arw)"></line>
+          <line x1="460" y1="49" x2="467" y2="49"></line><line x1="522" y1="49" x2="532" y2="49" marker-end="url(#arw)"></line>
+          <line x1="460" y1="192" x2="467" y2="192"></line>
+        </g>
+        <text x="760" y="40" font-size="9.5" fill="currentColor" opacity="0.75">"Aa" and "BB" both hash to 2112</text>
+        <text x="610" y="120" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">a lookup searches one bucket:</text>
+        <text x="610" y="134" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">same hash? then == or equals</text>
+      </svg>
+    </div>
+    <figcaption>The real layout of the map built below. Eight keys in 16 buckets, but five landed in bucket 0, which shows that a bucket is chosen by a few low bits, not by the whole hash.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">HashMapPeek.java · the index arithmetic, then the table itself</div>
+<pre><code class="language-java">// Run with: java --add-opens java.base/java.util=ALL-UNNAMED HashMapPeek.java
+import java.lang.reflect.Field;
+import java.util.*;
+
+public class HashMapPeek {
+    static Field table, next, key;
+
+    static int spread(Object k) {                       // what HashMap.hash(key) computes
+        if (k == null) return 0;
+        int h = k.hashCode();
+        return h ^ (h &gt;&gt;&gt; 16);                          // fold the high bits into the low ones
+    }
+
+    static void dump(HashMap&lt;?, ?&gt; map) throws Exception {
+        Object[] tab = (Object[]) table.get(map);
+        System.out.println("table length " + tab.length + ", size " + map.size());
+        for (int i = 0; i &lt; tab.length; i++) {
+            if (tab[i] == null) continue;
+            List&lt;Object&gt; keys = new ArrayList&lt;&gt;();
+            for (Object node = tab[i]; node != null; node = next.get(node)) keys.add(key.get(node));
+            System.out.println("  bucket " + String.format("%2d", i) + ": " + keys);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        table = HashMap.class.getDeclaredField("table");
+        table.setAccessible(true);
+        Class&lt;?&gt; node = Class.forName("java.util.HashMap$Node");
+        next = node.getDeclaredField("next");
+        next.setAccessible(true);
+        key = node.getDeclaredField("key");
+        key.setAccessible(true);
+
+        String k = "SKU-17";
+        int h = k.hashCode();
+        System.out.printf("hashCode     %32s  (%d)%n", Integer.toBinaryString(h), h);
+        System.out.printf("h &gt;&gt;&gt; 16     %32s%n", Integer.toBinaryString(h &gt;&gt;&gt; 16));
+        System.out.printf("spread       %32s%n", Integer.toBinaryString(spread(k)));
+        System.out.printf("&amp; (16 - 1)   %32s  -&gt; bucket %d%n", Integer.toBinaryString(spread(k) &amp; 15), spread(k) &amp; 15);
+
+        var stock = new HashMap&lt;String, Integer&gt;();
+        for (String s : List.of("SKU-17", "apple", "banana", "cherry", "Aa", "BB", "plum"))
+            stock.put(s, s.length());
+        stock.put(null, 0);                             // allowed, always bucket 0
+        dump(stock);
+        System.out.println("iteration order: " + stock.keySet());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · HashMapPeek.java</div>
+<pre><code class="language-plaintext">hashCode     10010001111010100111000011110110  (-1846906634)
+h &gt;&gt;&gt; 16                     1001000111101010
+spread       10010001111010101110000100011100
+&amp; (16 - 1)                               1100  -&gt; bucket 12
+table length 16, size 8
+  bucket  0: [banana, Aa, BB, plum, null]
+  bucket  1: [apple, cherry]
+  bucket 12: [SKU-17]
+iteration order: [banana, Aa, BB, plum, null, apple, cherry, SKU-17]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Design choice</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Power-of-two table</td><td><code>hash &amp; (n - 1)</code> is a single AND, where <code>hash % n</code> is a division.</td></tr>
+            <tr><td>Spreading the hash</td><td>The mask keeps only the low bits. Keys whose hash codes differ only in high bits, such as many <code>Float</code> values, would all collide without it.</td></tr>
+            <tr><td>Hash stored in the node</td><td>Comparing two ints rejects most keys in a bucket before any <code>equals</code> call, and a resize never calls <code>hashCode</code> again.</td></tr>
+            <tr><td>Null key</td><td>Hashes to 0, so it always lives in bucket 0. <code>Hashtable</code> and <code>ConcurrentHashMap</code> reject it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Iteration order is bucket order</span>The keys came out as bucket 0, then 1, then 12: neither insertion order nor sorted, and it changes when the table resizes, on the next slide. Code that depends on <code>HashMap</code> order breaks on a JDK upgrade or a larger data set.</div>
+    </div>
+  </div>
+</section>

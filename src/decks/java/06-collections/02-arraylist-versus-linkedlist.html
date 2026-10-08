@@ -1,0 +1,99 @@
+<section class="slide" data-sec="Collections" data-title="ArrayList versus LinkedList">
+  <h2>ArrayList grows by half when full; LinkedList pays 24 bytes and a pointer chase per element</h2>
+  <p class="dek">An <code>ArrayList</code> is an array with spare room. When it fills, it copies everything into an array 1.5 times larger, so appends are O(1) amortised. A <code>LinkedList</code> allocates a node per element, with links both ways. The textbook says linked lists win at inserts. On a modern CPU the array wins almost everything, because it is contiguous and the nodes are scattered across the heap.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ListGrowth.java · reads elementData by reflection, counts bytes per thread</div>
+<pre><code class="language-java">// Run with: java --add-opens java.base/java.util=ALL-UNNAMED ListGrowth.java
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
+import java.util.*;
+
+public class ListGrowth {
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+    static Field elementData;
+
+    static int capacity(ArrayList&lt;?&gt; list) throws IllegalAccessException {
+        return ((Object[]) elementData.get(list)).length;
+    }
+
+    public static void main(String[] args) throws Exception {
+        elementData = ArrayList.class.getDeclaredField("elementData");
+        elementData.setAccessible(true);
+
+        var list = new ArrayList&lt;Integer&gt;();
+        var growth = new StringBuilder("capacity " + capacity(list));
+        for (int i = 0; i &lt; 100; i++) {
+            int before = capacity(list);
+            list.add(i);
+            if (capacity(list) != before) growth.append(" -&gt; ").append(capacity(list));
+        }
+        System.out.println(growth + " (size " + list.size() + ")");
+        list.trimToSize();
+        System.out.println("after trimToSize: " + capacity(list));
+
+        int n = 1_000_000;
+        Integer[] boxes = new Integer[n];                   // box once, outside the measurements
+        for (int i = 0; i &lt; n; i++) boxes[i] = i + 1_000;
+
+        long t = MX.getCurrentThreadAllocatedBytes();
+        var grown = new ArrayList&lt;Integer&gt;();
+        for (Integer b : boxes) grown.add(b);
+        long grownBytes = MX.getCurrentThreadAllocatedBytes() - t;
+
+        t = MX.getCurrentThreadAllocatedBytes();
+        var presized = new ArrayList&lt;Integer&gt;(n);
+        for (Integer b : boxes) presized.add(b);
+        long presizedBytes = MX.getCurrentThreadAllocatedBytes() - t;
+
+        t = MX.getCurrentThreadAllocatedBytes();
+        var linked = new LinkedList&lt;Integer&gt;();
+        for (Integer b : boxes) linked.add(b);
+        long linkedBytes = MX.getCurrentThreadAllocatedBytes() - t;
+
+        System.out.printf("bytes allocated per element: ArrayList grown %.1f, presized %.1f, LinkedList %.1f%n",
+                grownBytes / (double) n, presizedBytes / (double) n, linkedBytes / (double) n);
+
+        long sum = 0;
+        long t0 = System.nanoTime();
+        for (int i = 0; i &lt; 1_000; i++) sum += presized.get(n / 2);
+        long arrayNs = System.nanoTime() - t0;
+        t0 = System.nanoTime();
+        for (int i = 0; i &lt; 1_000; i++) sum += linked.get(n / 2);
+        long linkedNs = System.nanoTime() - t0;
+        System.out.printf("1,000 x get(n/2): ArrayList %.2f ms, LinkedList %.0f ms (one run, sum %d)%n",
+                arrayNs / 1e6, linkedNs / 1e6, sum);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ListGrowth.java · the timings vary by run</div>
+<pre><code class="language-plaintext">capacity 0 -&gt; 10 -&gt; 15 -&gt; 22 -&gt; 33 -&gt; 49 -&gt; 73 -&gt; 109 (size 100)
+after trimToSize: 100
+bytes allocated per element: ArrayList grown 14.6, presized 4.0, LinkedList 24.0
+1,000 x get(n/2): ArrayList 0.17 ms, LinkedList 1268 ms (one run, sum 1002000000)</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Line</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>0 → 10 → 15 → 22</td><td>A new list shares one empty array and allocates 10 slots on the first <code>add</code>. Each growth is <code>old + old/2</code>.</td></tr>
+            <tr><td>grown 14.6</td><td>Each growth copies into a new array and discards the old one. The live list costs 4 to 6 bytes per element; the garbage costs the rest.</td></tr>
+            <tr><td>presized 4.0</td><td>One reference per element, 4 bytes with compressed pointers. <code>new ArrayList&lt;&gt;(n)</code> when you know <code>n</code>.</td></tr>
+            <tr><td>LinkedList 24.0</td><td>One node per element: a 12-byte object header and three 4-byte references (item, next, prev).</td></tr>
+            <tr><td><code>get(n/2)</code></td><td><code>get(n/2)</code> walks 500,000 nodes per call, from the nearer end, missing the cache at almost every step.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">Default to ArrayList</span>Iteration, random access and appends are all fast, and the list itself needs a quarter or less of a linked list's memory. Even inserting into the middle is a <code>System.arraycopy</code> that moves bytes at memory speed, which beats walking to the node for most sizes.</div>
+    <div class="note warn"><span class="lbl">Not a queue, either</span>Removing from the front of an <code>ArrayList</code> shifts every element: O(n). For a queue or a stack use <code>ArrayDeque</code>, which is a circular array and beats <code>LinkedList</code> at both ends too.</div>
+    <div class="note"><span class="lbl">The one case for LinkedList</span>Many inserts and removals in the middle of a long list, through a <code>ListIterator</code> you already hold. It is rare enough that Joshua Bloch, who wrote <code>LinkedList</code>, has said he never uses it.</div>
+  </div>
+</section>

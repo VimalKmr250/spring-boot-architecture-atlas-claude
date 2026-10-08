@@ -1,0 +1,107 @@
+<section class="slide" data-sec="Modern Java" data-title="The new syntax on one slide">
+  <h2>Ten years of syntax in one file: what Java 21 code looks like when it uses what it has</h2>
+  <p class="dek">Code written against Java 8 still compiles on 25, so many codebases never adopt the newer forms. This file uses most of them at once, each commented with the release that made it final. Read it as a checklist: every line here replaces a longer pattern that reviewers still see every week.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ModernSyntax.java · sealed records, switch patterns, text blocks, sequenced collections</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.stream.*;
+
+public class ModernSyntax {
+    static Map&lt;String, Integer&gt; stock;                                        // never assigned
+
+    sealed interface Shipment permits Parcel, Pallet { }                       // 17
+    record Parcel(String id, double kg) implements Shipment { }                // 16
+    record Pallet(String id, int boxes, boolean hazardous) implements Shipment { }
+
+    static String describe(Shipment s) {
+        return switch (s) {                                                    // 21: patterns in switch
+            case Parcel(var id, var kg) when kg &gt; 20 -&gt; id + ": heavy parcel";
+            case Parcel p -&gt; p.id() + ": parcel";
+            case Pallet(var id, var boxes, var hazardous) when hazardous -&gt; id + ": hazardous, " + boxes + " boxes";
+            case Pallet p -&gt; p.id() + ": pallet";
+        };
+    }
+
+    static int workingHours(String day) {
+        return switch (day) {                                                  // 14: switch expression
+            case "SAT", "SUN" -&gt; 0;
+            case "FRI" -&gt; 6;
+            default -&gt; {
+                int base = 8;
+                yield base;                                                    // a block yields its value
+            }
+        };
+    }
+
+    public static void main(String[] args) {
+        var shipments = List.of(new Parcel("P-1", 4.5), new Parcel("P-2", 31),     // 10: var; 9: List.of
+                new Pallet("L-1", 12, false), new Pallet("L-2", 40, true));
+        shipments.stream().map(ModernSyntax::describe).forEach(System.out::println);
+
+        String label = """
+                Order %s
+                  ships to: %s
+                """.formatted("ORD-7", "Leeds");                                // 15: text blocks, formatted
+        System.out.print(label);
+
+        Object o = shipments.getFirst();                                       // 21: sequenced collections
+        if (o instanceof Parcel p &amp;&amp; p.kg() &lt; 10)                              // 16: instanceof pattern
+            System.out.println("light parcel " + p.id());
+
+        System.out.println("hours: MON " + workingHours("MON") + ", FRI " + workingHours("FRI") + ", SUN " + workingHours("SUN"));
+        List&lt;String&gt; ids = shipments.stream().map(s -&gt; s instanceof Parcel p ? p.id() : ((Pallet) s).id()).toList();   // 16: toList
+        System.out.println("ids " + ids + ", last " + ids.getLast() + ", reversed " + ids.reversed());
+        System.out.println("blank? " + "  ".isBlank() + ", repeat " + "-".repeat(5) + ", strip [" + " x ".strip() + "]");   // 11
+        System.out.println("clamp(130, 0, 100) = " + Math.clamp(130, 0, 100));                                         // 21
+        Map&lt;Boolean, Long&gt; byKind = shipments.stream().collect(Collectors.partitioningBy(s -&gt; s instanceof Parcel, Collectors.counting()));
+        System.out.println("parcels " + byKind.get(true) + ", pallets " + byKind.get(false));
+        try {
+            stock.get("tea");
+        } catch (NullPointerException e) {
+            System.out.println("helpful NPE (14): " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ModernSyntax.java</div>
+<pre><code class="language-plaintext">P-1: parcel
+P-2: heavy parcel
+L-1: pallet
+L-2: hazardous, 40 boxes
+Order ORD-7
+  ships to: Leeds
+light parcel P-1
+hours: MON 8, FRI 6, SUN 0
+ids [P-1, P-2, L-1, L-2], last L-2, reversed [L-2, L-1, P-2, P-1]
+blank? true, repeat -----, strip [x]
+clamp(130, 0, 100) = 100
+parcels 2, pallets 2
+helpful NPE (14): Cannot invoke "java.util.Map.get(Object)" because "ModernSyntax.stock" is null</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Instead of</th><th>Write</th></tr></thead>
+          <tbody>
+            <tr><td>A class with fields, constructor, getters, <code>equals</code>, <code>hashCode</code>, <code>toString</code></td><td>A <code>record</code></td></tr>
+            <tr><td>An <code>instanceof</code> chain with casts</td><td>A <code>switch</code> over a sealed type, with record patterns and <code>when</code> guards</td></tr>
+            <tr><td><code>switch</code> statements with <code>break</code> and an assigned variable</td><td>A switch expression with arrows and <code>yield</code></td></tr>
+            <tr><td>Strings joined with <code>+ "\n" +</code></td><td>A text block and <code>formatted</code></td></tr>
+            <tr><td><code>list.get(list.size() - 1)</code></td><td><code>list.getLast()</code>, and <code>reversed()</code> for a view</td></tr>
+            <tr><td><code>collect(Collectors.toList())</code></td><td><code>toList()</code>, unmodifiable</td></tr>
+            <tr><td><code>Math.max(lo, Math.min(hi, x))</code></td><td><code>Math.clamp(x, lo, hi)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">var, used well</span>Use it where the type is obvious from the right-hand side, as in <code>var shipments = List.of(…)</code>. Avoid it where the reader would have to look the type up, and for literals whose type matters: <code>var total = 0</code> is an <code>int</code>, whatever the code later adds to it.</div>
+    <div class="note"><span class="lbl">Helpful NullPointerExceptions</span>Since 14 the message names exactly what was null: here the field <code>ModernSyntax.stock</code>. For a local variable it gives only a slot number, such as <code>"&lt;local6&gt;"</code>, unless the class was compiled with <code>-g</code>, which Maven and Gradle builds do by default.</div>
+    <div class="note warn"><span class="lbl">Patterns need a sealed type to shine</span>A <code>switch</code> over an open interface needs a <code>default</code>, which hides the case you forgot. Over a sealed one it needs none, and a new subtype breaks the build. More on <a data-deck="cj" data-slide="Sealed types and pattern matching">sealed types and pattern matching</a>.</div>
+  </div>
+</section>

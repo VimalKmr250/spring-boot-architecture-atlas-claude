@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Collections" data-title="LinkedHashMap, TreeMap and NavigableMap">
+  <h2>LinkedHashMap remembers order; TreeMap keeps keys sorted and answers range questions</h2>
+  <p class="dek"><code>LinkedHashMap</code> is a <code>HashMap</code> with a doubly linked list threaded through its entries, in insertion order or, if you ask, access order. That second mode plus one overridden method is an LRU cache. <code>TreeMap</code> is a red-black tree: every operation is O(log n), and in exchange it can find the nearest key, the first or last entry, or a whole range.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">OrderedMaps.java · three orders, an LRU cache, price bands by weight</div>
+<pre><code class="language-java">import java.util.*;
+
+public class OrderedMaps {
+    // An LRU cache in eight lines: access order plus an eviction hook.
+    static class LruCache&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+        private static final long serialVersionUID = 1L;
+        private final int capacity;
+        LruCache(int capacity) {
+            super(16, 0.75f, true);                       // true = access order, not insertion
+            this.capacity = capacity;
+        }
+        @Override protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; eldest) { return size() &gt; capacity; }
+    }
+
+    public static void main(String[] args) {
+        List&lt;String&gt; skus = List.of("tea", "apple", "milk", "bread", "eggs");
+        Map&lt;String, Integer&gt; hash = new HashMap&lt;&gt;(), linked = new LinkedHashMap&lt;&gt;(), tree = new TreeMap&lt;&gt;();
+        for (String s : skus) { hash.put(s, s.length()); linked.put(s, s.length()); tree.put(s, s.length()); }
+        System.out.println("HashMap       " + hash.keySet());
+        System.out.println("LinkedHashMap " + linked.keySet() + "  insertion order");
+        System.out.println("TreeMap       " + tree.keySet() + "  sorted");
+
+        var cache = new LruCache&lt;String, String&gt;(3);
+        cache.put("a", "A");
+        cache.put("b", "B");
+        cache.put("c", "C");
+        cache.get("a");                                   // a becomes the most recently used
+        cache.put("d", "D");                              // evicts the eldest: b
+        System.out.println("LRU after get(a), put(d): " + cache.keySet());
+
+        // Shipping price by weight band: the band starts at the key, in kg.
+        NavigableMap&lt;Double, Integer&gt; bands = new TreeMap&lt;&gt;(Map.of(0.0, 4, 2.0, 7, 5.0, 12, 10.0, 20, 30.0, 45));
+        for (double kg : new double[] {0.4, 2.0, 7.5, 31})
+            System.out.println(kg + " kg -&gt; band " + bands.floorKey(kg) + " costs " + bands.floorEntry(kg).getValue());
+        System.out.println("ceilingKey(7.5) " + bands.ceilingKey(7.5) + ", higherKey(10.0) " + bands.higherKey(10.0)
+                + ", lowerKey(0.0) " + bands.lowerKey(0.0));
+        System.out.println("headMap(5.0) " + bands.headMap(5.0) + ", tailMap(10.0, true) " + bands.tailMap(10.0, true));
+        System.out.println("subMap(2.0, 10.0) " + bands.subMap(2.0, 10.0) + ", descending " + bands.descendingKeySet());
+        System.out.println("pollFirstEntry " + bands.pollFirstEntry() + ", now first " + bands.firstKey());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · OrderedMaps.java</div>
+<pre><code class="language-plaintext">HashMap       [tea, apple, eggs, bread, milk]
+LinkedHashMap [tea, apple, milk, bread, eggs]  insertion order
+TreeMap       [apple, bread, eggs, milk, tea]  sorted
+LRU after get(a), put(d): [c, a, d]
+0.4 kg -&gt; band 0.0 costs 4
+2.0 kg -&gt; band 2.0 costs 7
+7.5 kg -&gt; band 5.0 costs 12
+31.0 kg -&gt; band 30.0 costs 45
+ceilingKey(7.5) 10.0, higherKey(10.0) 30.0, lowerKey(0.0) null
+headMap(5.0) {0.0=4, 2.0=7}, tailMap(10.0, true) {10.0=20, 30.0=45}
+subMap(2.0, 10.0) {2.0=7, 5.0=12}, descending [30.0, 10.0, 5.0, 2.0, 0.0]
+pollFirstEntry 0.0=4, now first 2.0</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>NavigableMap method</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td><code>floorKey(k)</code>, <code>ceilingKey(k)</code></td><td>The greatest key ≤ k, the least key ≥ k</td></tr>
+            <tr><td><code>lowerKey(k)</code>, <code>higherKey(k)</code></td><td>The same, strictly &lt; or &gt; k; <code>null</code> when there is none</td></tr>
+            <tr><td><code>headMap(k)</code>, <code>tailMap(k, true)</code>, <code>subMap(a, b)</code></td><td>Live views of a range: lower bound inclusive, upper exclusive, unless you pass the flags</td></tr>
+            <tr><td><code>firstEntry</code>, <code>pollFirstEntry</code>, <code>descendingMap</code></td><td>The ends, removing one, and the whole map reversed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Access order makes get a write</span>In access-order mode every <code>get</code> moves an entry, so it is a structural change. Iterating while calling <code>get</code> throws <code>ConcurrentModificationException</code>, and two threads that only read can still corrupt the list. The thread-safe version is on <a data-deck="lld" data-slide="Thread-safe LRU cache: design">the LLD tab's LRU cache</a>.</div>
+    <div class="note tip"><span class="lbl">floorEntry is a lookup table</span>Tax brackets, shipping bands, rate cards, time-based price lists: store each band's start as a key and <code>floorEntry(x)</code> finds the band for any <code>x</code> in O(log n). That replaces a chain of <code>if</code>s that someone has to keep in order.</div>
+    <div class="note"><span class="lbl">Views write through</span><code>headMap</code>, <code>tailMap</code> and <code>subMap</code> are views: removing from one removes from the map, and putting a key outside the range throws <code>IllegalArgumentException: key out of range</code>. For a sorted map shared between threads, use <code>ConcurrentSkipListMap</code>.</div>
+  </div>
+</section>

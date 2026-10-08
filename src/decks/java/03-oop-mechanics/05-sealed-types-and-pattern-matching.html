@@ -1,0 +1,119 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Sealed types and pattern matching">
+  <h2>A sealed hierarchy lets the compiler prove that a switch handles every case</h2>
+  <p class="dek">A sealed interface lists every type allowed to implement it <span class="tag a">since 17</span>. A <code>switch</code> over it can then match on type, deconstruct records and add guards <span class="tag a">since 21</span>, with no <code>default</code> branch. Add a new permitted type and every switch that forgot it stops compiling, instead of falling into a <code>default</code> that hides the gap.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Sealed.java · type patterns, record patterns, guards, case null</div>
+<pre><code class="language-java">import java.util.List;
+
+public class Sealed {
+    sealed interface Payment permits Card, Wallet, BankTransfer { long cents(); }
+    record Card(long cents, String network) implements Payment { }
+    record Wallet(long cents, String provider) implements Payment { }
+    record BankTransfer(long cents, String iban, boolean instant) implements Payment { }
+
+    static long feeCents(Payment p) {
+        return switch (p) {                                  // exhaustive: no default needed
+            case Card c when c.network().equals("AMEX") -&gt; c.cents() * 3 / 100;
+            case Card c                                  -&gt; c.cents() * 2 / 100;
+            case Wallet w                                -&gt; 25;
+            case BankTransfer(long cents, String iban, boolean instant) when instant -&gt; 50;
+            case BankTransfer t                          -&gt; 0;
+        };
+    }
+
+    static String describe(Object o) {
+        return switch (o) {
+            case null                    -&gt; "nothing";       // since 21: null gets a case
+            case Integer i when i &gt; 100  -&gt; "big int " + i;
+            case Integer i               -&gt; "int " + i;
+            case String s                -&gt; "string of " + s.length();
+            case Payment p               -&gt; "payment of " + p.cents();
+            default                      -&gt; "other " + o.getClass().getSimpleName();
+        };
+    }
+
+    public static void main(String[] args) {
+        List&lt;Payment&gt; payments = List.of(new Card(10_000, "VISA"), new Card(10_000, "AMEX"),
+                new Wallet(4_000, "PayPal"), new BankTransfer(90_000, "DE89...", true),
+                new BankTransfer(90_000, "DE89...", false));
+        for (Payment p : payments) System.out.println(p + " -&gt; fee " + feeCents(p));
+
+        for (Object o : new Object[] {null, 7, 500, "refund", new Wallet(1, "X"), 2.5})
+            System.out.println(describe(o));
+
+        Object order = "ORD-42";
+        if (order instanceof String id &amp;&amp; id.startsWith("ORD-"))   // pattern variable in scope
+            System.out.println("order number " + id.substring(4));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Sealed.java</div>
+<pre><code class="language-plaintext">Card[cents=10000, network=VISA] -&gt; fee 200
+Card[cents=10000, network=AMEX] -&gt; fee 300
+Wallet[cents=4000, provider=PayPal] -&gt; fee 25
+BankTransfer[cents=90000, iban=DE89..., instant=true] -&gt; fee 50
+BankTransfer[cents=90000, iban=DE89..., instant=false] -&gt; fee 0
+nothing
+int 7
+big int 500
+string of 6
+payment of 1
+other Double
+order number 42</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">SealedMissing.java · a Voucher type the switch does not handle</div>
+<pre><code class="language-java">public class SealedMissing {
+    sealed interface Payment permits Card, Wallet, Voucher { long cents(); }
+    record Card(long cents) implements Payment { }
+    record Wallet(long cents) implements Payment { }
+    record Voucher(long cents) implements Payment { }        // the new type
+
+    static long feeCents(Payment p) {
+        return switch (p) {
+            case Card c   -&gt; c.cents() * 2 / 100;
+            case Wallet w -&gt; 25;
+        };                                                     // Voucher is not handled
+    }
+}</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac · SealedMissing.java</div>
+<pre><code class="language-plaintext">SealedMissing.java:8: error: the switch expression does not cover all possible input values
+        return switch (p) {
+               ^
+1 error</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Rule</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Who may be permitted</td><td>Subtypes in the same module, or the same package when there is no module. Each must be <code>final</code>, <code>sealed</code> or <code>non-sealed</code>; records are final already. <code>permits</code> may be left out when they are all in the same file.</td></tr>
+          <tr><td>Exhaustiveness</td><td>Required for every switch expression, and for any switch that uses patterns or <code>case null</code>.</td></tr>
+          <tr><td>Order and dominance</td><td>Cases are tried top to bottom. A case that can never match because an earlier one covers it is an error, shown below.</td></tr>
+          <tr><td><code>null</code></td><td>A switch without <code>case null</code> throws <code>NullPointerException</code> on null, as switches always have.</td></tr>
+          <tr><td>Separate compilation</td><td>If a new permitted type arrives in a jar and the switch is not recompiled, it throws <code>MatchException</code> at run time.</td></tr>
+          <tr><td>Since</td><td><code>instanceof</code> patterns <span class="tag a">16</span> · sealed <span class="tag a">17</span> · switch and record patterns <span class="tag a">21</span> · unnamed <code>_</code> <span class="tag a">22</span> · primitive patterns in preview in 25</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">javac · Dominance.java, a String case after CharSequence</div>
+<pre><code class="language-plaintext">Dominance.java:5: error: this case label is dominated by a preceding case label
+            case String s        -&gt; "string";                  // can never match
+                 ^
+1 error</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Sealed switch or polymorphic method?</span>Use a sealed type and a switch when the set of types is fixed and new operations keep coming. Use a method on the interface when new types keep coming. The LLD tab's <a data-deck="lld" data-slide="The Java 21 toolkit for LLD">Java 21 toolkit</a> applies this to a parking-lot model.</div>
+    </div>
+  </div>
+</section>

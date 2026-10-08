@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Pitfalls" data-title="Equality and hashing bugs">
+  <h2>Seven equality bugs that compile cleanly, pass the tests, and return null in production</h2>
+  <p class="dek">Each of these has appeared earlier in the tab as a mechanism. Here they are as a reviewer meets them: one line of code, the wrong answer it gives, and the fix. All seven come from the same two facts: <code>==</code> compares identity, and hash-based collections trust <code>equals</code> and <code>hashCode</code> to agree and to stay fixed.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">EqualityBugs.java · each bug in a line or two</div>
+<pre><code class="language-java">import java.math.BigDecimal;
+import java.util.*;
+
+public class EqualityBugs {
+    static final class Order {
+        final String id;
+        Order(String id) { this.id = id; }
+        public boolean equals(Order other) { return other != null &amp;&amp; id.equals(other.id); }   // an overload!
+        @Override public int hashCode() { return id.hashCode(); }
+    }
+
+    record Batch(int[] quantities) { }
+
+    public static void main(String[] args) {
+        Map&lt;String, Integer&gt; stock = Map.of("tea", 500, "milk", 500);
+        System.out.println("1 same stock?             " + (stock.get("tea") == stock.get("milk"))
+                + "  -&gt; equals: " + stock.get("tea").equals(stock.get("milk")));
+
+        String typed = new Scanner("ACTIVE").next();                          // as if read from input
+        System.out.println("2 status == \"ACTIVE\"      " + (typed == "ACTIVE") + "  -&gt; equals: " + "ACTIVE".equals(typed));
+
+        Set&lt;Order&gt; orders = new HashSet&lt;&gt;(List.of(new Order("ORD-1")));
+        System.out.println("3 contains(ORD-1)         " + orders.contains(new Order("ORD-1"))
+                + "  (equals(Order) never overrides equals(Object))");
+
+        Map&lt;BigDecimal, String&gt; priceBands = new HashMap&lt;&gt;(Map.of(new BigDecimal("10.00"), "standard"));
+        System.out.println("4 band for 10.0           " + priceBands.get(new BigDecimal("10.0"))
+                + "  -&gt; TreeMap: " + new TreeMap&lt;&gt;(priceBands).get(new BigDecimal("10.0")));
+
+        Map&lt;Batch, String&gt; labels = new HashMap&lt;&gt;(Map.of(new Batch(new int[] {1, 2}), "small"));
+        System.out.println("5 label for equal batch   " + labels.get(new Batch(new int[] {1, 2})) + "  (arrays compare by identity)");
+
+        List&lt;Integer&gt; ids = new ArrayList&lt;&gt;(List.of(5, Integer.MIN_VALUE, 3, Integer.MAX_VALUE, -7));
+        ids.sort((a, b) -&gt; a - b);                                            // subtraction overflows
+        System.out.println("6 sorted with a - b       " + ids);
+        ids.sort(Integer::compare);
+        System.out.println("  sorted with compare     " + ids);
+
+        Date start = new Date(0);
+        Map&lt;Date, String&gt; shifts = new HashMap&lt;&gt;(Map.of(start, "night"));
+        start.setTime(3_600_000);                                             // a mutable key, changed
+        System.out.println("7 shift after the key changed: " + shifts.get(start) + ", map still holds " + shifts.size());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · EqualityBugs.java</div>
+<pre><code class="language-plaintext">1 same stock?             false  -&gt; equals: true
+2 status == "ACTIVE"      false  -&gt; equals: true
+3 contains(ORD-1)         false  (equals(Order) never overrides equals(Object))
+4 band for 10.0           null  -&gt; TreeMap: standard
+5 label for equal batch   null  (arrays compare by identity)
+6 sorted with a - b       [3, 5, 2147483647, -2147483648, -7]
+  sorted with compare     [-2147483648, -7, 3, 5, 2147483647]
+7 shift after the key changed: null, map still holds 1</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac · the same Order with @Override on its equals</div>
+<pre><code class="language-plaintext">OverrideCheck.java:5: error: method does not override or implement a method from a supertype
+        @Override public boolean equals(Order other) { return other != null &amp;&amp; id.equals(other.id); }
+        ^
+1 error</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Bug</th><th>Why tests miss it</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td><code>==</code> on two <code>Integer</code>s from a map</td><td>Test values are small and cached</td><td><code>equals</code>, or unbox to <code>int</code> first</td></tr>
+        <tr><td class="num">2</td><td><code>==</code> on a string from input</td><td>Tests compare literals, which are pooled</td><td><code>"ACTIVE".equals(status)</code>, or an enum</td></tr>
+        <tr><td class="num">3</td><td><code>equals(Order)</code> instead of <code>equals(Object)</code></td><td>Direct calls to <code>a.equals(b)</code> work; only collections use the inherited one</td><td><code>@Override</code>, which turns it into a compile error; or a record</td></tr>
+        <tr><td class="num">4</td><td><code>BigDecimal</code> keys with different scales</td><td>Fixtures use one scale</td><td>Normalise with <code>stripTrailingZeros()</code>, or use a <code>TreeMap</code></td></tr>
+        <tr><td class="num">5</td><td>An array, or a record holding one, as a key</td><td>Lookups in tests reuse the same array object</td><td>A <code>List</code>, or override <code>equals</code> and <code>hashCode</code> with <code>Arrays</code></td></tr>
+        <tr><td class="num">6</td><td>A comparator written as <code>a - b</code></td><td>Small numbers never overflow</td><td><code>Integer.compare</code>, <code>Comparator.comparingInt</code></td></tr>
+        <tr><td class="num">7</td><td>A mutable key changed after insertion</td><td>Tests rarely mutate a key</td><td>Immutable keys: <code>Instant</code>, records, strings</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">The review question</span>For every type used as a map key or set element, ask: is <code>equals</code> overridden, does <code>hashCode</code> use the same fields, and can any of those fields change? A record of immutable types answers all three. The rules themselves are on <a data-deck="cj" data-slide="The Object contract">the Object contract</a>.</div>
+</section>

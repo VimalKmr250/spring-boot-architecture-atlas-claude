@@ -1,0 +1,148 @@
+<section class="slide" data-sec="Concurrent collections" data-title="ConcurrentHashMap internals">
+  <h2>ConcurrentHashMap locks one bin at a time, and its compound methods are atomic per key</h2>
+  <p class="dek">Since Java 8 a <code>ConcurrentHashMap</code> is a hash table much like <code>HashMap</code>, made safe bin by bin. Reads take no lock at all. A write into an empty bin is a single compare-and-set; a write into a non-empty bin locks only that bin's first node. A resize is shared out among the threads that write during it. What it cannot make atomic is two separate calls, such as <code>get</code> followed by <code>put</code>.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Four bins of a ConcurrentHashMap table. An empty bin, where put uses one compare-and-set and takes no lock. A bin holding a chain of three nodes, where put synchronizes on the first node, so only this bin is locked. A TreeBin, a red-black tree for a crowded bin, locked the same way. A ForwardingNode left during a resize, pointing at the new table, where threads that write help move the remaining bins. Above them: get never locks; it reads volatile fields.">
+        <text x="450" y="22" text-anchor="middle" font-size="11.5" font-weight="600" fill="currentColor">get() never locks: it reads volatile fields</text>
+        <g fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.4">
+          <rect x="40" y="40" width="190" height="80" rx="6"></rect><rect x="250" y="40" width="190" height="80" rx="6"></rect>
+          <rect x="460" y="40" width="190" height="80" rx="6"></rect><rect x="670" y="40" width="190" height="80" rx="6"></rect>
+        </g>
+        <text x="135" y="86" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.6" font-family="IBM Plex Mono, monospace">null</text>
+        <g font-size="10" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="262" y="68" width="48" height="24" rx="4" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="286" y="84">k1</text>
+          <rect x="324" y="68" width="48" height="24" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="348" y="84">k2</text>
+          <rect x="386" y="68" width="44" height="24" rx="4" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect><text x="408" y="84">k3</text>
+          <circle cx="555" cy="60" r="11" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></circle>
+          <circle cx="525" cy="98" r="11" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></circle>
+          <circle cx="585" cy="98" r="11" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.45"></circle>
+          <rect x="684" y="68" width="110" height="24" rx="4" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B"></rect><text x="739" y="84">Forwarding</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1">
+          <line x1="310" y1="80" x2="321" y2="80" marker-end="url(#arw)"></line><line x1="372" y1="80" x2="383" y2="80" marker-end="url(#arw)"></line>
+          <line x1="548" y1="69" x2="531" y2="89"></line><line x1="562" y1="69" x2="579" y2="89"></line>
+          <line x1="794" y1="80" x2="846" y2="80" stroke="#3AA79B" marker-end="url(#arwB)"></line>
+        </g>
+        <text x="850" y="72" text-anchor="end" font-size="9.5" fill="#3AA79B">new table</text>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <text x="135" y="145">empty: put is one CAS,</text><text x="135" y="160">no lock at all</text>
+          <text x="345" y="145">chain: synchronized on the</text><text x="345" y="160">first node; only this bin waits</text>
+          <text x="555" y="145">TreeBin: a red-black tree for</text><text x="555" y="160">a crowded bin, locked the same way</text>
+          <text x="765" y="145">mid-resize: a thread that writes</text><text x="765" y="160">here helps move bins first</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ChmDemo.java · HashMap against ConcurrentHashMap, then the atomic methods</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class ChmDemo {
+    static void inParallel(int threads, Runnable work) throws InterruptedException {
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int t = 0; t &lt; threads; t++) pool.submit(work);
+        }
+    }
+
+    // Eight daemon threads write one plain HashMap. Any of three things can happen; report which did.
+    static String racyHashMap() throws InterruptedException {
+        Map&lt;Integer, Integer&gt; plain = new HashMap&lt;&gt;();
+        AtomicInteger next = new AtomicInteger();
+        Queue&lt;String&gt; errors = new ConcurrentLinkedQueue&lt;&gt;();
+        List&lt;Thread&gt; writers = new ArrayList&lt;&gt;();
+        for (int t = 0; t &lt; 8; t++) {
+            Thread w = Thread.ofPlatform().daemon().unstarted(() -&gt; {
+                for (int i = 0; i &lt; 50_000; i++) { int k = next.getAndIncrement(); plain.put(k, k); }
+            });
+            w.setUncaughtExceptionHandler((th, e) -&gt; errors.add(e.getClass().getSimpleName()));
+            writers.add(w);
+            w.start();
+        }
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        for (Thread w : writers) w.join(Math.max(1, (deadline - System.nanoTime()) / 1_000_000));
+        long stuck = writers.stream().filter(Thread::isAlive).count();
+        if (stuck &gt; 0) return stuck + " writer(s) still running after 5 s, looping in a corrupted bin";
+        if (!errors.isEmpty()) return "writers threw " + new TreeSet&lt;&gt;(errors);
+        return String.format("size %,d", plain.size());
+    }
+
+    public static void main(String[] args) throws Exception {
+        System.out.println("HashMap, 400,000 distinct keys from 8 threads: " + racyHashMap());
+        Map&lt;Integer, Integer&gt; concurrent = new ConcurrentHashMap&lt;&gt;();
+        AtomicInteger next = new AtomicInteger();
+        inParallel(8, () -&gt; { for (int i = 0; i &lt; 50_000; i++) { int k = next.getAndIncrement(); concurrent.put(k, k); } });
+        System.out.printf("ConcurrentHashMap, the same keys: size %,d%n", concurrent.size());
+
+        Map&lt;String, Integer&gt; racy = new ConcurrentHashMap&lt;&gt;(), atomic = new ConcurrentHashMap&lt;&gt;();
+        inParallel(8, () -&gt; {
+            for (int i = 0; i &lt; 100_000; i++) {
+                Integer old = racy.get("hits");                   // get, then put: two steps
+                racy.put("hits", old == null ? 1 : old + 1);
+                atomic.merge("hits", 1, Integer::sum);            // one atomic step per key
+            }
+        });
+        System.out.printf("800,000 increments: get-then-put %,d, merge %,d%n", racy.get("hits"), atomic.get("hits"));
+
+        AtomicInteger loads = new AtomicInteger();
+        Map&lt;String, String&gt; cache = new ConcurrentHashMap&lt;&gt;();
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 1_000; i++)
+                pool.submit(() -&gt; cache.computeIfAbsent("rates", k -&gt; { loads.incrementAndGet(); return "loaded"; }));
+        }
+        System.out.println("1,000 concurrent computeIfAbsent calls ran the loader " + loads.get() + " time(s)");
+
+        try {
+            concurrent.put(null, 1);
+        } catch (NullPointerException e) {
+            System.out.println("put(null, ...) -&gt; NullPointerException");
+        }
+        Map&lt;String, Integer&gt; nested = new ConcurrentHashMap&lt;&gt;();
+        try {
+            nested.computeIfAbsent("a", k -&gt; nested.computeIfAbsent("a", k2 -&gt; 1));   // the map, from inside itself
+        } catch (IllegalStateException e) {
+            System.out.println("computeIfAbsent inside computeIfAbsent: IllegalStateException: " + e.getMessage());
+        }
+
+        ConcurrentHashMap&lt;String, Long&gt; sales = new ConcurrentHashMap&lt;&gt;(Map.of("tea", 40L, "milk", 75L, "jam", 12L));
+        long total = sales.reduceValuesToLong(1, Long::longValue, 0L, Long::sum);    // parallel bulk operation
+        String best = sales.search(1, (k, v) -&gt; v &gt; 50 ? k : null);
+        System.out.println("reduceValues " + total + ", search " + best + ", mappingCount " + sales.mappingCount());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ChmDemo.java · the lost counts vary by run</div>
+<pre><code class="language-plaintext">HashMap, 400,000 distinct keys from 8 threads: size 167,856
+ConcurrentHashMap, the same keys: size 400,000
+800,000 increments: get-then-put 683,953, merge 800,000
+1,000 concurrent computeIfAbsent calls ran the loader 1 time(s)
+put(null, ...) -&gt; NullPointerException
+computeIfAbsent inside computeIfAbsent: IllegalStateException: Recursive update
+reduceValues 127, search milk, mappingCount 3</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Atomic per key</th><th>Not atomic</th></tr></thead>
+          <tbody>
+            <tr><td><code>merge</code>, <code>compute</code>, <code>computeIfAbsent</code>, <code>computeIfPresent</code></td><td><code>get</code>, then <code>put</code>: it lost increments above</td></tr>
+            <tr><td><code>putIfAbsent</code>, <code>replace(k, old, new)</code>, <code>remove(k, v)</code></td><td><code>containsKey</code>, then <code>put</code></td></tr>
+            <tr><td>Each single <code>get</code>, <code>put</code>, <code>remove</code></td><td>Anything across two keys</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">HashMap between threads</span>It lost a large share of 400,000 distinct keys in the run above, with no exception. It can also throw from inside a resize, or corrupt a bin into a loop: in one run while this tab was written, a writer never finished, which is why the demo now gives them five seconds and reports what happened. <code>Hashtable</code> and <code>Collections.synchronizedMap</code> are correct, with one lock for the whole map.</div>
+    <div class="note warn"><span class="lbl">Keep compute functions short</span><code>computeIfAbsent</code> calls the loader once per absent key, while it holds that bin's lock. A slow remote call inside it stalls every writer to that bin. Touching the same map from inside the function is illegal: <code>IllegalStateException: Recursive update</code>.</div>
+    <div class="note tip"><span class="lbl">Why no nulls</span>A <code>get</code> returning <code>null</code> must mean absent. In a <code>HashMap</code> you can follow up with <code>containsKey</code>, but in a concurrent map the answer may change in between. <code>mappingCount()</code> returns a <code>long</code> estimate; the bulk methods take a parallelism threshold.</div>
+  </div>
+</section>

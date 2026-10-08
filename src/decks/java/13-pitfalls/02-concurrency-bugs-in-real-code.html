@@ -1,0 +1,133 @@
+<section class="slide" data-sec="Pitfalls" data-title="Concurrency bugs in real code">
+  <h2>Six concurrency bugs from real code reviews, each one forced into the open</h2>
+  <p class="dek">Concurrency bugs hide because they need an unlucky interleaving, and a single-threaded test never provides one. Each case below runs with enough threads to make the race likely, so the wrong answer appears on an ordinary laptop. The counts change from run to run; that they are wrong does not.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ConcurrencyBugs.java · shared formatters, check-then-act, pool starvation, boxed locks</div>
+<pre><code class="language-java">import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+
+public class ConcurrencyBugs {
+    static final SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd");    // shared and mutable
+    static Map&lt;String, String&gt; config;                                             // lazily loaded, unsafely
+    static final AtomicInteger loads = new AtomicInteger();
+
+    static Map&lt;String, String&gt; config() {
+        if (config == null) {                                                      // check...
+            loads.incrementAndGet();
+            config = Map.of("region", "eu");                                       // ...then act
+        }
+        return config;
+    }
+
+    public static void main(String[] args) throws Exception {
+        AtomicInteger wrong = new AtomicInteger(), failed = new AtomicInteger();
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; 10_000; i++) {
+                String day = String.format("2026-%02d-%02d", 1 + i % 12, 1 + i % 28);
+                pool.submit(() -&gt; {
+                    try {
+                        if (!FORMAT.format(FORMAT.parse(day)).equals(day)) wrong.incrementAndGet();
+                    } catch (Exception e) {
+                        failed.incrementAndGet();
+                    }
+                });
+            }
+        }
+        System.out.println("1 shared SimpleDateFormat: " + wrong.get() + " wrong results, " + failed.get() + " exceptions in 10,000 parses");
+
+        Map&lt;String, Integer&gt; initCalls = new ConcurrentHashMap&lt;&gt;();
+        AtomicInteger inits = new AtomicInteger();
+        CountDownLatch go = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; 8; i++)
+                pool.submit(() -&gt; {
+                    go.await();
+                    if (!initCalls.containsKey("rates")) {                         // check-then-act on a concurrent map
+                        inits.incrementAndGet();
+                        initCalls.put("rates", 1);
+                    }
+                    return null;
+                });
+            go.countDown();
+        }
+        System.out.println("2 containsKey then put: the expensive init ran " + inits.get() + " times for one key");
+
+        List&lt;Integer&gt; unsafe = new ArrayList&lt;&gt;();
+        try {
+            IntStream.range(0, 100_000).parallel().forEach(unsafe::add);           // ArrayList from many threads
+            System.out.println("3 parallel forEach into ArrayList: " + unsafe.size() + " of 100000 elements kept");
+        } catch (RuntimeException e) {
+            System.out.println("3 parallel forEach into ArrayList threw " + e.getClass().getSimpleName());
+        }
+        System.out.println("  collect instead: " + IntStream.range(0, 100_000).parallel().boxed().toList().size());
+
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int i = 0; i &lt; 8; i++) pool.submit(() -&gt; { start.await(); return config(); });
+            start.countDown();
+        }
+        System.out.println("4 unsynchronised lazy init: loaded " + loads.get() + " time(s) (varies; can be 1)");
+
+        ExecutorService small = Executors.newFixedThreadPool(2);
+        List&lt;Future&lt;String&gt;&gt; outer = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; 2; i++)
+            outer.add(small.submit(() -&gt; small.submit(() -&gt; "inner").get()));    // waits on its own pool
+        try {
+            outer.get(0).get(1, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            System.out.println("5 tasks waiting on subtasks in the same full pool: stuck (TimeoutException after 1 s)");
+        }
+        small.shutdownNow();
+
+        Integer counterLock = 42;
+        synchronized (counterLock) {                                               // javac warns: value-based class
+            System.out.println("6 locked a boxed Integer, shared with every other 42 in the JVM");
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ConcurrencyBugs.java · the counts vary by run</div>
+<pre><code class="language-plaintext">1 shared SimpleDateFormat: 7177 wrong results, 1800 exceptions in 10,000 parses
+2 containsKey then put: the expensive init ran 1 times for one key
+3 parallel forEach into ArrayList: 17331 of 100000 elements kept
+  collect instead: 100000
+4 unsynchronised lazy init: loaded 2 time(s) (varies; can be 1)
+5 tasks waiting on subtasks in the same full pool: stuck (TimeoutException after 1 s)
+6 locked a boxed Integer, shared with every other 42 in the JVM</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac --release 21 -Xlint:all · ConcurrencyBugs.java</div>
+<pre><code class="language-plaintext">ConcurrencyBugs.java:81: warning: [identity] attempt to synchronize on an instance of a value-based class
+        synchronized (counterLock) {                                               // javac warns: value-based class
+        ^
+1 warning</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Bug</th><th>Symptom</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>A <code>static SimpleDateFormat</code> shared by request threads</td><td>Wrong dates and odd exceptions under load, never in tests</td><td><code>DateTimeFormatter</code>, which is immutable</td></tr>
+        <tr><td class="num">2</td><td><code>containsKey</code> then <code>put</code>, even on a <code>ConcurrentHashMap</code></td><td>An expensive initialisation runs twice or more</td><td><code>computeIfAbsent</code></td></tr>
+        <tr><td class="num">3</td><td>A parallel stream adding to an <code>ArrayList</code></td><td>Lost elements, or <code>ArrayIndexOutOfBoundsException</code></td><td>Collect: <code>toList()</code>, <code>collect(…)</code>; no shared mutable state</td></tr>
+        <tr><td class="num">4</td><td>Lazy initialisation with <code>if (x == null) x = load()</code></td><td>Loaded several times; another thread may even see a half-built object</td><td>The holder idiom, a <code>volatile</code> double-check, or eager initialisation</td></tr>
+        <tr><td class="num">5</td><td>Tasks that wait for subtasks in the same bounded pool</td><td>Every thread waits, nothing progresses: a hang with no deadlock in the dump</td><td>A separate pool for subtasks, <code>CompletableFuture</code> chaining, or <code>ForkJoinPool</code></td></tr>
+        <tr><td class="num">6</td><td><code>synchronized</code> on an <code>Integer</code>, a <code>String</code> literal or <code>this</code> in a public class</td><td>Unrelated code shares the lock: contention or a surprise deadlock</td><td><code>private final Object lock = new Object()</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note warn"><span class="lbl">Testing for races</span>Run the code with many threads released together by a latch, as here, and repeat it. For memory-model bugs, OpenJDK's jcstress tool runs millions of trials on purpose. A passing single-threaded test proves nothing about any of these.</div>
+    <div class="note tip"><span class="lbl">The tools that prevent them</span>Every fix in the table comes from one page: <a data-deck="cj" data-slide="Choosing a concurrency tool">choosing a concurrency tool</a>. The memory-model reasons behind bug 4 are on <a data-deck="cj" data-slide="Happens-before">happens-before</a>.</div>
+  </div>
+</section>

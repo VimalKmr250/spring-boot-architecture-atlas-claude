@@ -1,0 +1,93 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Happens-before">
+  <h2>Happens-before is the only ordering promise between threads, and it is created at specific points</h2>
+  <p class="dek">If action A happens-before action B, then B sees A's effects and everything that happened before A. The JLS defines a small set of these edges, <code>java.util.concurrent</code> documents more, and the relation is transitive. Without an edge, any outcome the hardware can produce is legal, including one that no interleaving of the source lines could produce: both reads below returning 0.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Reordering.java · the store-buffering test, plain fields against volatile ones</div>
+<pre><code class="language-java">import java.util.concurrent.atomic.AtomicInteger;
+
+// The store-buffering test: each thread writes one variable, then reads the other.
+// If every thread's actions happened in program order, at least one read would see a 1.
+public class Reordering {
+    static int x, y, r1, r2;                       // plain fields
+    static volatile int vx, vy;                    // volatile fields
+    static int vr1, vr2;
+    static final AtomicInteger round = new AtomicInteger(), finished = new AtomicInteger();
+
+    static Thread side(int trials, Runnable body) {
+        return new Thread(() -&gt; {
+            for (int i = 1; i &lt;= trials; i++) {
+                while (round.get() != i) Thread.onSpinWait();   // start each trial together
+                body.run();
+                finished.incrementAndGet();
+            }
+        });
+    }
+
+    static int run(boolean useVolatile, int trials) throws InterruptedException {
+        round.set(0);
+        Thread a = useVolatile ? side(trials, () -&gt; { vx = 1; vr1 = vy; }) : side(trials, () -&gt; { x = 1; r1 = y; });
+        Thread b = useVolatile ? side(trials, () -&gt; { vy = 1; vr2 = vx; }) : side(trials, () -&gt; { y = 1; r2 = x; });
+        a.start();
+        b.start();
+        int bothZero = 0;
+        for (int i = 1; i &lt;= trials; i++) {
+            x = y = vx = vy = 0;
+            finished.set(0);
+            round.set(i);                          // release both threads
+            while (finished.get() != 2) Thread.onSpinWait();
+            if (useVolatile ? vr1 == 0 &amp;&amp; vr2 == 0 : r1 == 0 &amp;&amp; r2 == 0) bothZero++;
+        }
+        a.join();
+        b.join();
+        return bothZero;
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        int trials = 200_000;
+        System.out.printf("plain fields:    both reads saw 0 in %,d of %,d trials%n", run(false, trials), trials);
+        System.out.printf("volatile fields: both reads saw 0 in %,d of %,d trials%n", run(true, trials), trials);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25, x86-64 · Reordering.java · the plain count varies by run</div>
+<pre><code class="language-plaintext">plain fields:    both reads saw 0 in 22,217 of 200,000 trials
+volatile fields: both reads saw 0 in 0 of 200,000 trials</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Reading the result</span>If each thread's write came before its read, the second read to run would have to see a 1. Yet with plain fields both saw 0 in tens of thousands of trials: each write sat in a store buffer while the next read went ahead. With <code>volatile</code>, the JVM puts a fence after each write, and the impossible result never appeared in 200,000 trials. x86 reorders only a store with a later load; ARM servers such as Graviton reorder more, so racy code that works on a laptop can fail in production.</div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>This</th><th>happens-before</th></tr></thead>
+          <tbody>
+            <tr><td>Each action in a thread</td><td>Every later action in that thread (program order)</td></tr>
+            <tr><td>Unlocking a monitor</td><td>Every later lock of the same monitor</td></tr>
+            <tr><td>A volatile write</td><td>Every later read of that variable</td></tr>
+            <tr><td><code>t.start()</code></td><td>Everything thread <code>t</code> does</td></tr>
+            <tr><td>Everything thread <code>t</code> does</td><td>Another thread's return from <code>t.join()</code></td></tr>
+            <tr><td>The end of a constructor</td><td>Reads of that object's final fields by other threads, if <code>this</code> did not escape</td></tr>
+            <tr><td>A class's static initialiser</td><td>Any use of the class</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>java.util.concurrent edge</th><th>Means</th></tr></thead>
+        <tbody>
+          <tr><td>Putting into a concurrent collection</td><td>Visible to the thread that gets or removes that element</td></tr>
+          <tr><td><code>executor.submit(task)</code></td><td>Visible to the task when it starts</td></tr>
+          <tr><td>A task's actions</td><td>Visible after <code>future.get()</code> returns</td></tr>
+          <tr><td><code>countDown()</code>, <code>release()</code>, <code>unlock()</code></td><td>Visible after the matching <code>await()</code>, <code>acquire()</code>, <code>lock()</code> returns</td></tr>
+          <tr><td>Completing a <code>CompletableFuture</code></td><td>Visible to its dependent stages</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note tip"><span class="lbl">Piggybacking on transitivity</span>Write the data in plain fields, then write a <code>volatile</code> flag. A reader that sees the flag also sees the data: write data → write flag (program order) → read flag (volatile) → read data (program order). This is how <code>BlockingQueue</code>, <code>Future</code> and safe publication work, and it is why you rarely need <code>volatile</code> on every field.</div>
+  </div>
+</section>
