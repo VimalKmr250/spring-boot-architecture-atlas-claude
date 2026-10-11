@@ -1,0 +1,140 @@
+<section class="slide" data-sec="Database code" data-title="Procedures, functions and packages">
+  <h2>Stored procedures move logic next to the data; the question is which logic belongs there</h2>
+  <p class="dek">A <b>procedure</b> performs an action and may return values through output parameters; it is called with <code>EXEC</code> or from a PL/SQL block. A <b>function</b> returns a value and can be used inside SQL. A function used in a query should read, not write. Oracle groups related procedures, functions, types and exceptions into a <b>package</b>: a specification that callers compile against, and a body that can change without invalidating them. Both procedures below reserve stock with one conditional <code>UPDATE</code> and raise an error when there is not enough: the same check-and-act pattern as <a data-deck="db" data-slide="Preventing lost updates in SQL">Preventing lost updates</a>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">procedures.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- a package groups related procedures and functions behind one specification
+CREATE OR REPLACE PACKAGE stock AS
+  insufficient_stock EXCEPTION;
+  PRAGMA EXCEPTION_INIT(insufficient_stock, -20001);
+  PROCEDURE reserve(p_product_id IN NUMBER, p_qty IN NUMBER);
+  FUNCTION available(p_product_id IN NUMBER) RETURN NUMBER;
+END stock;
+/
+CREATE OR REPLACE PACKAGE BODY stock AS
+  PROCEDURE reserve(p_product_id IN NUMBER, p_qty IN NUMBER) IS
+  BEGIN
+    UPDATE inventory
+    SET    reserved = reserved + p_qty
+    WHERE  product_id = p_product_id
+    AND    on_hand - reserved &gt;= p_qty;
+    IF SQL%ROWCOUNT = 0 THEN
+      RAISE_APPLICATION_ERROR(-20001, 'not enough stock for product ' || p_product_id);
+    END IF;
+  END reserve;
+
+  FUNCTION available(p_product_id IN NUMBER) RETURN NUMBER IS
+    v_available NUMBER;
+  BEGIN
+    SELECT on_hand - reserved INTO v_available FROM inventory WHERE product_id = p_product_id;
+    RETURN v_available;
+  END available;
+END stock;
+/
+-- call the procedure from a block, and the function from SQL
+BEGIN
+  stock.reserve(109, 2);
+  DBMS_OUTPUT.PUT_LINE('reserved 2 of product 109');
+  stock.reserve(109, 5);
+EXCEPTION
+  WHEN stock.insufficient_stock THEN
+    DBMS_OUTPUT.PUT_LINE('caught: ' || SQLERRM);
+END;
+/
+SELECT product_id, stock.available(product_id) AS available FROM inventory WHERE product_id IN (107, 109);
+ROLLBACK;
+DROP PACKAGE stock;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · procedures.ora.sql</div>
+<pre><code class="language-plaintext">Package created.
+
+Package body created.
+
+reserved 2 of product 109
+caught: ORA-20001: not enough stock for product 109
+
+PL/SQL procedure successfully completed.
+
+PRODUCT_ID AVAILABLE
+---------- ---------
+       107         0
+       109         1
+
+2 rows selected.
+
+Rollback complete.
+
+Package dropped.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">procedures.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">CREATE OR ALTER PROCEDURE reserve_stock @product_id INT, @qty INT
+AS
+BEGIN
+  SET NOCOUNT ON;
+  UPDATE inventory
+  SET    reserved = reserved + @qty
+  WHERE  product_id = @product_id
+  AND    on_hand - reserved &gt;= @qty;
+  IF @@ROWCOUNT = 0
+    THROW 50001, 'not enough stock', 1;
+END;
+GO
+CREATE OR ALTER FUNCTION available_stock (@product_id INT) RETURNS INT
+AS
+BEGIN
+  RETURN (SELECT on_hand - reserved FROM inventory WHERE product_id = @product_id);
+END;
+GO
+-- call the procedure, catch its error, and use the function in a query
+BEGIN TRANSACTION;
+BEGIN TRY
+  EXEC reserve_stock @product_id = 109, @qty = 2;
+  PRINT 'reserved 2 of product 109';
+  EXEC reserve_stock @product_id = 109, @qty = 5;
+END TRY
+BEGIN CATCH
+  PRINT CONCAT('caught: ', ERROR_NUMBER(), ' ', ERROR_MESSAGE());
+END CATCH;
+SELECT product_id, dbo.available_stock(product_id) AS available FROM inventory WHERE product_id IN (107, 109);
+ROLLBACK;
+GO
+DROP PROCEDURE reserve_stock;
+DROP FUNCTION available_stock;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · procedures.mss.sql</div>
+<pre><code class="language-plaintext">reserved 2 of product 109
+caught: 50001 not enough stock
+product_id available
+---------- ---------
+       107         0
+       109         1
+
+(2 rows affected)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Put it in the database when</th><th>Keep it in the application when</th></tr></thead>
+      <tbody>
+        <tr><td>It is set-based and touches many rows: a month-end recalculation, an archiving job</td><td>It is business logic that changes often and needs unit tests, code review and feature flags</td></tr>
+        <tr><td>Round trips dominate: a loop of dependent statements over a slow network</td><td>It calls other services, queues or files</td></tr>
+        <tr><td>Several applications in different languages must apply one rule identically</td><td>The team cannot debug, version and deploy database code as well as application code</td></tr>
+        <tr><td>Security: callers get <code>EXECUTE</code> on a procedure, not access to the tables</td><td>You may need to scale it out: application servers scale horizontally, the database does not</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Scalar functions in queries</span>A function called in a <code>WHERE</code> or <code>SELECT</code> list runs once per row, and a query inside it runs once per call. SQL Server 2019+ can inline simple scalar functions; Oracle offers <code>RESULT_CACHE</code> and inlining for some. Prefer a join or a <code>CASE</code> when the logic is simple.</div>
+    <div class="note warn"><span class="lbl">User errors</span>Raise application errors in the reserved ranges: <code>RAISE_APPLICATION_ERROR(-20000 … -20999)</code> in Oracle, <code>THROW</code> with numbers of 50000 and above in SQL Server. The Java side can then map the error number to a business exception; see <a data-deck="db" data-slide="Procedures, ref cursors and exception translation">exception translation</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Procedure: performs an action, called with EXEC, can have output parameters and manage transactions. Function: returns a value, usable in SQL, and should not change data. I keep business rules in the application, and use procedures for set-based work and to save round trips."</div>
+  </div>
+</section>

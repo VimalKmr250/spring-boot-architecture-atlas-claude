@@ -1,0 +1,132 @@
+<section class="slide" data-sec="Java and Spring" data-title="JDBC done right">
+  <h2>Most slow data access code is slow because of round trips and commits, not because of the database</h2>
+  <p class="dek">Every JDBC call that reaches the server costs a network round trip, and every commit makes the server wait for its log to reach disk. Code that inserts rows one at a time with autocommit on pays both for every row. Batching sends many rows per round trip, and one transaction commits them once. Reading has the mirror-image setting: the <b>fetch size</b> decides how many rows the driver asks for per round trip. The program below writes and reads 20,000 rows on both engines. It also gets a generated key back from the insert itself, as on <a data-deck="db" data-slide="Getting generated values back">Getting generated values back</a>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">JdbcDoneRight.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.List;
+
+/** Inserting and reading 20,000 rows through JDBC: per-row against batched, and what fetch size changes. */
+public class JdbcDoneRight {
+    record Db(String name, String url, String user, String password, String ddl, String idColumn) {}
+
+    static final List&lt;Db&gt; DBS = List.of(
+        new Db("Oracle 26ai", "jdbc:oracle:thin:@//localhost:1521/FREEPDB1", "shop", "Atlas_pw1",
+               "CREATE TABLE audit_events (event_id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, kind VARCHAR2(20), ref NUMBER)",
+               "EVENT_ID"),
+        new Db("SQL Server 2025", "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false", "sa", "Atlas_pw1!",
+               "CREATE TABLE audit_events (event_id INT IDENTITY PRIMARY KEY, kind VARCHAR(20), ref INT)",
+               "event_id"));
+
+    static final String INSERT = "INSERT INTO audit_events (kind, ref) VALUES (?, ?)";
+
+    public static void main(String[] args) throws SQLException {
+        for (Db db : DBS) {
+            System.out.println("== " + db.name());
+            try (Connection c = DriverManager.getConnection(db.url(), db.user(), db.password())) {
+                execute(c, "DROP TABLE audit_events", true);
+                execute(c, db.ddl(), false);
+
+                // 1  one statement per row, autocommit on: a round trip and a commit for every row
+                long t0 = System.nanoTime();
+                try (PreparedStatement ps = c.prepareStatement(INSERT)) {
+                    for (int i = 1; i &lt;= 10_000; i++) { ps.setString(1, "VIEW"); ps.setInt(2, i); ps.executeUpdate(); }
+                }
+                System.out.printf("  10,000 single inserts, autocommit: %5d ms%n", ms(t0));
+
+                // 2  the same rows batched, 1,000 per round trip, in one transaction
+                c.setAutoCommit(false);
+                t0 = System.nanoTime();
+                try (PreparedStatement ps = c.prepareStatement(INSERT)) {
+                    for (int i = 1; i &lt;= 10_000; i++) {
+                        ps.setString(1, "CLICK"); ps.setInt(2, i); ps.addBatch();
+                        if (i % 1_000 == 0) ps.executeBatch();
+                    }
+                }
+                c.commit();
+                System.out.printf("  10,000 batched inserts, 1 commit:  %5d ms%n", ms(t0));
+
+                // 3  read the generated key back from the insert itself
+                try (PreparedStatement ps = c.prepareStatement(INSERT, new String[] {db.idColumn()})) {
+                    ps.setString(1, "ORDER"); ps.setInt(2, 1019); ps.executeUpdate();
+                    try (ResultSet keys = ps.getGeneratedKeys()) { keys.next(); System.out.println("  generated key: " + keys.getLong(1)); }
+                }
+                c.commit();
+
+                // 4  fetch size: how many rows the driver asks for per round trip while reading
+                for (int fetchSize : new int[] {0, 10, 1_000}) {
+                    long trips = roundTrips(c, db);
+                    try (PreparedStatement ps = c.prepareStatement("SELECT event_id, kind, ref FROM audit_events")) {
+                        if (fetchSize &gt; 0) ps.setFetchSize(fetchSize);
+                        int rows = 0;
+                        try (ResultSet rs = ps.executeQuery()) { while (rs.next()) rows++; }
+                        String measured = trips &lt; 0 ? "not counted by this engine" : (roundTrips(c, db) - trips) + " round trips";
+                        System.out.printf("  read %d rows, fetch size %-13s %s%n", rows, fetchSize == 0 ? "default:" : fetchSize + ":", measured);
+                    }
+                }
+                c.setAutoCommit(true);
+                execute(c, "DROP TABLE audit_events", false);
+            }
+        }
+    }
+
+    // Oracle counts round trips per session; SQL Server's driver buffers the whole result by default
+    static long roundTrips(Connection c, Db db) throws SQLException {
+        if (!db.name().startsWith("Oracle")) return -1;
+        try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery(
+                "SELECT m.value FROM v$mystat m JOIN v$statname n ON n.statistic# = m.statistic# "
+              + "WHERE n.name = 'SQL*Net roundtrips to/from client'")) {
+            rs.next();
+            return rs.getLong(1) + 1;                                 // the next query is itself one more trip
+        }
+    }
+
+    static void execute(Connection c, String sql, boolean ignoreErrors) throws SQLException {
+        try (Statement s = c.createStatement()) { s.execute(sql); }
+        catch (SQLException e) { if (!ignoreErrors) throw e; }
+    }
+
+    static long ms(long t0) { return (System.nanoTime() - t0) / 1_000_000; }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · JdbcDoneRight.java · timings vary by run</div>
+<pre><code class="language-plaintext">== Oracle 26ai
+  10,000 single inserts, autocommit: 26642 ms
+  10,000 batched inserts, 1 commit:     78 ms
+  generated key: 20001
+  read 20001 rows, fetch size default:      84 round trips
+  read 20001 rows, fetch size 10:           2002 round trips
+  read 20001 rows, fetch size 1000:         22 round trips
+== SQL Server 2025
+  10,000 single inserts, autocommit: 74185 ms
+  10,000 batched inserts, 1 commit:    212 ms
+  generated key: 20001
+  read 20001 rows, fetch size default:      not counted by this engine
+  read 20001 rows, fetch size 10:           not counted by this engine
+  read 20001 rows, fetch size 1000:         not counted by this engine</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Setting</th><th>Do</th></tr></thead>
+          <tbody>
+            <tr><td>Inserts and updates in a loop</td><td><code>addBatch()</code>, <code>executeBatch()</code> every 500–1,000 rows, one transaction; Hibernate: <code>hibernate.jdbc.batch_size</code></td></tr>
+            <tr><td>Reading many rows</td><td>Set the fetch size, for example 500; check your driver's default rather than assuming one</td></tr>
+            <tr><td>SQL Server batches</td><td><code>useBulkCopyForBatchInsert=true</code> turns batched inserts into a bulk load</td></tr>
+            <tr><td>Resources</td><td>try-with-resources for every <code>Connection</code>, <code>Statement</code> and <code>ResultSet</code></td></tr>
+            <tr><td>Values</td><td>Always <code>?</code> placeholders: plan reuse and no injection</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Over three hundred times slower</span>10,000 single inserts with autocommit took 27 seconds on Oracle and 74 on SQL Server in this run; batched in one transaction they took 78 and 212 milliseconds. On a laptop's Docker disk each commit is especially slow, but the shape holds everywhere: per-row commits are the cost to remove first.</div>
+    <div class="note warn"><span class="lbl">Fetch size, measured</span>Oracle counts its round trips. With fetch size 10, the old driver default, reading 20,001 rows took 2,002 round trips. This ojdbc 23 driver's default needed 84, and a fetch size of 1,000 needed 22. SQL Server's driver works differently: by default it streams the result as the server sends it, so there is no per-batch request to count.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For bulk writes I batch statements and commit once per batch; for large reads I set a fetch size and stream rather than load everything. I keep placeholders for all values and close resources with try-with-resources." Pool sizing is on <a data-deck="deck" data-slide="Runtime and capacity">Runtime and capacity</a>.</div>
+  </div>
+</section>

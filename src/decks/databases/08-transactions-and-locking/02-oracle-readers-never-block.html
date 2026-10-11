@@ -1,0 +1,158 @@
+<section class="slide" data-sec="Transactions and locking" data-title="Oracle: readers never block writers">
+  <h2>Oracle keeps the previous version of every changed row, so a query reads a consistent snapshot instead of waiting for locks</h2>
+  <p class="dek">When session A updates a row, Oracle writes the old version to <b>undo</b> and locks only the row, against other writers. When session B reads the row, it reads the last committed version: from the table if no change is pending, rebuilt from undo if one is. Readers take no locks, so they never wait for writers, and writers never wait for readers. Writers still wait for writers on the same row. Each statement reads as of its start under READ COMMITTED, Oracle's default. Under SERIALIZABLE, which is really snapshot isolation, the whole transaction reads as of its first statement.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Session A updates wallet 1 from 500 to 400 and has not committed. The table block holds the new value 400 with a lock owned by A; undo holds the old version, 500. Session B's query reads wallet 1: it sees the uncommitted change, follows the pointer to undo, and returns 500 without waiting. Session B's FOR UPDATE on the same row must wait for A's row lock.">
+        <g font-size="10.5" fill="currentColor">
+          <rect x="20" y="30" width="170" height="54" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="105" y="52" text-anchor="middle" font-weight="600">Session A</text><text x="105" y="70" text-anchor="middle" font-family="IBM Plex Mono, monospace">SET balance = 400</text>
+          <rect x="20" y="110" width="170" height="54" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="105" y="132" text-anchor="middle" font-weight="600">Session B</text><text x="105" y="150" text-anchor="middle" font-family="IBM Plex Mono, monospace">SELECT balance</text>
+          <rect x="330" y="30" width="230" height="64" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="445" y="52" text-anchor="middle" font-weight="600">table block</text><text x="445" y="72" text-anchor="middle" font-family="IBM Plex Mono, monospace">wallet 1: 400, locked by A</text>
+          <rect x="680" y="30" width="200" height="64" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="780" y="52" text-anchor="middle" font-weight="600">undo</text><text x="780" y="72" text-anchor="middle" font-family="IBM Plex Mono, monospace">wallet 1 was 500</text>
+        </g>
+        <line x1="190" y1="57" x2="328" y2="57" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <line x1="560" y1="62" x2="678" y2="62" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="619" y="54" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.8">old version</text>
+        <path d="M190 137 C 300 137, 330 110, 400 96" fill="none" stroke="#3AA79B" stroke-width="1.4" marker-end="url(#arwB)"></path>
+        <path d="M480 96 C 560 140, 700 140, 760 96" fill="none" stroke="#3AA79B" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arwB)"></path>
+        <text x="620" y="158" text-anchor="middle" font-size="10.5" fill="currentColor">B rebuilds the committed version from undo: 500, no wait</text>
+        <text x="290" y="182" font-size="10.5" fill="currentColor">B's SELECT … FOR UPDATE on the same row: waits for A's row lock</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">OracleReads.java · ojdbc17 23.26.3</div>
+<pre><code class="language-java">import java.sql.*;
+
+/** Oracle's multi-version reads, shown with two sessions taking turns: A writes, B reads. */
+public class OracleReads {
+    static final String URL = "jdbc:oracle:thin:@//localhost:1521/FREEPDB1";
+
+    public static void main(String[] args) throws Exception {
+        try (Connection a = open(); Connection b = open()) {
+            reset(a);
+
+            // 1  a reader never waits for a writer: B sees the last committed value at once
+            update(a, "UPDATE accounts SET balance = 400 WHERE account_id = 1");
+            long t0 = System.nanoTime();
+            long seen = balance(b, 1);
+            System.out.printf("1 A changed 500 to 400, not committed; B reads %d, waited %s%n",
+                    seen, (System.nanoTime() - t0) / 1_000_000 &lt; 500 ? "no" : "yes");
+
+            // 2  a writer does wait for a writer: B's locking read gives up after 1 second
+            try {
+                query(b, "SELECT balance FROM accounts WHERE account_id = 1 FOR UPDATE WAIT 1");
+            } catch (SQLException e) {
+                System.out.println("2 B's FOR UPDATE WAIT 1: " + firstLine(e));
+            }
+            a.commit();
+            b.rollback();
+
+            // 3  READ COMMITTED: each statement sees the latest commit, so a repeated read can change
+            long first = balance(b, 1);
+            update(a, "UPDATE accounts SET balance = 300 WHERE account_id = 1"); a.commit();
+            System.out.printf("3 READ COMMITTED: B reads %d, A commits 300, B reads %d%n", first, balance(b, 1));
+            b.commit();
+
+            // 4  SERIALIZABLE: the whole transaction reads one snapshot, taken at its first statement
+            b.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            first = balance(b, 1);
+            update(a, "UPDATE accounts SET balance = 200 WHERE account_id = 1"); a.commit();
+            System.out.printf("4 SERIALIZABLE:   B reads %d, A commits 200, B reads %d%n", first, balance(b, 1));
+
+            // 5  ... and B may not overwrite a row changed since that snapshot
+            try {
+                update(b, "UPDATE accounts SET balance = balance - 50 WHERE account_id = 1");
+            } catch (SQLException e) {
+                System.out.println("5 B updates the row A changed: " + firstLine(e));
+            }
+            b.rollback();
+
+            // 6  write skew: SERIALIZABLE here is snapshot isolation, which does not stop it
+            reset(a);
+            a.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            long totalA = total(a), totalB = total(b);            // both see 800 across the two wallets
+            if (totalA - 600 &gt;= 0) update(a, "UPDATE accounts SET balance = balance - 600 WHERE account_id = 1");
+            if (totalB - 600 &gt;= 0) update(b, "UPDATE accounts SET balance = balance - 600 WHERE account_id = 2");
+            a.commit();
+            b.commit();
+            System.out.printf("6 write skew: both saw %d and withdrew 600 from different wallets; total now %d%n",
+                    totalA, total(a));
+            a.commit();
+            reset(a);
+        }
+    }
+
+    static Connection open() throws SQLException {
+        Connection c = DriverManager.getConnection(URL, "shop", "Atlas_pw1");
+        c.setAutoCommit(false);
+        return c;
+    }
+
+    static void reset(Connection c) throws SQLException {
+        update(c, "UPDATE accounts SET balance = CASE account_id WHEN 1 THEN 500 ELSE 300 END WHERE account_id IN (1, 2)");
+        c.commit();
+    }
+
+    static long balance(Connection c, int id) throws SQLException {
+        return query(c, "SELECT balance FROM accounts WHERE account_id = ?", id);
+    }
+
+    static long total(Connection c) throws SQLException {
+        return query(c, "SELECT SUM(balance) FROM accounts WHERE account_id IN (1, 2)");
+    }
+
+    static long query(Connection c, String sql, Object... params) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    static void update(Connection c, String sql) throws SQLException {
+        try (Statement s = c.createStatement()) { s.executeUpdate(sql); }
+    }
+
+    static String firstLine(SQLException e) { return e.getMessage().lines().findFirst().orElse(""); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · OracleReads.java · the lock ids in step 2 vary by run</div>
+<pre><code class="language-plaintext">1 A changed 500 to 400, not committed; B reads 500, waited no
+2 B's FOR UPDATE WAIT 1: ORA-00054: Failed to acquire a lock (Type: "TX", Name: "Transaction", Description: "Lock held by a transaction to allow other transactions to wait for it") because it is currently held by another session. The resource being locked can be identified by 524315 ("usn&lt;&lt;16 | slot") and 871 ("sequence")
+3 READ COMMITTED: B reads 400, A commits 300, B reads 300
+4 SERIALIZABLE:   B reads 300, A commits 200, B reads 300
+5 B updates the row A changed: ORA-08177: can't serialize access for this transaction
+6 write skew: both saw 800 and withdrew 600 from different wallets; total now -400</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Anomaly</th><th>READ COMMITTED</th><th>SERIALIZABLE</th></tr></thead>
+          <tbody>
+            <tr><td>Dirty read</td><td>Impossible</td><td>Impossible</td></tr>
+            <tr><td>Non-repeatable read</td><td>Possible: step 3</td><td>Prevented: step 4</td></tr>
+            <tr><td>Lost update</td><td>Possible</td><td>ORA-08177: step 5</td></tr>
+            <tr><td>Write skew</td><td>Possible</td><td><b>Possible</b>: step 6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Snapshot is not serializable</span>Both transactions read a total of 800 and each withdrew 600 from a different wallet. Neither wrote a row the other wrote, so neither got ORA-08177, and the combined result, −400, could not happen in any serial order. Guard such invariants with a lock on a shared row (<code>SELECT … FOR UPDATE</code> on the customer) or a constraint.</div>
+    <div class="note warn"><span class="lbl">The price of versions</span>Long queries need old versions to stay in undo. If they are overwritten first, the query fails with ORA-01555, "snapshot too old". In 26ai, a <code>FOR UPDATE WAIT 1</code> that times out reports ORA-00054 with the lock described, as step 2 shows; older releases reported ORA-30006.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Oracle uses multi-version concurrency: readers see a consistent snapshot from undo and take no locks, so reads never block writes. READ COMMITTED snapshots per statement, SERIALIZABLE per transaction and raises ORA-08177 on a conflicting write. Neither prevents write skew." The anomalies themselves are on <a data-deck="hld" data-slide="ACID, isolation and anomalies">HLD · ACID, isolation and anomalies</a>.</div>
+  </div>
+</section>

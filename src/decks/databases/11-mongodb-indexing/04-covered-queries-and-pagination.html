@@ -1,0 +1,47 @@
+<section class="slide" data-sec="MongoDB indexing" data-title="Covered queries and range pagination">
+  <h2>A query answered from the index alone examines zero documents; a page found by range skips nothing</h2>
+  <p class="dek">A query is <b>covered</b> when the filter, the sort and every projected field are in one index, so MongoDB never loads the documents. The common miss is <code>_id</code>: it is returned unless excluded, and it is not in a secondary index, so including it forces a <code>FETCH</code> per result. Pagination has the same shape as in SQL. <code>skip(n)</code> still walks <code>n</code> index entries and throws them away, while a range on the sort key, "after the last value I saw", starts at the right place.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">covered.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">db.big_orders.createIndex({ customerId: 1, placedAt: -1, total: 1 });
+const report = (label, ex) =&gt; print(label.padEnd(24), stages(ex).padEnd(54),
+  'keys', String(ex.executionStats.totalKeysExamined).padStart(6), '| docs', String(ex.executionStats.totalDocsExamined).padStart(6));
+
+// 1  covered: the filter, the sort and every returned field are in the index, and _id is excluded
+report('projection with _id', db.big_orders.find({ customerId: 4242 }, { placedAt: 1, total: 1 }).sort({ placedAt: -1 }).explain('executionStats'));
+report('covered', db.big_orders.find({ customerId: 4242 }, { _id: 0, placedAt: 1, total: 1 }).sort({ placedAt: -1 }).explain('executionStats'));
+db.big_orders.dropIndex({ customerId: 1, placedAt: -1, total: 1 });
+
+// 2  paging the whole collection by _id: skip walks past every earlier key, a range starts where the last page ended
+report('skip(400000).limit(20)', db.big_orders.find().sort({ _id: 1 }).skip(400000).limit(20).explain('executionStats'));
+report('_id &gt; 400000, limit(20)', db.big_orders.find({ _id: { $gt: 400000 } }).sort({ _id: 1 }).limit(20).explain('executionStats'));</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · covered.js</div>
+<pre><code class="language-plaintext">projection with _id      PROJECTION_SIMPLE &gt; FETCH &gt; IXSCAN customerId_1_placedAt_-1_total_1 keys     25 | docs     25
+covered                  PROJECTION_COVERED &gt; IXSCAN customerId_1_placedAt_-1_total_1 keys     25 | docs      0
+skip(400000).limit(20)   LIMIT &gt; FETCH &gt; SKIP &gt; IXSCAN _id_                     keys 400020 | docs     20
+_id &gt; 400000, limit(20)  LIMIT &gt; FETCH &gt; IXSCAN _id_                            keys     20 | docs     20</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Query</th><th>Plan</th><th class="num">Keys</th><th class="num">Documents</th></tr></thead>
+      <tbody>
+        <tr><td>Projection including <code>_id</code></td><td><code>FETCH</code> after the index scan</td><td class="num">25</td><td class="num">25</td></tr>
+        <tr><td>Projection with <code>_id: 0</code></td><td><code>PROJECTION_COVERED</code></td><td class="num">25</td><td class="num">0</td></tr>
+        <tr><td><code>skip(400000).limit(20)</code></td><td><code>SKIP</code> over the <code>_id</code> index</td><td class="num">400,020</td><td class="num">20</td></tr>
+        <tr><td><code>{ _id: { $gt: 400000 } }</code>, <code>limit(20)</code></td><td>Index range</td><td class="num">20</td><td class="num">20</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">skip is not free</span>Page 20,001 by <code>skip</code> read 400,020 index keys to return 20 documents. The cost grows with the page number, exactly like SQL's <code>OFFSET</code>. Spring Data's <code>PageRequest.of(n, size)</code> becomes <code>skip(n * size)</code>.</div>
+    <div class="note warn"><span class="lbl">Range pages need a unique sort</span>Paging by <code>placedAt</code> alone breaks when two orders share a timestamp. Sort by <code>{ placedAt: -1, _id: -1 }</code>, and continue with <code>$or: [{ placedAt: { $lt: t } }, { placedAt: t, _id: { $lt: id } }]</code>, the same tie-breaker logic as <a data-deck="db" data-slide="Pagination: OFFSET against keyset">keyset pagination in SQL</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For hot list endpoints I build an index that covers the filter, the sort and the returned fields, and exclude <code>_id</code> if it is not needed. For paging I use the last seen sort key as a cursor instead of <code>skip</code>."</div>
+  </div>
+</section>

@@ -1,0 +1,68 @@
+<section class="slide" data-sec="MongoDB basics" data-title="Update operators and upserts">
+  <h2>Update operators change fields in place on the server; a replacement document overwrites everything else</h2>
+  <p class="dek"><code>updateOne(filter, update)</code> takes either a document of <b>update operators</b> (<code>$set</code>, <code>$inc</code>, <code>$push</code>, <code>$unset</code>, <code>$min</code>, <code>$max</code>…) or, with <code>replaceOne</code>, a whole new document. Operators modify the matched document atomically on the server, so two clients incrementing a counter never lose an update, with no read first. With <code>upsert: true</code>, a filter that matches nothing inserts a new document built from the filter's equality fields plus the update. <code>$setOnInsert</code> sets fields only on that insert. A shopping cart is the classic case.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">updates.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">db.carts.drop();
+// 1  upsert with $setOnInsert: fields set only when the document is created
+show(db.carts.updateOne(
+  { _id: 'cart-asha' },
+  { $setOnInsert: { customerId: 1, createdAt: ISODate('2026-04-01T10:00:00Z') },
+    $push: { items: { sku: 'COF-BNS', qty: 1 } }, $inc: { itemCount: 1 } },
+  { upsert: true }));
+show(db.carts.updateOne(
+  { _id: 'cart-asha' },
+  { $setOnInsert: { customerId: 1, createdAt: ISODate('2026-04-02T09:00:00Z') },
+    $push: { items: { sku: 'KIT-KTL', qty: 1 } }, $inc: { itemCount: 1 } },
+  { upsert: true }));
+show(db.carts.findOne());
+
+// 2  $min, $max and $unset: conditional and removing updates in one round trip
+show(db.carts.updateOne({ _id: 'cart-asha' },
+  { $min: { cheapestSeen: Decimal128('24.00') }, $max: { biggestQty: 1 }, $unset: { createdAt: '' } }));
+show(db.carts.findOne({}, { items: 0 }));
+
+// 3  replaceOne swaps the whole document: every field you did not send is gone
+show(db.carts.replaceOne({ _id: 'cart-asha' }, { itemCount: 3 }));
+show(db.carts.findOne());
+
+// 4  findOneAndUpdate returns the document, before or after the change
+show(db.carts.findOneAndUpdate({ _id: 'cart-asha' }, { $inc: { itemCount: -1 } }, { returnDocument: 'after' }));
+db.carts.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · updates.js</div>
+<pre><code class="language-plaintext">{ acknowledged: true, insertedId: 'cart-asha', matchedCount: 0, modifiedCount: 0, upsertedCount: 1 }
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+{ _id: 'cart-asha', createdAt: ISODate('2026-04-01T10:00:00.000Z'), customerId: 1, itemCount: 2, items: [ { sku: 'COF-BNS', qty: 1 }, { sku: 'KIT-KTL', qty: 1 } ] }
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+{ _id: 'cart-asha', customerId: 1, itemCount: 2, biggestQty: 1, cheapestSeen: Decimal128('24.00') }
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+{ _id: 'cart-asha', itemCount: 3 }
+{ _id: 'cart-asha', itemCount: 2 }</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Operator</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>$set</code> / <code>$unset</code></td><td>Set or remove fields, including nested paths</td></tr>
+            <tr><td><code>$inc</code></td><td>Add atomically: counters, stock</td></tr>
+            <tr><td><code>$min</code> / <code>$max</code></td><td>Set only if lower / higher than the current value</td></tr>
+            <tr><td><code>$setOnInsert</code></td><td>Apply only when an upsert inserts</td></tr>
+            <tr><td><code>$push</code>, <code>$pull</code>, <code>$addToSet</code></td><td>Array changes: see <a data-deck="db" data-slide="Arrays: $elemMatch, positional updates, arrayFilters">Arrays</a></td></tr>
+            <tr><td><code>$currentDate</code></td><td>Server time, for <code>updatedAt</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">replaceOne deletes what you did not send</span>Replacing the cart with <code>{ itemCount: 3 }</code> removed the customer id, the items and everything else. The same happens in application code that loads a document, changes one field and saves the whole object back: concurrent changes to other fields are lost. Update the fields that changed with operators.</div>
+    <div class="note warn"><span class="lbl">Reading the result</span><code>matchedCount</code> is how many documents the filter found; <code>modifiedCount</code> is how many actually changed. A <code>$set</code> to the current value matches but does not modify. <code>upsertedCount: 1</code> and an <code>insertedId</code> mean the upsert created the document.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I update with operators, not by replacing documents, so the change is atomic on the server and other fields are untouched. Upsert plus <code>$setOnInsert</code> is the create-or-update idiom, backed by a unique index on the filter field. <code>findOneAndUpdate</code> returns the document in the same round trip."</div>
+  </div>
+</section>

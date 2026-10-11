@@ -1,0 +1,100 @@
+<section class="slide" data-sec="SQL drills" data-title="Pivot monthly revenue by category">
+  <h2>Drill: "one row per category, one column per month": turn rows into columns, then explain why the columns must be known in advance</h2>
+  <p class="dek">There are two ways to answer, and the interviewer wants to hear both. <b>Conditional aggregation</b>, a <code>SUM(CASE …)</code> per column, works on every engine, can mix measures, and is what most production code uses. <b>PIVOT</b> is shorter, and Oracle and SQL Server both have it with slightly different syntax. Either way, the list of columns is fixed when the query is written. A pivot whose columns depend on the data ("one column per month, however many there are") needs dynamic SQL, or is better done in the application.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">pivot.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- revenue by top-level category and month, one column per month
+WITH lines AS (
+  SELECT top_cat.name AS category, TO_CHAR(o.placed_at, 'MM') AS mon, i.qty * i.unit_price AS amount
+  FROM   order_items i
+  JOIN   orders o     ON o.order_id = i.order_id AND o.status IN ('PAID', 'SHIPPED')
+  JOIN   products p   ON p.product_id = i.product_id
+  JOIN   categories c ON c.category_id = p.category_id
+  LEFT   JOIN categories mid ON mid.category_id = c.parent_id
+  JOIN   categories top_cat  ON top_cat.category_id = COALESCE(mid.parent_id, c.parent_id, c.category_id)
+)
+-- 1  conditional aggregation: portable, and easy to extend
+SELECT category,
+       SUM(CASE WHEN mon = '01' THEN amount ELSE 0 END) AS jan,
+       SUM(CASE WHEN mon = '02' THEN amount ELSE 0 END) AS feb,
+       SUM(CASE WHEN mon = '03' THEN amount ELSE 0 END) AS mar
+FROM   lines GROUP BY category ORDER BY category;
+
+-- 2  the same with PIVOT
+WITH lines AS (
+  SELECT top_cat.name AS category, TO_CHAR(o.placed_at, 'MM') AS mon, i.qty * i.unit_price AS amount
+  FROM   order_items i
+  JOIN   orders o     ON o.order_id = i.order_id AND o.status IN ('PAID', 'SHIPPED')
+  JOIN   products p   ON p.product_id = i.product_id
+  JOIN   categories c ON c.category_id = p.category_id
+  LEFT   JOIN categories mid ON mid.category_id = c.parent_id
+  JOIN   categories top_cat  ON top_cat.category_id = COALESCE(mid.parent_id, c.parent_id, c.category_id)
+)
+SELECT * FROM lines
+PIVOT (SUM(amount) FOR mon IN ('01' AS jan, '02' AS feb, '03' AS mar))
+ORDER  BY category;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · pivot.ora.sql</div>
+<pre><code class="language-plaintext">CATEGORY        JAN     FEB     MAR
+----------- ------- ------- -------
+Books          0.00   84.00    0.00
+Electronics 2166.40 3406.30 2077.00
+Home         187.00   83.00  187.00
+
+3 rows selected.
+
+CATEGORY        JAN     FEB     MAR
+----------- ------- ------- -------
+Books        (null)   84.00  (null)
+Electronics 2166.40 3406.30 2077.00
+Home         187.00   83.00  187.00
+
+3 rows selected.</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Zero or NULL</span>Books sold nothing in January. <code>ELSE 0</code> made that 0.00; <code>PIVOT</code> has no row to sum, so it returns NULL. Decide which one the report wants, and wrap the PIVOT columns in <code>COALESCE</code> if it is zero.</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">pivot.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- revenue by top-level category and month, one column per month
+WITH lines AS (
+  SELECT top_cat.name AS category, FORMAT(o.placed_at, 'MM') AS mon, i.qty * i.unit_price AS amount
+  FROM   order_items i
+  JOIN   orders o     ON o.order_id = i.order_id AND o.status IN ('PAID', 'SHIPPED')
+  JOIN   products p   ON p.product_id = i.product_id
+  JOIN   categories c ON c.category_id = p.category_id
+  LEFT   JOIN categories mid ON mid.category_id = c.parent_id
+  JOIN   categories top_cat  ON top_cat.category_id = COALESCE(mid.parent_id, c.parent_id, c.category_id)
+)
+SELECT category, [01] AS jan, [02] AS feb, [03] AS mar
+FROM   lines
+PIVOT (SUM(amount) FOR mon IN ([01], [02], [03])) AS p
+ORDER  BY category;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · pivot.mss.sql</div>
+<pre><code class="language-plaintext">category        jan     feb     mar
+----------- ------- ------- -------
+Books          NULL   84.00    NULL
+Electronics 2166.40 3406.30 2077.00
+Home         187.00   83.00  187.00
+
+(3 rows affected)</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">The totals check out</span>Each month's column adds up to the revenue on <a data-deck="db" data-slide="Running totals and month-over-month growth">Running totals and month-over-month growth</a>: 2,353.40, 3,573.30 and 2,264.00. Checking a new query against a known total is a habit worth saying out loud.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Engine differences</h4><p>Oracle names the pivoted columns with <code>'01' AS jan</code> and also has <code>PIVOT XML</code> for a data-driven column list. SQL Server names them <code>[01]</code> and requires an alias on the pivot. <code>FORMAT()</code> is convenient but slow on large sets in SQL Server; <code>MONTH(placed_at)</code> or <code>DATETRUNC</code> is cheaper.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Add a total column?" One more <code>SUM(amount)</code> in the conditional version; with PIVOT, add the month columns together in the outer <code>SELECT</code>. "Two measures per month?" Oracle's PIVOT takes several aggregates, SQL Server's takes one, and conditional aggregation handles any number. "Columns to rows?" <code>UNPIVOT</code>, or <code>CROSS APPLY (VALUES …)</code> on SQL Server. "Months from the data?" Build the column list in code and say why that is dynamic SQL.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>GROUP BY</code> the row key, and one <code>SUM(CASE WHEN month = … THEN amount END)</code> per column. PIVOT is the shorthand. The columns are fixed at parse time, so for a variable set I'd return rows and pivot in the report layer."</div>
+  </div>
+</section>

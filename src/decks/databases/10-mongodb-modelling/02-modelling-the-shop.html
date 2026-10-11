@@ -1,0 +1,66 @@
+<section class="slide" data-sec="MongoDB modelling" data-title="Modelling orders, customers and the catalogue">
+  <h2>Model the shop from its screens: each page should be one read, and each change one write where possible</h2>
+  <p class="dek">List the application's reads and writes, then shape documents so the frequent ones are cheap. The order page needs the order, its lines and the customer's name, so lines are embedded and the name is copied. The product page needs the product, its breadcrumbs, a rating and the newest reviews. A review is written once and read mostly on that page, while the full review list grows without limit. So reviews get their own collection, and the product page carries a <b>computed</b> rating and a <b>subset</b> of the latest two, both maintained when a review is added.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">shop-model.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// a product page needs the product, its category path and its latest reviews: one document
+db.reviews.drop();
+db.product_pages.drop();
+const reviews = [
+  { productId: 109, stars: 5, text: 'Consistent grind', at: ISODate('2026-02-01') },
+  { productId: 109, stars: 4, text: 'Loud but fast',     at: ISODate('2026-02-20') },
+  { productId: 109, stars: 2, text: 'Burrs wore out',    at: ISODate('2026-03-05') },
+  { productId: 109, stars: 5, text: 'Great value',       at: ISODate('2026-03-18') }
+];
+db.reviews.insertMany(reviews);                                   // every review: its own collection
+const p = db.products.findOne({ _id: 109 });
+db.product_pages.insertOne({
+  _id: p._id, sku: p.sku, name: p.name, price: p.price,
+  categoryPath: p.categoryPath,                                    // copied: the page shows breadcrumbs
+  rating: { count: 4, sum: 16 },                                   // computed pattern: kept by $inc
+  latestReviews: reviews.slice(-2).reverse()                       // subset pattern: the newest two only
+    .map(r =&gt; ({ stars: r.stars, text: r.text, at: r.at }))
+});
+show(db.product_pages.findOne({ _id: 109 }, { _id: 0, name: 1, categoryPath: 1, rating: 1, latestReviews: 1 }));
+
+// a new review: insert it, and update the page's summary in the same breath
+const r = { productId: 109, stars: 3, text: 'Fine for filter', at: ISODate('2026-04-02') };
+db.reviews.insertOne(r);
+show(db.product_pages.updateOne({ _id: 109 }, {
+  $inc: { 'rating.count': 1, 'rating.sum': r.stars },
+  $push: { latestReviews: { $each: [{ stars: r.stars, text: r.text, at: r.at }], $position: 0, $slice: 2 } }
+}));
+show(db.product_pages.findOne({ _id: 109 }, { _id: 0, rating: 1, 'latestReviews.text': 1 }));
+db.reviews.drop();
+db.product_pages.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · shop-model.js</div>
+<pre><code class="language-plaintext">{ name: 'Burr Grinder', categoryPath: [ 'Home', 'Kitchen', 'Coffee' ], rating: { count: 4, sum: 16 }, latestReviews: [ { stars: 5, text: 'Great value', at: ISODate('2026-03-18T00:00:00.000Z') }, { stars: 2, text: 'Burrs wore out', at: ISODate('2026-03-05T00:00:00.000Z') } ] }
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+{ rating: { count: 5, sum: 19 }, latestReviews: [ { text: 'Fine for filter' }, { text: 'Great value' } ] }</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Collection</th><th>Shape</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>customers</code></td><td>Profile, embedded addresses</td><td>Few addresses, always shown with the customer</td></tr>
+            <tr><td><code>orders</code></td><td>Lines embedded; <code>customer: { id, name }</code></td><td>One read per order page; name is a snapshot</td></tr>
+            <tr><td><code>products</code></td><td><code>categoryPath</code> array, rating, latest reviews</td><td>The product page in one read; the path is indexable</td></tr>
+            <tr><td><code>reviews</code></td><td>One document per review, <code>productId</code> indexed</td><td>Unbounded; paged separately</td></tr>
+            <tr><td><code>payments</code></td><td>One per attempt, <code>orderId</code>, unique idempotency key</td><td>Written by another service; audited separately</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Every copy needs an owner</span>The page's rating and latest reviews are copies of data in <code>reviews</code>. The code that inserts a review also updates the page, here with one <code>$inc</code> and one <code>$push</code> with <code>$slice</code>. If that second write can fail, recompute the summary from <code>reviews</code> periodically, or write both in a transaction.</div>
+    <div class="note bad"><span class="lbl">The relational habit</span>Splitting every entity into its own collection and joining with <code>$lookup</code> on every page gives MongoDB's costs without its benefit. If most screens join three collections, either the documents are shaped wrong or the data is relational.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I list the queries first: product page, order page, order history, admin search. Then I shape documents so each frequent query is one read on one index. Copies of other entities are snapshots or summaries with a defined update path." The relational version of the same shop is on <a data-deck="db" data-slide="The running example">The running example</a>.</div>
+  </div>
+</section>

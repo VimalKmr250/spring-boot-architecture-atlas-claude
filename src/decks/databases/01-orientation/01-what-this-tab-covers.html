@@ -1,0 +1,48 @@
+<section class="slide" data-sec="Orientation" data-title="What this tab covers">
+  <h2>SQL and NoSQL for developers: Oracle, SQL Server and MongoDB, from the first query to the interview</h2>
+  <p class="lede">A reference for the database work a backend developer actually does: writing queries, modelling data for an application, reading a plan, getting transactions right, and choosing between a relational and a document store. Every query in this tab was run on the real engine, and the output beside it is what the engine printed. The examples come from one shop with payments and monitoring, so the same orders, payments and metrics appear in SQL and in MongoDB.</p>
+
+  <div class="grid3">
+    <div class="card lift"><span class="bignum">113</span><p>slides in eighteen sections. It is written for developers, not DBAs: installation, backups, users and storage internals appear only where they change a developer's decision.</p></div>
+    <div class="card lift"><span class="bignum">30</span><p>interview questions, each with a 30-second answer and a follow-up, and 13 coding drills: 8 in SQL, run on both engines, and 5 in MongoDB, each with the follow-up questions that usually come next.</p></div>
+    <div class="card lift"><span class="bignum">3</span><p>engines, run in Docker: Oracle AI Database 26ai Free 23.26.3, SQL Server 2025 Developer 17.0 and MongoDB 8.3.11. The Java code uses Spring Boot 4.1 on JDK 25.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The eighteen sections</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Orientation</dt><dd>this slide, topics by interview level, and an index of every slide</dd>
+        <dt>Foundations</dt><dd>rows and documents, the running example, types, Unicode, NULL, keys, constraints, the three engines</dd>
+        <dt>SQL essentials</dt><dd>evaluation order, filtering and limits, joins, anti-joins, grouping, CTEs, conversions, dates</dd>
+        <dt>Relational modelling</dt><dd>normalisation, deliberate denormalisation, trees, a double-entry ledger, history and audit</dd>
+        <dt>Advanced SQL</dt><dd>ranking, window frames, gaps and islands, <code>MERGE</code>, generated keys, JSON</dd>
+        <dt>Database code</dt><dd>deletes, temporary tables, procedures, bulk processing, error handling, triggers, views</dd>
+        <dt>Indexes and plans</dt><dd>seeks and scans, column order, covering indexes, sargability, both engines' plans, sniffing, paging</dd>
+        <dt>Transactions and locking</dt><dd>boundaries, Oracle MVCC, SQL Server locking and RCSI, lost updates, deadlocks, job queues</dd>
+        <dt>MongoDB basics</dt><dd>BSON, queries, update operators, arrays, the aggregation pipeline, <code>$lookup</code>, validation</dd>
+        <dt>MongoDB modelling</dt><dd>embed or reference, the shop as documents, patterns, anti-patterns, time series</dd>
+        <dt>MongoDB indexing</dt><dd>index types, explain, the ESR rule, covered queries</dd>
+        <dt>MongoDB consistency</dt><dd>atomic updates, transactions, write and read concern, sharding, change streams</dd>
+        <dt>Java and Spring</dt><dd>JDBC, dialect traps, exception translation, Spring Data MongoDB, Testcontainers</dd>
+        <dt>Choosing and case studies</dt><dd>which engine, schema evolution, payments, orders and inventory, monitoring</dd>
+        <dt>Interview questions</dt><dd>thirty questions, three per slide</dd>
+        <dt>SQL drills</dt><dd>a method, eight problems run on both engines, and a revision table</dd>
+        <dt>MongoDB drills</dt><dd>a method, five problems as pipelines, and a revision table</dd>
+        <dt>Wrap-up</dt><dd>syntax side by side, red flags, a study plan</dd>
+      </dl>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <h3>How to use it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Arrow keys</b> move through slides; <b>C</b> opens contents, where each topic is its own section.</li>
+          <li>Preparing for an interview? Start with <a data-deck="db" data-slide="Topics by interview level">topics by interview level</a>, then the questions and the drills. Every answer links back to the slide that goes deeper.</li>
+          <li>Looking something up? <a data-deck="db" data-slide="SQL and NoSQL on one page">The one-page index</a> links every slide with the fact it shows.</li>
+          <li>Other tabs go further on neighbouring ground: JPA and transactions in <b>Spring Boot</b>, replication and partitioning in <b>System design</b>, idempotent consumers in <b>Event-driven</b>. This tab links to them rather than repeating them.</li>
+        </ul>
+      </div>
+      <div class="note tip"><span class="lbl">How the code is written</span>A label that names a file, such as <code>top-n.sql</code>, means the block is the complete file that was run; an <b>Output on…</b> block is what that engine printed, and a label says so when timings or counts vary. Not shown: a fixed SQL*Plus prelude that sets date formats, UTC and <code>(null)</code> for NULLs, and per-script <code>COLUMN</code> formats so headings are not truncated. Result grids from SQL*Plus and sqlcmd were re-padded to line up, changing whitespace only. MongoDB scripts print through a small <code>show()</code> helper that writes one document per line. Java programs compile with <code>javac --release 21 -Xlint:all</code>, run on JDK 25, and run with framework logging turned down. Oracle 26ai is release 23.26, so a <span class="tag a">23ai</span> tag means "available from 23ai on".</div>
+    </div>
+  </div>
+</section>

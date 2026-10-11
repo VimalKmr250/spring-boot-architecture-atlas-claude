@@ -1,0 +1,114 @@
+<section class="slide" data-sec="Choosing and case studies" data-title="Evolving a schema in SQL and in MongoDB">
+  <h2>Schemas change in both worlds: SQL changes them with migrations, MongoDB with code that tolerates two shapes at once</h2>
+  <p class="dek">A new attribute, here a sales <code>channel</code> on every order, has to reach 500,000 existing rows without downtime. In Oracle and SQL Server, adding a NOT NULL column with a constant default is a metadata-only change: existing rows get the default without being rewritten. In MongoDB there is no <code>ALTER</code>. New documents carry the field, readers treat a missing field as the default, and a batched backfill migrates the old documents at its own pace. In both worlds the safe sequence is the same: <b>expand</b>, migrate, then <b>contract</b>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">evolve.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">SET TIMING ON
+-- 1  expand: a new NOT NULL column with a default, on 500,000 rows, is a dictionary change only
+ALTER TABLE big_orders ADD channel VARCHAR2(10) DEFAULT 'web' NOT NULL;
+SELECT channel, COUNT(*) AS orders FROM big_orders GROUP BY channel;
+
+-- 2  contract, later: drop it once no code reads it
+ALTER TABLE big_orders DROP COLUMN channel;
+SET TIMING OFF</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · evolve.ora.sql · elapsed times vary by run</div>
+<pre><code class="language-plaintext">Table altered.
+
+Elapsed: 00:00:01.11
+
+CHANNEL ORDERS
+------- ------
+web     500000
+
+1 row selected.
+
+Elapsed: 00:00:00.65
+
+Table altered.
+
+Elapsed: 00:00:01.97</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">evolve.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">SET STATISTICS TIME ON;
+-- 1  expand: a new NOT NULL column with a constant default is metadata-only (Enterprise and Developer)
+ALTER TABLE big_orders ADD channel VARCHAR(10) NOT NULL CONSTRAINT big_orders_channel_df DEFAULT 'web';
+GO
+SELECT channel, COUNT(*) AS orders FROM big_orders GROUP BY channel;
+
+-- 2  contract, later: drop the default and then the column
+ALTER TABLE big_orders DROP CONSTRAINT big_orders_channel_df;
+ALTER TABLE big_orders DROP COLUMN channel;
+SET STATISTICS TIME OFF;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · evolve.mss.sql · times vary by run</div>
+<pre><code class="language-plaintext"> SQL Server Execution Times:
+   CPU time = 33 ms,  elapsed time = 41 ms.
+SQL Server parse and compile time:
+   CPU time = 546 ms, elapsed time = 546 ms.
+channel orders
+------- ------
+web     500000
+
+(1 rows affected)
+
+ SQL Server Execution Times:
+   CPU time = 191 ms,  elapsed time = 203 ms.
+
+ SQL Server Execution Times:
+   CPU time = 9 ms,  elapsed time = 14 ms.
+SQL Server parse and compile time:
+   CPU time = 0 ms, elapsed time = 0 ms.
+
+ SQL Server Execution Times:
+   CPU time = 3 ms,  elapsed time = 9 ms.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">evolve.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  no ALTER: new documents simply carry the field; old ones lack it until migrated
+db.big_orders.updateOne({ _id: 500001 }, { $setOnInsert: { customerId: 1, status: 'PENDING', channel: 'app', schemaVersion: 2,
+  placedAt: ISODate('2026-04-01T10:00:00Z'), total: Decimal128('10.00') } }, { upsert: true });
+print('without channel:', db.big_orders.countDocuments({ channel: { $exists: false } }));
+
+// 2  readers treat a missing field as the old default...
+show(db.big_orders.aggregate([{ $group: { _id: { $ifNull: ['$channel', 'web'] }, n: { $sum: 1 } } }, { $sort: { _id: 1 } }]));
+
+// 3  ...while a backfill fills it in batches, so no single write is huge
+let migrated = 0, res;
+do {
+  const ids = db.big_orders.find({ channel: { $exists: false } }, { _id: 1 }).limit(50000).toArray().map(d =&gt; d._id);
+  res = db.big_orders.updateMany({ _id: { $in: ids } }, { $set: { channel: 'web', schemaVersion: 2 } });
+  migrated += res.modifiedCount;
+} while (res.modifiedCount &gt; 0);
+print('backfilled:', migrated, '| still without channel:', db.big_orders.countDocuments({ channel: { $exists: false } }));
+
+// put the collection back for the other slides
+db.big_orders.deleteOne({ _id: 500001 });
+db.big_orders.updateMany({}, { $unset: { channel: '', schemaVersion: '' } });</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · evolve.js</div>
+<pre><code class="language-plaintext">without channel: 500000
+{ _id: 'app', n: 1 }
+{ _id: 'web', n: 500000 }
+backfilled: 500000 | still without channel: 0</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">What is not instant</span>Adding a column with a default that is not a constant, changing a column's type, or adding a NOT NULL constraint to a populated column rewrites or scans the table, holding locks while it does. Those changes need the expand-and-contract sequence: a new column, a backfill in batches, a switch of readers and writers, and a drop at the end. Oracle's DDL also commits implicitly, so a failed migration cannot simply be rolled back.</div>
+    <div class="note bad"><span class="lbl">Two shapes forever</span>MongoDB's lazy migration is easy to start and easy to never finish. Until the backfill reaches every document, every query, index and report must handle both shapes. Track the count of old-shape documents, as the script does, and finish the job.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Versioned migrations with Flyway or Liquibase for SQL, each backwards compatible with the running version of the application, and expand-and-contract for anything destructive. In MongoDB, a schema version field, tolerant readers and a batched backfill." The full procedure is on <a data-deck="deck" data-slide="Zero-downtime schema change">Zero-downtime schema change</a>.</div>
+  </div>
+</section>

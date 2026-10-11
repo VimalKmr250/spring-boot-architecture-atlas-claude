@@ -1,0 +1,94 @@
+<section class="slide" data-sec="Advanced SQL" data-title="LAG, LEAD, gaps and islands">
+  <h2>LAG and LEAD compare a row with its neighbour, which turns "find the outage" and "find the hot streak" into one pass</h2>
+  <p class="dek"><code>LAG(col)</code> returns <code>col</code> from the previous row in the window's order, and <code>LEAD(col)</code> from the next. Comparing neighbours answers questions that are otherwise self-joins: the time between payment retries, the minutes a host stayed silent. A <b>gap</b> is where the next row is further away than expected. An <b>island</b> is a run of consecutive rows that meet a condition, such as minutes above 90% CPU. The trick for islands: within a run, timestamp minus row number is constant, so it can be grouped on.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="Thirty minutes of samples from 10:00 to 10:29. Host web-2 has no samples from 10:12 to 10:16: a gap of five missing minutes between 10:11 and 10:17. Host db-1 is above 90 percent CPU from 10:08 to 10:13 and from 10:21 to 10:24: two islands of six and four minutes.">
+        <text x="20" y="48" font-size="11" font-family="IBM Plex Mono, monospace" fill="currentColor">web-2</text>
+        <text x="20" y="98" font-size="11" font-family="IBM Plex Mono, monospace" fill="currentColor">db-1</text>
+        <g fill="currentColor" fill-opacity="0.18">
+          <rect x="80" y="36" width="316" height="16" rx="3"></rect>
+          <rect x="527.7" y="36" width="342.3" height="16" rx="3"></rect>
+          <rect x="80" y="86" width="790" height="16" rx="3"></rect>
+        </g>
+        <rect x="396" y="34" width="131.7" height="20" rx="3" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+        <text x="461.9" y="30" text-anchor="middle" font-size="10" fill="currentColor">gap: 10:12–10:16 silent</text>
+        <rect x="290.7" y="84" width="158" height="20" rx="3" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <rect x="633" y="84" width="105.3" height="20" rx="3" fill="#D26A3F" fill-opacity="0.35" stroke="#D26A3F"></rect>
+        <text x="369.7" y="120" text-anchor="middle" font-size="10" fill="currentColor">island: 10:08–10:13, 6 min</text>
+        <text x="685.6" y="120" text-anchor="middle" font-size="10" fill="currentColor">island: 10:21–10:24, 4 min</text>
+        <g font-size="9.5" fill="currentColor" opacity="0.7" font-family="IBM Plex Mono, monospace">
+          <text x="93.2" y="140" text-anchor="middle">10:00</text><text x="356.5" y="140" text-anchor="middle">10:10</text><text x="619.9" y="140" text-anchor="middle">10:20</text><text x="856.9" y="140" text-anchor="middle">10:29</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>One sample a minute from 10:00 to 10:29. Grey: samples present. Copper: the outage (missing samples) and the hot streaks (CPU above 90%).</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">gaps-islands.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  LAG: seconds since the previous payment attempt on the same order
+SELECT order_id, payment_id, status,
+       ROUND((CAST(created_at AS DATE)
+            - CAST(LAG(created_at) OVER (PARTITION BY order_id ORDER BY created_at) AS DATE)) * 86400) AS secs_since_prev
+FROM   payments
+WHERE  order_id IN (1003, 1005, 1011)
+ORDER  BY order_id, created_at;
+
+-- 2  gaps: a host whose next sample arrives more than a minute later went silent
+SELECT host, ts AS last_seen, next_ts AS back_at,
+       ROUND((CAST(next_ts AS DATE) - CAST(ts AS DATE)) * 1440) - 1 AS missing_minutes
+FROM  (SELECT host, ts, LEAD(ts) OVER (PARTITION BY host ORDER BY ts) AS next_ts
+       FROM   metric_samples
+       WHERE  metric = 'cpu')
+WHERE  next_ts &gt; ts + INTERVAL '1' MINUTE;
+
+-- 3  islands: consecutive hot minutes; ts minus the row number is constant within a run
+SELECT host, MIN(ts) AS started, MAX(ts) AS ended, COUNT(*) AS minutes, MAX(value) AS peak
+FROM  (SELECT host, ts, value,
+              ts - NUMTODSINTERVAL(ROW_NUMBER() OVER (PARTITION BY host ORDER BY ts), 'MINUTE') AS run_key
+       FROM   metric_samples
+       WHERE  metric = 'cpu' AND value &gt; 90)
+GROUP  BY host, run_key
+ORDER  BY host, started;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · gaps-islands.ora.sql</div>
+<pre><code class="language-plaintext">ORDER_ID PAYMENT_ID STATUS   SECS_SINCE_PREV
+-------- ---------- -------- ---------------
+    1003          3 FAILED            (null)
+    1003          4 CAPTURED             210
+    1005          6 FAILED            (null)
+    1005          7 FAILED               160
+    1005          8 FAILED               155
+    1011         15 FAILED            (null)
+    1011         16 CAPTURED             225
+
+7 rows selected.
+
+HOST  LAST_SEEN           BACK_AT             MISSING_MINUTES
+----- ------------------- ------------------- ---------------
+web-2 2026-03-01 10:11:00 2026-03-01 10:17:00               5
+
+1 row selected.
+
+HOST STARTED             ENDED               MINUTES PEAK
+---- ------------------- ------------------- ------- ----
+db-1 2026-03-01 10:08:00 2026-03-01 10:13:00       6   95
+db-1 2026-03-01 10:21:00 2026-03-01 10:24:00       4   95
+
+2 rows selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span><code>gaps-islands.mss.sql</code> uses <code>DATEDIFF</code> and <code>DATEADD</code> instead of date subtraction and <code>NUMTODSINTERVAL</code>, and prints the same rows.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note"><span class="lbl">How the island key works</span>The hot minutes of db-1 are 08, 09, …, 13, then 21, …, 24. Number them 1, 2, 3 … and subtract: 08 − 1 = 07, 09 − 2 = 07, …, 13 − 6 = 07, then 21 − 7 = 14 and so on. Each run has its own constant, so <code>GROUP BY run_key</code> collapses each run into one row with its start, end and length.</div>
+    <div class="note warn"><span class="lbl">The first row has no neighbour</span><code>LAG</code> returns NULL on the first row of each partition: the first attempt of each order above. Supply a default with <code>LAG(col, 1, default)</code> when NULL would break the arithmetic. And partition by the entity: without <code>PARTITION BY host</code>, the last sample of one host would be compared with the first of the next.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Gaps: <code>LEAD</code> the timestamp and keep rows where the difference exceeds the interval. Islands: subtract a <code>ROW_NUMBER</code> from the sequence value and group by the result." The <a data-deck="db" data-slide="Payment failure streaks: gaps and islands">drill</a> applies it to consecutive failed payments.</div>
+  </div>
+</section>

@@ -1,0 +1,157 @@
+<section class="slide" data-sec="SQL essentials" data-title="Dates and times in queries">
+  <h2>Reports by month need a calendar to join against; otherwise a month with no sales is simply missing</h2>
+  <p class="dek">Most reporting queries group by a time bucket: a day, a week, a month. Truncate each timestamp to the start of its bucket, then group. Grouping alone only produces buckets that contain rows, so a report that must show "April: 0" needs a generated calendar left-joined to the facts. Date arithmetic differs by engine, and so do the edge cases. Adding a month to 31 January gives 28 February in both. SQL Server's <code>DATEDIFF</code> counts boundaries crossed, not elapsed time. Time zones belong at the edges: store UTC, convert for display.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">dates.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  orders and revenue per month, every month shown even if empty
+WITH months AS (
+  SELECT ADD_MONTHS(DATE '2026-01-01', LEVEL - 1) AS month_start
+  FROM   dual CONNECT BY LEVEL &lt;= 4
+)
+SELECT TO_CHAR(m.month_start, 'YYYY-MM') AS month,
+       COUNT(o.order_id)                  AS orders,
+       COALESCE(SUM(o.total), 0)          AS revenue
+FROM   months m
+LEFT   JOIN orders o
+       ON  o.placed_at &gt;= m.month_start
+       AND o.placed_at &lt;  ADD_MONTHS(m.month_start, 1)
+       AND o.status IN ('PAID', 'SHIPPED')
+GROUP  BY m.month_start
+ORDER  BY m.month_start;
+
+-- 2  truncating, adding and differencing dates
+SELECT TRUNC(TIMESTAMP '2026-02-27 21:10:00', 'MM')         AS month_start,
+       ADD_MONTHS(DATE '2026-01-31', 1)                     AS jan31_plus_1_month,
+       DATE '2026-01-01' - DATE '2025-12-31'                AS days_between,
+       MONTHS_BETWEEN(DATE '2026-01-01', DATE '2025-12-31') AS months_between
+FROM   dual;
+
+-- 3  a UTC timestamp shown in another time zone
+SELECT placed_at,
+       FROM_TZ(placed_at, 'UTC') AT TIME ZONE 'Asia/Kolkata' AS in_kolkata
+FROM   orders WHERE order_id = 1011;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · dates.ora.sql</div>
+<pre><code class="language-plaintext">MONTH   ORDERS REVENUE
+------- ------ -------
+2026-01      4 2353.40
+2026-02      5 3573.30
+2026-03      4 2264.00
+2026-04      0    0.00
+
+4 rows selected.
+
+MONTH_START JAN31_PLUS_1_MONTH DAYS_BETWEEN MONTHS_BETWEEN
+----------- ------------------ ------------ --------------
+2026-02-01  2026-02-28                    1     .032258065
+
+1 row selected.
+
+PLACED_AT           IN_KOLKATA
+------------------- --------------------------
+2026-02-27 21:10:00 2026-02-28 02:40:00 +05:30
+
+1 row selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">dates.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  orders and revenue per month, every month shown even if empty
+WITH months AS (
+  SELECT DATEADD(MONTH, value, CAST('2026-01-01' AS DATE)) AS month_start
+  FROM   GENERATE_SERIES(0, 3)
+)
+SELECT FORMAT(m.month_start, 'yyyy-MM') AS month,
+       COUNT(o.order_id)                AS orders,
+       COALESCE(SUM(o.total), 0)        AS revenue
+FROM   months m
+LEFT   JOIN orders o
+       ON  o.placed_at &gt;= m.month_start
+       AND o.placed_at &lt;  DATEADD(MONTH, 1, m.month_start)
+       AND o.status IN ('PAID', 'SHIPPED')
+GROUP  BY m.month_start
+ORDER  BY m.month_start;
+
+-- 2  truncating, adding and differencing dates
+SELECT DATETRUNC(MONTH, CAST('2026-02-27 21:10:00' AS DATETIME2(0)))  AS month_start,
+       DATEADD(MONTH, 1, CAST('2026-01-31' AS DATE))                   AS jan31_plus_1_month,
+       DATEDIFF(DAY, '2025-12-31', '2026-01-01')                       AS days_between,
+       DATEDIFF(YEAR, '2025-12-31', '2026-01-01')                      AS years_between;
+
+-- 3  a UTC timestamp shown in another time zone
+SELECT placed_at,
+       placed_at AT TIME ZONE 'UTC' AT TIME ZONE 'India Standard Time' AS in_kolkata
+FROM   orders WHERE order_id = 1011;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · dates.mss.sql</div>
+<pre><code class="language-plaintext">month   orders revenue
+------- ------ -------
+2026-01      4 2353.40
+2026-02      5 3573.30
+2026-03      4 2264.00
+2026-04      0     .00
+
+(4 rows affected)
+month_start         jan31_plus_1_month days_between years_between
+------------------- ------------------ ------------ -------------
+2026-02-01 00:00:00 2026-02-28                    1             1
+
+(1 rows affected)
+placed_at           in_kolkata
+------------------- --------------------------
+2026-02-27 21:10:00 2026-02-28 02:40:00 +05:30
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">dates.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// revenue per month: $dateTrunc buckets each order by calendar month
+show(db.orders.aggregate([
+  { $match: { status: { $in: ['PAID', 'SHIPPED'] } } },
+  { $group: { _id: { $dateTrunc: { date: '$placedAt', unit: 'month' } },
+              orders: { $sum: 1 }, revenue: { $sum: '$total' } } },
+  { $sort: { _id: 1 } }
+]));
+// the same instant, shown in Kolkata time
+show(db.orders.aggregate([
+  { $match: { _id: 1011 } },
+  { $project: { placedAt: 1, inKolkata: { $dateToString: { date: '$placedAt', timezone: 'Asia/Kolkata', format: '%Y-%m-%d %H:%M' } } } }
+]));</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · dates.js</div>
+<pre><code class="language-plaintext">{ _id: ISODate('2026-01-01T00:00:00.000Z'), orders: 4, revenue: Decimal128('2353.40') }
+{ _id: ISODate('2026-02-01T00:00:00.000Z'), orders: 5, revenue: Decimal128('3573.30') }
+{ _id: ISODate('2026-03-01T00:00:00.000Z'), orders: 4, revenue: Decimal128('2264.00') }
+{ _id: 1011, placedAt: ISODate('2026-02-27T21:10:00.000Z'), inKolkata: '2026-02-28 02:40' }</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Task</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>Start of the month</td><td><code>TRUNC(ts, 'MM')</code></td><td><code>DATETRUNC(month, ts)</code> <span class="tag a">2022</span></td><td><code>$dateTrunc</code> <span class="tag a">5.0</span></td></tr>
+        <tr><td>Fixed-width buckets (5 min)</td><td>Arithmetic on the timestamp</td><td><code>DATE_BUCKET(minute, 5, ts)</code> <span class="tag a">2022</span></td><td><code>$dateTrunc</code> with <code>binSize: 5</code></td></tr>
+        <tr><td>Add an interval</td><td><code>ts + INTERVAL '5' MINUTE</code>, <code>ADD_MONTHS</code></td><td><code>DATEADD(minute, 5, ts)</code></td><td><code>$dateAdd</code></td></tr>
+        <tr><td>A list of dates</td><td><code>CONNECT BY LEVEL &lt;= n</code></td><td><code>GENERATE_SERIES</code> <span class="tag a">2022</span></td><td><code>$densify</code> fills the gaps</td></tr>
+        <tr><td>Show in a time zone</td><td><code>FROM_TZ(ts, 'UTC') AT TIME ZONE 'Asia/Kolkata'</code></td><td><code>ts AT TIME ZONE 'UTC' AT TIME ZONE 'India Standard Time'</code></td><td><code>timezone</code> option on date operators</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">DATEDIFF counts boundaries</span><code>DATEDIFF(YEAR, '2025-12-31', '2026-01-01')</code> is <b>1</b>, after one day. It counts year boundaries crossed. An age or tenure computed this way is wrong for most of the year. Oracle's <code>MONTHS_BETWEEN</code> returns a fraction, 0.032 here, which is closer to what people mean.</div>
+    <div class="note warn"><span class="lbl">The missing month</span>The MongoDB pipeline returned three months and no April, because grouping cannot invent an empty bucket. Both SQL queries show April with 0 because they start from a generated list of months. In MongoDB, follow <code>$group</code> with <code>$densify</code> and <code>$fill</code>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I store instants in UTC, filter with half-open ranges on the raw column so an index can be used, and truncate only in the select list and <code>GROUP BY</code>. Zone names, not fixed offsets, so daylight saving is handled; Windows zone names in SQL Server, IANA names elsewhere."</div>
+  </div>
+</section>

@@ -1,0 +1,157 @@
+<section class="slide" data-sec="Choosing and case studies" data-title="Case study: a metrics and monitoring store">
+  <h2>Monitoring data is append-only and queried by time, so partition it by time, read only the partitions a query needs, and drop old ones whole</h2>
+  <p class="dek">CPU samples from 50 hosts, one a minute, make 72,000 rows a day and a million in two weeks; real fleets produce far more. Dashboards query recent windows, and old data expires. Partitioning by day suits both. A query for one day reads one partition (<b>partition pruning</b>), and retention drops or truncates a whole partition as a metadata operation instead of deleting rows. Oracle's interval partitioning even creates each day's partition automatically. The MongoDB equivalent, a time-series collection with expiry, is on <a data-deck="db" data-slide="Time-series collections and TTL indexes">Time-series collections</a>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">partitions.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">SET SERVEROUTPUT OFF
+-- the 1,008,000 CPU samples, partitioned by day: Oracle creates each day's partition on first insert
+CREATE TABLE metrics_by_day
+PARTITION BY RANGE (ts) INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+  (PARTITION p_start VALUES LESS THAN (TIMESTAMP '2026-03-01 00:00:00'))
+AS SELECT host, ts, cpu FROM big_metrics;
+SELECT COUNT(*) AS partitions FROM user_tab_partitions WHERE table_name = 'METRICS_BY_DAY';
+
+-- 1  a query on one day reads one partition: partition pruning
+SELECT /*+ gather_plan_statistics */ ROUND(AVG(cpu), 2) AS avg_cpu
+FROM   metrics_by_day WHERE ts &gt;= TIMESTAMP '2026-03-07 00:00:00' AND ts &lt; TIMESTAMP '2026-03-08 00:00:00';
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS PARTITION IOSTATS LAST'));
+
+-- 2  retention: drop the oldest day, then delete the next day's 72,000 rows, and compare the redo each wrote
+CREATE OR REPLACE VIEW my_redo AS
+  SELECT m.value AS bytes FROM v$mystat m JOIN v$statname n ON n.statistic# = m.statistic# WHERE n.name = 'redo size';
+VARIABLE before NUMBER
+EXEC SELECT bytes INTO :before FROM my_redo
+ALTER TABLE metrics_by_day DROP PARTITION FOR (TIMESTAMP '2026-03-01 00:00:00');
+SELECT 'DROP PARTITION' AS operation, bytes - :before AS redo_bytes FROM my_redo;
+EXEC SELECT bytes INTO :before FROM my_redo
+DELETE FROM metrics_by_day WHERE ts &lt; TIMESTAMP '2026-03-03 00:00:00';
+SELECT 'DELETE one day' AS operation, bytes - :before AS redo_bytes FROM my_redo;
+ROLLBACK;
+DROP VIEW my_redo;
+DROP TABLE metrics_by_day PURGE;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · partitions.ora.sql · A-Time and Reads vary by run</div>
+<pre><code class="language-plaintext">Table created.
+
+PARTITIONS
+----------
+        15
+
+1 row selected.
+
+AVG_CPU
+-------
+  49.95
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+-----------------------------------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ ROUND(AVG(cpu), 2) AS avg_cpu FROM
+  metrics_by_day WHERE ts &gt;= TIMESTAMP '2026-03-07 00:00:00' AND ts &lt;
+TIMESTAMP '2026-03-08 00:00:00'
+
+Plan hash value: 3966659372
+
+-----------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation               | Name           | Starts | E-Rows | Pstart| Pstop | A-Rows |   A-Time   | Buffers | Reads  |
+-----------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT        |                |      1 |        |       |       |      1 |00:00:00.05 |     250 |    249 |
+|   1 |  SORT AGGREGATE         |                |      1 |      1 |       |       |      1 |00:00:00.05 |     250 |    249 |
+|   2 |   PARTITION RANGE SINGLE|                |      1 |  72053 |     8 |     8 |  72000 |00:00:01.38 |     250 |    249 |
+|   3 |    TABLE ACCESS FULL    | METRICS_BY_DAY |      1 |  72053 |     8 |     8 |  72000 |00:00:01.38 |     250 |    249 |
+-----------------------------------------------------------------------------------------------------------------------------
+
+17 rows selected.
+
+View created.
+
+PL/SQL procedure successfully completed.
+
+Table altered.
+
+OPERATION      REDO_BYTES
+-------------- ----------
+DROP PARTITION       8120
+
+1 row selected.
+
+PL/SQL procedure successfully completed.
+
+72000 rows deleted.
+
+OPERATION      REDO_BYTES
+-------------- ----------
+DELETE one day    2323700
+
+1 row selected.
+
+Rollback complete.
+
+View dropped.
+
+Table dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">partitions.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- one partition per day for the fourteen days of samples
+CREATE PARTITION FUNCTION pf_day (DATETIME2(0)) AS RANGE RIGHT FOR VALUES
+  ('2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08',
+   '2026-03-09', '2026-03-10', '2026-03-11', '2026-03-12', '2026-03-13', '2026-03-14');
+CREATE PARTITION SCHEME ps_day AS PARTITION pf_day ALL TO ([PRIMARY]);
+CREATE TABLE metrics_by_day (host VARCHAR(20) NOT NULL, ts DATETIME2(0) NOT NULL, cpu DECIMAL(5,1) NOT NULL,
+  INDEX metrics_by_day_cx CLUSTERED (ts, host)) ON ps_day (ts);
+INSERT INTO metrics_by_day WITH (TABLOCK) SELECT host, ts, cpu FROM big_metrics;
+
+-- 1  one day's query touches one partition
+SET STATISTICS IO ON;
+SELECT CAST(AVG(cpu) AS DECIMAL(5,2)) AS avg_cpu FROM metrics_by_day
+WHERE  ts &gt;= CAST('2026-03-07' AS DATETIME2(0)) AND ts &lt; CAST('2026-03-08' AS DATETIME2(0));
+SET STATISTICS IO OFF;
+
+-- 2  retention: empty the oldest partition in one metadata operation
+SELECT $PARTITION.pf_day('2026-03-01') AS oldest_partition, COUNT(*) AS rows_before FROM metrics_by_day WHERE ts &lt; '2026-03-02';
+TRUNCATE TABLE metrics_by_day WITH (PARTITIONS (1));
+SELECT COUNT(*) AS rows_after FROM metrics_by_day WHERE ts &lt; '2026-03-02';
+DROP TABLE metrics_by_day;
+DROP PARTITION SCHEME ps_day;
+DROP PARTITION FUNCTION pf_day;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · partitions.mss.sql</div>
+<pre><code class="language-plaintext">Partition scheme 'ps_day' has been created successfully. 'PRIMARY' is marked as the next used filegroup in partition scheme 'ps_day'.
+
+(1008000 rows affected)
+avg_cpu
+-------
+  49.95
+
+(1 rows affected)
+Table 'metrics_by_day'. Scan count 2, logical reads 299, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+oldest_partition rows_before
+---------------- -----------
+               1       72000
+
+(1 rows affected)
+rows_after
+----------
+         0
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">Pruning and retention, measured</span>Oracle read partition 8 only (<code>Pstart</code> and <code>Pstop</code> both 8), 250 blocks for 72,000 rows. Dropping a day's partition wrote <b>8,120</b> bytes of redo; deleting the next day's rows wrote <b>2,323,700</b>, about 285 times more, and the gap grows with the table. SQL Server emptied the oldest partition with <code>TRUNCATE … WITH (PARTITIONS (1))</code>.</div>
+    <div class="note warn"><span class="lbl">Rollups</span>Dashboards over weeks should not scan raw samples. Keep per-minute raw data for days, per-hour rollups for months and per-day rollups for years, each built by a scheduled <code>MERGE</code>, a materialised view, or <code>$merge</code> in MongoDB. Every resolution gets its own retention.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Time-partitioned tables, or a time-series collection, keyed by source and time; queries always bound the time range so pruning applies; retention by dropping partitions; rollups for long ranges. Queries on the partition key, not around it." General partitioning trade-offs are on <a data-deck="hld" data-slide="Partitioning strategies">HLD · Partitioning strategies</a>.</div>
+  </div>
+</section>

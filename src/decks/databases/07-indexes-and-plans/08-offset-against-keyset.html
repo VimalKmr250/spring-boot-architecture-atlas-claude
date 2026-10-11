@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Pagination: OFFSET against keyset">
+  <h2>OFFSET pages get slower the deeper you go; keyset pages cost the same on page 20,000 as on page 1</h2>
+  <p class="dek"><code>OFFSET n ROWS FETCH NEXT 20</code> must produce and discard <code>n</code> rows before returning 20, even with a perfect index, so the cost grows linearly with the page number. <b>Keyset</b> pagination, also called seek pagination, remembers where the previous page ended: the sort key and a unique tie-breaker of its last row. The next page then seeks straight to that point. Below, newest orders first, 20 per page, with an index whose order matches the sort.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">paging.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- newest orders first, 20 per page; the index matches the sort and covers the columns shown
+CREATE INDEX big_orders_paging_ix ON big_orders (placed_at DESC, order_id DESC) INCLUDE (status, total);
+GO
+SET STATISTICS IO ON;
+-- 1  page 1 with OFFSET
+SELECT order_id, placed_at, total FROM big_orders
+ORDER  BY placed_at DESC, order_id DESC
+OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY;
+
+-- 2  page 20,000 with OFFSET: 399,980 rows are read and thrown away first
+SELECT order_id, placed_at, total FROM big_orders
+ORDER  BY placed_at DESC, order_id DESC
+OFFSET 399980 ROWS FETCH NEXT 20 ROWS ONLY;
+
+-- 3  the same page by keyset: continue after the last row of page 19,999 (order 100021)
+DECLARE @last_placed DATETIME2(0) = '2025-02-12 19:59:37', @last_id INT = 100021;
+SELECT TOP (20) order_id, placed_at, total FROM big_orders
+WHERE  placed_at &lt; @last_placed OR (placed_at = @last_placed AND order_id &lt; @last_id)
+ORDER  BY placed_at DESC, order_id DESC;
+SET STATISTICS IO OFF;
+DROP INDEX big_orders_paging_ix ON big_orders;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · paging.mss.sql (excerpt: first and last rows of each page, and its I/O)</div>
+<pre><code class="language-plaintext">order_id placed_at            total
+-------- ------------------- ------
+  500000 2025-08-03 02:53:20   5.00
+  499999 2025-08-03 02:52:43 504.63
+…
+  499981 2025-08-03 02:41:37 497.97
+…
+Table 'big_orders'. Scan count 1, logical reads 3, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+…
+order_id placed_at           total
+-------- ------------------- -----
+  100020 2025-02-12 19:59:00 12.40
+  100019 2025-02-12 19:58:23 12.03
+…
+  100001 2025-02-12 19:47:17  5.37
+…
+Table 'big_orders'. Scan count 1, logical reads 1789, physical reads 0, page server reads 0, read-ahead reads 42, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+…
+order_id placed_at           total
+-------- ------------------- -----
+  100020 2025-02-12 19:59:00 12.40
+  100019 2025-02-12 19:58:23 12.03
+…
+  100001 2025-02-12 19:47:17  5.37
+…
+Table 'big_orders'. Scan count 2, logical reads 6, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Query</th><th class="num">Pages read</th></tr></thead>
+          <tbody>
+            <tr><td>Page 1, <code>OFFSET 0</code></td><td class="num">3</td></tr>
+            <tr><td>Page 20,000, <code>OFFSET 399980</code></td><td class="num">1,789</td></tr>
+            <tr><td>Page 20,000, keyset</td><td class="num">6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>OFFSET / FETCH</th><th>Keyset (seek)</th></tr></thead>
+      <tbody>
+        <tr><td>Cost of page k</td><td>Grows with k</td><td>Constant</td></tr>
+        <tr><td>Jump to page 500</td><td>Yes</td><td>No: only next and previous, from a cursor value</td></tr>
+        <tr><td>Rows inserted while paging</td><td>Pages shift: rows repeat or get skipped</td><td>Stable: the next page starts after the last row seen</td></tr>
+        <tr><td>Requirements</td><td>A deterministic <code>ORDER BY</code></td><td>A unique sort key, here <code>(placed_at, order_id)</code>, and an index in that order</td></tr>
+        <tr><td>API shape</td><td><code>?page=20000</code></td><td><code>?after=2025-02-12T19:59:37_100021</code>, an opaque cursor</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Ties break pages</span>Ordering by <code>placed_at</code> alone, two orders in the same second could straddle a page boundary, and one of them would appear on both pages or on neither. The tie-breaker <code>order_id</code> makes the order total. The keyset filter needs both parts: <code>placed_at &lt; :p OR (placed_at = :p AND order_id &lt; :id)</code>.</div>
+    <div class="note warn"><span class="lbl">The total count</span>"Page 3 of 25,000" needs a <code>COUNT(*)</code> over the whole result, often the most expensive query on the page. Spring Data's <code>Page</code> runs it on every request. Show "more results" instead, or cache an approximate count.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For infinite scroll and APIs I use keyset pagination: a unique sort key, an index in that order, and the last row's key as the cursor. OFFSET is fine for small result sets, or when users really need to jump to page N." The MongoDB version is on <a data-deck="db" data-slide="Covered queries and range pagination">Covered queries and range pagination</a>.</div>
+  </div>
+</section>

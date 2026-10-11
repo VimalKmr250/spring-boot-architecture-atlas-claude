@@ -1,0 +1,139 @@
+<section class="slide" data-sec="Foundations" data-title="Numbers, money and time types">
+  <h2>Money needs an exact decimal type, and a date needs a range rather than an equals sign</h2>
+  <p class="dek">Choosing a column type looks like a DBA decision, but the bugs it causes show up in application code. Totals come out a cent off. Integer division drops the fraction. A <code>DATE</code> that looks like midnight is not. A timestamp silently rounds to the next day. Each engine has its own version of each trap, so the scripts below are written per engine, and each ran as shown.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">types.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  binary floating point against exact decimal
+SELECT TO_CHAR(TO_BINARY_DOUBLE(0.1) + TO_BINARY_DOUBLE(0.2)) AS binary_double,
+       TO_CHAR(0.1 + 0.2)                                     AS number_type
+FROM   dual;
+
+-- 2  dividing integers
+SELECT 7 / 2 AS seven_halves FROM dual;
+
+-- 3  a DATE always carries a time of day, even when the display hides it
+SELECT CAST(placed_at AS DATE)                                AS placed_date,
+       TO_CHAR(CAST(placed_at AS DATE), 'YYYY-MM-DD HH24:MI') AS really,
+       CASE WHEN CAST(placed_at AS DATE) = DATE '2026-01-05'
+            THEN 'equal' ELSE 'not equal' END                 AS same_as_jan_5
+FROM   orders
+WHERE  order_id = 1001;
+
+-- 4  the half-open range that finds it
+SELECT COUNT(*) AS orders_on_jan_5
+FROM   orders
+WHERE  placed_at &gt;= DATE '2026-01-05' AND placed_at &lt; DATE '2026-01-06';</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · types.ora.sql</div>
+<pre><code class="language-plaintext">          BINARY_DOUBLE NUMBER_TYPE
+----------------------- -----------
+3.0000000000000004E-001          .3
+
+1 row selected.
+
+SEVEN_HALVES
+------------
+         3.5
+
+1 row selected.
+
+PLACED_DATE REALLY           SAME_AS_JAN_5
+----------- ---------------- -------------
+2026-01-05  2026-01-05 09:12 not equal
+
+1 row selected.
+
+ORDERS_ON_JAN_5
+---------------
+              1
+
+1 row selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">types.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  binary floating point against exact decimal
+SELECT CAST(0.1 AS FLOAT) + CAST(0.2 AS FLOAT)         AS float_type,
+       CAST(0.1 AS DECIMAL(9,2)) + CAST(0.2 AS DECIMAL(9,2)) AS decimal_type;
+
+-- 2  dividing integers
+SELECT 7 / 2 AS seven_halves, 7 / 2.0 AS with_a_decimal;
+
+-- 3  MONEY keeps four decimal places through every step
+DECLARE @m MONEY = 100, @d DECIMAL(19,4) = 100;
+SELECT @m / 3 * 3 AS money_type, @d / 3 * 3 AS decimal_type;
+
+-- 4  DATETIME rounds to 1/300 of a second; DATETIME2 does not
+SELECT CAST('2026-01-05 23:59:59.999' AS DATETIME)     AS datetime_type,
+       CAST('2026-01-05 23:59:59.999' AS DATETIME2(3)) AS datetime2_type;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · types.mss.sql</div>
+<pre><code class="language-plaintext">         float_type decimal_type
+------------------- ------------
+0.30000000000000004          .30
+
+(1 rows affected)
+seven_halves with_a_decimal
+------------ --------------
+           3       3.500000
+
+(1 rows affected)
+money_type decimal_type
+---------- ------------
+   99.9999    99.999999
+
+(1 rows affected)
+datetime_type           datetime2_type
+----------------------- -----------------------
+2026-01-06 00:00:00.000 2026-01-05 23:59:59.999
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">types.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// the same sums, as BSON double and as Decimal128
+show(db.aggregate([
+  { $documents: [{ a: 0.1, b: 0.2, c: Decimal128('0.1'), d: Decimal128('0.2') }] },
+  { $project: { double: { $add: ['$a', '$b'] }, decimal: { $add: ['$c', '$d'] } } }
+]));
+// the shell writes a JavaScript number as a double unless told otherwise
+db.prices.drop();
+db.prices.insertOne({ _id: 1, asDouble: 19.99, asDecimal: Decimal128('19.99'), asInt: 1999 });
+show(db.prices.aggregate([{ $project: { _id: 0, t1: { $type: '$asDouble' }, t2: { $type: '$asDecimal' }, t3: { $type: '$asInt' } } }]));
+db.prices.drop();</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · types.js</div>
+<pre><code class="language-plaintext">{ double: 0.30000000000000004, decimal: Decimal128('0.3') }
+{ t1: 'double', t2: 'decimal', t3: 'int' }</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>To store</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>Money</td><td><code>NUMBER(12,2)</code></td><td><code>DECIMAL(12,2)</code>; not <code>MONEY</code>, not <code>FLOAT</code></td><td><code>Decimal128</code>, or whole cents in an <code>Int64</code></td></tr>
+        <tr><td>An instant (order placed)</td><td><code>TIMESTAMP</code> holding UTC, or <code>TIMESTAMP WITH TIME ZONE</code></td><td><code>DATETIME2</code> holding UTC, or <code>DATETIMEOFFSET</code></td><td><code>Date</code>: always UTC, to the millisecond</td></tr>
+        <tr><td>A calendar date (birthday)</td><td><code>DATE</code>, kept at midnight with <code>TRUNC</code></td><td><code>DATE</code></td><td>A <code>Date</code> at midnight UTC, or a <code>'YYYY-MM-DD'</code> string</td></tr>
+        <tr><td>Yes or no</td><td><code>BOOLEAN</code> <span class="tag a">23ai</span>, or <code>NUMBER(1)</code> with a check</td><td><code>BIT</code></td><td><code>bool</code></td></tr>
+        <tr><td>Measurements (CPU %)</td><td><code>BINARY_DOUBLE</code> or <code>NUMBER</code></td><td><code>FLOAT</code> or <code>REAL</code></td><td><code>double</code>: fine where a tiny error is harmless</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Four traps, all shown above</span><code>0.1 + 0.2</code> in binary floating point is <code>0.30000000000000004</code> in every engine. <code>7 / 2</code> is <b>3</b> in SQL Server, because both operands are integers, and 3.5 in Oracle. <code>MONEY</code> keeps 4 decimals at every step, so 100 / 3 × 3 is 99.9999. And <code>DATETIME</code> turned 23:59:59.999 into the next day.</div>
+    <div class="note warn"><span class="lbl">Oracle's DATE has a clock</span>The display showed <code>2026-01-05</code>, yet the value was not equal to <code>DATE '2026-01-05'</code>, because it also holds 09:12. Filter with a half-open range: <code>&gt;= day AND &lt; day + 1</code>. <code>TRUNC(col) = day</code> also works, but it cannot use a plain index on the column.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Money goes in an exact decimal type: <code>NUMBER</code>, <code>DECIMAL</code> or <code>Decimal128</code>, mapped to <code>BigDecimal</code> in Java. Instants go in UTC. I query time with half-open ranges so the boundary second belongs to exactly one day." Java's side of the same story is on <a data-deck="cj" data-slide="Numbers that bite">Numbers that bite</a>.</div>
+  </div>
+</section>

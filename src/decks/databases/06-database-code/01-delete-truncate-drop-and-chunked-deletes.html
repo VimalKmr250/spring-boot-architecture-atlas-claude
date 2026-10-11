@@ -1,0 +1,151 @@
+<section class="slide" data-sec="Database code" data-title="DELETE, TRUNCATE, DROP and chunked deletes">
+  <h2>DELETE removes rows, TRUNCATE empties the table, DROP removes it, and only one of the engines can roll back a TRUNCATE</h2>
+  <p class="dek">The question comes up in almost every SQL interview. The developer's answer is about consequences. <code>DELETE</code> is row-by-row DML: it can filter, it fires triggers, it is logged per row, and it is rolled back like any other change. <code>TRUNCATE</code> deallocates the table's storage in one step: no filter, no triggers, very fast. On Oracle it is DDL that commits, and on SQL Server it can be rolled back. <code>DROP</code> removes the table itself. Deleting millions of old rows is a fourth case: do it in chunks, each its own transaction.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">truncate.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">CREATE TABLE payments_copy AS SELECT * FROM payments;
+
+-- 1  DELETE is ordinary DML: it can be rolled back
+DELETE FROM payments_copy;
+ROLLBACK;
+SELECT COUNT(*) AS after_delete_rollback FROM payments_copy;
+
+-- 2  TRUNCATE is DDL: it commits before and after, so ROLLBACK has nothing to undo
+TRUNCATE TABLE payments_copy;
+ROLLBACK;
+SELECT COUNT(*) AS after_truncate_rollback FROM payments_copy;
+
+-- 3  neither TRUNCATE nor DROP is allowed while a foreign key points at the table
+TRUNCATE TABLE orders;
+DROP TABLE payments_copy PURGE;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · truncate.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+21 rows deleted.
+
+Rollback complete.
+
+AFTER_DELETE_ROLLBACK
+---------------------
+                   21
+
+1 row selected.
+
+Table truncated.
+
+Rollback complete.
+
+AFTER_TRUNCATE_ROLLBACK
+-----------------------
+                      0
+
+1 row selected.
+
+TRUNCATE TABLE orders
+               *
+ERROR at line 1:
+ORA-02266: unique/primary keys in table referenced by enabled foreign keys
+Help: https://docs.oracle.com/error-help/db/ora-02266/
+
+Table dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">truncate.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">SELECT * INTO payments_copy FROM payments;
+
+-- 1  DELETE is ordinary DML: it can be rolled back
+BEGIN TRANSACTION;
+DELETE FROM payments_copy;
+ROLLBACK;
+SELECT COUNT(*) AS after_delete_rollback FROM payments_copy;
+
+-- 2  TRUNCATE is logged and transactional in SQL Server: it can be rolled back too
+BEGIN TRANSACTION;
+TRUNCATE TABLE payments_copy;
+ROLLBACK;
+SELECT COUNT(*) AS after_truncate_rollback FROM payments_copy;
+
+-- 3  neither TRUNCATE nor DROP is allowed while a foreign key points at the table
+TRUNCATE TABLE orders;
+GO
+DROP TABLE payments_copy;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · truncate.mss.sql</div>
+<pre><code class="language-plaintext">(21 rows affected)
+
+(21 rows affected)
+after_delete_rollback
+---------------------
+                   21
+
+(1 rows affected)
+after_truncate_rollback
+-----------------------
+                     21
+
+(1 rows affected)
+Msg 4712, Level 16, State 1, Server mssql, Line 16
+Cannot truncate table 'orders' because it is being referenced by a FOREIGN KEY constraint.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>DELETE</th><th>TRUNCATE</th><th>DROP</th></tr></thead>
+      <tbody>
+        <tr><td>Kind</td><td>DML</td><td>DDL</td><td>DDL</td></tr>
+        <tr><td><code>WHERE</code> clause</td><td>Yes</td><td>No: all rows</td><td>No: the whole table</td></tr>
+        <tr><td>Rollback</td><td>Yes</td><td>Oracle: no, it commits. SQL Server: yes, inside a transaction</td><td>Oracle: no, but the recycle bin keeps it (<code>FLASHBACK TABLE … TO BEFORE DROP</code>). SQL Server: yes, inside a transaction</td></tr>
+        <tr><td>Triggers</td><td>Fire</td><td>Do not fire</td><td>Dropped with the table</td></tr>
+        <tr><td>Identity counter</td><td>Unchanged</td><td>SQL Server resets it; Oracle does not</td><td>Gone</td></tr>
+        <tr><td>Referenced by a foreign key</td><td>Allowed if no child rows</td><td>Refused (ORA-02266, Msg 4712)</td><td>Refused unless the constraint goes too</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">chunked-delete.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- retention: remove samples older than 3 March from a 360,000-row copy, 50,000 rows per transaction
+SELECT * INTO metrics_copy FROM big_metrics WHERE ts &lt; '2026-03-06';
+SET NOCOUNT ON;
+DECLARE @deleted INT = 1, @batches INT = 0, @total INT = 0;
+WHILE @deleted &gt; 0
+BEGIN
+  DELETE TOP (50000) FROM metrics_copy WHERE ts &lt; '2026-03-03';
+  SET @deleted = @@ROWCOUNT;
+  SET @total += @deleted;
+  IF @deleted &gt; 0 SET @batches += 1;
+END;
+SET NOCOUNT OFF;
+SELECT @batches AS batches, @total AS rows_deleted, (SELECT COUNT(*) FROM metrics_copy) AS rows_left;
+DROP TABLE metrics_copy;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · chunked-delete.mss.sql</div>
+<pre><code class="language-plaintext">(360000 rows affected)
+batches rows_deleted rows_left
+------- ------------ ---------
+      3       144000    216000
+
+(1 rows affected)</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">The Oracle version</span><code>chunked-delete.ora.sql</code> loops in PL/SQL with <code>ROWNUM &lt;= 50000</code> and a <code>COMMIT</code> per batch. It printed "3 batches, 144000 rows deleted" and left the same 216,000 rows.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">One huge DELETE</span>Deleting millions of rows in one statement holds locks on all of them until it ends; on SQL Server, past about 5,000 locks it escalates to a table lock. It writes undo or log for every row, and rolling it back after a failure takes as long again. Batches keep each transaction small, let other sessions in between, and can stop and resume.</div>
+    <div class="note warn"><span class="lbl">Better than deleting</span>For time-based retention, partition the table by day or month and drop or truncate whole partitions: a metadata operation instead of a million row deletes. See <a data-deck="db" data-slide="Case study: a metrics and monitoring store">the monitoring case study</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"DELETE is DML: filtered, logged per row, fires triggers, can be rolled back. TRUNCATE is DDL: all rows, minimal logging, no triggers. It auto-commits on Oracle but can be rolled back on SQL Server, and it is blocked by incoming foreign keys. DROP removes the table."</div>
+  </div>
+</section>

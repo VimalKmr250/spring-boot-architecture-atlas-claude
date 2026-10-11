@@ -1,0 +1,215 @@
+<section class="slide" data-sec="Database code" data-title="Errors and transactions in database code">
+  <h2>On SQL Server, a failed statement inside a transaction does not end the transaction, unless XACT_ABORT says so</h2>
+  <p class="dek">A transfer debits one wallet and credits another, and both must happen or neither. Here the debit breaks a <code>CHECK (balance &gt;= 0)</code>: wallet 2 holds 300 and is asked for 400. What happens next depends on the engine. SQL Server, by default, rolls back only the failing <i>statement</i> and carries on. The procedure then commits the credit alone, and money appears from nowhere. <code>SET XACT_ABORT ON</code> makes any runtime error roll back the whole transaction. Oracle treats a call from the client as a unit: an unhandled exception undoes everything the call did.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">errors.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- move 400 from wallet 2 (balance 300) to wallet 1; a CHECK forbids negative balances
+UPDATE accounts SET balance = CASE account_id WHEN 1 THEN 500 ELSE 300 END WHERE account_id IN (1, 2);
+ALTER TABLE accounts ADD CONSTRAINT accounts_balance_ck CHECK (balance &gt;= 0);
+GO
+CREATE OR ALTER PROCEDURE transfer @from INT, @to INT, @amount DECIMAL(12,2)
+AS
+BEGIN
+  BEGIN TRANSACTION;
+  UPDATE accounts SET balance = balance + @amount WHERE account_id = @to;
+  UPDATE accounts SET balance = balance - @amount WHERE account_id = @from;
+  COMMIT;
+END;
+GO
+-- 1  default settings: the failed UPDATE is rolled back, the transaction is not
+EXEC transfer @from = 2, @to = 1, @amount = 400;
+SELECT account_id, balance FROM accounts WHERE account_id IN (1, 2);
+UPDATE accounts SET balance = 500 WHERE account_id = 1;
+GO
+-- 2  XACT_ABORT ON: any runtime error rolls back the whole transaction
+SET XACT_ABORT ON;
+EXEC transfer @from = 2, @to = 1, @amount = 400;
+GO
+SELECT account_id, balance FROM accounts WHERE account_id IN (1, 2);
+GO
+-- 3  TRY/CATCH: roll back if a transaction is open, then re-raise with THROW
+CREATE OR ALTER PROCEDURE transfer @from INT, @to INT, @amount DECIMAL(12,2)
+AS
+BEGIN
+  SET XACT_ABORT ON;
+  BEGIN TRY
+    BEGIN TRANSACTION;
+    UPDATE accounts SET balance = balance + @amount WHERE account_id = @to;
+    UPDATE accounts SET balance = balance - @amount WHERE account_id = @from;
+    COMMIT;
+  END TRY
+  BEGIN CATCH
+    IF @@TRANCOUNT &gt; 0 ROLLBACK;
+    THROW;
+  END CATCH;
+END;
+GO
+EXEC transfer @from = 2, @to = 1, @amount = 400;
+GO
+SELECT account_id, balance FROM accounts WHERE account_id IN (1, 2);
+DROP PROCEDURE transfer;
+ALTER TABLE accounts DROP CONSTRAINT accounts_balance_ck;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · errors.mss.sql</div>
+<pre><code class="language-plaintext">(2 rows affected)
+
+(1 rows affected)
+Msg 547, Level 16, State 1, Server mssql, Procedure transfer, Line 6
+The UPDATE statement conflicted with the CHECK constraint "accounts_balance_ck". The conflict occurred in database "shop", table "dbo.accounts", column 'balance'.
+The statement has been terminated.
+account_id balance
+---------- -------
+         1  900.00
+         2  300.00
+
+(2 rows affected)
+
+(1 rows affected)
+
+(1 rows affected)
+Msg 547, Level 16, State 1, Server mssql, Procedure transfer, Line 6
+The UPDATE statement conflicted with the CHECK constraint "accounts_balance_ck". The conflict occurred in database "shop", table "dbo.accounts", column 'balance'.
+account_id balance
+---------- -------
+         1  500.00
+         2  300.00
+
+(2 rows affected)
+
+(1 rows affected)
+
+(0 rows affected)
+Msg 547, Level 16, State 1, Server mssql, Procedure transfer, Line 9
+The UPDATE statement conflicted with the CHECK constraint "accounts_balance_ck". The conflict occurred in database "shop", table "dbo.accounts", column 'balance'.
+account_id balance
+---------- -------
+         1  500.00
+         2  300.00
+
+(2 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">errors.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- move 400 from wallet 2 (balance 300) to wallet 1; a CHECK forbids negative balances
+UPDATE accounts SET balance = CASE account_id WHEN 1 THEN 500 ELSE 300 END WHERE account_id IN (1, 2);
+COMMIT;
+ALTER TABLE accounts ADD CONSTRAINT accounts_balance_ck CHECK (balance &gt;= 0);
+CREATE TABLE error_log (logged_at TIMESTAMP DEFAULT SYSTIMESTAMP, message VARCHAR2(400));
+
+-- an autonomous transaction commits on its own, whatever happens to the caller's
+CREATE OR REPLACE PROCEDURE log_error(p_message VARCHAR2) IS
+  PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+  INSERT INTO error_log (message) VALUES (p_message);
+  COMMIT;
+END;
+/
+CREATE OR REPLACE PROCEDURE transfer(p_from NUMBER, p_to NUMBER, p_amount NUMBER) IS
+BEGIN
+  UPDATE accounts SET balance = balance + p_amount WHERE account_id = p_to;
+  UPDATE accounts SET balance = balance - p_amount WHERE account_id = p_from;
+EXCEPTION
+  WHEN OTHERS THEN
+    log_error('transfer ' || p_from || '-&gt;' || p_to || ': ' || SQLERRM);
+    RAISE;
+END;
+/
+-- 1  the call fails: Oracle undoes everything the call did, not just the failing statement
+EXEC transfer(2, 1, 400)
+SELECT account_id, balance FROM accounts WHERE account_id IN (1, 2);
+ROLLBACK;
+
+-- 2  the caller rolled back, but the autonomous log entry survived
+SELECT message FROM error_log;
+
+DROP PROCEDURE transfer;
+DROP PROCEDURE log_error;
+DROP TABLE error_log PURGE;
+ALTER TABLE accounts DROP CONSTRAINT accounts_balance_ck;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · errors.ora.sql</div>
+<pre><code class="language-plaintext">2 rows updated.
+
+Commit complete.
+
+Table altered.
+
+Table created.
+
+Procedure created.
+
+Procedure created.
+
+BEGIN transfer(2, 1, 400); END;
+
+*
+ERROR at line 1:
+ORA-02290: check constraint (SHOP.ACCOUNTS_BALANCE_CK) violated
+ORA-06512: at "SHOP.TRANSFER", line 8
+ORA-06512: at "SHOP.TRANSFER", line 4
+ORA-06512: at line 1
+Help: https://docs.oracle.com/error-help/db/ora-02290/
+
+ACCOUNT_ID BALANCE
+---------- -------
+         1  500.00
+         2  300.00
+
+2 rows selected.
+
+Rollback complete.
+
+MESSAGE
+------------------------------------------------------------------------------
+transfer 2-&gt;1: ORA-02290: check constraint (SHOP.ACCOUNTS_BALANCE_CK) violated
+
+1 row selected.
+
+Procedure dropped.
+
+Procedure dropped.
+
+Table dropped.
+
+Table altered.</code></pre>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>SQL Server, by default</th><th>Effect of an error</th></tr></thead>
+        <tbody>
+          <tr><td>Most runtime errors (constraint, conversion of a value)</td><td>The statement is undone; the transaction stays open; the next statement runs</td></tr>
+          <tr><td>Some errors (deadlock 1205, certain conversions)</td><td>The batch is aborted and the transaction rolled back</td></tr>
+          <tr><td>Compile errors (unknown column)</td><td>Nothing in the batch runs</td></tr>
+          <tr><td>With <code>SET XACT_ABORT ON</code></td><td>Any runtime error rolls back the transaction and ends the batch</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Oracle</th><th>Effect of an error</th></tr></thead>
+        <tbody>
+          <tr><td>A failing SQL statement</td><td>Undone; earlier statements in the transaction stay, uncommitted</td></tr>
+          <tr><td>A PL/SQL call that raises an unhandled exception</td><td>Everything the call did is undone</td></tr>
+          <tr><td>An exception caught with <code>WHEN OTHERS</code> and not re-raised</td><td>The call "succeeds": its partial work stays. A classic bug</td></tr>
+          <tr><td><code>PRAGMA AUTONOMOUS_TRANSACTION</code></td><td>Its own commit, independent of the caller: the error log survived the rollback</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The half transfer</span>Without <code>XACT_ABORT</code>, wallet 1 went from 500 to <b>900</b> while wallet 2 stayed at 300: the procedure's <code>COMMIT</code> ran after the failed debit. Put <code>SET XACT_ABORT ON</code> at the top of every T-SQL procedure that opens a transaction.</div>
+    <div class="note warn"><span class="lbl">Swallowed exceptions</span><code>EXCEPTION WHEN OTHERS THEN NULL</code> in PL/SQL, or a <code>CATCH</code> block without <code>THROW</code> in T-SQL, turns a failure into partial success. Log and re-raise, as both versions do here, unless the code can genuinely recover.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"In T-SQL: <code>SET XACT_ABORT ON</code>, <code>BEGIN TRY</code>, and in <code>CATCH</code> roll back if <code>@@TRANCOUNT &gt; 0</code> and <code>THROW</code>. In PL/SQL: let exceptions propagate, and use an autonomous transaction only for logging. Commit in the caller that owns the unit of work." The Spring side is on <a data-deck="deck" data-slide="Transactions">Transactions</a>.</div>
+  </div>
+</section>

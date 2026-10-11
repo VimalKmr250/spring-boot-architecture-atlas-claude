@@ -1,0 +1,63 @@
+<section class="slide" data-sec="MongoDB basics" data-title="Finding documents: filters, projections, sorting">
+  <h2>A MongoDB query is itself a document, which makes it easy to build and easy to inject into</h2>
+  <p class="dek"><code>find(filter, projection)</code> returns a cursor, to which <code>sort</code>, <code>skip</code> and <code>limit</code> are applied on the server. A filter field with a plain value means equality. A value that is an object of operators, such as <code>$gt</code>, <code>$in</code>, <code>$regex</code> or <code>$exists</code>, applies those operators. Fields listed together are combined with AND; <code>$or</code> takes a list of alternatives. A projection keeps or removes fields, but not both, except that <code>_id</code> can always be excluded. Because the filter is data, an attacker who controls part of it can supply operators instead of values.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">finding.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  filters, a projection, a sort and a limit: the five largest paid or shipped orders since February
+show(db.orders.find(
+  { status: { $in: ['PAID', 'SHIPPED'] }, placedAt: { $gte: ISODate('2026-02-01') } },
+  { _id: 1, 'customer.name': 1, total: 1 }
+).sort({ total: -1 }).limit(5));
+
+// 2  OR across fields, and a regular expression anchored at the start
+show(db.customers.find(
+  { $or: [{ tier: 'GOLD' }, { name: /^E/ }] },
+  { _id: 0, name: 1, tier: 1 }
+).sort({ name: 1 }));
+
+// 3  operator injection: a request body parsed straight into the filter
+db.api_keys.drop();
+db.api_keys.insertOne({ key: 'k-7f3a9', owner: 'reporting-service' });
+const body = JSON.parse('{ "key": { "$ne": "" } }');          // sent by an attacker instead of a string
+show(db.api_keys.find({ key: body.key }, { _id: 0 }));         // matches any key at all
+print('with $eq:', db.api_keys.countDocuments({ key: { $eq: body.key } }), 'matches');  // compares the object as a value
+db.api_keys.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · finding.js</div>
+<pre><code class="language-plaintext">{ _id: 1007, customer: { name: 'Chen Wei' }, total: Decimal128('2598.00') }
+{ _id: 1013, customer: { name: 'Elif Demir' }, total: Decimal128('1988.00') }
+{ _id: 1011, customer: { name: 'Asha Rao' }, total: Decimal128('748.50') }
+{ _id: 1014, customer: { name: 'Gita Shah' }, total: Decimal128('139.00') }
+{ _id: 1017, customer: { name: 'Femi Ade' }, total: Decimal128('89.00') }
+{ name: 'Asha Rao', tier: 'GOLD' }
+{ name: 'Chen Wei', tier: 'GOLD' }
+{ name: 'Elif Demir', tier: 'SILVER' }
+{ name: 'Gita Shah', tier: 'GOLD' }
+{ key: 'k-7f3a9', owner: 'reporting-service' }
+with $eq: 0 matches</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>SQL</th><th>MongoDB filter</th></tr></thead>
+          <tbody>
+            <tr><td><code>status IN ('PAID','SHIPPED')</code></td><td><code>{ status: { $in: ['PAID', 'SHIPPED'] } }</code></td></tr>
+            <tr><td><code>placed_at &gt;= …</code></td><td><code>{ placedAt: { $gte: ISODate(…) } }</code></td></tr>
+            <tr><td><code>a = 1 OR b = 2</code></td><td><code>{ $or: [{ a: 1 }, { b: 2 }] }</code></td></tr>
+            <tr><td><code>name LIKE 'E%'</code></td><td><code>{ name: /^E/ }</code>: anchored, so an index can be used</td></tr>
+            <tr><td><code>col IS NULL</code></td><td><code>{ col: null }</code>, which also matches a missing field</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Operator injection</span>The request body put <code>{ "$ne": "" }</code> where a string key was expected, and <code>find({ key: body.key })</code> returned the stored API key. It is MongoDB's SQL injection. Validate that input fields have the expected type before building a filter, or wrap untrusted values in <code>$eq</code>, which compares the object as a literal value: 0 matches.</div>
+    <div class="note warn"><span class="lbl">Unanchored regular expressions</span><code>/^E/</code> can use an index because it fixes the start of the string; <code>/son$/</code> or a case-insensitive <code>/e/i</code> examines every document. For text search use an Atlas Search or text index, and for case-insensitive equality a collation index.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>find</code> takes a filter document and a projection; <code>sort</code> and <code>limit</code> run on the server. I project only the fields I need, and I treat request bodies as untyped input: a JSON object where a string was expected is an injection attempt."</div>
+  </div>
+</section>

@@ -1,0 +1,128 @@
+<section class="slide" data-sec="Java and Spring" data-title="MongoTemplate: updates, aggregations, transactions">
+  <h2>When a repository method name cannot say it, MongoTemplate can: atomic updates, pipelines and transactions in Java</h2>
+  <p class="dek">Repositories cover simple finds and saves. <code>MongoTemplate</code> exposes the rest of MongoDB with typed builders. <code>Query</code> and <code>Update</code> express a conditional atomic update, so stock is reserved only if available, without loading the document. <code>Aggregation.newAggregation(…)</code> builds a pipeline whose results map onto a record. Registering a <code>MongoTransactionManager</code> makes Spring transactions, <code>@Transactional</code> or a <code>TransactionTemplate</code>, run as MongoDB multi-document transactions. Below, the same three jobs as earlier slides did in mongosh, now from a Spring Boot application.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TemplateApp.java · Spring Boot 4.1.1, Spring Data MongoDB 5.1.1</div>
+<pre><code class="language-java">package shop;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+import static org.springframework.data.mongodb.core.query.Criteria.where;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.bson.types.Decimal128;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
+import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.bson.Document;
+
+@SpringBootApplication
+public class TemplateApp {
+
+    record CustomerRevenue(int id, String name, int orders, BigDecimal revenue) {}
+
+    public static void main(String[] args) {
+        new SpringApplicationBuilder(TemplateApp.class)
+            .web(WebApplicationType.NONE)
+            .properties(
+                "spring.mongodb.uri=mongodb://localhost:27017/shop?directConnection=true",
+                "spring.main.banner-mode=off",
+                "logging.pattern.console=%-5level %logger{0} - %msg%n",
+                "logging.level.root=warn")
+            .run(args)
+            .close();
+    }
+
+    @Bean
+    MongoTransactionManager transactionManager(MongoDatabaseFactory factory) {
+        return new MongoTransactionManager(factory);                  // makes @Transactional work for MongoDB
+    }
+
+    @Bean
+    CommandLineRunner demo(MongoTemplate mongo, MongoTransactionManager txManager) {
+        return args -&gt; {
+            // 1  an update built with Query and Update: reserve one unit only if one is available
+            Query available = Query.query(where("_id").is(109))
+                    .addCriteria(where("$expr").is(new Document("$lt", List.of("$reserved", "$onHand"))));
+            Document after = mongo.findAndModify(available, new Update().inc("reserved", 1),
+                    FindAndModifyOptions.options().returnNew(true), Document.class, "inventory");
+            System.out.println("1 reserved one grinder: " + after);
+
+            // 2  an aggregation pipeline, mapped onto a record
+            List&lt;CustomerRevenue&gt; top = mongo.aggregate(newAggregation(
+                    match(where("status").in("PAID", "SHIPPED")),
+                    group("customer.id").first("customer.name").as("name").count().as("orders").sum("total").as("revenue"),
+                    sort(Sort.Direction.DESC, "revenue"),
+                    limit(3),
+                    project("name", "orders", "revenue").and("_id").as("id")),
+                    "orders", CustomerRevenue.class).getMappedResults();
+            top.forEach(r -&gt; System.out.println("2 top customer: " + r));
+
+            // 3  a transaction across two documents; an exception rolls both back
+            Query wallets = new Query().addCriteria(where("_id").in(1, 2));
+            System.out.println("3 before: " + mongo.find(wallets, Document.class, "accounts").stream()
+                    .map(d -&gt; d.get("_id") + "=" + d.get("balance")).toList());
+            TransactionTemplate tx = new TransactionTemplate(txManager);
+            try {
+                tx.executeWithoutResult(status -&gt; {
+                    mongo.updateFirst(Query.query(where("_id").is(1)), new Update().inc("balance", new Decimal128(new BigDecimal("-100"))), "accounts");
+                    mongo.updateFirst(Query.query(where("_id").is(2)), new Update().inc("balance", new Decimal128(new BigDecimal("100"))), "accounts");
+                    throw new IllegalStateException("fraud check failed");
+                });
+            } catch (IllegalStateException e) {
+                System.out.println("  rolled back: " + e.getMessage());
+            }
+            System.out.println("  after:  " + mongo.find(wallets, Document.class, "accounts").stream()
+                    .map(d -&gt; d.get("_id") + "=" + d.get("balance")).toList());
+
+            mongo.updateFirst(Query.query(where("_id").is(109)), new Update().inc("reserved", -1), "inventory");
+        };
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · TemplateApp.java against MongoDB 8.3</div>
+<pre><code class="language-plaintext">1 reserved one grinder: Document{{_id=109, onHand=4, reserved=2}}
+2 top customer: CustomerRevenue[id=3, name=Chen Wei, orders=2, revenue=2785.00]
+2 top customer: CustomerRevenue[id=1, name=Asha Rao, orders=3, revenue=2215.90]
+2 top customer: CustomerRevenue[id=5, name=Elif Demir, orders=2, revenue=2071.00]
+3 before: [1=350.00, 2=390.00]
+  rolled back: fraud check failed
+  after:  [1=350.00, 2=390.00]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Need</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Find by fields, save an entity</td><td>A repository</td></tr>
+            <tr><td>Change fields without loading the document</td><td><code>updateFirst</code>, <code>updateMulti</code>, <code>upsert</code> with <code>Update</code></td></tr>
+            <tr><td>Change and return in one round trip</td><td><code>findAndModify</code> with <code>returnNew(true)</code></td></tr>
+            <tr><td>Reports</td><td><code>aggregate(newAggregation(…))</code>, mapped to a record</td></tr>
+            <tr><td>Several documents, all or nothing</td><td><code>MongoTransactionManager</code> + <code>@Transactional</code></td></tr>
+            <tr><td>A change feed</td><td><code>changeStream(…)</code>, or a message listener container</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">The rollback really happened</span>Both <code>updateFirst</code> calls ran inside the transaction, then the callback threw. The balances after, 350.00 and 390.00, are the balances before: neither debit nor credit was committed. Without the transaction manager the two updates would have committed one by one, and the exception would have left money moved.</div>
+    <div class="note warn"><span class="lbl">Transactions are opt-in</span>Spring Boot does not register a <code>MongoTransactionManager</code> by default, so <code>@Transactional</code> on a MongoDB service silently does nothing until you add the bean, as here. Once added, it needs a replica set, and every transaction should be retried on <code>TransientTransactionError</code>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Repositories for the simple cases, <code>MongoTemplate</code> for atomic updates with operators and for aggregations. I never load-modify-save a document that is edited concurrently: I send an <code>Update</code> with a condition, or use <code>@Version</code>." See <a data-deck="db" data-slide="Spring Data MongoDB repositories">Spring Data MongoDB repositories</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,69 @@
+<section class="slide" data-sec="MongoDB consistency" data-title="Write concern, read concern, read preference">
+  <h2>Durability and freshness in MongoDB are per-operation settings: how many members must have a write, and which data a read may see</h2>
+  <p class="dek">A replica set copies every write from the primary to the secondaries. The <b>write concern</b> says when the client is told "done": <code>w: 1</code> after the primary has it, <code>w: 'majority'</code> after most members have it, <code>w: 3</code> after all three. A <b>read concern</b> says which data a read may return: <code>local</code> may include writes that a failover could still roll back, <code>majority</code> only data that cannot be. A <b>read preference</b> says which members may serve the read. These scripts ran against a three-node replica set: first with every member up, then with one stopped.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">wc-up.js · MongoDB 8.3, three-member replica set rs1</div>
+<pre><code class="language-javascript">// all three members up: each write concern is acknowledged
+db.payments_log.drop();
+for (const w of [1, 'majority', 3]) {
+  const res = db.payments_log.insertOne({ event: 'captured', w: String(w) }, { writeConcern: { w, wtimeout: 2000 } });
+  print('w:', String(w).padEnd(8), 'acknowledged:', res.acknowledged);
+}
+print('members:', rs.status().members.map(m =&gt; m.name.split(':')[0] + ' ' + m.stateStr).join(', '));</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · wc-up.js</div>
+<pre><code class="language-plaintext">w: 1        acknowledged: true
+w: majority acknowledged: true
+w: 3        acknowledged: true
+members: rs1a PRIMARY, rs1b SECONDARY, rs1c SECONDARY</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">wc-down.js · run after docker stop rs1c</div>
+<pre><code class="language-javascript">// rs1c is stopped: two of three members up
+print('members:', rs.status().members.map(m =&gt; m.name.split(':')[0] + ' ' + m.stateStr).join(', '));
+for (const w of ['majority', 3]) {
+  try {
+    db.payments_log.insertOne({ event: 'refunded', w: String(w) }, { writeConcern: { w, wtimeout: 2000 } });
+    print('w:', String(w).padEnd(8), 'acknowledged');
+  } catch (e) {
+    print('w:', String(w).padEnd(8), e.name + ':', e.message);
+  }
+}
+// the w: 3 write timed out, yet it was not rolled back: the primary has it
+print('refund events on the primary:', db.payments_log.countDocuments({ event: 'refunded' }));</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · wc-down.js</div>
+<pre><code class="language-plaintext">members: rs1a PRIMARY, rs1b SECONDARY, rs1c (not reachable/healthy)
+w: majority acknowledged
+w: 3        MongoWriteConcernError: waiting for replication timed out
+refund events on the primary: 2</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Setting</th><th>Value</th><th>Guarantee</th><th>Typical use</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2">Write concern</td><td><code>w: 1</code></td><td>On the primary; lost if it fails before replicating</td><td>Logs, metrics</td></tr>
+        <tr><td><code>w: 'majority'</code> (the default since 5.0)</td><td>Survives any single failover</td><td>Orders, payments: anything that matters</td></tr>
+        <tr><td rowspan="2">Read concern</td><td><code>local</code> (the default)</td><td>The member's latest data, possibly not yet majority-committed</td><td>Most reads</td></tr>
+        <tr><td><code>majority</code> / <code>snapshot</code></td><td>Only data that cannot be rolled back / one point in time</td><td>Decisions based on the read; transactions</td></tr>
+        <tr><td rowspan="2">Read preference</td><td><code>primary</code> (the default)</td><td>Read your own writes</td><td>User-facing reads after writes</td></tr>
+        <tr><td><code>secondaryPreferred</code>, <code>nearest</code></td><td>May be seconds stale</td><td>Reports, analytics, other regions</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">A timeout is not a rollback</span>With <code>rs1c</code> down, <code>w: 3</code> failed with "waiting for replication timed out", yet both refund events were on the primary. The client only learns that the write was not confirmed in time. Retrying such a write without an idempotency key inserts it twice.</div>
+    <div class="note warn"><span class="lbl">Stale secondaries</span>A read from a secondary right after a write to the primary can miss the write. For read-your-writes on secondaries, use a causally consistent session with majority read and write concerns, or read from the primary. Replication lag grows under load, exactly when the dashboard is most in demand.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>w: 'majority'</code> for business writes, so a failover cannot lose them; read concern <code>majority</code> when I act on what I read; primary reads by default and secondaries only for staleness-tolerant reports." The theory behind it is <a data-deck="hld" data-slide="Leader-follower replication">HLD · Leader-follower replication</a>.</div>
+  </div>
+</section>

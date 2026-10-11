@@ -1,0 +1,165 @@
+<section class="slide" data-sec="Transactions and locking" data-title="Work queues with SKIP LOCKED and READPAST">
+  <h2>A table can be a reliable job queue: each worker locks the next free rows and skips the ones another worker holds</h2>
+  <p class="dek">Outbox relays, payment retries and email sends often keep pending work in a table. Several workers poll it, and each job must go to exactly one worker. With plain <code>SELECT … FOR UPDATE</code>, the second worker waits on the rows the first has locked: one worker at a time. With <code>SKIP LOCKED</code> (Oracle) or the <code>READPAST</code> hint (SQL Server), a worker passes over locked rows and takes the next free ones. Workers then never wait for each other, and never take the same job. The claim and the status change happen in one transaction, so a crashed worker's rows unlock and return to the queue.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 120" role="img" aria-label="Eight jobs in a table. Worker A has locked jobs 1, 2 and 3. Worker B's query skips those locked rows and locks jobs 4, 5 and 6. Jobs 7 and 8 remain ready for the next poll.">
+        <g font-size="11" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="20" y="40" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.3"></rect><text x="70" y="65" text-anchor="middle">job 1</text>
+          <rect x="125" y="40" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.3"></rect><text x="175" y="65" text-anchor="middle">job 2</text>
+          <rect x="230" y="40" width="100" height="40" rx="5" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.3"></rect><text x="280" y="65" text-anchor="middle">job 3</text>
+          <rect x="335" y="40" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-width="1.3"></rect><text x="385" y="65" text-anchor="middle">job 4</text>
+          <rect x="440" y="40" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-width="1.3"></rect><text x="490" y="65" text-anchor="middle">job 5</text>
+          <rect x="545" y="40" width="100" height="40" rx="5" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B" stroke-width="1.3"></rect><text x="595" y="65" text-anchor="middle">job 6</text>
+          <rect x="650" y="40" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="700" y="65" text-anchor="middle">job 7</text>
+          <rect x="755" y="40" width="100" height="40" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="805" y="65" text-anchor="middle">job 8</text>
+        </g>
+        <g font-size="10.5" fill="currentColor">
+          <text x="175" y="28" text-anchor="middle">locked by worker A</text>
+          <text x="490" y="28" text-anchor="middle">B skips 1–3, locks these</text>
+          <text x="752" y="28" text-anchor="middle">still READY</text>
+          <text x="20" y="108" opacity="0.8">Neither worker waits; a job is never claimed twice; an uncommitted claim is released if its worker dies.</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WorkQueue.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Two workers claim jobs from one table at the same time, without waiting for each other or taking the same job. */
+public class WorkQueue {
+    public static void main(String[] args) throws Exception {
+        oracle();
+        sqlServer();
+    }
+
+    static void oracle() throws SQLException {
+        System.out.println("== Oracle 26ai");
+        String url = "jdbc:oracle:thin:@//localhost:1521/FREEPDB1";
+        try (Connection a = open(url, "shop", "Atlas_pw1"); Connection b = open(url, "shop", "Atlas_pw1")) {
+            setUp(a, "CREATE TABLE jobs (job_id NUMBER PRIMARY KEY, status VARCHAR2(10) NOT NULL, worker VARCHAR2(10))",
+                     "INSERT INTO jobs SELECT LEVEL, 'READY', NULL FROM dual CONNECT BY LEVEL &lt;= 8");
+            // the obvious query is refused: FETCH FIRST and FOR UPDATE cannot be combined
+            try (Statement s = a.createStatement()) {
+                s.executeQuery("SELECT job_id FROM jobs WHERE status = 'READY' ORDER BY job_id FETCH FIRST 3 ROWS ONLY FOR UPDATE SKIP LOCKED");
+            } catch (SQLException e) {
+                System.out.println("  " + e.getMessage().lines().findFirst().orElse(""));
+                a.rollback();
+            }
+            // instead: open a SKIP LOCKED cursor and fetch only 3 rows; rows are locked as they are fetched
+            String claim = "SELECT job_id FROM jobs WHERE status = 'READY' ORDER BY job_id FOR UPDATE SKIP LOCKED";
+            List&lt;Integer&gt; jobsA = claim(a, claim, "A");               // A holds its jobs, uncommitted
+            List&lt;Integer&gt; jobsB = claim(b, claim, "B");               // B skips them instead of waiting
+            System.out.println("  worker A claimed " + jobsA + ", worker B claimed " + jobsB);
+            a.commit(); b.commit();
+            report(a);
+            setUp(a, "DROP TABLE jobs PURGE");
+        }
+    }
+
+    static void sqlServer() throws SQLException {
+        System.out.println("== SQL Server 2025");
+        String url = "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false";
+        try (Connection a = open(url, "sa", "Atlas_pw1!"); Connection b = open(url, "sa", "Atlas_pw1!")) {
+            setUp(a, "CREATE TABLE jobs (job_id INT PRIMARY KEY, status VARCHAR(10) NOT NULL, worker VARCHAR(10))",
+                     "INSERT INTO jobs SELECT value, 'READY', NULL FROM GENERATE_SERIES(1, 8)");
+            // UPDLOCK claims the rows, READPAST skips rows another worker has locked
+            String claim = """
+                WITH next_jobs AS (
+                  SELECT TOP (3) job_id, status, worker FROM jobs WITH (UPDLOCK, READPAST, ROWLOCK)
+                  WHERE status = 'READY' ORDER BY job_id)
+                UPDATE next_jobs SET status = 'TAKEN', worker = ? OUTPUT inserted.job_id""";
+            List&lt;Integer&gt; jobsA = claimInOneStatement(a, claim, "A");
+            List&lt;Integer&gt; jobsB = claimInOneStatement(b, claim, "B");
+            System.out.println("  worker A claimed " + jobsA + ", worker B claimed " + jobsB);
+            a.commit(); b.commit();
+            report(a);
+            setUp(a, "DROP TABLE jobs");
+        }
+    }
+
+    // Oracle: lock up to 3 rows through the cursor, then mark them taken in the same transaction
+    static List&lt;Integer&gt; claim(Connection c, String sql, String worker) throws SQLException {
+        List&lt;Integer&gt; ids = new ArrayList&lt;&gt;();
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setFetchSize(3);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (ids.size() &lt; 3 &amp;&amp; rs.next()) ids.add(rs.getInt(1));
+            }
+        }
+        try (PreparedStatement ps = c.prepareStatement("UPDATE jobs SET status = 'TAKEN', worker = ? WHERE job_id = ?")) {
+            for (int id : ids) { ps.setString(1, worker); ps.setInt(2, id); ps.addBatch(); }
+            ps.executeBatch();
+        }
+        return ids;
+    }
+
+    static List&lt;Integer&gt; claimInOneStatement(Connection c, String sql, String worker) throws SQLException {
+        List&lt;Integer&gt; ids = new ArrayList&lt;&gt;();
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, worker);
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) ids.add(rs.getInt(1)); }
+        }
+        ids.sort(null);
+        return ids;
+    }
+
+    static void report(Connection c) throws SQLException {
+        try (Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT status, COUNT(*) FROM jobs GROUP BY status ORDER BY status")) {
+            StringBuilder sb = new StringBuilder("  after both commits:");
+            while (rs.next()) sb.append(' ').append(rs.getString(1)).append('=').append(rs.getInt(2));
+            System.out.println(sb);
+        }
+        c.commit();
+    }
+
+    static Connection open(String url, String user, String password) throws SQLException {
+        Connection c = DriverManager.getConnection(url, user, password);
+        c.setAutoCommit(false);
+        return c;
+    }
+
+    static void setUp(Connection c, String... sql) throws SQLException {
+        try (Statement s = c.createStatement()) { for (String q : sql) s.execute(q); }
+        c.commit();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · WorkQueue.java</div>
+<pre><code class="language-plaintext">== Oracle 26ai
+  ORA-02014: cannot select FOR UPDATE from view with DISTINCT, GROUP BY, etc.
+  worker A claimed [1, 2, 3], worker B claimed [4, 5, 6]
+  after both commits: READY=2 TAKEN=6
+== SQL Server 2025
+  worker A claimed [1, 2, 3], worker B claimed [4, 5, 6]
+  after both commits: READY=2 TAKEN=6</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Engine</th><th>Claim the next free rows</th></tr></thead>
+          <tbody>
+            <tr><td>Oracle</td><td>A cursor <code>… FOR UPDATE SKIP LOCKED</code>, fetching only as many rows as you want; rows are locked as they are fetched</td></tr>
+            <tr><td>SQL Server</td><td><code>TOP (n)</code> with <code>UPDLOCK, READPAST, ROWLOCK</code>, updated through a CTE with <code>OUTPUT</code></td></tr>
+            <tr><td>PostgreSQL, MySQL 8</td><td><code>FOR UPDATE SKIP LOCKED</code> with <code>LIMIT</code></td></tr>
+            <tr><td>MongoDB</td><td><code>findOneAndUpdate({ status: 'READY' }, { $set: { status: 'TAKEN' } })</code>: atomic per document</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">ORA-02014</span>The natural Oracle query, <code>… FETCH FIRST 3 ROWS ONLY FOR UPDATE SKIP LOCKED</code>, is refused: the row limit turns the query into a view that cannot be locked. Open the cursor without a limit and stop fetching after three rows. JDBC's fetch size of 3 makes the first fetch lock exactly three.</div>
+    <div class="note warn"><span class="lbl">Not a message broker</span>A table queue gives transactions together with your business data: claiming a payment retry and updating the payment in one commit. It does not give push delivery, fan-out or high throughput. For those, publish from the table through an outbox: see <a data-deck="ed" data-slide="Outbox and CDC">Outbox and CDC</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For a table-based queue each worker claims a batch with SKIP LOCKED on Oracle, or READPAST plus UPDLOCK on SQL Server, inside a short transaction, with an index on the status column. Jobs need a lease or retry count, so a job that keeps failing does not loop forever."</div>
+  </div>
+</section>

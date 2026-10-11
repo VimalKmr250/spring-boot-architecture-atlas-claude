@@ -1,0 +1,121 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Reading an Oracle execution plan">
+  <h2>Ask Oracle for the plan it actually ran, with real row counts, then compare estimates with actuals</h2>
+  <p class="dek"><code>EXPLAIN PLAN</code> shows what the optimiser <i>would</i> do, with estimates only. For a slow query you want the plan it <i>did</i> run. Add the <code>gather_plan_statistics</code> hint, run the query, then call <code>DBMS_XPLAN.DISPLAY_CURSOR</code> in the same session. Every step then shows how many times it started, the rows estimated against the rows produced, and the blocks it read. Below, one customer's orders from the 500,000-row table, first without a suitable index and then with one.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">oracle-plan.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- SERVEROUTPUT off, or the "last cursor" is SQL*Plus fetching DBMS_OUTPUT
+SET SERVEROUTPUT OFF
+
+-- 1  one customer's recent orders, before any index on customer_id
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders, SUM(total) AS total
+FROM   big_orders
+WHERE  customer_id = 4242
+AND    placed_at &gt;= TIMESTAMP '2025-06-01 00:00:00';
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'ALLSTATS LAST'));
+
+-- 2  the same query with an index that leads with the equality column
+CREATE INDEX big_orders_cust_placed_ix ON big_orders (customer_id, placed_at);
+
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders, SUM(total) AS total
+FROM   big_orders
+WHERE  customer_id = 4242
+AND    placed_at &gt;= TIMESTAMP '2025-06-01 00:00:00';
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'ALLSTATS LAST'));
+
+DROP INDEX big_orders_cust_placed_ix;</code></pre>
+    </div>
+    <div class="panel">
+      <h3>How to read it</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Order</dt><dd>Indentation is the tree: a step feeds the step above it, one level less indented. Start reading at the most indented line.</dd>
+        <dt>*</dt><dd>That step has a predicate, listed under <b>Predicate Information</b> by Id.</dd>
+        <dt>access</dt><dd>The predicate decided which index entries to read: the index did the work.</dd>
+        <dt>filter</dt><dd>The rows were read first and the predicate was applied afterwards: the work was done and then discarded.</dd>
+        <dt>Starts</dt><dd>How many times the step ran. A large number under a nested loop is the classic hidden cost.</dd>
+        <dt>E-Rows / A-Rows</dt><dd>Estimated rows against actual rows. Within a factor of a few is fine; a factor of 100 means the optimiser chose blind, usually because of stale statistics or a predicate it cannot estimate.</dd>
+        <dt>Buffers</dt><dd>Logical reads: the number to compare between two versions of a query. <b>A-Time</b> moves with the cache and the machine.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Output on Oracle 26ai · oracle-plan.ora.sql · A-Time varies by run</div>
+<pre><code class="language-plaintext">ORDERS   TOTAL
+------ -------
+     8 2391.44
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+-------------------------------------------------------------------------------------------
+SQL_ID  bxzds37padd7a, child number 0
+-------------------------------------
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders, SUM(total) AS
+total FROM   big_orders WHERE  customer_id = 4242 AND    placed_at &gt;=
+TIMESTAMP '2025-06-01 00:00:00'
+
+Plan hash value: 4155165316
+
+-------------------------------------------------------------------------------------------
+| Id  | Operation          | Name       | Starts | E-Rows | A-Rows |   A-Time   | Buffers |
+-------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT   |            |      1 |        |      1 |00:00:00.02 |    2425 |
+|   1 |  SORT AGGREGATE    |            |      1 |      1 |      1 |00:00:00.02 |    2425 |
+|*  2 |   TABLE ACCESS FULL| BIG_ORDERS |      1 |      7 |      8 |00:00:00.02 |    2425 |
+-------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter(("CUSTOMER_ID"=4242 AND "PLACED_AT"&gt;=TIMESTAMP' 2025-06-01
+              00:00:00.000000000'))
+
+22 rows selected.
+
+Index created.
+
+ORDERS   TOTAL
+------ -------
+     8 2391.44
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+-------------------------------------------------------------------------------------------------------------------------------------
+SQL_ID  bxzds37padd7a, child number 0
+-------------------------------------
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders, SUM(total) AS
+total FROM   big_orders WHERE  customer_id = 4242 AND    placed_at &gt;=
+TIMESTAMP '2025-06-01 00:00:00'
+
+Plan hash value: 3431247293
+
+-------------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                            | Name                      | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |
+-------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                     |                           |      1 |        |      1 |00:00:00.01 |      11 |      2 |
+|   1 |  SORT AGGREGATE                      |                           |      1 |      1 |      1 |00:00:00.01 |      11 |      2 |
+|   2 |   TABLE ACCESS BY INDEX ROWID BATCHED| BIG_ORDERS                |      1 |      7 |      8 |00:00:00.01 |      11 |      2 |
+|*  3 |    INDEX RANGE SCAN                  | BIG_ORDERS_CUST_PLACED_IX |      1 |      7 |      8 |00:00:00.01 |       3 |      2 |
+-------------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   3 - access("CUSTOMER_ID"=4242 AND "PLACED_AT"&gt;=TIMESTAMP' 2025-06-01 00:00:00.000000000')
+
+22 rows selected.
+
+Index dropped.</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Before: filter on a full scan</span>Step 2 read every block of the table, <b>2,425 buffers</b>, to return 8 rows. Both conditions appear as <code>filter</code>. Neither could narrow the read, because no index starts with <code>customer_id</code>.</div>
+    <div class="note good"><span class="lbl">After: access on a range scan</span>With <code>(customer_id, placed_at)</code>, both conditions became <code>access</code> predicates: 3 index blocks, then 8 table rows, <b>11 buffers</b> in total. The equality column leads and the range column follows; <a data-deck="db" data-slide="Composite indexes and column order">the column-order slide</a> shows why that order matters.</div>
+    <div class="note tip"><span class="lbl">Two gotchas</span><code>SET SERVEROUTPUT OFF</code> first: with it on, the last cursor is SQL*Plus fetching <code>DBMS_OUTPUT</code>, and you get that plan instead. And the same SQL_ID got a new plan once the index existed: creating an index invalidates the cached cursors that use the table.</div>
+  </div>
+</section>

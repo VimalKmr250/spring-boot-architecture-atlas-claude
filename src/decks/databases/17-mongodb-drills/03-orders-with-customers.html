@@ -1,0 +1,47 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Orders with customers, and customers without orders">
+  <h2>Drill: "each customer's order count and spend", then "customers who never ordered", without a JOIN keyword</h2>
+  <p class="dek"><code>$lookup</code> is MongoDB's left outer join: every input document comes out, with an array of the matching documents from the other collection, empty when nothing matches. Counting and summing that array answers the first question. An empty array is the anti-join, which answers the second. The third query answers it with no join at all: the customer ids found in orders, then the customers not in that list. Each of the three has a cost worth naming.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">customers-orders.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  each customer with order count and spend: $lookup from customers into orders
+show(db.customers.aggregate([
+  { $match: { _id: { $in: [1, 3, 8] } } },
+  { $lookup: { from: 'orders', localField: '_id', foreignField: 'customer.id', as: 'orders' } },
+  { $project: { _id: 0, name: 1, orders: { $size: '$orders' }, spent: { $sum: '$orders.total' } } }
+]));
+
+// 2  customers without any order: $lookup, then keep the empty arrays
+show(db.customers.aggregate([
+  { $lookup: { from: 'orders', localField: '_id', foreignField: 'customer.id', as: 'orders', pipeline: [{ $limit: 1 }] } },
+  { $match: { orders: { $size: 0 } } },
+  { $project: { _id: 1, name: 1 } }
+]));
+
+// 3  the same answer without a join: the ids that appear in orders, then the rest
+const ordered = db.orders.distinct('customer.id');
+show(db.customers.find({ _id: { $nin: ordered } }, { name: 1 }));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · customers-orders.js</div>
+<pre><code class="language-plaintext">{ name: 'Asha Rao', orders: 4, spent: Decimal128('2274.90') }
+{ name: 'Chen Wei', orders: 3, spent: Decimal128('3263.90') }
+{ name: 'Hugo Lima', orders: 0, spent: 0 }
+{ _id: 8, name: 'Hugo Lima' }
+{ _id: 10, name: 'Jon Berg' }
+{ _id: 8, name: 'Hugo Lima' }
+{ _id: 10, name: 'Jon Berg' }</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Same answers as SQL</span>Hugo Lima and Jon Berg, customers 8 and 10, are the two found by <code>NOT EXISTS</code> on <a data-deck="db" data-slide="Customers with no orders">Customers with no orders</a>.</div>
+      <div class="note warn"><span class="lbl">0 is not 0.00</span>Hugo's <code>spent</code> is the integer <code>0</code>: <code>$sum</code> over an empty array returns an int, while the others are Decimal128. Java code that maps <code>spent</code> to <code>BigDecimal</code> must accept both, or the pipeline should convert with <code>$toDecimal</code>.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>Each <code>$lookup</code> runs one query against <code>orders</code> per customer, so the index on <code>customer.id</code> from the seed is what keeps it fast; without it, every customer scans every order. The <code>$limit: 1</code> in query 2 stops after the first match, because only "any?" matters. Query 3 is two round trips, and <code>distinct</code> must return its whole list in one 16 MB document.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Only paid orders?" Use <code>$lookup</code> with a <code>pipeline</code> that adds a <code>$match</code> on status. "Show the customer's name on each order?" It is already there: the order embeds <code>customer.name</code>, an extended reference, so no join is needed. "What if the name changes?" That is the trade-off of copying it, see <a data-deck="db" data-slide="Schema design patterns">Schema design patterns</a>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$lookup</code> from customers into orders on <code>customer.id</code>, which needs an index there. Then <code>$size</code> and <code>$sum</code> over the joined array, or <code>$match</code> on <code>$size: 0</code> for customers without orders. If this runs often, I'd keep a counter on the customer instead."</div>
+  </div>
+</section>

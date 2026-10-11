@@ -1,0 +1,120 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Bind variables, plan reuse and parameter sniffing">
+  <h2>Bind variables let one plan serve every value, which is fast, safe from injection, and occasionally wrong for a skewed value</h2>
+  <p class="dek">Every distinct SQL text is parsed and optimised once, then cached. With values pasted into the text as literals, every customer id is a new statement: a parse and optimisation per call, and a shared pool or plan cache full of near-duplicates. With a <b>bind variable</b> (a <code>?</code> in JDBC, <code>:name</code> in Oracle, <code>@name</code> in T-SQL), the text never changes, so the plan is reused. Reuse has one cost. The plan is optimised for the values seen at its first execution, and SQL Server calls that <b>parameter sniffing</b>. If the data is skewed, the plan for a rare value can be disastrous for a common one.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">binds.ora.sql · Oracle 26ai, as a lab user allowed to flush the shared pool</div>
+<pre><code class="language-sql">-- lab only: start from an empty statement cache
+ALTER SYSTEM FLUSH SHARED_POOL;
+
+-- 1  three literal values: three different statements, each parsed and optimised from scratch
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 1;
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 2;
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 3;
+
+-- 2  one statement with a bind variable, executed three times
+VARIABLE cust NUMBER
+EXEC :cust := 1
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = :cust;
+EXEC :cust := 2
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = :cust;
+EXEC :cust := 3
+SELECT COUNT(*) AS orders FROM orders WHERE customer_id = :cust;
+
+-- what the shared pool now holds
+SELECT executions, sql_text FROM v$sql
+WHERE  sql_text LIKE 'SELECT COUNT(*) AS orders FROM orders WHERE customer_id =%'
+ORDER  BY sql_text;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · binds.ora.sql (excerpt: the shared pool at the end)</div>
+<pre><code class="language-plaintext">EXECUTIONS SQL_TEXT
+---------- ---------------------------------------------------------------
+         1 SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 1
+         1 SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 2
+         1 SELECT COUNT(*) AS orders FROM orders WHERE customer_id = 3
+         3 SELECT COUNT(*) AS orders FROM orders WHERE customer_id = :cust
+
+4 rows selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">binds.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">CREATE INDEX big_orders_total_ix ON big_orders (total);
+GO
+CREATE OR ALTER PROCEDURE orders_above @min_total DECIMAL(12,2) AS
+  SELECT COUNT(*) AS orders, MAX(placed_at) AS latest FROM big_orders WHERE total &gt; @min_total;
+GO
+DBCC FREEPROCCACHE WITH NO_INFOMSGS;   -- lab only: start from an empty plan cache
+SET STATISTICS IO ON;
+-- 1  the first call compiles the plan for its value: very few rows, so seek and look up
+EXEC orders_above @min_total = 504.90;
+-- 2  the second call reuses that plan for a value that matches every row
+EXEC orders_above @min_total = 5.00;
+-- 3  the same call, compiled for its own value
+EXEC orders_above @min_total = 5.00 WITH RECOMPILE;
+SET STATISTICS IO OFF;
+GO
+DROP PROCEDURE orders_above;
+DROP INDEX big_orders_total_ix ON big_orders;
+GO
+-- 4  SQL injection: input glued into the SQL text becomes code; a parameter stays data
+DECLARE @email NVARCHAR(100) = N'x'' OR ''1''=''1';
+EXEC (N'SELECT COUNT(*) AS matches FROM customers WHERE email = ''' + @email + N'''');
+EXEC sp_executesql N'SELECT COUNT(*) AS matches FROM customers WHERE email = @email',
+                   N'@email NVARCHAR(100)', @email = @email;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · binds.mss.sql</div>
+<pre><code class="language-plaintext">orders latest
+------ -------------------
+    90 2025-07-31 05:26:31
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 287, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders latest
+------ -------------------
+499990 2025-08-03 02:52:43
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 1532419, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders latest
+------ -------------------
+499990 2025-08-03 02:52:43
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 2639, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+matches
+-------
+     10
+
+(1 rows affected)
+matches
+-------
+      0
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Sniffing remedy</th><th>Effect</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td><code>OPTION (RECOMPILE)</code> / <code>WITH RECOMPILE</code></td><td>A fresh plan for every value: 2,639 pages instead of 1,532,419 here</td><td>A compilation per call; fine for reports, costly at thousands of calls a second</td></tr>
+        <tr><td><code>OPTIMIZE FOR (@p = typical)</code> or <code>UNKNOWN</code></td><td>The plan targets a chosen value, or the average</td><td>Wrong for the other extreme</td></tr>
+        <tr><td>Separate queries for rare and common cases</td><td>Two plans, each right for its case</td><td>More code paths</td></tr>
+        <tr><td>Parameter-sensitive plans <span class="tag a">2022</span>; Oracle adaptive cursor sharing</td><td>The engine keeps several plans for different value ranges</td><td>Automatic, but only for skew the statistics reveal</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Injection</span>Concatenated into the SQL text, the input <code>x' OR '1'='1</code> turned the filter into <code>email = 'x' OR '1'='1'</code> and matched all 10 customers. Passed as a parameter through <code>sp_executesql</code>, the same input was compared as a value and matched 0. In Java: always <code>PreparedStatement</code> with <code>?</code>, never string concatenation, including in "internal" admin tools.</div>
+    <div class="note warn"><span class="lbl">1.5 million pages for one call</span>The first call compiled a seek-plus-lookup plan for 90 rows (287 pages). Reused for a value matching 499,990 rows, it performed half a million lookups: 1,532,419 pages, about 580 times the cost of a scan. The same procedure can be fast in testing and slow in production, depending on which call came first after a restart.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Bind variables: one parse and one cached plan for all values, and immunity to SQL injection. The trade-off is sniffing on skewed data. I fix the hot case with <code>RECOMPILE</code> or a targeted hint, after confirming it in Query Store or the plan cache."</div>
+  </div>
+</section>

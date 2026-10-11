@@ -1,0 +1,150 @@
+<section class="slide" data-sec="Transactions and locking" data-title="Transaction boundaries: autocommit, DDL and savepoints">
+  <h2>Know where your transaction starts and ends: autocommit, implicit commits and nested BEGINs all move the boundary</h2>
+  <p class="dek">A transaction is the unit that commits or rolls back as a whole. Where it begins differs by engine. Oracle starts one implicitly with the first change and ends it with <code>COMMIT</code> or <code>ROLLBACK</code>, and every DDL statement commits first. SQL Server runs each statement in autocommit unless <code>BEGIN TRANSACTION</code> opens an explicit one, and DDL inside it can be rolled back. JDBC drivers start in autocommit mode on both, which is why frameworks switch it off for a <code>@Transactional</code> method. A savepoint lets part of a transaction be undone without ending it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">boundaries.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  DDL commits: the CREATE TABLE silently commits the INSERT before it
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (11, 'Kai Tanaka', 'kai@example.com', 'JP', 'BRONZE', TIMESTAMP '2026-04-01 10:00:00');
+CREATE TABLE scratch (id NUMBER);
+ROLLBACK;
+SELECT COUNT(*) AS customer_11_rows FROM customers WHERE customer_id = 11;
+DELETE FROM customers WHERE customer_id = 11;
+DROP TABLE scratch PURGE;
+COMMIT;
+
+-- 2  a savepoint undoes part of a transaction
+INSERT INTO payments (order_id, idempotency_key, method, status, amount, created_at)
+VALUES (1018, 'pay-1018-1', 'CARD', 'FAILED', 59.00, TIMESTAMP '2026-03-29 20:01:00');
+SAVEPOINT after_first_attempt;
+INSERT INTO payments (order_id, idempotency_key, method, status, amount, created_at)
+VALUES (1018, 'pay-1018-2', 'CARD', 'CAPTURED', 59.00, TIMESTAMP '2026-03-29 20:03:00');
+ROLLBACK TO SAVEPOINT after_first_attempt;
+SELECT idempotency_key, status FROM payments WHERE order_id = 1018;
+ROLLBACK;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · boundaries.ora.sql</div>
+<pre><code class="language-plaintext">1 row created.
+
+Table created.
+
+Rollback complete.
+
+CUSTOMER_11_ROWS
+----------------
+               1
+
+1 row selected.
+
+1 row deleted.
+
+Table dropped.
+
+Commit complete.
+
+1 row created.
+
+Savepoint created.
+
+1 row created.
+
+Rollback complete.
+
+IDEMPOTENCY_KEY STATUS
+--------------- ------
+pay-1018-1      FAILED
+
+1 row selected.
+
+Rollback complete.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">boundaries.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  DDL is transactional: ROLLBACK undoes the CREATE TABLE and the INSERT
+BEGIN TRANSACTION;
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (11, N'Kai Tanaka', 'kai@example.com', 'JP', 'BRONZE', '2026-04-01 10:00:00');
+CREATE TABLE scratch (id INT);
+ROLLBACK;
+SELECT COUNT(*) AS customer_11_rows, OBJECT_ID('scratch') AS scratch_table FROM customers WHERE customer_id = 11;
+
+-- 2  a savepoint undoes part of a transaction
+BEGIN TRANSACTION;
+INSERT INTO payments (order_id, idempotency_key, method, status, amount, created_at)
+VALUES (1018, 'pay-1018-1', 'CARD', 'FAILED', 59.00, '2026-03-29 20:01:00');
+SAVE TRANSACTION after_first_attempt;
+INSERT INTO payments (order_id, idempotency_key, method, status, amount, created_at)
+VALUES (1018, 'pay-1018-2', 'CARD', 'CAPTURED', 59.00, '2026-03-29 20:03:00');
+ROLLBACK TRANSACTION after_first_attempt;
+SELECT idempotency_key, status, @@TRANCOUNT AS open_transactions FROM payments WHERE order_id = 1018;
+ROLLBACK;
+
+-- 3  nested BEGIN TRANSACTION only counts; the inner COMMIT commits nothing
+BEGIN TRANSACTION;
+BEGIN TRANSACTION;
+SELECT @@TRANCOUNT AS depth_after_two_begins;
+COMMIT;
+SELECT @@TRANCOUNT AS depth_after_inner_commit;
+ROLLBACK;
+SELECT @@TRANCOUNT AS depth_after_rollback;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · boundaries.mss.sql</div>
+<pre><code class="language-plaintext">(1 rows affected)
+customer_11_rows scratch_table
+---------------- -------------
+               0 NULL
+
+(1 rows affected)
+
+(1 rows affected)
+
+(1 rows affected)
+idempotency_key status open_transactions
+--------------- ------ -----------------
+pay-1018-1      FAILED                 1
+
+(1 rows affected)
+depth_after_two_begins
+----------------------
+                     2
+
+(1 rows affected)
+depth_after_inner_commit
+------------------------
+                       1
+
+(1 rows affected)
+depth_after_rollback
+--------------------
+                   0
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>Starts</td><td>Implicitly, at the first DML</td><td><code>BEGIN TRANSACTION</code>; otherwise each statement commits alone</td><td><code>session.startTransaction()</code>; otherwise each write is its own atomic unit</td></tr>
+        <tr><td>DDL inside</td><td>Commits the open transaction, then itself</td><td>Part of the transaction; can be rolled back</td><td>Creating collections and indexes is allowed</td></tr>
+        <tr><td>Savepoint</td><td><code>SAVEPOINT s</code> / <code>ROLLBACK TO SAVEPOINT s</code></td><td><code>SAVE TRANSACTION s</code> / <code>ROLLBACK TRANSACTION s</code></td><td>None</td></tr>
+        <tr><td>Nesting</td><td>None: one transaction per session</td><td><code>BEGIN</code> increments <code>@@TRANCOUNT</code>; only the outermost <code>COMMIT</code> commits, and any <code>ROLLBACK</code> rolls back everything</td><td>None</td></tr>
+        <tr><td>Session ends uncommitted</td><td>Committed: SQL*Plus commits on exit, and Oracle's JDBC driver commits on <code>close()</code></td><td>Rolled back</td><td>Aborted</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The CREATE TABLE that committed</span>The Oracle script inserted customer 11, created a table, and rolled back, yet customer 11 was still there: the DDL had committed the insert. Migration scripts that mix DML and DDL on Oracle cannot be undone by a rollback; plan them to be re-runnable instead. See <a data-deck="deck" data-slide="Zero-downtime schema change">Zero-downtime schema change</a>.</div>
+    <div class="note warn"><span class="lbl">Nested transactions are not nested</span>In SQL Server the inner <code>COMMIT</code> only decremented <code>@@TRANCOUNT</code> from 2 to 1; nothing was committed, and the final <code>ROLLBACK</code> undid it all. A procedure that commits "its own" work inside a caller's transaction commits nothing. Spring's <code>REQUIRES_NEW</code> opens a second connection for this reason; see <a data-deck="sb" data-slide="Transaction propagation">Transaction propagation</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"A transaction should cover one business operation and nothing slow: no remote calls, no user think time inside it. In application code I let the framework open and close it, and I know that Oracle DDL commits implicitly while SQL Server DDL is transactional."</div>
+  </div>
+</section>

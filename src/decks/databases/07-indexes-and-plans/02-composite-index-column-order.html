@@ -1,0 +1,108 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Composite indexes and column order">
+  <h2>In a composite index, equality columns go first and the range column last, because the index is sorted left to right</h2>
+  <p class="dek">An index on <code>(status, placed_at)</code> is sorted by status, and by date within each status, like a phone book sorted by surname, then first name. "FAILED orders in July" is then one contiguous slice: jump to FAILED, then to 1 July, read to 31 July. Reverse the columns and all of July is contiguous, but the FAILED rows are scattered through it, so every July entry must be read and checked. And a query that does not constrain the leading column cannot seek at all. The script forces each index with a hint so the three can be compared on the same query.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="Two index orders for the query status equals FAILED and placed_at in July. Index (status, placed_at): entries sorted CANCELLED, FAILED, PAID, PENDING, SHIPPED, and within FAILED by date; the July FAILED entries form one short contiguous slice, 6 pages read. Index (placed_at, status): entries sorted by date; July is one long slice containing all statuses mixed, and every entry must be checked for FAILED, 326 pages read.">
+        <text x="20" y="22" font-size="11" font-weight="600" fill="currentColor">(status, placed_at): 6 pages</text>
+        <g font-size="9.5" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="20" y="32" width="150" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="95" y="49" text-anchor="middle">CANCELLED …</text>
+          <rect x="170" y="32" width="150" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="245" y="49" text-anchor="middle">FAILED Jan … Jun</text>
+          <rect x="320" y="32" width="70" height="26" fill="#3AA79B" fill-opacity="0.25" stroke="#3AA79B" stroke-width="1.4"></rect><text x="355" y="49" text-anchor="middle">Jul</text>
+          <rect x="390" y="32" width="60" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="420" y="49" text-anchor="middle">Aug</text>
+          <rect x="450" y="32" width="430" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="665" y="49" text-anchor="middle">PAID … PENDING … SHIPPED …</text>
+        </g>
+        <text x="20" y="92" font-size="11" font-weight="600" fill="currentColor">(placed_at, status): 326 pages</text>
+        <g font-size="9.5" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="20" y="102" width="380" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="210" y="119" text-anchor="middle">Jan … Jun, all statuses</text>
+          <rect x="400" y="102" width="300" height="26" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.4"></rect><text x="550" y="119" text-anchor="middle">Jul: every status interleaved, all read</text>
+          <rect x="700" y="102" width="180" height="26" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="790" y="119" text-anchor="middle">Aug</text>
+        </g>
+        <text x="20" y="145" font-size="10" fill="currentColor" opacity="0.75">Teal: the slice the query needs, contiguous. Copper: the slice that must be read, of which 0.5% matches.</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">column-order.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- one query, three candidate indexes: FAILED orders placed in July 2025
+-- (each index is created, measured and dropped in turn)
+CREATE INDEX ix_status_placed ON big_orders (status, placed_at) INCLUDE (total);
+GO
+SET STATISTICS IO ON;
+-- 1  equality column first, range column second: one contiguous slice of the index
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WITH (INDEX (ix_status_placed))
+WHERE  status = 'FAILED' AND placed_at &gt;= '2025-07-01' AND placed_at &lt; '2025-08-01';
+SET STATISTICS IO OFF;
+DROP INDEX ix_status_placed ON big_orders;
+GO
+CREATE INDEX ix_placed_status ON big_orders (placed_at, status) INCLUDE (total);
+GO
+SET STATISTICS IO ON;
+-- 2  range column first: every July order is read, and status is checked on each
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WITH (INDEX (ix_placed_status))
+WHERE  status = 'FAILED' AND placed_at &gt;= '2025-07-01' AND placed_at &lt; '2025-08-01';
+SET STATISTICS IO OFF;
+DROP INDEX ix_placed_status ON big_orders;
+GO
+CREATE INDEX ix_status_placed ON big_orders (status, placed_at) INCLUDE (total);
+GO
+SET STATISTICS IO ON;
+-- 3  the leading column is missing from the query: the index cannot be sought, only scanned
+SELECT COUNT(*) AS orders FROM big_orders WITH (INDEX (ix_status_placed))
+WHERE  placed_at &gt;= '2025-07-01' AND placed_at &lt; '2025-07-02';
+SET STATISTICS IO OFF;
+GO
+SET SHOWPLAN_TEXT ON;
+GO
+SELECT COUNT(*) AS orders FROM big_orders WITH (INDEX (ix_status_placed))
+WHERE  placed_at &gt;= '2025-07-01' AND placed_at &lt; '2025-07-02';
+GO
+SET SHOWPLAN_TEXT OFF;
+GO
+DROP INDEX ix_status_placed ON big_orders;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · column-order.mss.sql</div>
+<pre><code class="language-plaintext">orders    total
+------ --------
+   362 91376.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 6, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders    total
+------ --------
+   362 91376.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 326, physical reads 0, page server reads 0, read-ahead reads 7, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders
+------
+  2335
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 2219, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+StmtText
+-------------------------------------------------------------------------
+SELECT COUNT(*) AS orders FROM big_orders WITH (INDEX (ix_status_placed))
+WHERE  placed_at &gt;= '2025-07-01' AND placed_at &lt; '2025-07-02';
+
+(1 rows affected)
+StmtText
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(int,[Expr1003],0)))
+     |--Stream Aggregate(DEFINE:([Expr1003]=Count(*)))
+          |--Index Scan(OBJECT:([shop].[dbo].[big_orders].[ix_status_placed]),  WHERE:([shop].[dbo].[big_orders].[placed_at]&gt;='2025-07-01 00:00:00.0000000' AND [shop].[dbo].[big_orders].[placed_at]&lt;'2025-07-02 00:00:00.0000000'))
+
+(3 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The missing leading column</span>Query 3 asks only for a date, and <code>(status, placed_at)</code> is sorted by status first, so the plan shows an <b>Index Scan</b> with the date as a residual <code>WHERE</code>: 2,219 pages for one day's 2,335 orders. Oracle can sometimes "skip scan" such an index when the leading column has few distinct values, but do not design for it.</div>
+    <div class="note warn"><span class="lbl">One index, several queries</span>An index on <code>(a, b, c)</code> serves filters on <code>a</code>, on <code>a, b</code> and on <code>a, b, c</code>: the left prefixes. It does not serve <code>b</code> alone. Before adding an index, check whether an existing one can be extended instead; every index slows every write.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Equality columns first, then the range or sort column. If the query also sorts, an index whose order matches the <code>ORDER BY</code> after the equality columns avoids the sort." MongoDB's version of this rule has a name, ESR: see <a data-deck="db" data-slide="Compound indexes and the ESR rule">the ESR rule</a>.</div>
+  </div>
+</section>

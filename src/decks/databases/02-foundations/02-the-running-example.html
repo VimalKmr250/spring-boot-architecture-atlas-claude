@@ -1,0 +1,117 @@
+<section class="slide" data-sec="Foundations" data-title="The running example">
+  <h2>One small shop, its payments and its servers: every query in this tab runs against these tables and collections</h2>
+  <p class="dek">The data is small enough to read in a result grid: 10 customers, 12 products in a 3-level category tree, 18 orders from January to March 2026, 21 payment attempts (some failed, one refunded), 12 employees and 30 minutes of CPU samples from 3 hosts, with one host going silent. The same rows are loaded into all three engines from one generator, so results can be compared. Three bulk tables, generated in each engine with the same integer formulas, are there for execution plans and pagination, where row counts matter.</p>
+
+  <figure>
+    <div class="figbox">
+        <svg viewBox="0 0 900 355" role="img" aria-label="Entity-relationship diagram of the running example. Shop tables: categories, with a parent_id referencing itself; products, referencing categories; order_items, keyed by order_id and line_no, referencing products and orders; orders, with an identity key, referencing customers; customers, with referred_by referencing itself. Below: employees with manager_id referencing itself; inventory, keyed by product_id and referencing products; metric_samples keyed by host, metric and timestamp; payments, with an identity key and a unique idempotency key, referencing orders; and accounts with a balance and a version column.">
+          <rect x="15" y="40" width="150" height="76" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="15" y1="60" x2="165" y2="60" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="90" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">categories</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="22" y="75">category_id  PK</text><text x="22" y="91">name</text><text x="22" y="107">parent_id  FK ↺</text></g>
+          <rect x="195" y="40" width="150" height="108" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="195" y1="60" x2="345" y2="60" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="270" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">products</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="202" y="75">product_id  PK</text><text x="202" y="91">sku  UNIQUE</text><text x="202" y="107">name</text><text x="202" y="123">category_id  FK</text><text x="202" y="139">price  (12,2)</text></g>
+          <rect x="375" y="40" width="150" height="92" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <line x1="375" y1="60" x2="525" y2="60" stroke="#D26A3F" stroke-opacity="0.7"></line>
+          <text x="450" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">order_items</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="382" y="75">order_id, line_no  PK</text><text x="382" y="91">product_id  FK</text><text x="382" y="107">qty  CHECK > 0</text><text x="382" y="123">unit_price</text></g>
+          <rect x="555" y="40" width="150" height="108" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <line x1="555" y1="60" x2="705" y2="60" stroke="#D26A3F" stroke-opacity="0.7"></line>
+          <text x="630" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">orders</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="562" y="75">order_id  PK  identity</text><text x="562" y="91">customer_id  FK</text><text x="562" y="107">status  CHECK</text><text x="562" y="123">placed_at</text><text x="562" y="139">total</text></g>
+          <rect x="735" y="40" width="150" height="108" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="735" y1="60" x2="885" y2="60" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="810" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">customers</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="742" y="75">customer_id  PK</text><text x="742" y="91">name</text><text x="742" y="107">email  UNIQUE</text><text x="742" y="123">tier</text><text x="742" y="139">referred_by  FK ↺</text></g>
+          <rect x="15" y="205" width="150" height="108" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="15" y1="225" x2="165" y2="225" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="90" y="219" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">employees</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="22" y="240">emp_id  PK</text><text x="22" y="256">name</text><text x="22" y="272">dept</text><text x="22" y="288">salary</text><text x="22" y="304">manager_id  FK ↺</text></g>
+          <rect x="195" y="205" width="150" height="76" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="195" y1="225" x2="345" y2="225" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="270" y="219" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">inventory</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="202" y="240">product_id  PK, FK</text><text x="202" y="256">on_hand</text><text x="202" y="272">reserved</text></g>
+          <rect x="375" y="205" width="150" height="60" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <line x1="375" y1="225" x2="525" y2="225" stroke="#3AA79B" stroke-opacity="0.7"></line>
+          <text x="450" y="219" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">metric_samples</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="382" y="240">host, metric, ts  PK</text><text x="382" y="256">value</text></g>
+          <rect x="555" y="205" width="150" height="108" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <line x1="555" y1="225" x2="705" y2="225" stroke="#D26A3F" stroke-opacity="0.7"></line>
+          <text x="630" y="219" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">payments</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="562" y="240">payment_id  PK  identity</text><text x="562" y="256">order_id  FK</text><text x="562" y="272">idempotency_key  UQ</text><text x="562" y="288">status, amount</text><text x="562" y="304">created_at</text></g>
+          <rect x="735" y="205" width="150" height="92" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <line x1="735" y1="225" x2="885" y2="225" stroke="currentColor" stroke-opacity="0.45"></line>
+          <text x="810" y="219" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">accounts</text>
+          <g font-size="9.5" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="742" y="240">account_id  PK</text><text x="742" y="256">owner</text><text x="742" y="272">balance</text><text x="742" y="288">version</text></g>
+          <line x1="195" y1="92" x2="167" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="375" y1="92" x2="347" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="525" y1="92" x2="553" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="705" y1="92" x2="733" y2="92" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="270" y1="205" x2="270" y2="160" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <line x1="630" y1="205" x2="630" y2="160" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+          <text x="15" y="345" font-size="10" fill="currentColor" opacity="0.75">Arrows point from a foreign key to the key it references; ↺ references the same table. Bulk copies for plans and paging: big_orders (500,000 rows), big_customers (20,000), big_metrics (1,008,000).</text>
+        </svg>
+    </div>
+    <figcaption>Copper: the order and payment flow most slides query. Teal: the monitoring data. In MongoDB the same data uses the same collection names, but <code>orders</code> embeds its lines and a snapshot of the customer, and <code>metric_samples</code> is a time-series collection.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">seed/ora.sql (excerpt) · the orders table in Oracle</div>
+<pre><code class="language-sql">CREATE TABLE orders (
+  order_id     NUMBER(10)     GENERATED BY DEFAULT AS IDENTITY (START WITH 1019) CONSTRAINT orders_pk PRIMARY KEY,
+  customer_id  NUMBER(10)     NOT NULL CONSTRAINT orders_customer_fk REFERENCES customers,
+  status       VARCHAR2(10)   NOT NULL CONSTRAINT orders_status_ck
+                 CHECK (status IN ('PENDING', 'PAID', 'SHIPPED', 'CANCELLED', 'REFUNDED')),
+  placed_at    TIMESTAMP(0)   NOT NULL,
+  total        NUMBER(12,2)   NOT NULL,
+  currency     CHAR(3)        DEFAULT 'USD' NOT NULL
+);
+CREATE INDEX orders_customer_ix ON orders (customer_id);</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">seed/mss.sql (excerpt) · the same table in SQL Server</div>
+<pre><code class="language-sql">CREATE TABLE orders (
+  order_id     INT            IDENTITY(1001, 1) CONSTRAINT orders_pk PRIMARY KEY,
+  customer_id  INT            NOT NULL CONSTRAINT orders_customer_fk REFERENCES customers,
+  status       VARCHAR(10)    NOT NULL CONSTRAINT orders_status_ck
+                 CHECK (status IN ('PENDING', 'PAID', 'SHIPPED', 'CANCELLED', 'REFUNDED')),
+  placed_at    DATETIME2(0)   NOT NULL,
+  total        DECIMAL(12,2)  NOT NULL,
+  currency     CHAR(3)        NOT NULL CONSTRAINT orders_currency_df DEFAULT 'USD'
+);
+CREATE INDEX orders_customer_ix ON orders (customer_id);</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Scenario</th><th>Tables</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td>E-commerce orders</td><td>customers, categories, products, orders, order_items, inventory</td><td>Joins, grouping, windows, normalisation, embedding, overselling</td></tr>
+          <tr><td>Payment system</td><td>payments, accounts</td><td>Idempotency keys, lost updates, deadlocks, the ledger</td></tr>
+          <tr><td>Monitoring</td><td>metric_samples, big_metrics</td><td>Gaps and islands, time buckets, time-series collections, retention</td></tr>
+          <tr><td>Org chart</td><td>employees</td><td>Self-joins, recursive queries, ranking: the classic drills</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>How it was run</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Oracle</dt><dd>Oracle AI Database 26ai Free, release 23.26.3, in the <code>container-registry.oracle.com/database/free</code> image; scripts run in SQL*Plus as user <code>shop</code></dd>
+        <dt>SQL Server</dt><dd>SQL Server 2025 CU9 (17.0.5005.3), Developer edition, in <code>mcr.microsoft.com/mssql/server:2025-latest</code>; scripts run in <code>sqlcmd</code>, database <code>shop</code></dd>
+        <dt>MongoDB</dt><dd>MongoDB 8.3.11 in <code>mongo:8</code>, as a one-node replica set so transactions and change streams work; scripts run in mongosh 2.12</dd>
+        <dt>Java</dt><dd>JDK 25; Spring Boot 4.1.1 with its managed driver versions</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note"><span class="lbl">Integer ids in MongoDB</span>The seed gives orders and customers small integer <code>_id</code>s, so results can be compared with SQL and read at a glance. A real collection would usually keep the default <code>ObjectId</code>; <a data-deck="db" data-slide="Keys and generated ids">Keys and generated ids</a> compares the options.</div>
+    <div class="note warn"><span class="lbl">Prices are copied into lines</span><code>order_items.unit_price</code> repeats <code>products.price</code> on purpose: it records what the customer paid, and the product's price may change tomorrow. That is deliberate denormalisation, covered in <a data-deck="db" data-slide="Denormalising on purpose">its own slide</a>.</div>
+    <div class="note tip"><span class="lbl">Run it yourself</span>Each engine runs as one Docker container on a laptop. The script and output on every slide come from that setup; when a slide shows one engine's output and says another agrees, both were run and compared.</div>
+  </div>
+</section>

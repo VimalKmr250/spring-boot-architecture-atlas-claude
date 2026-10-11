@@ -1,0 +1,43 @@
+<section class="slide" data-sec="Wrap-up" data-title="Red flags in database answers">
+  <h2>Mistakes that corrupt data in production, and phrases that sink database interviews</h2>
+  <p class="dek">The left column lists what goes wrong in real systems; each item has a slide in this tab, with the output that shows it happening. The right column lists what interviewers hear as a red flag, with what to say instead. Most red flags have the same root: trusting the application, or the default settings, to keep the data correct.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>In production code</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Read, check in Java, write back.</b> Lost updates under READ COMMITTED, and overselling: 400 of 100 phones granted.</li>
+        <li><b>No unique constraint behind an upsert or an idempotency check.</b> Two concurrent requests both insert.</li>
+        <li><b><code>FLOAT</code> or <code>MONEY</code> for money.</b> Rounding errors in totals, 99.9999 instead of 100.</li>
+        <li><b><code>NOT IN</code> over a nullable column.</b> An empty result, with no error.</li>
+        <li><b>Functions or conversions on indexed columns.</b> 88 pages per lookup instead of 2, from a driver default.</li>
+        <li><b>One insert per round trip, with autocommit.</b> Seconds where milliseconds would do.</li>
+        <li><b><code>OFFSET</code> paging over large tables.</b> Page 20,000 reads 1,789 pages instead of 6.</li>
+        <li><b><code>NOLOCK</code> for speed.</b> Reports showing values that were rolled back.</li>
+        <li><b>Single-row triggers on SQL Server.</b> Multi-row inserts leave totals silently wrong.</li>
+        <li><b>Unbounded arrays in MongoDB.</b> A write that fails at 16 MB, for the most active customer.</li>
+        <li><b>Retrying a timed-out write without an idempotency key.</b> The write had succeeded; now it exists twice.</li>
+      </ul>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Red flag in an interview</th><th>Say instead</th></tr></thead>
+        <tbody>
+          <tr><td>"The application validates it, so we don't need constraints."</td><td>"Validation gives good messages; constraints keep the data correct, because the application is not the only writer, nor the only instance."</td></tr>
+          <tr><td>"Just add an index."</td><td>"I'd read the plan first: which predicate, how many rows, and whether the index can be used for it."</td></tr>
+          <tr><td>"We use <code>NOLOCK</code> because it is faster."</td><td>"If readers wait for writers, I enable read committed snapshot; <code>NOLOCK</code> reads uncommitted data."</td></tr>
+          <tr><td>"<code>@Transactional</code> makes it thread-safe."</td><td>"A transaction at READ COMMITTED still loses updates; I use a conditional update, a version column or a lock."</td></tr>
+          <tr><td>"MongoDB has no transactions / no schema."</td><td>"It has multi-document transactions with retries, and <code>$jsonSchema</code> validation; I design so most invariants live in one document."</td></tr>
+          <tr><td>"NoSQL scales, SQL doesn't."</td><td>"It depends on the access pattern; most systems need a well-indexed relational database long before they need sharding."</td></tr>
+          <tr><td>"We test against H2."</td><td>"Repository tests run on the production engine and version in Testcontainers, because dialect differences are where bugs hide."</td></tr>
+          <tr><td>"The id sequence gives us invoice numbers."</td><td>"Sequences have gaps by design; gapless numbering needs its own serialised step."</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">Where each one is shown</span><a data-deck="db" data-slide="Preventing lost updates in SQL">Lost updates</a>, <a data-deck="db" data-slide="Single-document atomicity and conditional updates">overselling in MongoDB</a>, <a data-deck="db" data-slide="Numbers, money and time types">money types</a>, <a data-deck="db" data-slide="Dialect traps under JPA and JDBC">driver defaults</a>, <a data-deck="db" data-slide="SQL Server: locking, RCSI and SNAPSHOT">NOLOCK</a>, <a data-deck="db" data-slide="Triggers, and why teams avoid them">triggers</a>, <a data-deck="db" data-slide="Modelling anti-patterns and the 16 MB limit">16 MB</a>, <a data-deck="db" data-slide="Write concern, read concern, read preference">write timeouts</a>.</div>
+    <div class="note"><span class="lbl">The ORM's share</span>Many of these arrive through JPA: N+1 queries, lazy loading outside a transaction, and flushes that hide the failing statement. The Spring Boot side is on <a data-deck="deck" data-slide="Persistence traps">Persistence traps</a> and <a data-deck="sb" data-slide="Fetching">Boot · Fetching</a>.</div>
+  </div>
+</section>

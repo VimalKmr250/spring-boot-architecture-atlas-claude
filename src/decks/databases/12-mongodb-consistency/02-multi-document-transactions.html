@@ -1,0 +1,68 @@
+<section class="slide" data-sec="MongoDB consistency" data-title="Multi-document transactions and retries">
+  <h2>MongoDB has ACID transactions across documents, but a conflict aborts at once instead of waiting, so every transaction needs a retry</h2>
+  <p class="dek">Since 4.0 on replica sets, and 4.2 on sharded clusters, a <b>session</b> can run a transaction that spans documents and collections. It reads from one snapshot, writes atomically on commit, and is invisible to others until then. Concurrency control is optimistic. When two transactions write the same document, the second gets a <code>WriteConflict</code> immediately, labelled <code>TransientTransactionError</code>, and must restart from the beginning. The drivers' <code>withTransaction</code> helper retries those automatically. A transfer between two wallets is the textbook case.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">transactions.js · MongoDB 8.3, mongosh, one-node replica set</div>
+<pre><code class="language-javascript">db.accounts.updateOne({ _id: 1 }, { $set: { balance: Decimal128('500.00') } });
+db.accounts.updateOne({ _id: 2 }, { $set: { balance: Decimal128('300.00') } });
+
+// 1  a transfer across two documents: both writes commit together or not at all
+const s1 = db.getMongo().startSession();
+const acc1 = s1.getDatabase('shop').accounts;
+s1.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+acc1.updateOne({ _id: 1 }, { $inc: { balance: Decimal128('-100') } });
+acc1.updateOne({ _id: 2 }, { $inc: { balance: Decimal128('100') } });
+print('inside the transaction, others still see:', db.accounts.findOne({ _id: 1 }).balance.toString());
+s1.commitTransaction();
+print('after commit:', db.accounts.findOne({ _id: 1 }).balance.toString(), db.accounts.findOne({ _id: 2 }).balance.toString());
+
+// 2  two transactions write the same document: the second fails at once with a write conflict
+const a = db.getMongo().startSession(), b = db.getMongo().startSession();
+a.startTransaction(); b.startTransaction();
+a.getDatabase('shop').accounts.updateOne({ _id: 1 }, { $inc: { balance: Decimal128('-50') } });
+try {
+  b.getDatabase('shop').accounts.updateOne({ _id: 1 }, { $inc: { balance: Decimal128('-70') } });
+} catch (e) {
+  print(e.codeName, '| labels:', JSON.stringify(e.errorLabels));
+  b.abortTransaction();
+}
+a.commitTransaction();
+
+// 3  withTransaction runs the callback again when the error is labelled TransientTransactionError
+const c = db.getMongo().startSession();
+let attempts = 0;
+c.withTransaction(() =&gt; {
+  attempts++;
+  c.getDatabase('shop').accounts.updateOne({ _id: 2 }, { $inc: { balance: Decimal128('-10') } });
+});
+print('withTransaction committed after', attempts, 'attempt(s); balances',
+      db.accounts.find({ _id: { $in: [1, 2] } }).toArray().map(d =&gt; d.balance.toString()).join(' / '));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · transactions.js</div>
+<pre><code class="language-plaintext">inside the transaction, others still see: 500.00
+after commit: 400.00 400.00
+WriteConflict | labels: ["TransientTransactionError"]
+withTransaction committed after 1 attempt(s); balances 350.00 / 390.00</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Error label</th><th>Meaning</th><th>Do</th></tr></thead>
+          <tbody>
+            <tr><td><code>TransientTransactionError</code></td><td>The whole transaction failed: conflict, failover</td><td>Run it again from the start</td></tr>
+            <tr><td><code>UnknownTransactionCommitResult</code></td><td>The commit may or may not have applied</td><td>Retry the commit; it is idempotent</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Not like SQL locking</span>Transaction B did not wait for A to commit; it failed at once with <code>WriteConflict</code>. Code written for a relational database, which expects to block and then proceed, sees an exception instead. Always use the driver's <code>withTransaction</code> or an equivalent retry loop.</div>
+    <div class="note warn"><span class="lbl">Limits and costs</span>Transactions are limited to 60 seconds by default (<code>transactionLifetimeLimitSeconds</code>). They hold resources on the server while open and add commit latency, especially across shards. Keep them short, touch few documents, and do not call other services inside them.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"MongoDB transactions give snapshot isolation across documents, with optimistic conflicts: a TransientTransactionError means retry the whole transaction. I prefer a model where one document holds the invariant, and use transactions for the rare cross-document case such as a transfer." Spring's <code>@Transactional</code> works with MongoDB through <code>MongoTransactionManager</code>.</div>
+  </div>
+</section>

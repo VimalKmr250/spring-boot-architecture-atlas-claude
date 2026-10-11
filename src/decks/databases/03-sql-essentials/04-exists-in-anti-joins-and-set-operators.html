@@ -1,0 +1,136 @@
+<section class="slide" data-sec="SQL essentials" data-title="EXISTS, IN, anti-joins and set operators">
+  <h2>"Customers who never ordered" has three spellings, and one of them returns nothing once a NULL appears</h2>
+  <p class="dek">A <b>semi-join</b> keeps rows that have a match (<code>EXISTS</code>, <code>IN</code>). An <b>anti-join</b> keeps rows that have none; you can write it as <code>NOT EXISTS</code>, as an outer join filtered to the misses, or as <code>NOT IN</code>. The first two give the same rows, though not always the same plan. <code>NOT IN</code> is different: one NULL in the subquery makes every comparison UNKNOWN, and no row survives. The set operators at the end compare whole result sets: they answer "in this list but not that one" without a join.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">anti-joins.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  customers who never placed an order: NOT EXISTS
+SELECT c.customer_id, c.name
+FROM   customers c
+WHERE  NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)
+ORDER  BY c.customer_id;
+
+-- 2  the same anti-join as an outer join that keeps only the misses
+SELECT c.customer_id, c.name
+FROM   customers c
+LEFT   JOIN orders o ON o.customer_id = c.customer_id
+WHERE  o.order_id IS NULL
+ORDER  BY c.customer_id;
+
+-- 3  customers who never referred anyone: referred_by contains NULLs
+SELECT COUNT(*) AS not_in_rows
+FROM   customers c
+WHERE  c.customer_id NOT IN (SELECT r.referred_by FROM customers r);
+
+SELECT COUNT(*) AS not_exists_rows
+FROM   customers c
+WHERE  NOT EXISTS (SELECT 1 FROM customers r WHERE r.referred_by = c.customer_id);
+
+-- 4  set operators: who cancelled, who had something shipped
+SELECT customer_id FROM orders WHERE status = 'CANCELLED'
+EXCEPT
+SELECT customer_id FROM orders WHERE status = 'SHIPPED'
+ORDER  BY customer_id;
+
+SELECT customer_id FROM orders WHERE status = 'CANCELLED'
+INTERSECT
+SELECT customer_id FROM orders WHERE status = 'SHIPPED'
+ORDER  BY customer_id;
+
+SELECT (SELECT COUNT(*) FROM (SELECT customer_id FROM orders WHERE status = 'CANCELLED'
+                              UNION ALL
+                              SELECT customer_id FROM orders WHERE status = 'SHIPPED') a) AS union_all_rows,
+       (SELECT COUNT(*) FROM (SELECT customer_id FROM orders WHERE status = 'CANCELLED'
+                              UNION
+                              SELECT customer_id FROM orders WHERE status = 'SHIPPED') u) AS union_rows;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · anti-joins.sql</div>
+<pre><code class="language-plaintext">CUSTOMER_ID NAME
+----------- ---------
+          8 Hugo Lima
+         10 Jon Berg
+
+2 rows selected.
+
+CUSTOMER_ID NAME
+----------- ---------
+          8 Hugo Lima
+         10 Jon Berg
+
+2 rows selected.
+
+NOT_IN_ROWS
+-----------
+          0
+
+1 row selected.
+
+NOT_EXISTS_ROWS
+---------------
+              6
+
+1 row selected.
+
+CUSTOMER_ID
+-----------
+          9
+
+1 row selected.
+
+CUSTOMER_ID
+-----------
+          4
+
+1 row selected.
+
+UNION_ALL_ROWS UNION_ROWS
+-------------- ----------
+            10          7
+
+1 row selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span>Run on SQL Server, the same file prints the same rows, with lower-case headings and <code>(2 rows affected)</code> footers. That includes the <b>0</b> from <code>NOT IN</code>: this is standard three-valued logic, not an Oracle quirk.</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Oracle 26ai · EXPLAIN PLAN for queries 1 and 2 on the 500,000-row tables (excerpt)</div>
+<pre><code class="language-plaintext">| Id  | Operation             | Name             |
+--------------------------------------------------
+|   0 | SELECT STATEMENT      |                  |
+|   1 |  HASH JOIN ANTI       |                  |
+|   2 |   INDEX FAST FULL SCAN| BIG_CUSTOMERS_PK |
+|   3 |   TABLE ACCESS FULL   | BIG_ORDERS       |
+--------------------------------------------------
+…
+| Id  | Operation              | Name             |
+---------------------------------------------------
+|   0 | SELECT STATEMENT       |                  |
+|   1 |  FILTER                |                  |
+|   2 |   HASH JOIN OUTER      |                  |
+|   3 |    INDEX FAST FULL SCAN| BIG_CUSTOMERS_PK |
+|   4 |    TABLE ACCESS FULL   | BIG_ORDERS       |
+---------------------------------------------------</code></pre>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Spelling</th><th>Oracle 26ai</th><th>SQL Server 2025</th></tr></thead>
+        <tbody>
+          <tr><td><code>NOT EXISTS</code></td><td><code>HASH JOIN ANTI</code></td><td><code>Hash Match (Left Anti Semi Join)</code></td></tr>
+          <tr><td><code>LEFT JOIN … IS NULL</code></td><td><code>HASH JOIN OUTER</code>, then <code>FILTER</code>: it builds the joined rows first</td><td>The same anti semi join as <code>NOT EXISTS</code></td></tr>
+          <tr><td><code>NOT IN</code>, nullable column</td><td><code>HASH JOIN ANTI NA</code>, a null-aware anti-join</td><td>An anti semi join with an extra <code>IS NULL OR</code> predicate</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The trap</span><code>customer_id NOT IN (SELECT referred_by …)</code> returned 0 rows, not 6. <code>x NOT IN (1, 3, NULL)</code> means <code>x &lt;&gt; 1 AND x &lt;&gt; 3 AND x &lt;&gt; NULL</code>, and the last comparison is UNKNOWN for every x. Filter the NULLs out in the subquery, or write <code>NOT EXISTS</code>.</div>
+    <div class="note warn"><span class="lbl">Set operators, briefly</span><code>UNION</code> removes duplicates, which costs a sort or a hash: 10 rows became 7 above. Use <code>UNION ALL</code> unless you need that. <code>EXCEPT</code> works in both engines (Oracle <span class="tag a">21c</span>; <code>MINUS</code> before that). Set operators treat two NULLs as equal, unlike <code>=</code>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I write anti-joins as <code>NOT EXISTS</code>. It is NULL-safe, and both Oracle and SQL Server plan it as an anti-join; the outer-join spelling stays an outer join on Oracle. <code>NOT IN</code> silently returns nothing if the subquery yields a NULL."</div>
+  </div>
+</section>

@@ -1,0 +1,124 @@
+<section class="slide" data-sec="Java and Spring" data-title="Procedures, ref cursors and exception translation">
+  <h2>Spring turns ORA-00001 and SQL Server error 2627 into the same DuplicateKeyException, so retry logic can be written once</h2>
+  <p class="dek">Calling a stored procedure from Java differs by engine. An Oracle procedure returns rows through an <code>OUT</code> parameter of type <code>SYS_REFCURSOR</code>, which JDBC reads as a <code>ResultSet</code>. A SQL Server procedure simply returns a result set, so Spring's <code>JdbcClient</code> can treat it like a query. Errors are where Spring helps most. Its translator maps each vendor's error codes onto one hierarchy of <code>DataAccessException</code> subclasses, so a service can catch "duplicate key" or "deadlock loser" without knowing which database it runs on.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProceduresAndErrors.java · Spring Framework 7.0.9 JdbcClient, ojdbc17, mssql-jdbc</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.List;
+import javax.sql.DataSource;
+
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
+
+/** Calling procedures from Java, and the exceptions Spring turns database errors into. */
+public class ProceduresAndErrors {
+    public static void main(String[] args) throws SQLException {
+        DataSource oracle = new DriverManagerDataSource("jdbc:oracle:thin:@//localhost:1521/FREEPDB1", "shop", "Atlas_pw1");
+        DataSource mssql = new DriverManagerDataSource("jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false", "sa", "Atlas_pw1!");
+
+        // 1  Oracle returns rows from a procedure through an OUT parameter of type SYS_REFCURSOR
+        JdbcClient.create(oracle).sql("""
+            CREATE OR REPLACE PROCEDURE orders_of(p_customer IN NUMBER, p_orders OUT SYS_REFCURSOR) AS
+            BEGIN
+              OPEN p_orders FOR SELECT order_id, status FROM orders WHERE customer_id = p_customer ORDER BY order_id;
+            END;""").update();
+        try (Connection c = oracle.getConnection(); CallableStatement cs = c.prepareCall("{call orders_of(?, ?)}")) {
+            cs.setInt(1, 3);
+            cs.registerOutParameter(2, Types.REF_CURSOR);
+            cs.execute();
+            try (ResultSet rs = cs.getObject(2, ResultSet.class)) {
+                while (rs.next()) System.out.println("1 Oracle ref cursor: " + rs.getInt(1) + " " + rs.getString(2));
+            }
+        }
+
+        // 2  SQL Server procedures return result sets directly, so JdbcClient can read them like a query
+        JdbcClient sql = JdbcClient.create(mssql);
+        sql.sql("CREATE OR ALTER PROCEDURE orders_of @customer INT AS "
+              + "SELECT order_id, status FROM orders WHERE customer_id = @customer ORDER BY order_id").update();
+        sql.sql("EXEC orders_of ?").param(3).query((rs, n) -&gt; rs.getInt(1) + " " + rs.getString(2)).list()
+           .forEach(r -&gt; System.out.println("2 SQL Server result set: " + r));
+
+        // 3  the same three mistakes on both engines, as Spring reports them
+        for (DataSource ds : List.of(oracle, mssql)) {
+            JdbcClient db = JdbcClient.create(ds);
+            String engine = ds == oracle ? "Oracle    " : "SQL Server";
+            report(engine, "duplicate email", () -&gt; db.sql(
+                "INSERT INTO customers (customer_id, name, email, country, tier, created_at) VALUES (11, 'X', 'asha@example.com', 'IN', 'GOLD', CURRENT_TIMESTAMP)").update());
+            report(engine, "unknown customer", () -&gt; db.sql(
+                "INSERT INTO orders (customer_id, status, placed_at, total) VALUES (999, 'PENDING', CURRENT_TIMESTAMP, 10)").update());
+            report(engine, "zero quantity", () -&gt; db.sql(
+                "INSERT INTO order_items (order_id, line_no, product_id, qty, unit_price) VALUES (1001, 3, 103, 0, 29.90)").update());
+        }
+
+        // 4  errors that need two sessions to provoke: what Spring maps their vendor codes to
+        SQLErrorCodeSQLExceptionTranslator oraT = new SQLErrorCodeSQLExceptionTranslator(oracle);
+        SQLErrorCodeSQLExceptionTranslator mssT = new SQLErrorCodeSQLExceptionTranslator(mssql);
+        System.out.println("4 ORA-00060 deadlock      -&gt; " + name(oraT.translate("debit", null, new SQLException("deadlock", "61000", 60))));
+        System.out.println("  ORA-00054 lock busy     -&gt; " + name(oraT.translate("lock", null, new SQLException("busy", "61000", 54))));
+        System.out.println("  1205 deadlock victim    -&gt; " + name(mssT.translate("debit", null, new SQLException("victim", "40001", 1205))));
+        System.out.println("  1222 lock time-out      -&gt; " + name(mssT.translate("lock", null, new SQLException("timeout", "HY000", 1222))));
+
+        JdbcClient.create(oracle).sql("DROP PROCEDURE orders_of").update();
+        sql.sql("DROP PROCEDURE orders_of").update();
+    }
+
+    static void report(String engine, String what, Runnable call) {
+        try {
+            call.run();
+            System.out.println("3 " + engine + " " + what + ": no error");
+        } catch (DataAccessException e) {
+            System.out.printf("3 %s %-17s -&gt; %s%n", engine, what + ":", name(e));
+        }
+    }
+
+    static String name(Object e) {
+        if (e == null) return "not translated";
+        Class&lt;?&gt; c = e.getClass();
+        return c.getSimpleName() + " (" + c.getSuperclass().getSimpleName() + ")";
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on JDK 25 · ProceduresAndErrors.java</div>
+<pre><code class="language-plaintext">1 Oracle ref cursor: 1003 SHIPPED
+1 Oracle ref cursor: 1007 PAID
+1 Oracle ref cursor: 1015 PENDING
+2 SQL Server result set: 1003 SHIPPED
+2 SQL Server result set: 1007 PAID
+2 SQL Server result set: 1015 PENDING
+3 Oracle     duplicate email:  -&gt; DuplicateKeyException (DataIntegrityViolationException)
+3 Oracle     unknown customer: -&gt; DataIntegrityViolationException (NonTransientDataAccessException)
+3 Oracle     zero quantity:    -&gt; DataIntegrityViolationException (NonTransientDataAccessException)
+3 SQL Server duplicate email:  -&gt; DuplicateKeyException (DataIntegrityViolationException)
+3 SQL Server unknown customer: -&gt; DataIntegrityViolationException (NonTransientDataAccessException)
+3 SQL Server zero quantity:    -&gt; DataIntegrityViolationException (NonTransientDataAccessException)
+4 ORA-00060 deadlock      -&gt; DeadlockLoserDataAccessException (PessimisticLockingFailureException)
+  ORA-00054 lock busy     -&gt; CannotAcquireLockException (PessimisticLockingFailureException)
+  1205 deadlock victim    -&gt; DeadlockLoserDataAccessException (PessimisticLockingFailureException)
+  1222 lock time-out      -&gt; CannotAcquireLockException (PessimisticLockingFailureException)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Spring exception</th><th>From</th><th>Usual handling</th></tr></thead>
+      <tbody>
+        <tr><td><code>DuplicateKeyException</code></td><td>ORA-00001, SQL Server 2627 and 2601, MongoDB E11000</td><td>Often a normal outcome: the idempotent retry, "email already registered"</td></tr>
+        <tr><td><code>DataIntegrityViolationException</code></td><td>Foreign key, check, not-null violations</td><td>A bug or bad input: 4xx with a clear message</td></tr>
+        <tr><td><code>DeadlockLoserDataAccessException</code></td><td>ORA-00060, SQL Server 1205</td><td>Retry the whole transaction</td></tr>
+        <tr><td><code>CannotAcquireLockException</code></td><td>ORA-00054, SQL Server 1222</td><td>Retry later, or report "busy"</td></tr>
+        <tr><td><code>OptimisticLockingFailureException</code></td><td>JPA or Spring Data <code>@Version</code> mismatch</td><td>Reload and retry, or ask the user</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">How step 4 was produced</span>Deadlocks and lock timeouts need two sessions to provoke; <a data-deck="db" data-slide="Deadlocks in Oracle and SQL Server">Deadlocks</a> does that for real. Here the translator was handed <code>SQLException</code>s carrying those vendor codes, which shows what the same Spring application would throw. Both deadlock codes land on <code>PessimisticLockingFailureException</code> subclasses.</div>
+    <div class="note bad"><span class="lbl">Catching too broadly</span><code>catch (DataAccessException e)</code> treats a duplicate key, a deadlock and a broken connection alike. Retrying a constraint violation never succeeds, while not retrying a deadlock loses work. Catch the specific subclasses, and let Spring Retry or Resilience4j retry only the transient ones.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I let Spring translate SQL errors and branch on the exception type: <code>DuplicateKeyException</code> for idempotency, <code>PessimisticLockingFailureException</code> for retries, everything else as a failure. For an Oracle ref cursor I register a <code>REF_CURSOR</code> out parameter and read it as a <code>ResultSet</code>."</div>
+  </div>
+</section>

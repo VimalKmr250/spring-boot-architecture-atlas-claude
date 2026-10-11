@@ -1,0 +1,76 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Reading a SQL Server execution plan">
+  <h2>In a SQL Server plan, read from the most indented operator outwards, and compare estimated rows with actual rows at each step</h2>
+  <p class="dek">SQL Server shows plans graphically in SSMS and VS Code; the same tree is available as text, and it is what tools and logs capture. <code>SET SHOWPLAN_TEXT ON</code> shows the estimated plan without running the query. <code>SET STATISTICS PROFILE ON</code> runs it and adds, for every operator, how many rows it really produced and how many times it ran. <code>SET STATISTICS IO ON</code> adds pages read per table, the most reliable number for comparing two versions of a query. Here, revenue per country from July's shipped orders: a seek on a covering date index, hash-joined to the customers.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">mssql-plan.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- revenue by country from July's shipped orders; the query lives in a view
+CREATE INDEX big_orders_placed_ix ON big_orders (placed_at) INCLUDE (customer_id, status, total);
+GO
+CREATE VIEW july_shipped_revenue AS
+SELECT c.country, COUNT(*) AS orders, SUM(o.total) AS revenue
+FROM   big_orders o
+JOIN   big_customers c ON c.customer_id = o.customer_id
+WHERE  o.placed_at &gt;= CAST('2025-07-01' AS DATETIME2(0))
+AND    o.placed_at &lt;  CAST('2025-08-01' AS DATETIME2(0))
+AND    o.status = 'SHIPPED'
+GROUP  BY c.country;
+GO
+-- run it with the actual plan: STATISTICS PROFILE adds Rows and Executes to every operator
+SET STATISTICS IO ON;
+SET STATISTICS PROFILE ON;
+SELECT country, orders, revenue FROM july_shipped_revenue ORDER BY revenue DESC;
+SET STATISTICS PROFILE OFF;
+SET STATISTICS IO OFF;
+GO
+DROP VIEW july_shipped_revenue;
+DROP INDEX big_orders_placed_ix ON big_orders;</code></pre>
+    </div>
+    <div class="panel">
+      <h3>How to read it</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>Shape</dt><dd>Each <code>|--</code> feeds the operator above it, one level less indented. Data flows upwards; execution starts at the most indented lines.</dd>
+        <dt>Seek / Scan</dt><dd><code>Index Seek</code> with a <code>SEEK:</code> range used the index's order. <code>Index Scan</code> or <code>Clustered Index Scan</code> read all of it. A <code>WHERE:</code> after either is a residual filter applied to every row read.</dd>
+        <dt>Lookup</dt><dd><code>Key Lookup</code>, or a clustered seek marked <code>LOOKUP</code>, under a <code>Nested Loops</code>: one per row. Cover the query to remove it.</dd>
+        <dt>Joins</dt><dd><code>Nested Loops</code> for few outer rows, <code>Hash Match</code> for large unsorted inputs, <code>Merge Join</code> for inputs already sorted on the key.</dd>
+        <dt>Rows / Executes</dt><dd>Actual rows and executions. Compare with <code>EstimateRows</code>: a large gap is where the plan went wrong.</dd>
+        <dt>Warnings</dt><dd><code>CONVERT_IMPLICIT</code> in a predicate, spills to <code>tempdb</code>, missing statistics: in the graphical plan, a yellow triangle.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Output on SQL Server 2025 · mssql-plan.mss.sql (excerpt: of the profile's columns, Rows, Executes, EstimateRows and StmtText)</div>
+<pre><code class="language-plaintext">country orders    revenue
+------- ------ ----------
+US       14116 3597117.15
+IN        7239 1844978.93
+BR        7239 1844657.36
+GB        7239 1844514.22
+SG        7239 1844335.79
+
+(5 rows affected)
+Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'Workfile'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'big_orders'. Scan count 1, logical reads 362, physical reads 0, page server reads 0, read-ahead reads 7, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+Table 'big_customers'. Scan count 1, logical reads 145, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+ Rows Executes EstimateRows StmtText
+----- -------- ------------ -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    5        1          5.0 SELECT country, orders, revenue FROM july_shipped_revenue ORDER BY revenue DESC
+    5        1          5.0   |--Sort(ORDER BY:([Expr1003] DESC))
+    0        0          5.0        |--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(int,[Expr1007],0)))
+    5        1          5.0             |--Hash Match(Aggregate, HASH:([c].[country]), RESIDUAL:([shop].[dbo].[big_customers].[country] as [c].[country] = [shop].[dbo].[big_customers].[country] as [c].[country]) DEFINE:([Expr1007]=COUNT(*), [Expr1003]=SUM([shop].[dbo].[big_orders].[total] as [o].[total])))
+43072        1    55840.902                  |--Hash Match(Inner Join, HASH:([c].[customer_id])=([o].[customer_id]))
+20000        1      20000.0                       |--Clustered Index Scan(OBJECT:([shop].[dbo].[big_customers].[big_customers_pk] AS [c]))
+43072        1    55840.902                       |--Index Seek(OBJECT:([shop].[dbo].[big_orders].[big_orders_placed_ix] AS [o]), SEEK:([o].[placed_at] &gt;= '2025-07-01 00:00:00' AND [o].[placed_at] &lt; '2025-08-01 00:00:00'),  WHERE:([shop].[dbo].[big_orders].[status] as [o].[status]='SHIPPED') ORDERED FORWARD)
+
+(7 rows affected)</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">This plan is healthy</span>The date seek returned 43,072 rows, every shipped order in July, from a covering index in 362 pages; <code>status</code> was checked as a residual <code>WHERE</code> inside the seek. The hash join read all 20,000 customers once (145 pages). The estimate of 55,836 rows was within a third of the actual 43,072, close enough for the right join choice.</div>
+    <div class="note warn"><span class="lbl">Where to look first</span>The operator with the largest actual rows, an <code>Executes</code> count in the thousands under a <code>Nested Loops</code>, and any estimate wrong by 10× or more. Query Store keeps plans and their run-time statistics over time, so a sudden plan change can be found and compared with the previous plan.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I start with <code>STATISTICS IO</code> to see which table dominates, then the actual plan: scans where I expected seeks, lookups per row, and estimate-against-actual gaps." The Oracle equivalent is <a data-deck="db" data-slide="Reading an Oracle execution plan">Reading an Oracle execution plan</a>.</div>
+  </div>
+</section>

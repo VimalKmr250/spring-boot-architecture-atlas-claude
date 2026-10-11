@@ -1,0 +1,122 @@
+<section class="slide" data-sec="SQL essentials" data-title="Joins, and the outer-join filter trap">
+  <h2>A LEFT JOIN keeps unmatched rows, until a WHERE condition on the right-hand table throws them away again</h2>
+  <p class="dek">An <b>inner join</b> keeps pairs of rows that match the <code>ON</code> condition. A <b>left outer join</b> also keeps every left-hand row that matched nothing, with NULLs in the right-hand columns. <b>Right</b> and <b>full</b> outer joins do the same for the other side, or for both. Two mistakes cause most wrong join results. The first: a filter on the right-hand table placed in <code>WHERE</code>, where it rejects the NULL-padded rows and turns the outer join back into an inner one. The second: joining a one-to-many relationship and then summing a column of the "one" side, which counts that column once per child row.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 230" role="img" aria-label="Three customers, Asha, Dana and Hugo, left-joined to their cancelled orders. Joined with the status test in ON: Asha has no cancelled order and gets a NULL-padded row, Dana matches order 1005, and Hugo has no orders and gets a NULL-padded row, so three rows with counts 0, 1 and 0. Joined with the status test in WHERE: the NULL-padded rows have status NULL, the test is unknown, and they are dropped, leaving only Dana's row.">
+        <text x="20" y="22" font-size="12" font-weight="600" fill="currentColor">customers LEFT JOIN orders … ON customer AND status = 'CANCELLED'</text>
+        <text x="500" y="22" font-size="12" font-weight="600" fill="currentColor">… ON customer, then WHERE status = 'CANCELLED'</text>
+        <g font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="20" y="40" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="32" y="59">1 Asha Rao</text>
+          <rect x="20" y="85" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="32" y="104">4 Dana Kim</text>
+          <rect x="20" y="130" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="32" y="149">8 Hugo Lima</text>
+          <rect x="220" y="40" width="200" height="30" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-dasharray="4 3"></rect><text x="232" y="59">NULL     NULL</text>
+          <rect x="220" y="85" width="200" height="30" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="232" y="104">1005     CANCELLED</text>
+          <rect x="220" y="130" width="200" height="30" rx="5" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-dasharray="4 3"></rect><text x="232" y="149">NULL     NULL</text>
+        </g>
+        <g stroke="#3AA79B" stroke-width="1.3"><line x1="140" y1="55" x2="218" y2="55"></line><line x1="140" y1="100" x2="218" y2="100"></line><line x1="140" y1="145" x2="218" y2="145"></line></g>
+        <text x="20" y="186" font-size="10.5" fill="currentColor">3 customers kept: cancelled = 0, 1, 0</text>
+        <text x="20" y="202" font-size="10" fill="currentColor" opacity="0.7">(the running example keeps all 10)</text>
+
+        <g font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="500" y="40" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.25"></rect><text x="512" y="59" opacity="0.45">1 Asha Rao</text>
+          <rect x="500" y="85" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="512" y="104">4 Dana Kim</text>
+          <rect x="500" y="130" width="120" height="30" rx="5" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.25"></rect><text x="512" y="149" opacity="0.45">8 Hugo Lima</text>
+          <rect x="700" y="40" width="190" height="30" rx="5" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="712" y="59" opacity="0.6">status NULL: unknown</text>
+          <rect x="700" y="85" width="190" height="30" rx="5" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.3"></rect><text x="712" y="104">1005     CANCELLED</text>
+          <rect x="700" y="130" width="190" height="30" rx="5" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-dasharray="4 3"></rect><text x="712" y="149" opacity="0.6">status NULL: unknown</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3"><line x1="620" y1="55" x2="698" y2="55"></line><line x1="620" y1="145" x2="698" y2="145"></line></g>
+        <line x1="620" y1="100" x2="698" y2="100" stroke="#3AA79B" stroke-width="1.3"></line>
+        <text x="500" y="186" font-size="10.5" fill="currentColor">WHERE drops the NULL-padded rows: only Dana remains</text>
+        <text x="500" y="202" font-size="10" fill="currentColor" opacity="0.7">the outer join has become an inner join</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">joins.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  every customer with the number of cancelled orders, or so it seems
+SELECT c.customer_id, c.name, COUNT(o.order_id) AS cancelled
+FROM   customers c
+LEFT   JOIN orders o ON o.customer_id = c.customer_id
+WHERE  o.status = 'CANCELLED'
+GROUP  BY c.customer_id, c.name
+ORDER  BY c.customer_id;
+
+-- 2  the condition on the right-hand table belongs in ON
+SELECT c.customer_id, c.name, COUNT(o.order_id) AS cancelled
+FROM   customers c
+LEFT   JOIN orders o ON o.customer_id = c.customer_id AND o.status = 'CANCELLED'
+GROUP  BY c.customer_id, c.name
+ORDER  BY c.customer_id;
+
+-- 3  fan-out: joining the lines repeats each order total once per line
+SELECT SUM(o.total) AS revenue_wrong
+FROM   orders o
+JOIN   order_items i ON i.order_id = o.order_id
+WHERE  o.status IN ('PAID', 'SHIPPED');
+
+SELECT SUM(o.total) AS revenue_right
+FROM   orders o
+WHERE  o.status IN ('PAID', 'SHIPPED');</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · joins.sql</div>
+<pre><code class="language-plaintext">customer_id name       cancelled
+----------- ---------- ---------
+          4 Dana Kim           1
+          9 Ines Sousa         1
+
+(2 rows affected)
+customer_id name       cancelled
+----------- ---------- ---------
+          1 Asha Rao           0
+          2 Ben Clark          0
+          3 Chen Wei           0
+          4 Dana Kim           1
+          5 Elif Demir         0
+          6 Femi Ade           0
+          7 Gita Shah          0
+          8 Hugo Lima          0
+          9 Ines Sousa         1
+         10 Jon Berg           0
+
+(10 rows affected)
+revenue_wrong
+-------------
+     12748.60
+
+(1 rows affected)
+revenue_right
+-------------
+      8190.70
+
+(1 rows affected)</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Oracle 26ai agrees</span>The same file on Oracle prints the same rows and the same two revenue figures.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Join</th><th>Keeps</th><th>Typical question</th></tr></thead>
+      <tbody>
+        <tr><td><code>INNER JOIN</code></td><td>Matching pairs only</td><td>Orders with their customer's name</td></tr>
+        <tr><td><code>LEFT JOIN</code></td><td>Every left row; NULLs where nothing matched</td><td>Every customer with their order count, including zero</td></tr>
+        <tr><td><code>FULL JOIN</code></td><td>Every row of both sides</td><td>Reconciling two lists: payments against the bank statement</td></tr>
+        <tr><td><code>CROSS JOIN</code></td><td>Every combination</td><td>A calendar of every day for every host, before filling in the gaps</td></tr>
+        <tr><td>Self-join</td><td>A table joined to itself under two aliases</td><td>Employees with their managers: see the <a data-deck="db" data-slide="Employees, managers and the org chart">org-chart drill</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Fan-out doubles the money</span><code>SUM(o.total)</code> after joining <code>order_items</code> gave <b>12,748.60</b> instead of <b>8,190.70</b>: every order with two lines was counted twice. Aggregate the child table in a subquery first, or sum child columns (<code>qty * unit_price</code>) rather than parent ones. If a <code>DISTINCT</code> "fixes" a join, suspect fan-out.</div>
+    <div class="note warn"><span class="lbl">ON or WHERE</span>For an inner join it makes no difference. For an outer join, a condition in <code>ON</code> decides which right-hand rows match; a condition in <code>WHERE</code> filters the joined result, NULL-padded rows included. Conditions on the preserved, left-hand side belong in <code>WHERE</code>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For 'every customer, with or without orders', I use a LEFT JOIN, put conditions on the orders table in the ON clause, and count a column of the right-hand table, <code>COUNT(o.order_id)</code>, not <code>COUNT(*)</code>, which would count 1 for a customer with no orders."</div>
+  </div>
+</section>

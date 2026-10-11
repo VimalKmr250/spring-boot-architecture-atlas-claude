@@ -1,0 +1,68 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Time-bucket rollups for metrics">
+  <h2>Drill: "average and peak CPU per host in 5-minute buckets", and make the minutes with no data visible</h2>
+  <p class="dek">The monitoring question: raw samples arrive every minute, and the dashboard wants one point per host every five minutes. <code>$dateTrunc</code> with <code>binSize: 5</code> rounds each timestamp down to its bucket, and <code>$group</code> on host and bucket does the rest. Then the follow-up every monitoring interviewer asks: what about the minutes a host did not report? A plain <code>$group</code> skips them silently. <code>$densify</code> inserts a document for each missing step, so the gap shows up as rows.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">rollups.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  5-minute averages and peaks per host from the minute samples
+show(db.metric_samples.aggregate([
+  { $match: { 'meta.host': { $in: ['web-2', 'db-1'] }, ts: { $lt: ISODate('2026-03-01T10:20:00Z') } } },
+  { $group: { _id: { host: '$meta.host', bucket: { $dateTrunc: { date: '$ts', unit: 'minute', binSize: 5 } } },
+              avg: { $avg: '$value' }, peak: { $max: '$value' }, samples: { $sum: 1 } } },
+  { $sort: { '_id.host': 1, '_id.bucket': 1 } },
+  { $project: { _id: 0, host: '$_id.host', at: { $dateToString: { date: '$_id.bucket', format: '%H:%M' } },
+                avg: { $round: ['$avg', 1] }, peak: 1, samples: 1 } }
+]));
+
+// 2  $densify fills the minutes web-2 never reported, so gaps are visible rather than silently skipped
+show(db.metric_samples.aggregate([
+  { $match: { 'meta.host': 'web-2', ts: { $gte: ISODate('2026-03-01T10:10:00Z'), $lt: ISODate('2026-03-01T10:19:00Z') } } },
+  { $project: { _id: 0, ts: 1, value: 1 } },
+  { $densify: { field: 'ts', range: { step: 1, unit: 'minute', bounds: 'full' } } },
+  { $project: { at: { $dateToString: { date: '$ts', format: '%H:%M' } }, value: { $ifNull: ['$value', 'missing'] } } }
+]));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · rollups.js</div>
+<pre><code class="language-plaintext">{ peak: 54, samples: 5, host: 'db-1', at: '10:00', avg: 48 }
+{ peak: 95, samples: 5, host: 'db-1', at: '10:05', avg: 66 }
+{ peak: 94, samples: 5, host: 'db-1', at: '10:10', avg: 83.6 }
+{ peak: 54, samples: 5, host: 'db-1', at: '10:15', avg: 48 }
+{ peak: 49, samples: 5, host: 'web-2', at: '10:00', avg: 39 }
+{ peak: 44, samples: 5, host: 'web-2', at: '10:05', avg: 34 }
+{ peak: 36, samples: 2, host: 'web-2', at: '10:10', avg: 30.5 }
+{ peak: 42, samples: 3, host: 'web-2', at: '10:15', avg: 33 }
+{ at: '10:10', value: 25 }
+{ at: '10:11', value: 36 }
+{ at: '10:12', value: 'missing' }
+{ at: '10:13', value: 'missing' }
+{ at: '10:14', value: 'missing' }
+{ at: '10:15', value: 'missing' }
+{ at: '10:16', value: 'missing' }
+{ at: '10:17', value: 42 }
+{ at: '10:18', value: 23 }</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">Read the samples column</span>web-2's 10:10 bucket averages 2 samples, not 5, and its 10:15 bucket 3. The average looks normal; only the count gives the outage away. A rollup that drops <code>samples</code> hides it. The <code>$densify</code> query shows the same outage minute by minute: 10:12 to 10:16, the gap found with <code>LEAD</code> on <a data-deck="db" data-slide="LAG, LEAD, gaps and islands">LAG, LEAD, gaps and islands</a>.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Need</th><th>MongoDB</th><th>SQL</th></tr></thead>
+      <tbody>
+        <tr><td>Round a time down to a bucket</td><td><code>$dateTrunc</code> with <code>unit</code> and <code>binSize</code> <span class="tag a">5.0</span></td><td>SQL Server: <code>DATE_BUCKET(MINUTE, 5, ts)</code> <span class="tag a">2022</span>. Oracle: <code>TRUNC(ts, 'HH24')</code> plus whole 5-minute steps</td></tr>
+        <tr><td>Add rows for missing steps</td><td><code>$densify</code> <span class="tag a">5.1</span></td><td>A generated calendar, left-joined</td></tr>
+        <tr><td>Fill the added rows with a value</td><td><code>$fill</code>: last value or linear <span class="tag a">5.3</span></td><td><code>LAST_VALUE … IGNORE NULLS</code></td></tr>
+        <tr><td>Keep the rollup for later</td><td><code>$merge</code> into a rollup collection, on a schedule</td><td><code>MERGE</code> into a summary table, or a materialised view</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>The <code>$match</code> on host and time range is what makes this cheap: a time-series collection stores samples in buckets per host and time, so a bounded range reads only the buckets it needs. Without the time bound, every dashboard refresh reads the whole history. Storage and retention are on <a data-deck="db" data-slide="Time-series collections and TTL indexes">Time-series collections and TTL indexes</a>.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Bucket boundaries in a time zone?" <code>$dateTrunc</code> takes a <code>timezone</code>, which matters for daily buckets. "95th percentile, not the peak?" <code>$percentile</code> <span class="tag a">7.0</span>. "Weeks of data on one chart?" Query hourly rollups built by <code>$merge</code>, not raw samples, as in <a data-deck="db" data-slide="Case study: a metrics and monitoring store">the monitoring case study</a>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$match</code> a bounded time range first, then <code>$group</code> by the series and <code>$dateTrunc</code> of the timestamp, with the average, the maximum and a sample count. <code>$densify</code> if the chart must show gaps, and rollups via <code>$merge</code> for long ranges."</div>
+  </div>
+</section>

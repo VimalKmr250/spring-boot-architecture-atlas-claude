@@ -1,0 +1,35 @@
+<section class="slide" data-sec="MongoDB drills" data-title="How to answer a MongoDB query question">
+  <h2>A MongoDB query question is half about the pipeline and half about the shape of the documents</h2>
+  <p class="dek">MongoDB interviews ask the same problems as SQL interviews: top N per group, rows without a match, totals per item, rollups by time, duplicates. The difference is that the data may already be joined, because order lines are embedded in the order, or may be missing, because a field can be absent instead of NULL. The drills that follow solve each problem with the aggregation pipeline on the running example, run on MongoDB 8.3, and point out the SQL drill that asks the same question.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Five steps, out loud</h3>
+      <ol class="tight" style="margin-top:10px">
+        <li><b>Ask about the shape.</b> "Are the lines embedded in the order? Can <code>items</code> be empty or missing? Is <code>total</code> a Decimal128 or a double?"</li>
+        <li><b>Name the stages.</b> "Filter, unwind the lines, group by product, sort, limit." That sentence is the pipeline.</li>
+        <li><b>Filter first.</b> Put <code>$match</code>, and <code>$sort</code> where it helps, at the start, where they can use an index. Later stages work on documents in memory.</li>
+        <li><b>Build it stage by stage.</b> Run the first stage, look at the documents, add the next. Say what each stage's output looks like.</li>
+        <li><b>Discuss cost.</b> Which index serves the first <code>$match</code>, whether <code>$lookup</code> has an index on its foreign field, and how big a group can grow.</li>
+      </ol>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Drill</th><th>What it tests</th><th>SQL version</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="db" data-slide="Top N per group with $topN">Top N per group</a></td><td><code>$topN</code>, <code>$denseRank</code></td><td><a data-deck="db" data-slide="Top N per group">Top N per group</a></td></tr>
+          <tr><td><a data-deck="db" data-slide="Orders with customers, and customers without orders">Orders with customers</a></td><td><code>$lookup</code>, the anti-join</td><td><a data-deck="db" data-slide="Customers with no orders">No orders</a></td></tr>
+          <tr><td><a data-deck="db" data-slide="Revenue per product from embedded lines">Revenue per product</a></td><td><code>$unwind</code>, Decimal128 sums</td><td><a data-deck="db" data-slide="Grouping and aggregation">Grouping</a></td></tr>
+          <tr><td><a data-deck="db" data-slide="Time-bucket rollups for metrics">Time-bucket rollups</a></td><td><code>$dateTrunc</code>, <code>$densify</code></td><td><a data-deck="db" data-slide="LAG, LEAD, gaps and islands">Gaps and islands</a></td></tr>
+          <tr><td><a data-deck="db" data-slide="Find duplicate documents">Duplicates</a></td><td>Normalised keys, unique indexes with collation</td><td><a data-deck="db" data-slide="Find and delete duplicate rows">Duplicates</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The silent mistakes</span><code>$unwind</code> drops documents whose array is empty or missing. <code>{ field: null }</code> also matches documents without the field. <code>$sum</code> of a missing field is 0, not null. A date stored as a string never equals an <code>ISODate</code>. Each one returns a plausible wrong answer with no error.</div>
+    <div class="note warn"><span class="lbl">SQL habits that hurt</span>A pipeline that starts with three <code>$lookup</code>s is a relational schema stored in documents. Say so, and say which data you would embed so the query becomes a <code>$match</code> and a <code>$group</code>. The modelling side is on <a data-deck="db" data-slide="Embed or reference">Embed or reference</a>.</div>
+    <div class="note tip"><span class="lbl">Practise like this</span>Cover the pipeline, write your own from the question alone, and run it in mongosh against the running example: every expected output is on the slide. Then answer the follow-ups out loud, including "what index would you add?"</div>
+  </div>
+</section>

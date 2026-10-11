@@ -1,0 +1,72 @@
+<section class="slide" data-sec="SQL drills" data-title="Running totals and month-over-month growth">
+  <h2>Drill: "monthly revenue with growth against the previous month and a year-to-date total", in one query</h2>
+  <p class="dek">Aggregate to one row per month in a CTE, then let window functions look across months. <code>LAG(revenue)</code> is the previous month's value. Growth is <code>(this − previous) / previous</code>, NULL for the first month. A running total is <code>SUM</code> over an explicit <code>ROWS UNBOUNDED PRECEDING</code> frame. Engines differ only in how they truncate to a month: <code>TRUNC(…, 'MM')</code> on Oracle, <code>DATETRUNC(MONTH, …)</code> on SQL Server 2022 and later.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">growth.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- monthly revenue, month-over-month growth, and the running total for the year
+WITH monthly AS (
+  SELECT TRUNC(placed_at, 'MM') AS month_start, SUM(total) AS revenue
+  FROM   orders
+  WHERE  status IN ('PAID', 'SHIPPED')
+  GROUP  BY TRUNC(placed_at, 'MM')
+)
+SELECT TO_CHAR(month_start, 'YYYY-MM')                                       AS month,
+       revenue,
+       LAG(revenue) OVER (ORDER BY month_start)                               AS prev_month,
+       ROUND(100 * (revenue - LAG(revenue) OVER (ORDER BY month_start))
+                 / LAG(revenue) OVER (ORDER BY month_start), 1)               AS growth_pct,
+       SUM(revenue) OVER (ORDER BY month_start ROWS UNBOUNDED PRECEDING)     AS running_total
+FROM   monthly
+ORDER  BY month_start;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · growth.ora.sql</div>
+<pre><code class="language-plaintext">MONTH   REVENUE PREV_MONTH GROWTH_PCT RUNNING_TOTAL
+------- ------- ---------- ---------- -------------
+2026-01 2353.40     (null)     (null)       2353.40
+2026-02 3573.30    2353.40       51.8       5926.70
+2026-03 2264.00    3573.30      -36.6       8190.70
+
+3 rows selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">growth.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- monthly revenue, month-over-month growth, and the running total for the year
+WITH monthly AS (
+  SELECT DATETRUNC(MONTH, placed_at) AS month_start, SUM(total) AS revenue
+  FROM   orders
+  WHERE  status IN ('PAID', 'SHIPPED')
+  GROUP  BY DATETRUNC(MONTH, placed_at)
+)
+SELECT FORMAT(month_start, 'yyyy-MM')                                        AS month,
+       revenue,
+       LAG(revenue) OVER (ORDER BY month_start)                               AS prev_month,
+       CAST(100 * (revenue - LAG(revenue) OVER (ORDER BY month_start))
+                / LAG(revenue) OVER (ORDER BY month_start) AS DECIMAL(6,1))   AS growth_pct,
+       SUM(revenue) OVER (ORDER BY month_start ROWS UNBOUNDED PRECEDING)     AS running_total
+FROM   monthly
+ORDER  BY month_start;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · growth.mss.sql</div>
+<pre><code class="language-plaintext">month   revenue prev_month growth_pct running_total
+------- ------- ---------- ---------- -------------
+2026-01 2353.40       NULL       NULL       2353.40
+2026-02 3573.30    2353.40       51.8       5926.70
+2026-03 2264.00    3573.30      -36.6       8190.70
+
+(3 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>One scan of the orders to aggregate, then a sort of a few month rows for the windows. On a large table, an index on <code>(status, placed_at)</code> that includes <code>total</code> feeds the aggregation without touching the table.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"A month with no orders?" It is missing here; generate a calendar and left-join, as on <a data-deck="db" data-slide="Dates and times in queries">Dates and times</a>, or <code>LAG</code> compares with the wrong month. "Previous month was zero?" Wrap the divisor in <code>NULLIF(…, 0)</code>. "Per category?" Add <code>PARTITION BY category</code> to every window.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Aggregate first, then window: <code>LAG</code> for the previous period, <code>SUM … ROWS UNBOUNDED PRECEDING</code> for the running total, and a calendar so missing periods are zero rather than skipped. I guard the division with <code>NULLIF</code>."</div>
+  </div>
+</section>

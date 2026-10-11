@@ -1,0 +1,149 @@
+<section class="slide" data-sec="Advanced SQL" data-title="JSON inside Oracle and SQL Server">
+  <h2>A JSON column lets a relational table hold a document, and SQL can still filter, explode, index and produce JSON</h2>
+  <p class="dek">Not every attribute deserves a column. Event payloads, provider responses and per-product specifications vary in shape, and are mostly stored and returned whole. Both engines now have a native JSON type: Oracle <span class="tag a">21c</span> and SQL Server <span class="tag a">2025</span>, which replaces JSON kept in <code>NVARCHAR</code>. The database validates each value on insert and stores it in a binary form. SQL reaches inside with path expressions: <code>JSON_VALUE</code> for a scalar, <code>JSON_TABLE</code> (Oracle) or <code>OPENJSON</code> (SQL Server) to turn an array into rows, and an index on an extracted value. The same engines also build JSON from rows, which is often exactly what an API returns.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">json.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  a native JSON column: the database parses and validates every value
+CREATE TABLE order_events (event_id NUMBER PRIMARY KEY, payload JSON NOT NULL);
+INSERT INTO order_events VALUES (1, '{"type":"ORDER_PLACED","orderId":1001,"channel":"web",
+  "items":[{"sku":"LAP-14","qty":1},{"sku":"ACC-MSE","qty":1}]}');
+INSERT INTO order_events VALUES (2, '{"type":"ORDER_PLACED","orderId":1003,"channel":"app",
+  "items":[{"sku":"COF-GRD","qty":1},{"sku":"COF-BNS","qty":2}]}');
+INSERT INTO order_events VALUES (3, '{"type":"ORDER_PLACED", "orderId": 1004');
+
+-- 2  scalars with JSON_VALUE, arrays as rows with JSON_TABLE
+SELECT e.event_id,
+       JSON_VALUE(e.payload, '$.channel')                  AS channel,
+       jt.sku, jt.qty
+FROM   order_events e,
+       JSON_TABLE(e.payload, '$.items[*]'
+                  COLUMNS (sku VARCHAR2(20) PATH '$.sku', qty NUMBER PATH '$.qty')) jt
+WHERE  JSON_EXISTS(e.payload, '$.items[*]?(@.qty &gt;= 2)')
+ORDER  BY e.event_id, jt.sku;
+
+-- 3  index one field so lookups by it do not parse every document
+CREATE INDEX order_events_order_ix ON order_events (JSON_VALUE(payload, '$.orderId' RETURNING NUMBER ERROR ON ERROR));
+
+-- 4  and the other direction: rows to JSON, as an API would return them
+SELECT JSON_OBJECT('orderId' VALUE o.order_id,
+                   'lines'   VALUE JSON_ARRAYAGG(JSON_OBJECT('sku' VALUE p.sku, 'qty' VALUE i.qty) ORDER BY i.line_no)) AS order_json
+FROM   orders o
+JOIN   order_items i ON i.order_id = o.order_id
+JOIN   products p    ON p.product_id = i.product_id
+WHERE  o.order_id = 1001
+GROUP  BY o.order_id;
+
+DROP TABLE order_events PURGE;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · json.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+1 row created.
+
+1 row created.
+
+INSERT INTO order_events VALUES (3, '{"type":"ORDER_PLACED", "orderId": 1004')
+            *
+ERROR at line 1:
+ORA-40441: JSON syntax error
+JZN-00084: unclosed object (line 1, position 40)
+Help: https://docs.oracle.com/error-help/db/ora-40441/
+
+EVENT_ID CHANNEL SKU     QTY
+-------- ------- ------- ---
+       2 app     COF-BNS   2
+       2 app     COF-GRD   1
+
+2 rows selected.
+
+Index created.
+
+ORDER_JSON
+-----------------------------------------------------------------------------
+{"orderId":1001,"lines":[{"sku":"LAP-14","qty":1},{"sku":"ACC-MSE","qty":1}]}
+
+1 row selected.
+
+Table dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">json.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  the native json type (2025): values are parsed and validated on the way in
+--    (a JSON parse error aborts the rest of its batch, hence the GO)
+CREATE TABLE order_events (event_id INT PRIMARY KEY, payload JSON NOT NULL);
+INSERT INTO order_events VALUES (1, '{"type":"ORDER_PLACED","orderId":1001,"channel":"web",
+  "items":[{"sku":"LAP-14","qty":1},{"sku":"ACC-MSE","qty":1}]}');
+INSERT INTO order_events VALUES (2, '{"type":"ORDER_PLACED","orderId":1003,"channel":"app",
+  "items":[{"sku":"COF-GRD","qty":1},{"sku":"COF-BNS","qty":2}]}');
+INSERT INTO order_events VALUES (3, '{"type":"ORDER_PLACED", "orderId": 1004');
+GO
+
+-- 2  scalars with JSON_VALUE, arrays as rows with OPENJSON
+SELECT e.event_id,
+       JSON_VALUE(e.payload, '$.channel') AS channel,
+       j.sku, j.qty
+FROM   order_events e
+CROSS  APPLY OPENJSON(e.payload, '$.items') WITH (sku VARCHAR(20) '$.sku', qty INT '$.qty') j
+WHERE  EXISTS (SELECT 1 FROM OPENJSON(e.payload, '$.items') WITH (qty INT '$.qty') x WHERE x.qty &gt;= 2)
+ORDER  BY e.event_id, j.sku;
+
+-- 3  index one field through a computed column
+ALTER TABLE order_events ADD order_id AS CAST(JSON_VALUE(payload, '$.orderId') AS INT);
+CREATE INDEX order_events_order_ix ON order_events (order_id);
+
+-- 4  and the other direction: rows to JSON, as an API would return them
+SELECT o.order_id AS orderId,
+       (SELECT p.sku, i.qty FROM order_items i JOIN products p ON p.product_id = i.product_id
+        WHERE i.order_id = o.order_id ORDER BY i.line_no FOR JSON PATH) AS lines
+FROM   orders o
+WHERE  o.order_id = 1001
+FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER;
+
+DROP TABLE order_events;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · json.mss.sql</div>
+<pre><code class="language-plaintext">(1 rows affected)
+
+(1 rows affected)
+Msg 13609, Level 16, State 9, Server mssql, Line 8
+JSON text is not properly formatted. Unexpected character '.' is found at position 39.
+event_id channel sku     qty
+-------- ------- ------- ---
+       2 app     COF-BNS   2
+       2 app     COF-GRD   1
+
+(2 rows affected)
+JSON_F52E2B61-18A1-11d1-B105-00805F49916B
+-----------------------------------------------------------------------------
+{"orderId":1001,"lines":[{"sku":"LAP-14","qty":1},{"sku":"ACC-MSE","qty":1}]}
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Task</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>Store</td><td><code>JSON</code> column</td><td><code>JSON</code> column <span class="tag a">2025</span>; <code>NVARCHAR(MAX)</code> with <code>ISJSON</code> check before</td><td>Every document</td></tr>
+        <tr><td>Read one value</td><td><code>JSON_VALUE</code>, or dot notation <code>e.payload.channel</code></td><td><code>JSON_VALUE</code></td><td>A field path</td></tr>
+        <tr><td>Array to rows</td><td><code>JSON_TABLE</code></td><td><code>OPENJSON … WITH</code></td><td><code>$unwind</code></td></tr>
+        <tr><td>Index a field</td><td>Function-based index on <code>JSON_VALUE</code></td><td>Index a computed column</td><td>Any field, array elements included</td></tr>
+        <tr><td>Rows to JSON</td><td><code>JSON_OBJECT</code>, <code>JSON_ARRAYAGG</code></td><td><code>FOR JSON PATH</code></td><td>The document is already JSON-shaped</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">JSON is not a schema escape hatch</span>Fields inside JSON have no types, no <code>NOT NULL</code> and no foreign keys unless you add check constraints. If a field is filtered, joined or updated on its own, it wants to be a real column. Use JSON for payloads that are written once and read whole.</div>
+    <div class="note warn"><span class="lbl">Errors stop more than the row</span>The truncated document was rejected by both engines: ORA-40441 with the position, and SQL Server error 13609. In SQL Server that error aborted the rest of its batch, which is why the script needs a <code>GO</code> after it. Parse JSON in the application if bad input is expected.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For a mostly relational model with a few flexible attributes, I add a JSON column to the relational table and index the paths I query. When the whole aggregate is document-shaped and read as a unit, a document database fits better." See <a data-deck="db" data-slide="Embed or reference">Embed or reference</a>.</div>
+  </div>
+</section>

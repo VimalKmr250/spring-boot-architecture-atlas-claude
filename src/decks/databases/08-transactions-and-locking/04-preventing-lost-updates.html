@@ -1,0 +1,172 @@
+<section class="slide" data-sec="Transactions and locking" data-title="Preventing lost updates in SQL">
+  <h2>Two withdrawals of 100 from a 500 wallet should leave 300; read-modify-write leaves 400 on both engines</h2>
+  <p class="dek">READ COMMITTED, the default in Oracle and SQL Server, does not stop a <b>lost update</b>. Two sessions read the same balance, each subtracts in application code, and the second write replaces the first. Neither engine raises an error, because each statement on its own was valid. There are three fixes. Do the arithmetic inside one <code>UPDATE</code>. Or write only if a version column still holds the value you read (optimistic). Or lock the row as you read it (pessimistic). The program below runs all four versions against both engines, with two JDBC connections taking turns in a fixed order.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LostUpdate.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+/** Two sessions each withdraw 100 from a wallet holding 500, four ways, on Oracle and on SQL Server. */
+public class LostUpdate {
+    record Db(String name, String url, String user, String password, String lockingRead, String blockedSessions) {}
+
+    static final List&lt;Db&gt; DBS = List.of(
+        new Db("Oracle 26ai", "jdbc:oracle:thin:@//localhost:1521/FREEPDB1", "shop", "Atlas_pw1",
+               "SELECT balance, version FROM accounts WHERE account_id = 1 FOR UPDATE NOWAIT",
+               "SELECT COUNT(*) FROM v$session WHERE username = 'SHOP' AND blocking_session IS NOT NULL"),
+        new Db("SQL Server 2025", "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false", "sa", "Atlas_pw1!",
+               "SELECT balance, version FROM accounts WITH (UPDLOCK, ROWLOCK, NOWAIT) WHERE account_id = 1",
+               "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id &lt;&gt; 0"));
+
+    static final String READ = "SELECT balance, version FROM accounts WHERE account_id = 1";
+    static final String WRITE = "UPDATE accounts SET balance = ? WHERE account_id = 1";
+
+    public static void main(String[] args) throws Exception {
+        for (Db db : DBS) {
+            System.out.println("== " + db.name());
+            try (Connection a = open(db); Connection b = open(db); Connection monitor = open(db)) {
+                readModifyWrite(a, b);
+                atomicUpdate(a, b, monitor, db);
+                optimistic(a, b);
+                pessimistic(a, b, db);
+            }
+        }
+    }
+
+    // 1  read, subtract in Java, write back: B's write silently replaces A's
+    static void readModifyWrite(Connection a, Connection b) throws SQLException {
+        reset(a);
+        long seenByA = read(a, READ)[0];
+        long seenByB = read(b, READ)[0];
+        update(a, WRITE, seenByA - 100); a.commit();
+        update(b, WRITE, seenByB - 100); b.commit();
+        System.out.printf("1 read-modify-write  A read %d, B read %d, final %d   &lt;- one withdrawal lost%n", seenByA, seenByB, balance(a));
+    }
+
+    // 2  let the database do the arithmetic: B waits for A's row lock, then works on A's result
+    static void atomicUpdate(Connection a, Connection b, Connection monitor, Db db) throws Exception {
+        reset(a);
+        String withdraw = "UPDATE accounts SET balance = balance - 100 WHERE account_id = 1 AND balance &gt;= 100";
+        int rowsA = update(a, withdraw);                              // A holds the row lock, not yet committed
+        try (var threads = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future&lt;Integer&gt; rowsB = threads.submit(() -&gt; update(b, withdraw));
+            waitUntilBlocked(monitor, db);
+            System.out.printf("2 atomic UPDATE      A updated %d row; B is blocked on A's row lock%n", rowsA);
+            a.commit();                                               // B wakes up and re-reads the row
+            System.out.printf("                     A committed; B updated %d row", rowsB.get());
+            b.commit();
+            System.out.printf(", final %d%n", balance(a));
+        }
+    }
+
+    // 3  optimistic: the write only succeeds if the version is still the one that was read
+    static void optimistic(Connection a, Connection b) throws SQLException {
+        reset(a);
+        String cas = "UPDATE accounts SET balance = ?, version = version + 1 WHERE account_id = 1 AND version = ?";
+        long[] seenByA = read(a, READ), seenByB = read(b, READ);
+        int rowsA = update(a, cas, seenByA[0] - 100, seenByA[1]); a.commit();
+        int rowsB = update(b, cas, seenByB[0] - 100, seenByB[1]); b.rollback();
+        System.out.printf("3 optimistic         A updated %d row, B updated %d rows (version %d is gone)", rowsA, rowsB, seenByB[1]);
+        seenByB = read(b, READ);                                      // retry: re-read, recompute, write
+        update(b, cas, seenByB[0] - 100, seenByB[1]); b.commit();
+        System.out.printf("; B retried, final %d%n", balance(a));
+    }
+
+    // 4  pessimistic: lock the row while reading it; a second locking read with NOWAIT fails at once
+    static void pessimistic(Connection a, Connection b, Db db) throws SQLException {
+        reset(a);
+        long seenByA = read(a, db.lockingRead())[0];                  // A holds the row lock from here
+        try {
+            read(b, db.lockingRead());
+        } catch (SQLException e) {
+            System.out.printf("4 pessimistic        B's locking read failed: %s%n", e.getMessage().lines().findFirst().orElse(""));
+            b.rollback();
+        }
+        update(a, WRITE, seenByA - 100); a.commit();
+        long seenByB = read(b, db.lockingRead())[0];                  // B tries again after A commits
+        update(b, WRITE, seenByB - 100); b.commit();
+        System.out.printf("                     B retried after A committed and read %d, final %d%n", seenByB, balance(a));
+    }
+
+    static Connection open(Db db) throws SQLException {
+        Connection c = DriverManager.getConnection(db.url(), db.user(), db.password());
+        c.setAutoCommit(false);                                       // both drivers start in autocommit mode
+        return c;                                                     // READ COMMITTED: the default in both engines
+    }
+
+    static void reset(Connection c) throws SQLException {
+        update(c, "UPDATE accounts SET balance = 500, version = 0 WHERE account_id = 1");
+        c.commit();
+    }
+
+    static long[] read(Connection c, String sql) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            rs.next();
+            return new long[] { rs.getLong(1), rs.getLong(2) };
+        }
+    }
+
+    static int update(Connection c, String sql, Object... params) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);
+            return ps.executeUpdate();
+        }
+    }
+
+    static long balance(Connection c) throws SQLException {
+        long balance = read(c, READ)[0];
+        c.commit();
+        return balance;
+    }
+
+    static void waitUntilBlocked(Connection monitor, Db db) throws Exception {
+        for (int i = 0; i &lt; 200; i++) {
+            try (PreparedStatement ps = monitor.prepareStatement(db.blockedSessions()); ResultSet rs = ps.executeQuery()) {
+                if (rs.next() &amp;&amp; rs.getInt(1) &gt; 0) return;
+            }
+            Thread.sleep(25);
+        }
+        throw new IllegalStateException("B never blocked");
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on JDK 25 · LostUpdate.java · Oracle's lock ids vary by run</div>
+<pre><code class="language-plaintext">== Oracle 26ai
+1 read-modify-write  A read 500, B read 500, final 400   &lt;- one withdrawal lost
+2 atomic UPDATE      A updated 1 row; B is blocked on A's row lock
+                     A committed; B updated 1 row, final 300
+3 optimistic         A updated 1 row, B updated 0 rows (version 0 is gone); B retried, final 300
+4 pessimistic        B's locking read failed: ORA-00054: Failed to acquire a lock (Type: "TX", Name: "Transaction", Description: "Lock held by a transaction to allow other transactions to wait for it") because it is currently held by another session. The resource being locked can be identified by 262173 ("usn&lt;&lt;16 | slot") and 785 ("sequence")
+                     B retried after A committed and read 400, final 300
+== SQL Server 2025
+1 read-modify-write  A read 500, B read 500, final 400   &lt;- one withdrawal lost
+2 atomic UPDATE      A updated 1 row; B is blocked on A's row lock
+                     A committed; B updated 1 row, final 300
+3 optimistic         A updated 1 row, B updated 0 rows (version 0 is gone); B retried, final 300
+4 pessimistic        B's locking read failed: Lock request time out period exceeded.
+                     B retried after A committed and read 400, final 300</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Fix</th><th>How it works</th><th>Use it when</th></tr></thead>
+      <tbody>
+        <tr><td>Atomic <code>UPDATE</code></td><td><code>SET balance = balance - 100 WHERE … AND balance &gt;= 100</code>. The row lock serialises writers, and B re-reads the committed row once A commits.</td><td>The new value can be computed in SQL. Check the row count: 0 means insufficient funds.</td></tr>
+        <tr><td>Optimistic</td><td><code>WHERE version = ?</code> and <code>version = version + 1</code>. 0 rows updated means someone else got there first: re-read and retry.</td><td>Conflicts are rare and the logic lives in the application. This is what JPA's <code>@Version</code> generates.</td></tr>
+        <tr><td>Pessimistic</td><td><code>FOR UPDATE</code> (Oracle) or <code>WITH (UPDLOCK, ROWLOCK)</code> (SQL Server). Others wait, or fail at once with <code>NOWAIT</code>.</td><td>Conflicts are frequent and a retry is expensive. Keep the transaction short and never wait for a user while holding the lock.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Why no error appeared</span>In step 1 A commits before B writes, so B's <code>UPDATE</code> never waits for a lock. It sets the balance to the 400 it computed from a stale read. Raising the isolation level only helps in some engines: Oracle's SERIALIZABLE would reject B with ORA-08177, while SQL Server's REPEATABLE READ would make A and B deadlock instead.</div>
+    <div class="note warn"><span class="lbl">The same lock, two dialects</span>Oracle's <code>NOWAIT</code> gave ORA-00054. In 26ai the message describes the lock; older releases print "resource busy and acquire with NOWAIT specified or timeout expired". SQL Server's <code>NOWAIT</code> hint gave error 1222, the same error <code>SET LOCK_TIMEOUT</code> raises. Use <code>WAIT n</code> or a lock timeout to wait a bounded time instead of failing at once.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Read-modify-write under READ COMMITTED loses updates. I push the arithmetic into a single conditional <code>UPDATE</code> when I can, use a version column when the logic must stay in Java, and lock with <code>SELECT … FOR UPDATE</code> only for short, hot transactions." The Spring side is on <a data-deck="deck" data-slide="Concurrency and idempotency">Concurrency and idempotency</a>.</div>
+  </div>
+</section>

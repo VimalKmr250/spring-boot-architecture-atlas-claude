@@ -1,0 +1,38 @@
+<section class="slide" data-sec="SQL drills" data-title="How to answer a SQL coding question">
+  <h2>A SQL coding question is graded on the edge cases you ask about, not only on the query you write</h2>
+  <p class="dek">Interviewers reuse a small set of SQL problems: the Nth highest value, duplicates, top N per group, rows with no match, running totals, consecutive runs, hierarchies and pivots. Each has a standard answer, and each has edge cases the interviewer is waiting for: ties, NULLs, empty groups, dates at boundaries. The drills that follow solve each problem on the running example, run on both Oracle and SQL Server, with the follow-up questions that usually come next.</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Five steps, out loud</h3>
+      <ol class="tight" style="margin-top:10px">
+        <li><b>Restate and clarify.</b> "Highest salary: distinct values, or people? If two people tie, are they both second? What if there is no third?"</li>
+        <li><b>Name the shape.</b> "This is top N per group, so a ranking window partitioned by department."</li>
+        <li><b>Write it in steps.</b> A CTE per step: filter, aggregate, rank, then select. Easier to read and to fix while talking.</li>
+        <li><b>Check with data.</b> Run it in your head on a tie, a NULL and an empty group. Say what each returns.</li>
+        <li><b>Discuss cost.</b> Which index supports it, how it scales, and the engine-specific alternative such as <code>QUALIFY</code>, <code>CROSS APPLY</code> or <code>PIVOT</code>.</li>
+      </ol>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Drill</th><th>What it tests</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="db" data-slide="Nth highest salary, three ways">Nth highest salary</a></td><td>Ties, DENSE_RANK, no Nth value</td></tr>
+          <tr><td><a data-deck="db" data-slide="Find and delete duplicate rows">Duplicates</a></td><td>Grouping on a normalised key, deleting all but one</td></tr>
+          <tr><td><a data-deck="db" data-slide="Top N per group">Top N per group</a></td><td>Window partitions, CROSS APPLY</td></tr>
+          <tr><td><a data-deck="db" data-slide="Customers with no orders">No orders</a></td><td>Anti-joins and the NOT IN trap</td></tr>
+          <tr><td><a data-deck="db" data-slide="Running totals and month-over-month growth">Running totals and growth</a></td><td>LAG, frames, division by zero</td></tr>
+          <tr><td><a data-deck="db" data-slide="Payment failure streaks: gaps and islands">Streaks</a></td><td>Gaps and islands</td></tr>
+          <tr><td><a data-deck="db" data-slide="Employees, managers and the org chart">Org chart</a></td><td>Self-join, recursive CTE</td></tr>
+          <tr><td><a data-deck="db" data-slide="Pivot monthly revenue by category">Pivot</a></td><td>Conditional aggregation, PIVOT</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The silent mistakes</span><code>NOT IN</code> over a nullable column, <code>COUNT(*)</code> after a LEFT JOIN, <code>BETWEEN</code> on timestamps, <code>ROW_NUMBER</code> where ties matter, integer division in SQL Server. Each returns a plausible wrong answer with no error, which is why interviewers ask about them.</div>
+    <div class="note warn"><span class="lbl">Dialect on a whiteboard</span>Write standard SQL (<code>OFFSET … FETCH</code>, <code>CASE</code>, window functions) and mention the dialect form: "on SQL Server I'd use <code>TOP</code>, on old Oracle <code>ROWNUM</code> in a subquery". Interviewers care that you know the difference, not that you remember every function name.</div>
+    <div class="note tip"><span class="lbl">Practise like this</span>Cover each drill's query, write your own from the question alone, then compare. Run it against the running example: every expected output is on the slide. Then answer the follow-ups out loud.</div>
+  </div>
+</section>
