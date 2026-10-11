@@ -1,0 +1,68 @@
+<section class="slide" data-sec="MongoDB basics" data-title="$lookup, $unwind, $facet and $merge">
+  <h2>MongoDB can join, flatten, fan out and materialise inside one pipeline; whether it should is a modelling question</h2>
+  <p class="dek"><code>$lookup</code> is a left outer join: for each input document it finds matching documents in another collection and adds them as an array. <code>$unwind</code> turns an array into one document per element, the shape SQL would return. <code>$facet</code> runs several sub-pipelines over the same input, which suits a dashboard that needs counts, a top list and a total from one query. <code>$merge</code> writes the result into a collection, inserting or replacing by key: a materialised view that you refresh by running the pipeline again.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">lookup-facet.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  $lookup joins another collection; $unwind turns the array into one document per element
+show(db.orders.aggregate([
+  { $match: { _id: { $in: [1003, 1005] } } },
+  { $lookup: { from: 'payments', localField: '_id', foreignField: 'orderId', as: 'attempts' } },
+  { $unwind: '$attempts' },
+  { $project: { _id: 1, status: 1, attempt: '$attempts.idempotencyKey', result: '$attempts.status' } }
+]));
+
+// 2  $facet runs several pipelines over the same input, for a dashboard in one round trip
+show(db.orders.aggregate([
+  { $facet: {
+      byStatus:     [{ $group: { _id: '$status', n: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+      topCustomers: [{ $group: { _id: '$customer.name', spent: { $sum: '$total' } } },
+                     { $sort: { spent: -1 } }, { $limit: 2 }],
+      totalOrders:  [{ $count: 'n' }]
+  } }
+]));
+
+// 3  $merge writes the result into a collection: a materialised view, refreshed by re-running it
+db.orders.aggregate([
+  { $unwind: '$items' },
+  { $group: { _id: '$items.productId', units: { $sum: '$items.qty' } } },
+  { $merge: { into: 'product_sales', whenMatched: 'replace', whenNotMatched: 'insert' } }
+]);
+show(db.product_sales.find().sort({ units: -1 }).limit(3));
+db.product_sales.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · lookup-facet.js</div>
+<pre><code class="language-plaintext">{ _id: 1003, status: 'SHIPPED', attempt: 'pay-1003-1', result: 'FAILED' }
+{ _id: 1003, status: 'SHIPPED', attempt: 'pay-1003-2', result: 'CAPTURED' }
+{ _id: 1005, status: 'CANCELLED', attempt: 'pay-1005-1', result: 'FAILED' }
+{ _id: 1005, status: 'CANCELLED', attempt: 'pay-1005-2', result: 'FAILED' }
+{ _id: 1005, status: 'CANCELLED', attempt: 'pay-1005-3', result: 'FAILED' }
+{ byStatus: [ { _id: 'CANCELLED', n: 2 }, { _id: 'PAID', n: 5 }, { _id: 'PENDING', n: 2 }, { _id: 'REFUNDED', n: 1 }, { _id: 'SHIPPED', n: 8 } ], topCustomers: [ { _id: 'Chen Wei', spent: Decimal128('3263.90') }, { _id: 'Asha Rao', spent: Decimal128('2274.90') } ], totalOrders: [ { n: 18 } ] }
+{ _id: 110, units: 8 }
+{ _id: 103, units: 4 }
+{ _id: 101, units: 3 }</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Stage</th><th>SQL analogue</th></tr></thead>
+          <tbody>
+            <tr><td><code>$lookup</code></td><td><code>LEFT JOIN</code>, results nested as an array</td></tr>
+            <tr><td><code>$unwind</code></td><td>One row per child; drops parents with an empty array unless <code>preserveNullAndEmptyArrays</code></td></tr>
+            <tr><td><code>$facet</code></td><td>Several <code>GROUP BY</code> queries in one statement</td></tr>
+            <tr><td><code>$merge</code> / <code>$out</code></td><td><code>MERGE INTO</code> a summary table / <code>CREATE TABLE AS</code></td></tr>
+            <tr><td><code>$graphLookup</code></td><td>A recursive CTE: see <a data-deck="db" data-slide="CTEs and recursive queries">CTEs</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">$lookup on the hot path</span>A <code>$lookup</code> runs a query against the other collection for each input document, so it needs an index on <code>foreignField</code>; here that is <code>payments.orderId</code>. It is fine for reports and admin screens. If every order page needs the payments, embed a summary of them in the order instead.</div>
+    <div class="note warn"><span class="lbl">$unwind multiplies</span>Order 1005 became three documents, one per payment attempt: the fan-out of a SQL join. A <code>$group</code> after <code>$unwind</code> that sums an order-level field would count it three times, the same trap as <a data-deck="db" data-slide="Joins, and the outer-join filter trap">fan-out in SQL</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$lookup</code> gives MongoDB joins, but a design that needs them on every read is a relational design in the wrong database. I embed what is read together and use <code>$lookup</code> for occasional queries, with an index on the joined field."</div>
+  </div>
+</section>

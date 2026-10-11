@@ -1,0 +1,178 @@
+<section class="slide" data-sec="Advanced SQL" data-title="MERGE and upserts under concurrency">
+  <h2>MERGE reads as one atomic upsert, but under concurrency two sessions can both decide to insert the same new key</h2>
+  <p class="dek"><code>MERGE</code> joins a source to a target and, per row, updates when matched and inserts when not. It is the standard upsert, and both engines have it. The match and the insert are not one indivisible step. If two sessions merge the same new key at once, both may see "not matched", and the second insert fails on the primary key. The program below shows this twice. First with two sessions taking turns: A inserts key 7 through <code>MERGE</code> without committing, B runs the same <code>MERGE</code>, then A commits. Then under load: 8 threads each upsert keys 1 to 400 in the same order, so every new key is contested.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">MergeRace.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/** Is MERGE a safe upsert when many sessions upsert the same new keys at once? */
+public class MergeRace {
+    record Db(String name, String url, String user, String password, String merge, String safeMerge, String blocked) {}
+
+    static final String ORACLE_MERGE = """
+        MERGE INTO page_views t
+        USING (SELECT ? AS product_id FROM dual) s ON (t.product_id = s.product_id)
+        WHEN MATCHED THEN UPDATE SET t.views = t.views + 1
+        WHEN NOT MATCHED THEN INSERT (product_id, views) VALUES (s.product_id, 1)""";
+    static final String MSSQL_MERGE = """
+        MERGE INTO page_views%s AS t
+        USING (SELECT ? AS product_id) AS s ON t.product_id = s.product_id
+        WHEN MATCHED THEN UPDATE SET t.views = t.views + 1
+        WHEN NOT MATCHED THEN INSERT (product_id, views) VALUES (s.product_id, 1);""";
+
+    static final List&lt;Db&gt; DBS = List.of(
+        new Db("Oracle 26ai", "jdbc:oracle:thin:@//localhost:1521/FREEPDB1", "shop", "Atlas_pw1",
+               ORACLE_MERGE, null,
+               "SELECT COUNT(*) FROM v$session WHERE username = 'SHOP' AND blocking_session IS NOT NULL"),
+        new Db("SQL Server 2025", "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false", "sa", "Atlas_pw1!",
+               MSSQL_MERGE.formatted(""), MSSQL_MERGE.formatted(" WITH (HOLDLOCK)"),
+               "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id &lt;&gt; 0"));
+
+    public static void main(String[] args) throws Exception {
+        for (Db db : DBS) {
+            System.out.println("== " + db.name());
+            twoSessions(db);
+            stress(db, "MERGE", db.merge(), false);
+            if (db.safeMerge() != null) stress(db, "MERGE WITH (HOLDLOCK)", db.safeMerge(), false);
+            else stress(db, "MERGE, retried once on a duplicate key", db.merge(), true);
+            try (Connection c = open(db, true); Statement s = c.createStatement()) { s.execute("DROP TABLE page_views"); }
+        }
+    }
+
+    // A inserts key 7 through MERGE and has not committed; B runs the same MERGE
+    static void twoSessions(Db db) throws Exception {
+        reset(db);
+        try (Connection a = open(db, false); Connection b = open(db, false); Connection monitor = open(db, true);
+             var threads = Executors.newVirtualThreadPerTaskExecutor()) {
+            upsert(a, db.merge(), 7);
+            Future&lt;String&gt; bResult = threads.submit(() -&gt; {
+                try { upsert(b, db.merge(), 7); b.commit(); return "B's MERGE updated the row"; }
+                catch (SQLException e) { b.rollback(); return "B's MERGE failed: " + firstLine(e); }
+            });
+            waitUntilBlocked(monitor, db);
+            a.commit();
+            System.out.println("  two sessions, key 7: B waited for A; " + bResult.get());
+        }
+    }
+
+    // 8 threads each upsert keys 1 to 400 in the same order, so every new key is inserted by 8 sessions at once
+    static void stress(Db db, String label, String sql, boolean retry) throws Exception {
+        reset(db);
+        AtomicInteger ok = new AtomicInteger();
+        Map&lt;String, AtomicInteger&gt; errors = new ConcurrentHashMap&lt;&gt;();
+        try (var threads = Executors.newFixedThreadPool(8)) {
+            for (int t = 0; t &lt; 8; t++) {
+                threads.submit(() -&gt; {
+                    try (Connection c = open(db, true)) {
+                        for (int i = 0; i &lt; 400; i++) {
+                            int key = i + 1;
+                            try {
+                                upsert(c, sql, key);
+                                ok.incrementAndGet();
+                            } catch (SQLException e) {
+                                errors.computeIfAbsent(code(e), k -&gt; new AtomicInteger()).incrementAndGet();
+                                if (retry &amp;&amp; e instanceof SQLIntegrityConstraintViolationException) {
+                                    upsert(c, sql, key);          // the row exists now: this time MERGE updates it
+                                    ok.incrementAndGet();
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                });
+            }
+        }
+        try (Connection c = open(db, true); Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT COUNT(*), SUM(views) FROM page_views")) {
+            rs.next();
+            System.out.printf("  %-40s %4d upserts succeeded, errors %s; table: %d rows, %d views%n",
+                    label, ok.get(), errors, rs.getInt(1), rs.getInt(2));
+        }
+    }
+
+    static void reset(Db db) throws SQLException {
+        try (Connection c = open(db, true); Statement s = c.createStatement()) {
+            try { s.execute("DROP TABLE page_views"); } catch (SQLException ignored) { }
+            s.execute("CREATE TABLE page_views (product_id INT CONSTRAINT page_views_pk PRIMARY KEY, views INT NOT NULL)");
+        }
+    }
+
+    static void upsert(Connection c, String sql, int key) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, key);
+            ps.executeUpdate();
+        }
+    }
+
+    static Connection open(Db db, boolean autoCommit) throws SQLException {
+        Connection c = DriverManager.getConnection(db.url(), db.user(), db.password());
+        c.setAutoCommit(autoCommit);
+        return c;
+    }
+
+    static String code(SQLException e) {
+        return e.getSQLState().startsWith("40") ? "deadlock " + e.getErrorCode() : "duplicate key " + e.getErrorCode();
+    }
+
+    static String firstLine(SQLException e) { return e.getMessage().lines().findFirst().orElse(""); }
+
+    static void waitUntilBlocked(Connection monitor, Db db) throws Exception {
+        for (int i = 0; i &lt; 200; i++) {
+            try (Statement s = monitor.createStatement(); ResultSet rs = s.executeQuery(db.blocked())) {
+                if (rs.next() &amp;&amp; rs.getInt(1) &gt; 0) return;
+            }
+            Thread.sleep(25);
+        }
+        throw new IllegalStateException("B never blocked");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · MergeRace.java · error counts vary by run</div>
+<pre><code class="language-plaintext">== Oracle 26ai
+  two sessions, key 7: B waited for A; B's MERGE failed: ORA-00001: unique constraint (SHOP.PAGE_VIEWS_PK) violated on table SHOP.PAGE_VIEWS columns (PRODUCT_ID)
+  MERGE                                    3178 upserts succeeded, errors {duplicate key 1=22}; table: 400 rows, 3178 views
+  MERGE, retried once on a duplicate key   3200 upserts succeeded, errors {duplicate key 1=9}; table: 400 rows, 3200 views
+== SQL Server 2025
+  two sessions, key 7: B waited for A; B's MERGE updated the row
+  MERGE                                    3200 upserts succeeded, errors {}; table: 400 rows, 3200 views
+  MERGE WITH (HOLDLOCK)                    3200 upserts succeeded, errors {}; table: 400 rows, 3200 views</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Four runs, the last shown above</th><th>Plain MERGE errors</th><th>Fixed</th></tr></thead>
+          <tbody>
+            <tr><td>Oracle 26ai</td><td class="num">27, 18, 6, 22</td><td>0 lost: every duplicate retried</td></tr>
+            <tr><td>SQL Server 2025</td><td class="num">1, 0, 1, 0</td><td class="num">0 with <code>HOLDLOCK</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Engine</th><th>Why the second insert happens</th><th>The fix</th></tr></thead>
+      <tbody>
+        <tr><td>Oracle</td><td>B's <code>ON</code> check reads a consistent snapshot, which cannot see A's uncommitted row. B decides to insert, waits on the unique index entry, and fails with ORA-00001 when A commits. The two-session run shows it every time.</td><td>Catch the duplicate-key error and run the <code>MERGE</code> again: the row now exists, so it updates. Or insert first and update on <code>DUP_VAL_ON_INDEX</code> in PL/SQL.</td></tr>
+        <tr><td>SQL Server</td><td>Under locking READ COMMITTED, B's check waits for A's lock and then sees the row, so the two-session run succeeded. When both checks happen before either insert, both insert: 2627 under load.</td><td><code>MERGE … WITH (HOLDLOCK)</code>, which is SERIALIZABLE for the statement: the key range stays locked from check to insert.</td></tr>
+        <tr><td>MongoDB</td><td><code>updateOne(filter, update, { upsert: true })</code> has the same race; with a unique index on the filter field, the loser gets E11000.</td><td>A unique index plus a retry. The server retries some of these duplicate-key upserts itself, but only when the filter is an equality on the unique key.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Check-then-insert in Java is worse</span><code>if (repo.findById(id).isEmpty()) repo.save(new Row(id))</code> has the same race with a much wider window: a network round trip between the check and the insert. Without a unique constraint it creates silent duplicates rather than errors.</div>
+    <div class="note warn"><span class="lbl">Deadlocks are possible too</span><code>HOLDLOCK</code> takes key-range locks. Two sessions that merge several keys in different orders can deadlock, and one is rolled back with error 1205. Upsert keys in a consistent order, and treat 1205 as retryable, as on <a data-deck="db" data-slide="Deadlocks in Oracle and SQL Server">Deadlocks</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"MERGE is not an atomic upsert by itself. The unique constraint is what guarantees one row; the code must handle the duplicate-key error by retrying as an update. On SQL Server I add <code>HOLDLOCK</code> to the <code>MERGE</code>."</div>
+  </div>
+</section>

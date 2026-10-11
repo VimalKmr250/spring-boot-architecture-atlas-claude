@@ -1,0 +1,253 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Why the optimiser ignores your index">
+  <h2>An index on a column cannot help a predicate on an expression of that column, and an implicit type conversion is an expression</h2>
+  <p class="dek">A predicate is <b>sargable</b> (search-argument-able) when the index can be searched for it directly: <code>column = value</code>, <code>column &gt;= value</code>, <code>column LIKE 'abc%'</code>. Wrap the column in a function, such as <code>TRUNC(placed_at)</code>, <code>YEAR(placed_at)</code> or <code>UPPER(email)</code>, and the index's sort order no longer applies. The most common version is invisible in the code: comparing columns of different types makes the engine convert one side. When it converts the column, every row is converted and checked. Both engines show it in the plan's predicate.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">sargable.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">SET SERVEROUTPUT OFF
+CREATE INDEX big_customers_phone_ix ON big_customers (phone);
+CREATE INDEX big_orders_placed_ix   ON big_orders (placed_at);
+
+-- 1  phone is VARCHAR2 but the literal is a number: Oracle converts the column, row by row
+SELECT /*+ gather_plan_statistics */ customer_id FROM big_customers WHERE phone = 9000004242;
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST PREDICATE'));
+
+-- 2  the same lookup with a string literal: an index range scan
+SELECT /*+ gather_plan_statistics */ customer_id FROM big_customers WHERE phone = '9000004242';
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST PREDICATE'));
+
+-- 3  a function on the indexed column hides it; a range on the bare column does not
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders FROM big_orders WHERE TRUNC(placed_at) = DATE '2025-03-01';
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST PREDICATE'));
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders FROM big_orders
+WHERE  placed_at &gt;= DATE '2025-03-01' AND placed_at &lt; DATE '2025-03-02';
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST PREDICATE'));
+
+DROP INDEX big_customers_phone_ix;
+DROP INDEX big_orders_placed_ix;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · sargable.ora.sql · A-Time and Reads vary by run</div>
+<pre><code class="language-plaintext">Index created.
+
+Index created.
+
+CUSTOMER_ID
+-----------
+       4242
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+---------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ customer_id FROM big_customers
+WHERE phone = 9000004242
+
+Plan hash value: 2964358972
+
+---------------------------------------------------------------------------------------------
+| Id  | Operation         | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers |
+---------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |               |      1 |        |      1 |00:00:00.01 |     156 |
+|*  1 |  TABLE ACCESS FULL| BIG_CUSTOMERS |      1 |      1 |      1 |00:00:00.01 |     156 |
+---------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   1 - filter(TO_NUMBER("PHONE")=9000004242)
+
+19 rows selected.
+
+CUSTOMER_ID
+-----------
+       4242
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+---------------------------------------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ customer_id FROM big_customers
+WHERE phone = '9000004242'
+
+Plan hash value: 306257058
+
+---------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                           | Name                   | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |
+---------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                    |                        |      1 |        |      1 |00:00:00.01 |       4 |      1 |
+|   1 |  TABLE ACCESS BY INDEX ROWID BATCHED| BIG_CUSTOMERS          |      1 |      1 |      1 |00:00:00.01 |       4 |      1 |
+|*  2 |   INDEX RANGE SCAN                  | BIG_CUSTOMERS_PHONE_IX |      1 |      1 |      1 |00:00:00.01 |       3 |      1 |
+---------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("PHONE"='9000004242')
+
+20 rows selected.
+
+ORDERS
+------
+  2336
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+-----------------------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders FROM big_orders
+WHERE TRUNC(placed_at) = DATE '2025-03-01'
+
+Plan hash value: 3026485571
+
+-----------------------------------------------------------------------------------------------------------------
+| Id  | Operation             | Name                 | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |
+-----------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT      |                      |      1 |        |      1 |00:00:00.10 |    1339 |   1330 |
+|   1 |  SORT AGGREGATE       |                      |      1 |      1 |      1 |00:00:00.10 |    1339 |   1330 |
+|*  2 |   INDEX FAST FULL SCAN| BIG_ORDERS_PLACED_IX |      1 |   5000 |   2336 |00:00:00.03 |    1339 |   1330 |
+-----------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter(TRUNC(INTERNAL_FUNCTION("PLACED_AT"))=TO_DATE(' 2025-03-01 00:00:00', 'syyyy-mm-dd
+              hh24:mi:ss'))
+
+21 rows selected.
+
+ORDERS
+------
+  2336
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+----------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ COUNT(*) AS orders FROM big_orders
+WHERE  placed_at &gt;= DATE '2025-03-01' AND placed_at &lt; DATE '2025-03-02'
+
+Plan hash value: 3674777323
+
+----------------------------------------------------------------------------------------------------
+| Id  | Operation         | Name                 | Starts | E-Rows | A-Rows |   A-Time   | Buffers |
+----------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |                      |      1 |        |      1 |00:00:00.01 |       9 |
+|   1 |  SORT AGGREGATE   |                      |      1 |      1 |      1 |00:00:00.01 |       9 |
+|*  2 |   INDEX RANGE SCAN| BIG_ORDERS_PLACED_IX |      1 |   2336 |   2336 |00:00:00.01 |       9 |
+----------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("PLACED_AT"&gt;=TIMESTAMP' 2025-03-01 00:00:00' AND "PLACED_AT"&lt;TIMESTAMP'
+              2025-03-02 00:00:00')
+
+21 rows selected.
+
+Index dropped.
+
+Index dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">sargable.mss.sql · SQL Server 2025, database collation SQL_Latin1_General_CP1_CI_AS</div>
+<pre><code class="language-sql">CREATE INDEX big_customers_email_ix ON big_customers (email);
+GO
+SET STATISTICS IO ON;
+-- 1  email is VARCHAR; an NVARCHAR parameter makes SQL Server convert the column on every row
+DECLARE @unicode NVARCHAR(255) = N'user4242@example.com';
+SELECT customer_id FROM big_customers WHERE email = @unicode;
+
+-- 2  the same lookup with a VARCHAR parameter: an index seek
+DECLARE @plain VARCHAR(255) = 'user4242@example.com';
+SELECT customer_id FROM big_customers WHERE email = @plain;
+SET STATISTICS IO OFF;
+GO
+SET SHOWPLAN_TEXT ON;
+GO
+DECLARE @unicode NVARCHAR(255) = N'user4242@example.com';
+SELECT customer_id FROM big_customers WHERE email = @unicode;
+GO
+SET SHOWPLAN_TEXT OFF;
+GO
+-- 3  a function on the column hides the index; the same day as a range does not
+CREATE INDEX big_orders_placed_ix ON big_orders (placed_at);
+GO
+SET STATISTICS IO ON;
+SELECT COUNT(*) AS orders FROM big_orders WHERE DATEADD(DAY, DATEDIFF(DAY, 0, placed_at), 0) = '2025-03-01';
+SELECT COUNT(*) AS orders FROM big_orders WHERE placed_at &gt;= '2025-03-01' AND placed_at &lt; '2025-03-02';
+SET STATISTICS IO OFF;
+DROP INDEX big_orders_placed_ix ON big_orders;
+DROP INDEX big_customers_email_ix ON big_customers;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · sargable.mss.sql</div>
+<pre><code class="language-plaintext">customer_id
+-----------
+       4242
+
+(1 rows affected)
+Table 'big_customers'. Scan count 1, logical reads 88, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+customer_id
+-----------
+       4242
+
+(1 rows affected)
+Table 'big_customers'. Scan count 1, logical reads 2, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+StmtText
+-------------------------------------------------------------
+DECLARE @unicode NVARCHAR(255) = N'user4242@example.com';
+SELECT customer_id FROM big_customers WHERE email = @unicode;
+
+(2 rows affected)
+StmtText
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|--Index Scan(OBJECT:([shop].[dbo].[big_customers].[big_customers_email_ix]),  WHERE:(CONVERT_IMPLICIT(nvarchar(255),[shop].[dbo].[big_customers].[email],0)=[@unicode]))
+
+(1 rows affected)
+orders
+------
+  2336
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 1012, physical reads 0, page server reads 0, read-ahead reads 7, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders
+------
+  2336
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 9, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Non-sargable</th><th>Measured</th><th>Rewrite</th><th>Or index the expression</th></tr></thead>
+      <tbody>
+        <tr><td>Oracle: <code>phone = 9000004242</code> on a <code>VARCHAR2</code></td><td>Full scan, 156 buffers: <code>filter(TO_NUMBER("PHONE")=…)</code></td><td>Compare with a string: 4 buffers</td><td>—</td></tr>
+        <tr><td>SQL Server: <code>VARCHAR</code> column, <code>NVARCHAR</code> parameter</td><td>Index scan, 88 pages: <code>CONVERT_IMPLICIT(nvarchar…, email)</code></td><td>Send <code>VARCHAR</code>: 2 pages</td><td>Make the column <code>NVARCHAR</code>, or fix the driver setting</td></tr>
+        <tr><td><code>TRUNC(placed_at) = day</code></td><td>Oracle: 1,339 buffers</td><td>Half-open range: 9 buffers</td><td>Function-based index on <code>TRUNC(placed_at)</code></td></tr>
+        <tr><td>Truncating to the day in SQL Server</td><td>1,012 pages</td><td>Half-open range: 9 pages</td><td>Index a computed column</td></tr>
+        <tr><td><code>LIKE '%son'</code></td><td>Cannot seek: the start of the string is unknown</td><td><code>LIKE 'son%'</code> when the business allows</td><td>Full-text search, or a reversed-string column</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The Java version of the trap</span>Microsoft's JDBC driver sends every <code>String</code> parameter as <code>NVARCHAR</code> by default. Against <code>VARCHAR</code> columns, with a SQL collation like this database's, each lookup by email becomes an index scan, exactly as in query 1. Set <code>sendStringParametersAsUnicode=false</code> when the columns are <code>VARCHAR</code>; see <a data-deck="db" data-slide="Dialect traps under JPA and JDBC">Dialect traps</a>.</div>
+    <div class="note warn"><span class="lbl">Precedence decides which side converts</span>Oracle converts the string column to a number, not the number to a string, because numbers rank higher. SQL Server converts <code>VARCHAR</code> to <code>NVARCHAR</code> for the same reason. Whenever the column's type ranks lower than the value's, the column is the side that gets converted, so the fix belongs to whoever sends the value: send it in the column's type.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"When an indexed query scans, I read the predicate section of the plan. A function or a conversion on the column means the index cannot be sought. I rewrite the predicate so the bare column is compared with a value of its own type, or index the expression."</div>
+  </div>
+</section>

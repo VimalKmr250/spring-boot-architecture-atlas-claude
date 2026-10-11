@@ -1,0 +1,33 @@
+<section class="slide" data-sec="SQL drills" data-title="Question shape to SQL">
+  <h2>Read the question for its shape, and the SQL construct follows</h2>
+  <p class="dek">Interview SQL questions are a few shapes with different table names. Recognise the shape from the wording and the first line of the answer is decided. The third column holds the edge case the interviewer is waiting for. This is the table to revise from the night before.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>If the question says</th><th>Reach for</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>"…the Nth highest / second largest"</td><td><code>DENSE_RANK() = N</code> in an outer query, or <code>DISTINCT … OFFSET N-1 FETCH 1</code></td><td>Ties; no Nth value should give NULL, not no row</td></tr>
+        <tr><td>"…the top N in each group"</td><td><code>ROW_NUMBER() OVER (PARTITION BY …)</code>, then <code>rn &lt;= N</code>; <code>CROSS APPLY</code> per outer row</td><td>A tie-breaker in the <code>ORDER BY</code>; ranking before filtering</td></tr>
+        <tr><td>"…that have no / never"</td><td><code>NOT EXISTS</code></td><td><code>NOT IN</code> over a nullable column returns nothing</td></tr>
+        <tr><td>"…all of their X are Y"</td><td><code>EXISTS</code> plus <code>NOT EXISTS</code> with the opposite condition, or <code>HAVING SUM(CASE …) = 0</code></td><td>Entities with no X at all pass a bare <code>NOT EXISTS</code></td></tr>
+        <tr><td>"…duplicates"</td><td><code>GROUP BY</code> the normalised key <code>HAVING COUNT(*) &gt; 1</code>; delete <code>ROW_NUMBER() &gt; 1</code></td><td>Case and spaces in the key; add a unique index afterwards</td></tr>
+        <tr><td>"…per X, including X with none"</td><td>Start from X, <code>LEFT JOIN</code>, <code>COUNT(child.id)</code></td><td><code>COUNT(*)</code> counts the NULL row as 1; filters in <code>WHERE</code> undo the outer join</td></tr>
+        <tr><td>"…running total / cumulative"</td><td><code>SUM(…) OVER (ORDER BY … ROWS UNBOUNDED PRECEDING)</code></td><td>The default <code>RANGE</code> frame on duplicate sort values</td></tr>
+        <tr><td>"…compared with the previous / growth"</td><td><code>LAG</code> after aggregating to one row per period</td><td>Missing periods; division by zero (<code>NULLIF</code>)</td></tr>
+        <tr><td>"…consecutive / in a row / streak"</td><td>Two <code>ROW_NUMBER</code>s and group by their difference</td><td>Non-deterministic order when timestamps tie</td></tr>
+        <tr><td>"…gaps / missing / silent for"</td><td><code>LEAD</code> the timestamp, keep differences above the interval; or a calendar and an anti-join</td><td>Partition by the entity, or hosts bleed into each other</td></tr>
+        <tr><td>"…manager / parent / hierarchy / all levels"</td><td>Self-join for one level; recursive CTE for any depth</td><td>Cycles; SQL Server's 100-level default; anchor and member types</td></tr>
+        <tr><td>"…one column per month / status"</td><td>Conditional aggregation; <code>PIVOT</code></td><td>Zero or NULL for empty cells; columns fixed at parse time</td></tr>
+        <tr><td>"…latest row per X"</td><td><code>ROW_NUMBER() … ORDER BY ts DESC</code> = 1; Oracle's <code>KEEP (DENSE_RANK LAST …)</code></td><td><code>MAX(ts)</code> joined back returns two rows on a tie</td></tr>
+        <tr><td>"…page through / next 20"</td><td>Keyset: <code>ts &lt; :ts OR (ts = :ts AND id &lt; :id)</code> with an index on <code>(ts, id)</code></td><td><code>OFFSET</code> reads and discards every skipped row. Oracle 26ai also accepts <code>(ts, id) &lt; (:ts, :id)</code>; SQL Server rejects it (error 4145)</td></tr>
+        <tr><td>"…insert or update"</td><td><code>MERGE</code>, or <code>UPDATE</code> then <code>INSERT</code>, under a unique constraint</td><td>Two sessions both see "not found"; catch the duplicate and retry</td></tr>
+        <tr><td>"…between two dates"</td><td>Half-open: <code>&gt;= start AND &lt; next_start</code></td><td><code>BETWEEN</code> on a timestamp loses the last day; functions on the column</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">Where each one is explained</span>The constructs come from <a data-deck="db" data-slide="ROW_NUMBER, RANK and DENSE_RANK">ranking</a>, <a data-deck="db" data-slide="Running totals and window frames">window frames</a>, <a data-deck="db" data-slide="EXISTS, IN, anti-joins and set operators">anti-joins</a>, <a data-deck="db" data-slide="MERGE and upserts under concurrency">upserts</a> and <a data-deck="db" data-slide="Pagination: OFFSET against keyset">keyset pagination</a>; the traps in the third column are on <a data-deck="db" data-slide="NULL and three-valued logic">NULL and three-valued logic</a> and <a data-deck="db" data-slide="Dates and times in queries">Dates and times in queries</a>.</div>
+    <div class="note"><span class="lbl">Next</span>The same shapes in MongoDB's aggregation pipeline follow in the <a data-deck="db" data-slide="How to answer a MongoDB query question">MongoDB drills</a>. For the spoken answers, go through the <a data-deck="db" data-slide="Q7–9 · Writing queries">interview questions on writing queries</a>.</div>
+  </div>
+</section>

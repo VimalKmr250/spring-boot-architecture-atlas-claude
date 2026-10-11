@@ -1,0 +1,133 @@
+<section class="slide" data-sec="Foundations" data-title="Oracle, SQL Server and MongoDB at a glance">
+  <h2>The same question in three dialects: most of SQL is shared, and the differences sit in the details you type every day</h2>
+  <p class="dek">Oracle and SQL Server share the SQL standard's core: <code>SELECT</code>, joins, grouping, window functions, CTEs and <code>MERGE</code>. They differ in everyday functions, limiting rows, string handling, the default transaction behaviour and the procedural language: PL/SQL for Oracle, T-SQL for SQL Server. MongoDB's query language (MQL) is a set of JSON-like filter and pipeline documents, sent through a driver. Below, "the three cheapest active products" in each, then the differences worth knowing before an interview.</p>
+
+  <div class="grid3">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">dialect.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- the three cheapest active products, with a computed label
+SELECT product_id,
+       sku || ' / ' || name                AS label,
+       NVL(TO_CHAR(price, 'FM9990.00'), 'n/a') AS price_text
+FROM   products
+WHERE  active = 1
+ORDER  BY price
+FETCH  FIRST 3 ROWS ONLY;
+
+-- no FROM clause needed since 23ai, and BOOLEAN is a SQL type
+SELECT UPPER('shop') AS shouted, 1 = 1 AS is_true;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · dialect.ora.sql</div>
+<pre><code class="language-plaintext">PRODUCT_ID LABEL                           PRICE_TEXT
+---------- ------------------------------- ----------
+       110 COF-BNS / House Beans 1kg            24.00
+       103 ACC-MSE / Quiet Mouse                29.90
+       111 BK-DATA / Data Systems Handbook      45.00
+
+3 rows selected.
+
+SHOUTED IS_TRUE
+------- -------
+SHOP    TRUE
+
+1 row selected.</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">dialect.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- the three cheapest active products, with a computed label
+SELECT TOP (3)
+       product_id,
+       sku + ' / ' + name                         AS label,
+       ISNULL(CAST(price AS VARCHAR(12)), 'n/a')  AS price_text
+FROM   products
+WHERE  active = 1
+ORDER  BY price;
+
+-- no FROM clause needed, and no BOOLEAN type: comparisons are not values
+SELECT UPPER('shop') AS shouted, CASE WHEN 1 = 1 THEN 1 ELSE 0 END AS is_true;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · dialect.mss.sql</div>
+<pre><code class="language-plaintext">product_id label                           price_text
+---------- ------------------------------- ----------
+       110 COF-BNS / House Beans 1kg            24.00
+       103 ACC-MSE / Quiet Mouse                29.90
+       111 BK-DATA / Data Systems Handbook      45.00
+
+(3 rows affected)
+shouted is_true
+------- -------
+SHOP          1
+
+(1 rows affected)</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">dialect.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// the same question in MongoDB: a find with a projection, a sort and a limit
+show(db.products.find(
+  { active: true },
+  { label: { $concat: ['$sku', ' / ', '$name'] }, price: 1 }
+).sort({ price: 1 }).limit(3));</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · dialect.js</div>
+<pre><code class="language-plaintext">{ _id: 110, price: Decimal128('24.00'), label: 'COF-BNS / House Beans 1kg' }
+{ _id: 103, price: Decimal128('29.90'), label: 'ACC-MSE / Quiet Mouse' }
+{ _id: 111, price: Decimal128('45.00'), label: 'BK-DATA / Data Systems Handbook' }</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Topic</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>Namespaces</td><td>A schema is a user: <code>shop.orders</code></td><td>database.schema.table: <code>shop.dbo.orders</code></td><td>database.collection</td></tr>
+        <tr><td>First N rows</td><td><code>FETCH FIRST n ROWS ONLY</code> <span class="tag a">12c</span>; <code>ROWNUM</code> <span class="tag w">legacy</span></td><td><code>TOP (n)</code>, or <code>OFFSET … FETCH</code> after <code>ORDER BY</code></td><td><code>.sort().limit(n)</code></td></tr>
+        <tr><td>Concatenate</td><td><code>||</code>, which treats NULL as ''</td><td><code>+</code>, which returns NULL if either side is NULL; <code>CONCAT</code> does not</td><td><code>$concat</code>, which returns null if any part is</td></tr>
+        <tr><td>NULL default</td><td><code>NVL</code>, <code>COALESCE</code></td><td><code>ISNULL</code>, <code>COALESCE</code></td><td><code>$ifNull</code></td></tr>
+        <tr><td>Now</td><td><code>SYSTIMESTAMP</code>, <code>SYSDATE</code></td><td><code>SYSDATETIME()</code>, <code>SYSUTCDATETIME()</code></td><td><code>$$NOW</code>, <code>new Date()</code></td></tr>
+        <tr><td>Unquoted names</td><td>Stored upper-case: headings print as <code>PRODUCT_ID</code></td><td>Kept as written; matching follows the collation</td><td>Field names are case-sensitive</td></tr>
+        <tr><td>Batches, blocks</td><td>PL/SQL blocks end with <code>/</code> in SQL*Plus</td><td><code>GO</code> ends a batch (a client command, not T-SQL)</td><td>JavaScript in mongosh; drivers send commands</td></tr>
+        <tr><td>Commit default</td><td>SQL*Plus: off, you commit. JDBC: autocommit on, as in every driver</td><td>Autocommit in every client, unless <code>BEGIN TRANSACTION</code></td><td>Each write is atomic per document</td></tr>
+        <tr><td>Default isolation</td><td>READ COMMITTED: readers never wait</td><td>READ COMMITTED with locks; readers can wait for writers</td><td>Read concern "local"</td></tr>
+        <tr><td>DDL in a transaction</td><td>Commits implicitly, before and after</td><td>Transactional: it can be rolled back</td><td>Collection and index creation are allowed in transactions</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · versions.ora.sql (SELECT banner_full FROM v$version)</div>
+<pre><code class="language-plaintext">BANNER_FULL
+-----------------------------------------------------------------------------------
+Oracle AI Database 26ai Free Release 23.26.3.0.0 - Develop, Learn, and Run for Free
+Version 23.26.3.0.0
+
+1 row selected.</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · versions.mss.sql (SELECT @@VERSION)</div>
+<pre><code class="language-plaintext">version
+--------------------------------------------------------------------------
+Microsoft SQL Server 2025 (RTM-CU9) (KB5122048) - 17.0.5005.3 (X64)
+	Aug 27 2026 09:30:16
+	Copyright (C) 2025 Microsoft Corporation
+	Enterprise Developer Edition (64-bit) on Linux (Ubuntu 24.04.4 LTS) &lt;X64&gt;
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">What production actually runs</span>Many systems are a version or two behind. Oracle 19c is still the most common long-term release, so <code>FETCH FIRST</code> works but <code>BOOLEAN</code> and <code>SELECT</code> without <code>FROM</code> do not. SQL Server 2019 and 2022 are common. MongoDB 7.0 and 8.0 are the common majors. Features newer than those carry a release tag in this tab.</div>
+    <div class="note bad"><span class="lbl">String concatenation and NULL</span><code>'a' || NULL</code> is <code>'a'</code> in Oracle, because NULL and '' are the same thing there. <code>'a' + NULL</code> is NULL in SQL Server. A label built with <code>+</code> from a nullable column silently disappears; use <code>CONCAT</code>, which skips NULLs.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"The core SQL is portable: I write standard joins, <code>CASE</code>, window functions and <code>OFFSET/FETCH</code>, and keep dialect functions to the edges. The behaviours that differ, such as empty strings, collation, commit defaults and isolation, are what I check first on an unfamiliar database."</div>
+  </div>
+</section>

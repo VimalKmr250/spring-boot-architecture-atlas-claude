@@ -1,0 +1,52 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Revenue per product from embedded lines">
+  <h2>Drill: "the five products with the most revenue", when the order lines live inside each order</h2>
+  <p class="dek">In SQL this is a join of <code>orders</code> to <code>order_items</code> and a <code>GROUP BY</code>. In MongoDB the lines are already inside the order, so the pipeline <b>filters</b> orders, <b>unwinds</b> the <code>items</code> array into one document per line, <b>groups</b> by product, then <b>sorts and limits</b>. The product name is not stored in the line, so it comes from <code>products</code> with a <code>$lookup</code>. That lookup goes <i>after</i> the <code>$limit</code>, so it runs five times instead of once per line.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">revenue-per-product.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// units and revenue per product from paid and shipped orders, with the current product name
+show(db.orders.aggregate([
+  { $match: { status: { $in: ['PAID', 'SHIPPED'] } } },
+  { $unwind: '$items' },
+  { $group: { _id: '$items.productId',
+              units:   { $sum: '$items.qty' },
+              revenue: { $sum: { $multiply: ['$items.qty', '$items.unitPrice'] } } } },
+  { $sort: { revenue: -1 } },
+  { $limit: 5 },
+  { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'product',
+               pipeline: [{ $project: { _id: 0, name: 1 } }] } },
+  { $project: { _id: 0, productId: '$_id', name: { $first: '$product.name' }, units: 1, revenue: 1 } }
+]));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · revenue-per-product.js</div>
+<pre><code class="language-plaintext">{ units: 3, revenue: Decimal128('3897.00'), productId: 101, name: 'Aero 14 Laptop' }
+{ units: 1, revenue: Decimal128('1899.00'), productId: 102, name: 'Forge 16 Laptop' }
+{ units: 2, revenue: Decimal128('1398.00'), productId: 106, name: 'Nova A1 Phone' }
+{ units: 2, revenue: Decimal128('278.00'), productId: 109, name: 'Burr Grinder' }
+{ units: 3, revenue: Decimal128('267.00'), productId: 104, name: 'Mech Keyboard' }</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Same answers as SQL</span>LAP-14 at 3,897.00 and LAP-16 at 1,899.00 match the Electronics rows of <a data-deck="db" data-slide="Top N per group">Top N per group</a> on Oracle and SQL Server.</div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Stage</th><th>SQL clause</th></tr></thead>
+          <tbody>
+            <tr><td><code>$match</code></td><td><code>WHERE</code></td></tr>
+            <tr><td><code>$unwind: '$items'</code></td><td><code>JOIN order_items</code></td></tr>
+            <tr><td><code>$group</code> with <code>$sum</code></td><td><code>GROUP BY</code> with <code>SUM</code></td></tr>
+            <tr><td><code>$sort</code>, <code>$limit</code></td><td><code>ORDER BY … FETCH FIRST 5</code></td></tr>
+            <tr><td><code>$lookup</code> after the limit</td><td>A join on the top five only</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Doubles for money</span>The prices are Decimal128, so <code>$multiply</code> and <code>$sum</code> stay exact and keep two decimal places. Stored as doubles, they would not: 0.1 + 0.2 is 0.30000000000000004 in a double, and such errors add up across thousands of lines and show in reports. Decimal128 is on <a data-deck="db" data-slide="Schema validation, Decimal128 and dates">Schema validation, Decimal128 and dates</a>.</div>
+    <div class="card"><h4>Follow-ups</h4><p>"Revenue at today's price or the price paid?" The line's <code>unitPrice</code> is the price paid, a snapshot on purpose, as on <a data-deck="db" data-slide="Denormalising on purpose">Denormalising on purpose</a>. "Products that never sold?" Start from <code>products</code> and <code>$lookup</code> into orders instead. "Very large collection?" Index <code>status</code> for the <code>$match</code>, or keep running totals with a <code>$merge</code> into a summary collection.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$match</code> the orders that count, <code>$unwind</code> the lines, <code>$group</code> by product with <code>$sum</code> of quantity times price, <code>$sort</code> and <code>$limit</code>, and only then <code>$lookup</code> the names, so the join runs five times, not once per line."</div>
+  </div>
+</section>

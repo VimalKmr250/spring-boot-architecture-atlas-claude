@@ -1,0 +1,90 @@
+<section class="slide" data-sec="MongoDB consistency" data-title="Single-document atomicity and conditional updates">
+  <h2>Every write to one document is atomic, so put the check inside the update and 400 requests for 100 units grant exactly 100</h2>
+  <p class="dek">MongoDB guarantees that a single-document write is all-or-nothing and isolated: no reader sees half of it, and two writers to the same document are applied one after the other. That is enough for most invariants, as long as the condition is part of the update. The program below has 8 threads each asking 50 times to reserve one phone, with 100 in stock. The first version reads the document, checks in Java and writes back the new count, which is the document-database version of the lost update. The second puts the check in the filter: "where reserved is below onHand, increment reserved".</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">StockReservations.java · MongoDB Java driver 5.8.1</div>
+<pre><code class="language-java">import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.bson.Document;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/** 8 threads each try to reserve 1 unit 50 times: 400 requests for 100 units in stock. */
+public class StockReservations {
+    public static void main(String[] args) throws Exception {
+        try (MongoClient client = MongoClients.create("mongodb://localhost:27017/?directConnection=true")) {
+            MongoCollection&lt;Document&gt; stock = client.getDatabase("shop").getCollection("stock_demo");
+            run(stock, "read, check, then $set", StockReservations::readCheckWrite);
+            run(stock, "one conditional $inc", StockReservations::conditionalInc);
+            stock.drop();
+        }
+    }
+
+    interface Reservation { boolean reserve(MongoCollection&lt;Document&gt; stock); }
+
+    static void run(MongoCollection&lt;Document&gt; stock, String label, Reservation reservation) throws Exception {
+        stock.drop();
+        stock.insertOne(new Document("_id", "PHN-C2").append("onHand", 100).append("reserved", 0));
+        AtomicInteger granted = new AtomicInteger();
+        try (var pool = Executors.newFixedThreadPool(8)) {
+            for (int t = 0; t &lt; 8; t++) {
+                pool.submit(() -&gt; {
+                    for (int i = 0; i &lt; 50; i++) if (reservation.reserve(stock)) granted.incrementAndGet();
+                });
+            }
+        }
+        Document after = stock.find().first();
+        System.out.printf("%-24s granted %3d, stored reserved = %3d, onHand = %d%n",
+                label, granted.get(), after.getInteger("reserved"), after.getInteger("onHand"));
+    }
+
+    // the application reads, decides, and writes back the number it computed
+    static boolean readCheckWrite(MongoCollection&lt;Document&gt; stock) {
+        Document d = stock.find(Filters.eq("_id", "PHN-C2")).first();
+        int reserved = d.getInteger("reserved");
+        if (reserved &gt;= d.getInteger("onHand")) return false;
+        stock.updateOne(Filters.eq("_id", "PHN-C2"), Updates.set("reserved", reserved + 1));
+        return true;
+    }
+
+    // the server checks and increments in one atomic step on one document
+    static boolean conditionalInc(MongoCollection&lt;Document&gt; stock) {
+        return stock.updateOne(
+                Filters.and(Filters.eq("_id", "PHN-C2"),
+                            Filters.expr(new Document("$lt", java.util.List.of("$reserved", "$onHand")))),
+                Updates.inc("reserved", 1)).getModifiedCount() == 1;
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · StockReservations.java against MongoDB 8.3 · the first line varies by run</div>
+<pre><code class="language-plaintext">read, check, then $set   granted 400, stored reserved =  52, onHand = 100
+one conditional $inc     granted 100, stored reserved = 100, onHand = 100</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Need</th><th>One atomic operation</th></tr></thead>
+          <tbody>
+            <tr><td>Reserve if available</td><td><code>updateOne({ _id, $expr: { $lt: ['$reserved', '$onHand'] } }, { $inc: { reserved: 1 } })</code></td></tr>
+            <tr><td>Change only if unchanged</td><td>Filter on a <code>version</code> field, <code>$inc</code> it in the update</td></tr>
+            <tr><td>Take a job</td><td><code>findOneAndUpdate({ status: 'READY' }, { $set: { status: 'TAKEN' } })</code></td></tr>
+            <tr><td>Create once</td><td>Upsert on a field with a unique index</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">400 granted, 52 recorded</span>The read-check-write version told all 400 requests "yes", and the document records only 52 reservations: the threads read the same count and overwrote each other's increments. Four runs recorded 66, 50, 50 and 52, the last shown above. This is the same bug as <a data-deck="db" data-slide="Preventing lost updates in SQL">the SQL lost update</a>, and the same fix: let the database do the check and the change in one step.</div>
+    <div class="note good"><span class="lbl">The conditional increment</span>Exactly 100 reservations were granted and recorded, and the other 300 saw <code>modifiedCount</code> 0, which the code reports as "out of stock". It needs no transaction and no lock held across round trips, because the condition and the change are one atomic operation on one document.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Single-document writes are atomic, and I design so that each business invariant lives in one document. Then a conditional update, with the check in the filter, is a compare-and-set. I use multi-document transactions only when an invariant really spans documents."</div>
+  </div>
+</section>

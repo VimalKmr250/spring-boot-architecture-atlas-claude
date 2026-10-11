@@ -1,0 +1,96 @@
+<section class="slide" data-sec="MongoDB consistency" data-title="Sharding and choosing a shard key">
+  <h2>The shard key decides where every document lives and which queries touch one shard or all of them; it is the hardest choice to undo</h2>
+  <p class="dek">A sharded cluster splits a collection across shards, each itself a replica set, by ranges of a <b>shard key</b>. Applications connect to <code>mongos</code> routers, which send each operation to the shards that can hold the matching documents. A good key has many distinct values, spreads writes evenly, and appears in most queries. A <b>monotonic</b> key, such as a timestamp or an <code>ObjectId</code>, sends every new insert to the shard holding the highest range. Hashing the key spreads inserts but loses range queries. These scripts ran on a two-shard cluster with 100,000 orders loaded under two different keys.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 170" role="img" aria-label="An application talks to mongos. Sharded on hashed customerId, the orders are split about evenly between shard sh1 and shard sh2, and a query by customerId goes to one shard. Sharded on placedAt, all 100,000 orders sit on sh1, because every new order has the highest timestamp so far.">
+        <g font-size="11" fill="currentColor">
+          <rect x="20" y="62" width="120" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="80" y="89" text-anchor="middle">application</text>
+          <rect x="190" y="62" width="110" height="44" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="245" y="89" text-anchor="middle" font-family="IBM Plex Mono, monospace">mongos</text>
+          <text x="360" y="22" font-weight="600">hashed customerId</text>
+          <rect x="360" y="32" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="435" y="56" text-anchor="middle" font-family="IBM Plex Mono, monospace">sh1: 49,295</text>
+          <rect x="520" y="32" width="150" height="40" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="595" y="56" text-anchor="middle" font-family="IBM Plex Mono, monospace">sh2: 50,705</text>
+          <text x="360" y="102" font-weight="600">placedAt (monotonic)</text>
+          <rect x="360" y="112" width="150" height="40" rx="5" fill="#D26A3F" fill-opacity="0.15" stroke="#D26A3F" stroke-width="1.4"></rect><text x="435" y="136" text-anchor="middle" font-family="IBM Plex Mono, monospace">sh1: 100,000</text>
+          <rect x="520" y="112" width="150" height="40" rx="5" fill="currentColor" fill-opacity="0.03" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="4 3"></rect><text x="595" y="136" text-anchor="middle" font-family="IBM Plex Mono, monospace" opacity="0.6">sh2: 0</text>
+          <text x="690" y="56" font-size="10.5">writes spread evenly</text>
+          <text x="690" y="136" font-size="10.5">every insert hits one shard</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="140" y1="84" x2="188" y2="84" marker-end="url(#arw)"></line>
+          <line x1="300" y1="78" x2="358" y2="56" marker-end="url(#arw)"></line>
+          <line x1="300" y1="90" x2="358" y2="132" marker-end="url(#arw)"></line>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">sharding.js · MongoDB 8.3, two shards behind mongos</div>
+<pre><code class="language-javascript">// 100,000 orders loaded twice: once sharded on a hashed customerId, once on placedAt
+db.by_customer.drop(); db.by_time.drop();
+const orders = Array.from({ length: 100000 }, (_, i) =&gt; {
+  const n = i + 1;
+  return { _id: n, customerId: 1 + (n * 7919) % 20000, status: n % 200 === 0 ? 'FAILED' : 'SHIPPED',
+           placedAt: new Date(Date.UTC(2025, 0, 1) + n * 37 * 1000) };
+});
+sh.shardCollection('shop.by_customer', { customerId: 'hashed' });
+sh.shardCollection('shop.by_time', { placedAt: 1 });
+for (const name of ['by_customer', 'by_time']) {
+  for (let i = 0; i &lt; orders.length; i += 10000) db.getCollection(name).insertMany(orders.slice(i, i + 10000));
+}
+
+// 1  where the documents went
+for (const name of ['by_customer', 'by_time']) {
+  const perShard = db.getCollection(name).aggregate([{ $collStats: { count: {} } }]).toArray()
+    .map(s =&gt; s.shard + ' ' + s.count).sort().join(', ');
+  print(name.padEnd(12), perShard);
+}
+
+// 2  a query with the shard key goes to one shard; one without it goes to all of them
+const route = ex =&gt; ex.queryPlanner.winningPlan.stage + ' (' + ex.queryPlanner.winningPlan.shards.length + ' shard' +
+  (ex.queryPlanner.winningPlan.shards.length &gt; 1 ? 's' : '') + ')';
+print('by customerId:', route(db.by_customer.find({ customerId: 4242 }).explain()));
+print('by status:    ', route(db.by_customer.find({ status: 'FAILED' }).explain()));
+
+// 3  analyzeShardKey measures a candidate key before you commit to it; each needs a supporting index
+for (const key of [{ customerId: 1 }, { status: 1 }, { placedAt: 1 }]) db.by_customer.createIndex(key);
+for (const key of [{ customerId: 1 }, { status: 1 }, { placedAt: 1 }]) {
+  const k = db.adminCommand({ analyzeShardKey: 'shop.by_customer', key, readWriteDistribution: false }).keyCharacteristics;
+  print(JSON.stringify(key).padEnd(18), 'distinct values', String(k.numDistinctValues).padStart(6),
+        '| most common share', (100 * k.mostCommonValues[0].frequency / k.numDocsTotal).toFixed(3) + '%',
+        '| monotonic:', k.monotonicity.type);
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · sharding.js · the hashed split varies slightly</div>
+<pre><code class="language-plaintext">by_customer  sh1 49295, sh2 50705
+by_time      sh1 100000
+by customerId: SINGLE_SHARD (1 shard)
+by status:     SHARD_MERGE (2 shards)
+{"customerId":1}   distinct values  20000 | most common share 0.005% | monotonic: not monotonic
+{"status":1}       distinct values      2 | most common share 99.500% | monotonic: monotonic
+{"placedAt":1}     distinct values 100000 | most common share 0.001% | monotonic: monotonic</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Candidate key</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td><code>customerId</code></td><td>20,000 values, none dominant; "my orders" queries hit one shard. Good</td></tr>
+            <tr><td><code>status</code></td><td>2 values, one holding 99.5%: one huge, unsplittable chunk. Bad</td></tr>
+            <tr><td><code>placedAt</code></td><td>Unique values but monotonic: a hot shard for inserts. Hash it, or prefix it</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Scatter-gather</span>The query by <code>status</code> could not be routed: <code>SHARD_MERGE</code> across both shards, merging the results in <code>mongos</code>. With 20 shards, every such query asks all 20. Queries without the shard key are the hidden cost of a key chosen for even writes alone.</div>
+    <div class="note warn"><span class="lbl">Changing your mind</span>Since 5.0 a collection can be resharded online, and since 4.4 a key can be refined by adding a suffix field. Both are heavy operations on a large collection. <code>analyzeShardKey</code> <span class="tag a">7.0</span> measures cardinality, frequency and monotonicity of a candidate before you commit; it judged <code>status</code> monotonic here only because of how this synthetic data was generated.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"A shard key needs high cardinality, low frequency, non-monotonic inserts, and must match the main query's filter. For orders I would use the customer id, or a compound key of customer and date, so each customer's queries stay on one shard." Partitioning in general is on <a data-deck="hld" data-slide="Partitioning strategies">HLD · Partitioning strategies</a>.</div>
+  </div>
+</section>

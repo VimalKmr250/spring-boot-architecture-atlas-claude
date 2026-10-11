@@ -1,0 +1,75 @@
+<section class="slide" data-sec="MongoDB basics" data-title="The aggregation pipeline, with the SQL beside it">
+  <h2>An aggregation pipeline is a list of stages, each transforming the documents the previous stage produced</h2>
+  <p class="dek">Where SQL describes the result and lets the optimiser order the work, a pipeline lists the steps in order: <code>$match</code> filters, <code>$group</code> aggregates, <code>$sort</code>, <code>$limit</code> and <code>$project</code> shape the output. Each SQL clause has a stage, and the comments in the pipeline below name them. The order is yours to choose, and it matters: a <code>$match</code> placed first can use an index and shrinks everything after it. The SQL version ran on both Oracle and SQL Server and returned the same five customers and totals.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">pipeline.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// revenue per customer from paid and shipped orders, top 5: the SQL beside each stage
+show(db.orders.aggregate([
+  { $match: { status: { $in: ['PAID', 'SHIPPED'] } } },            // WHERE status IN ('PAID', 'SHIPPED')
+  { $group: { _id: '$customer.id',                                  // GROUP BY customer_id
+              name:    { $first: '$customer.name' },
+              orders:  { $sum: 1 },                                 // COUNT(*)
+              revenue: { $sum: '$total' } } },                      // SUM(total)
+  { $match: { orders: { $gte: 2 } } },                              // HAVING COUNT(*) &gt;= 2
+  { $sort: { revenue: -1 } },                                       // ORDER BY revenue DESC
+  { $limit: 5 },                                                    // FETCH FIRST 5 ROWS ONLY
+  { $project: { _id: 0, customerId: '$_id', name: 1, orders: 1, revenue: 1 } }  // SELECT list
+]));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · pipeline.js</div>
+<pre><code class="language-plaintext">{ name: 'Chen Wei', orders: 2, revenue: Decimal128('2785.00'), customerId: 3 }
+{ name: 'Asha Rao', orders: 3, revenue: Decimal128('2215.90'), customerId: 1 }
+{ name: 'Elif Demir', orders: 2, revenue: Decimal128('2071.00'), customerId: 5 }
+{ name: 'Ben Clark', orders: 2, revenue: Decimal128('758.80'), customerId: 2 }
+{ name: 'Gita Shah', orders: 2, revenue: Decimal128('223.00'), customerId: 7 }</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">pipeline.sql · runs on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">SELECT o.customer_id, c.name, COUNT(*) AS orders, SUM(o.total) AS revenue
+FROM   orders o JOIN customers c ON c.customer_id = o.customer_id
+WHERE  o.status IN ('PAID', 'SHIPPED')
+GROUP  BY o.customer_id, c.name
+HAVING COUNT(*) &gt;= 2
+ORDER  BY revenue DESC
+OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · pipeline.sql</div>
+<pre><code class="language-plaintext">CUSTOMER_ID NAME       ORDERS REVENUE
+----------- ---------- ------ -------
+          3 Chen Wei        2 2785.00
+          1 Asha Rao        3 2215.90
+          5 Elif Demir      2 2071.00
+          2 Ben Clark       2  758.80
+          7 Gita Shah       2  223.00
+
+5 rows selected.</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>SQL</th><th>Stage</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>WHERE</code></td><td><code>$match</code></td><td>First, so it can use an index</td></tr>
+        <tr><td><code>GROUP BY</code> + aggregates</td><td><code>$group</code> with <code>_id</code> as the key; <code>$sum</code>, <code>$avg</code>, <code>$min</code>, <code>$max</code>, <code>$first</code>, <code>$push</code></td><td>Every output field needs an accumulator, as every SQL column needs grouping or aggregating</td></tr>
+        <tr><td><code>HAVING</code></td><td>A second <code>$match</code> after <code>$group</code></td><td>Filters on the computed fields</td></tr>
+        <tr><td><code>ORDER BY</code>, <code>FETCH FIRST</code></td><td><code>$sort</code>, <code>$limit</code></td><td>Adjacent, they become a top-k sort that keeps only k documents</td></tr>
+        <tr><td><code>SELECT</code> list</td><td><code>$project</code>, <code>$set</code></td><td>Rename, compute, drop fields</td></tr>
+        <tr><td><code>JOIN</code></td><td><code>$lookup</code></td><td>Next slide</td></tr>
+        <tr><td>Window functions</td><td><code>$setWindowFields</code> <span class="tag a">5.0</span></td><td>Ranking and running totals: <a data-deck="db" data-slide="ROW_NUMBER, RANK and DENSE_RANK">ranking</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Stage order is plan order</span>A pipeline that groups first and matches afterwards groups every document in the collection. The optimiser moves some stages, such as a <code>$match</code> that only uses fields from before a <code>$project</code>, but do not rely on it: filter first, and project away large fields early.</div>
+    <div class="note warn"><span class="lbl">Memory</span><code>$group</code> and <code>$sort</code> work in memory up to 100 MB per stage, then spill to disk; <code>allowDiskUse</code> is the default since 6.0. A <code>$group</code> on a high-cardinality key over millions of documents is the usual cause of a slow pipeline.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$match</code> is WHERE, <code>$group</code> is GROUP BY, the second <code>$match</code> is HAVING, <code>$sort</code> and <code>$limit</code> are ORDER BY and FETCH. I put <code>$match</code> first so it can use an index, and I check the pipeline with <code>explain</code> like a SQL plan."</div>
+  </div>
+</section>

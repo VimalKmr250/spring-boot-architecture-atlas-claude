@@ -1,0 +1,74 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Top N per group with $topN">
+  <h2>Drill: "the two highest-paid people in each department", in one <code>$group</code> stage with <code>$topN</code></h2>
+  <p class="dek">Since MongoDB 5.2, <code>$group</code> has accumulators that keep only the best documents of each group: <code>$top</code> and <code>$topN</code>, with <code>$bottom</code>, <code>$bottomN</code>, <code>$firstN</code> and <code>$lastN</code> beside them. Each takes its own <code>sortBy</code>, so no earlier <code>$sort</code> is needed. For ties, <code>$setWindowFields</code> brings SQL's ranking functions, including <code>$denseRank</code>. The third query answers the e-commerce version: the best-selling product in each top-level category, computed from the order lines embedded in each order.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">top-n.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  the two highest-paid people in each department: $topN inside $group (MongoDB 5.2+)
+show(db.employees.aggregate([
+  { $group: { _id: '$dept',
+              top2: { $topN: { n: 2, sortBy: { salary: -1 }, output: { name: '$name', salary: '$salary' } } } } },
+  { $sort: { _id: 1 } }
+]));
+
+// 2  ties: the top three salary levels with $denseRank, so people on the same salary share a place
+show(db.employees.aggregate([
+  { $setWindowFields: { partitionBy: '$dept', sortBy: { salary: -1 }, output: { rnk: { $denseRank: {} } } } },
+  { $match: { rnk: { $lte: 3 }, dept: { $in: ['Engineering', 'Payments'] } } },
+  { $project: { _id: 0, dept: 1, name: 1, salary: 1, rnk: 1 } },
+  { $sort: { dept: 1, rnk: 1, name: 1 } }
+]));
+
+// 3  the best-selling product per top-level category, from the embedded order lines
+show(db.orders.aggregate([
+  { $match: { status: { $in: ['PAID', 'SHIPPED'] } } },
+  { $unwind: '$items' },
+  { $lookup: { from: 'products', localField: 'items.productId', foreignField: '_id', as: 'p' } },
+  { $group: { _id: { category: { $first: { $first: '$p.categoryPath' } }, sku: '$items.sku' },
+              revenue: { $sum: { $multiply: ['$items.qty', '$items.unitPrice'] } } } },
+  { $group: { _id: '$_id.category', best: { $top: { sortBy: { revenue: -1 }, output: { sku: '$_id.sku', revenue: '$revenue' } } } } },
+  { $sort: { _id: 1 } }
+]));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · top-n.js</div>
+<pre><code class="language-plaintext">{ _id: 'Engineering', top2: [ { name: 'Omar Haddad', salary: 180000 }, { name: 'Tom Becker', salary: 155000 } ] }
+{ _id: 'Executive', top2: [ { name: 'Maya Iyer', salary: 250000 } ] }
+{ _id: 'Payments', top2: [ { name: 'Wen Li', salary: 185000 }, { name: 'Lena Fischer', salary: 175000 } ] }
+{ _id: 'Support', top2: [ { name: 'Yara Saleh', salary: 90000 }, { name: 'Kai Tanaka', salary: 72000 } ] }
+{ name: 'Omar Haddad', dept: 'Engineering', salary: 180000, rnk: 1 }
+{ name: 'Tom Becker', dept: 'Engineering', salary: 155000, rnk: 2 }
+{ name: 'Ravi Menon', dept: 'Engineering', salary: 150000, rnk: 3 }
+{ name: 'Sara Lopez', dept: 'Engineering', salary: 150000, rnk: 3 }
+{ name: 'Wen Li', dept: 'Payments', salary: 185000, rnk: 1 }
+{ name: 'Lena Fischer', dept: 'Payments', salary: 175000, rnk: 2 }
+{ name: 'Uma Nair', dept: 'Payments', salary: 140000, rnk: 3 }
+{ name: 'Victor Chan', dept: 'Payments', salary: 140000, rnk: 3 }
+{ _id: 'Books', best: { sku: 'BK-DATA', revenue: Decimal128('45.00') } }
+{ _id: 'Electronics', best: { sku: 'LAP-14', revenue: Decimal128('3897.00') } }
+{ _id: 'Home', best: { sku: 'COF-GRD', revenue: Decimal128('278.00') } }</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Same answers as SQL</span>The third query returns the same leaders as the SQL drill <a data-deck="db" data-slide="Top N per group">Top N per group</a>: BK-DATA, LAP-14 and COF-GRD.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Need</th><th>MongoDB</th><th>SQL equivalent</th></tr></thead>
+      <tbody>
+        <tr><td>Best N per group, ties broken arbitrarily</td><td><code>$topN</code> in <code>$group</code> <span class="tag a">5.2</span></td><td><code>ROW_NUMBER() … &lt;= N</code></td></tr>
+        <tr><td>Top N values, ties included</td><td><code>$setWindowFields</code> with <code>$denseRank</code>, then <code>$match</code> <span class="tag a">5.0</span></td><td><code>DENSE_RANK() … &lt;= N</code></td></tr>
+        <tr><td>One best document per group</td><td><code>$top</code>, or <code>$sort</code> then <code>$group</code> with <code>$first</code></td><td><code>ROW_NUMBER() = 1</code>; <code>KEEP (DENSE_RANK FIRST …)</code></td></tr>
+        <tr><td>Before 5.2</td><td><code>$sort</code>, <code>$group</code> with <code>$push</code>, then <code>$slice</code></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p><code>$topN</code> keeps at most N documents per group while it streams, so memory grows with the number of groups, not the size of the collection. The pre-5.2 <code>$push</code> then <code>$slice</code> builds the whole group in memory first. Query 3 runs a <code>$lookup</code> per order line, served by the index on <code>products._id</code>.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"A department with one person?" Executive returns a one-element array, not an error. "Ties for second place?" <code>$topN</code> picks one arbitrarily, so use <code>$denseRank</code> as query 2 does: Ravi and Sara share third place. "Avoid the <code>$lookup</code>?" Copy the top-level category into each order line when the order is written: the extended reference pattern.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$group</code> by the department with <code>$topN</code>, <code>n: 2</code>, <code>sortBy</code> salary descending. If ties must be kept, <code>$setWindowFields</code> with <code>$denseRank</code> and a <code>$match</code> on the rank. And a <code>$match</code> at the start so an index cuts the input."</div>
+  </div>
+</section>

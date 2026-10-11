@@ -1,0 +1,92 @@
+<section class="slide" data-sec="MongoDB modelling" data-title="Embed or reference">
+  <h2>Embed what is read and written together and stays bounded; reference what grows without limit or is shared</h2>
+  <p class="dek">The central decision in document modelling is where each relationship lives. <b>Embedding</b> puts the child inside the parent: one read returns both, and one write changes both atomically. <b>Referencing</b> stores the child separately with the parent's id, as a foreign key would: the child can be queried on its own and can grow without limit, but reading both takes a second query or a <code>$lookup</code>, and changing both atomically takes a transaction. The questions below decide most cases. The script stores the running example's order lines both ways and measures each.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 220" role="img" aria-label="A decision flow. Is the child read with the parent most of the time? If no, reference it. If yes: is the number of children bounded and small? If no, reference it, perhaps embedding a subset. If yes: is the child shared by many parents and updated independently? If yes, reference it, perhaps copying a few fields. If no, embed it.">
+        <g font-size="11" fill="currentColor">
+          <rect x="20" y="20" width="250" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="145" y="46" text-anchor="middle">Read together with the parent?</text>
+          <rect x="325" y="20" width="250" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="450" y="40" text-anchor="middle">Bounded and small?</text><text x="450" y="55" text-anchor="middle" font-size="9.5" opacity="0.75">order lines: yes · page views: no</text>
+          <rect x="630" y="20" width="250" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="755" y="40" text-anchor="middle">Owned by this parent alone?</text><text x="755" y="55" text-anchor="middle" font-size="9.5" opacity="0.75">address: yes · product: no</text>
+          <rect x="630" y="150" width="250" height="50" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="755" y="172" text-anchor="middle" font-weight="600">Embed</text><text x="755" y="189" text-anchor="middle" font-size="9.5">one read, one atomic write</text>
+          <rect x="20" y="150" width="250" height="50" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="145" y="172" text-anchor="middle" font-weight="600">Reference</text><text x="145" y="189" text-anchor="middle" font-size="9.5">its own collection, keyed by the parent's id</text>
+          <rect x="325" y="150" width="250" height="50" rx="6" fill="#D26A3F" fill-opacity="0.06" stroke="#D26A3F" stroke-dasharray="4 3"></rect>
+          <text x="450" y="172" text-anchor="middle" font-weight="600">Reference, and copy a little</text><text x="450" y="189" text-anchor="middle" font-size="9.5">a subset or a few fields, embedded</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3" fill="none">
+          <line x1="270" y1="42" x2="323" y2="42" marker-end="url(#arw)"></line>
+          <line x1="575" y1="42" x2="628" y2="42" marker-end="url(#arw)"></line>
+          <line x1="755" y1="64" x2="755" y2="148" marker-end="url(#arw)"></line>
+          <line x1="145" y1="64" x2="145" y2="148" marker-end="url(#arw)"></line>
+          <line x1="450" y1="64" x2="450" y2="148" marker-end="url(#arw)"></line>
+          <path d="M700 64 C 640 110, 560 120, 520 148" marker-end="url(#arw)"></path>
+        </g>
+        <g font-size="10" fill="currentColor" opacity="0.8">
+          <text x="285" y="34">yes</text><text x="590" y="34">yes</text><text x="762" y="110">yes</text>
+          <text x="152" y="110">no</text><text x="457" y="110">no</text><text x="590" y="110">no: shared</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">embed-reference.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// the same orders stored two ways: lines embedded in the order, or lines in their own collection
+db.order_lines.drop();
+db.orders.find().forEach(o =&gt; o.items.forEach((it, i) =&gt;
+  db.order_lines.insertOne({ orderId: o._id, lineNo: i + 1, productId: it.productId, qty: it.qty, unitPrice: it.unitPrice })));
+db.order_lines.createIndex({ orderId: 1, lineNo: 1 });
+
+// 1  reading order 1003 with its lines
+const embedded = db.orders.find({ _id: 1003 }).explain('executionStats').executionStats;
+print('embedded:   1 query,', embedded.totalDocsExamined, 'document examined');
+const head = db.orders.find({ _id: 1003 }, { items: 0 }).explain('executionStats').executionStats;
+const lines = db.order_lines.find({ orderId: 1003 }).explain('executionStats').executionStats;
+print('referenced: 2 queries,', head.totalDocsExamined, '+', lines.totalDocsExamined, 'documents examined');
+
+// 2  one more bag of beans: line quantity and order total must change together
+show(db.orders.updateOne({ _id: 1003, 'items.productId': 110 },
+  { $inc: { 'items.$.qty': 1, total: Decimal128('24.00') } }));          // one document: atomic
+show(db.order_lines.updateOne({ orderId: 1003, productId: 110 }, { $inc: { qty: 1 } }));
+print('referenced: the order total is a second write, to a second document: atomic only in a transaction');
+
+db.orders.updateOne({ _id: 1003, 'items.productId': 110 }, { $inc: { 'items.$.qty': -1, total: Decimal128('-24.00') } });
+db.order_lines.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · embed-reference.js</div>
+<pre><code class="language-plaintext">embedded:   1 query, 1 document examined
+referenced: 2 queries, 1 + 2 documents examined
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+{ acknowledged: true, insertedId: null, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 }
+referenced: the order total is a second write, to a second document: atomic only in a transaction</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Relationship</th><th>Usually</th></tr></thead>
+          <tbody>
+            <tr><td>Order → lines</td><td>Embed: bounded, read and written with the order</td></tr>
+            <tr><td>Customer → addresses</td><td>Embed: a handful, owned by the customer</td></tr>
+            <tr><td>Order → customer</td><td>Reference, plus a snapshot of the name: shared, changes on its own</td></tr>
+            <tr><td>Product → reviews</td><td>Reference; embed the latest few (subset pattern)</td></tr>
+            <tr><td>Customer → events</td><td>Reference: unbounded</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">What embedding bought</span>Reading order 1003 with its lines examined one document in one query, against three documents in two queries when referenced. Adding a bag of beans changed the line and the order total in one atomic <code>updateOne</code>. Referenced, that is two writes to two documents, consistent only inside a transaction.</div>
+    <div class="note warn"><span class="lbl">What it costs</span>An embedded child cannot be queried as a top-level entity without <code>$unwind</code>, and everything embedded is loaded whenever the parent is, unless a projection excludes it. Embedding a shared entity, such as the full product in every order, means updating it everywhere when it changes.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I design from the access patterns. Data read together is stored together. One-to-few and owned: embed. One-to-many that grows without limit, or many-to-many: reference, and copy the few fields the read needs. Then I check the 16 MB limit and how often each piece changes."</div>
+  </div>
+</section>

@@ -1,0 +1,38 @@
+<section class="slide" data-sec="Choosing and case studies" data-title="Oracle, SQL Server or MongoDB for this workload">
+  <h2>Choose the data model first and the product second: relational for shared, constrained facts, documents for self-contained aggregates</h2>
+  <p class="dek">"SQL or NoSQL?" is the wrong first question. Ask what the data looks like and how it is used. Is it a set of related facts that many features query in different ways, with invariants across entities, such as money and stock? Or is it a collection of self-contained aggregates, read and written whole by key, whose shape varies and grows? The first is relational, the second fits documents, and most real systems have both. Between Oracle and SQL Server the choice is rarely technical: it follows the organisation's licences, skills and platform.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Question</th><th>Points to relational</th><th>Points to documents</th></tr></thead>
+      <tbody>
+        <tr><td>Shape</td><td>Entities shared by many others: products, customers, accounts</td><td>Aggregates owned by one parent: an order with its lines, a profile with its settings</td></tr>
+        <tr><td>Queries</td><td>Ad-hoc, cross-entity, reporting; not all known up front</td><td>Known access patterns, mostly by key or a few indexed fields</td></tr>
+        <tr><td>Invariants</td><td>Across rows and tables: balances, stock, uniqueness across entities</td><td>Inside one document; cross-document only occasionally</td></tr>
+        <tr><td>Schema change</td><td>Rare and planned; migrations are fine</td><td>Frequent, per-tenant or per-product variation</td></tr>
+        <tr><td>Scale</td><td>Vertical, read replicas, partitioning; sharding is hard</td><td>Horizontal sharding built in, with a well-chosen shard key</td></tr>
+        <tr><td>Team</td><td>SQL skills, existing DBA and tooling</td><td>Developers comfortable designing for access patterns</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Workload</th><th>Sensible default</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Payments, ledger, wallet balances</td><td>Oracle or SQL Server</td><td>Multi-row invariants, constraints, mature transactions and auditing: <a data-deck="db" data-slide="Case study: a payment system">payment case</a></td></tr>
+        <tr><td>Product catalogue with varying attributes</td><td>MongoDB, or a JSON column</td><td>Different fields per category; read whole per page</td></tr>
+        <tr><td>Orders</td><td>Either</td><td>Embedded lines suit documents; reporting across orders suits SQL: <a data-deck="db" data-slide="Case study: e-commerce orders and inventory">orders case</a></td></tr>
+        <tr><td>Inventory reservations</td><td>Relational, or one document per SKU</td><td>The invariant must live in one atomic unit</td></tr>
+        <tr><td>Metrics and monitoring</td><td>Time-series collection, or partitioned tables</td><td>Append-only, time-bucketed reads, retention by dropping old data: <a data-deck="db" data-slide="Case study: a metrics and monitoring store">metrics case</a></td></tr>
+        <tr><td>Sessions, carts, user preferences</td><td>MongoDB with TTL, or a key-value cache</td><td>By key, short-lived, shape changes freely</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Reasons that are not reasons</span>"MongoDB scales and SQL doesn't" ignores that most applications never outgrow one well-indexed relational server. "SQL is old" ignores fifty years of tooling. "No schema means faster development" lasts until the third version of a document shape. Choose for the data and the queries.</div>
+    <div class="note warn"><span class="lbl">Oracle against SQL Server</span>Both handle any of these workloads. They differ in defaults: Oracle reads without blocking, SQL Server needs RCSI for that. They differ in procedural language, in licensing, and in the platform around them, such as Azure for SQL Server and Exadata or OCI for Oracle. Follow the organisation's existing estate.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I start from the data model and the queries. Strongly related data with cross-entity invariants goes relational; self-contained aggregates read by key go to documents. Polyglot persistence is normal, as long as each store has a clear owner." The broader trade-offs are on <a data-deck="hld" data-slide="SQL or NoSQL">HLD · SQL or NoSQL</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,148 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Seek, scan and lookup: clustered tables and heaps">
+  <h2>An index is a sorted copy of some columns plus a pointer to the row; every extra row it finds costs a lookup</h2>
+  <p class="dek">A B-tree index keeps its keys sorted in pages: a root, a few levels of branches, then leaves. A <b>seek</b> walks from the root to the first matching leaf in three or four page reads, then reads along the leaves. A <b>scan</b> reads every page. In SQL Server, a table with a <b>clustered index</b> stores its rows in the clustered index's leaves, by default the primary key; a table without one is a <b>heap</b>. A non-clustered index leaf holds the key plus the clustered key, so each match costs a <b>lookup</b> into the clustered index for the other columns. Oracle tables are heaps by default, and the leaf holds a ROWID. Past a few thousand lookups, scanning the whole table is cheaper.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="A non-clustered index on customer_id: a root page, branch pages, and leaf pages holding customer_id with the order_id of each row. A seek for customer 4242 goes root, branch, leaf in 3 page reads and finds 25 entries. Each entry then needs a lookup into the clustered index on order_id, whose leaves hold the full rows, to fetch total: 25 lookups of about 3 pages each. That is about 78 page reads, against 2,639 for scanning the whole table.">
+        <text x="20" y="20" font-size="12" font-weight="600" fill="currentColor">Index on customer_id</text>
+        <text x="500" y="20" font-size="12" font-weight="600" fill="currentColor">Clustered index on order_id: the table itself</text>
+        <g font-size="10" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="150" y="34" width="110" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="205" y="52" text-anchor="middle">root</text>
+          <rect x="60" y="90" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="115" y="108" text-anchor="middle">branch</text>
+          <rect x="240" y="90" width="110" height="28" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="295" y="108" text-anchor="middle">branch</text>
+          <rect x="20" y="150" width="120" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="28" y="168">4240 → 81241</text><text x="28" y="184">4241 → 3842</text>
+          <rect x="160" y="150" width="140" height="44" rx="4" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="168" y="168">4242 → 9217</text><text x="168" y="184">4242 → 29217 …</text>
+          <rect x="320" y="150" width="120" height="44" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="328" y="168">4243 → 18592</text><text x="328" y="184">4244 → 37792</text>
+          <rect x="500" y="34" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="555" y="52" text-anchor="middle">root</text>
+          <rect x="640" y="90" width="110" height="28" rx="4" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="695" y="108" text-anchor="middle">branch</text>
+          <rect x="560" y="150" width="320" height="44" rx="4" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect><text x="568" y="168">9217: customer 4242, PAID, 2025-04-19, 345.29</text><text x="568" y="184">leaf pages hold whole rows, sorted by order_id</text>
+        </g>
+        <g stroke="#D26A3F" stroke-width="1.4"><line x1="190" y1="62" x2="285" y2="88" marker-end="url(#arwA)"></line><line x1="290" y1="118" x2="240" y2="148" marker-end="url(#arwA)"></line></g>
+        <g stroke="#8A94A3" stroke-width="1.1"><line x1="180" y1="62" x2="125" y2="88"></line><line x1="105" y1="118" x2="80" y2="148"></line><line x1="310" y1="118" x2="370" y2="148"></line><line x1="555" y1="62" x2="680" y2="88"></line><line x1="690" y1="118" x2="700" y2="148"></line></g>
+        <path d="M300 172 C 400 222, 470 222, 558 178" fill="none" stroke="#3AA79B" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arwB)"></path>
+        <text x="420" y="236" text-anchor="middle" font-size="10.5" fill="currentColor">a lookup per match: seek 3 pages + 25 × lookups ≈ 78 page reads; a full scan is 2,639</text>
+      </svg>
+    </div>
+    <figcaption>The order ids shown in the leaves are illustrative; the page counts are the ones measured below.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">seek-scan.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- big_orders: 500,000 rows, clustered on order_id
+CREATE INDEX big_orders_customer_ix ON big_orders (customer_id);
+CREATE INDEX big_orders_status_ix ON big_orders (status);
+GO
+-- STATISTICS IO reports the 8 KB pages each query read
+SET STATISTICS IO ON;
+
+-- 1  by the clustered key: a seek down the B-tree
+SELECT order_id, status, total FROM big_orders WHERE order_id = 250000;
+
+-- 2  one customer's 25 orders: seek the customer index, then look up each row
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE customer_id = 4242;
+
+-- 3  2,500 FAILED orders: 0.5% of the table, and the index on status is not used
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE status = 'FAILED';
+
+-- 4  the same count without SUM(total): every needed column is in the index
+SELECT COUNT(*) AS orders FROM big_orders WHERE status = 'FAILED';
+SET STATISTICS IO OFF;
+GO
+SET SHOWPLAN_TEXT ON;
+GO
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE customer_id = 4242;
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE status = 'FAILED';
+SELECT COUNT(*) AS orders FROM big_orders WHERE status = 'FAILED';
+GO
+SET SHOWPLAN_TEXT OFF;
+GO
+DROP INDEX big_orders_customer_ix ON big_orders;
+DROP INDEX big_orders_status_ix ON big_orders;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · seek-scan.mss.sql</div>
+<pre><code class="language-plaintext">order_id status total
+-------- ------ -----
+  250000 FAILED  5.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 0, logical reads 3, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders   total
+------ -------
+    25 6535.75
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 78, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders     total
+------ ---------
+  2500 635000.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 2639, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+orders
+------
+  2500
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 13, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+StmtText
+----------------------------------------------------------------------------------------
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE customer_id = 4242;
+
+(1 rows affected)
+StmtText
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(int,[Expr1011],0), [Expr1003]=CASE WHEN [Expr1011]=(0) THEN NULL ELSE [Expr1012] END))
+     |--Stream Aggregate(DEFINE:([Expr1011]=Count(*), [Expr1012]=SUM([shop].[dbo].[big_orders].[total])))
+          |--Nested Loops(Inner Join, OUTER REFERENCES:([shop].[dbo].[big_orders].[order_id]))
+               |--Index Seek(OBJECT:([shop].[dbo].[big_orders].[big_orders_customer_ix]), SEEK:([shop].[dbo].[big_orders].[customer_id]=(4242)) ORDERED FORWARD)
+               |--Clustered Index Seek(OBJECT:([shop].[dbo].[big_orders].[big_orders_pk]), SEEK:([shop].[dbo].[big_orders].[order_id]=[shop].[dbo].[big_orders].[order_id]) LOOKUP ORDERED FORWARD)
+
+(5 rows affected)
+StmtText
+---------------------------------------------------------------------------------------
+SELECT COUNT(*) AS orders, SUM(total) AS total FROM big_orders WHERE status = 'FAILED';
+
+(1 rows affected)
+StmtText
+--------------------------------------------------------------------------------------------------------------------------------------------
+|--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(int,[Expr1010],0), [Expr1003]=CASE WHEN [Expr1010]=(0) THEN NULL ELSE [Expr1011] END))
+     |--Stream Aggregate(DEFINE:([Expr1010]=Count(*), [Expr1011]=SUM([shop].[dbo].[big_orders].[total])))
+          |--Clustered Index Scan(OBJECT:([shop].[dbo].[big_orders].[big_orders_pk]), WHERE:([shop].[dbo].[big_orders].[status]='FAILED'))
+
+(3 rows affected)
+StmtText
+------------------------------------------------------------------
+SELECT COUNT(*) AS orders FROM big_orders WHERE status = 'FAILED';
+
+(1 rows affected)
+StmtText
+--------------------------------------------------------------------------------------------------------------------------------------------------
+|--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(int,[Expr1003],0)))
+     |--Stream Aggregate(DEFINE:([Expr1003]=Count(*)))
+          |--Index Seek(OBJECT:([shop].[dbo].[big_orders].[big_orders_status_ix]), SEEK:([shop].[dbo].[big_orders].[status]=[@1]) ORDERED FORWARD)
+
+(3 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Query</th><th>Plan</th><th class="num">Pages read</th></tr></thead>
+      <tbody>
+        <tr><td>1 by primary key</td><td>Clustered index seek</td><td class="num">3</td></tr>
+        <tr><td>2 one customer, 25 rows</td><td>Index seek, then 25 key lookups</td><td class="num">78</td></tr>
+        <tr><td>3 2,500 FAILED orders, needing <code>total</code></td><td>Clustered index scan: 2,500 lookups would cost more</td><td class="num">2,639</td></tr>
+        <tr><td>4 the same rows, counting only</td><td>Index seek; no lookups, because the index has every needed column</td><td class="num">13</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">"There is an index, why the scan?"</span>Query 3 matches 0.5% of the table, and the optimiser still scanned. Each lookup is a random read of about three pages, so 2,500 lookups cost more than reading 2,639 pages in order. An index on a column alone helps only when few rows match, or when it covers the query: see <a data-deck="db" data-slide="Covering and filtered indexes">covering indexes</a>.</div>
+    <div class="note warn"><span class="lbl">Heaps and clustered tables</span>Oracle's default table is a heap, and an index entry points at the row's physical ROWID; an index-organised table (IOT) is Oracle's clustered equivalent. SQL Server tables are usually clustered on the primary key. A random clustered key, such as a GUID, scatters inserts: see <a data-deck="db" data-slide="Keys and generated ids">Keys and generated ids</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"A seek costs the tree height plus one lookup per matching row; a scan costs every page. The optimiser picks by estimated rows, so selectivity, the fraction of rows that match, decides whether an index is used." The B-tree structure itself is on <a data-deck="hld" data-slide="Storage engines and indexes">HLD · Storage engines and indexes</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,70 @@
+<section class="slide" data-sec="MongoDB modelling" data-title="Time-series collections and TTL indexes">
+  <h2>For monitoring data, a time-series collection applies the bucket pattern for you, and a TTL index deletes old data on its own</h2>
+  <p class="dek">A <b>time-series collection</b> (MongoDB 5.0 and later) accepts one document per measurement but stores them internally in compressed buckets, grouped by the <code>metaField</code>, here the host, and by time. Queries look like queries on ordinary documents. A <b>TTL index</b> on a date field tells a background task, which runs every 60 seconds, to delete documents older than <code>expireAfterSeconds</code>. That suits sessions, one-time tokens and raw metrics. Time-series collections take the same option, <code>expireAfterSeconds</code>, at creation.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">timeseries.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  the same 1,008,000 CPU samples: big_metrics is a time-series collection; copy them into plain documents
+db.metrics_plain.drop();
+db.big_metrics.aggregate([{ $project: { _id: 0, host: 1, ts: 1, cpu: 1 } }, { $out: 'metrics_plain' }]);
+db.metrics_plain.createIndex({ host: 1, ts: 1 });
+db.adminCommand({ fsync: 1 });                                   // flush to disk first, so both sizes are settled
+const size = name =&gt; db.getCollection(name).aggregate([{ $collStats: { storageStats: {} } }]).next().storageStats;
+const mb = b =&gt; (b / 1024 / 1024).toFixed(1) + ' MB';
+const t = size('big_metrics'), p = size('metrics_plain');
+print('time-series:', mb(t.storageSize), 'data +', mb(t.totalIndexSize), 'indexes');
+print('plain:      ', mb(p.storageSize), 'data +', mb(p.totalIndexSize), 'indexes');
+
+// 2  hourly averages for one host and one day
+show(db.big_metrics.aggregate([
+  { $match: { host: 'host-07', ts: { $gte: ISODate('2026-03-05T00:00:00Z'), $lt: ISODate('2026-03-05T03:00:00Z') } } },
+  { $group: { _id: { $dateTrunc: { date: '$ts', unit: 'hour' } }, avgCpu: { $avg: '$cpu' }, samples: { $sum: 1 } } },
+  { $sort: { _id: 1 } }
+]));
+db.metrics_plain.drop();
+
+// 3  a TTL index: the server deletes documents once their date is older than expireAfterSeconds
+db.sessions.drop();
+db.sessions.createIndex({ lastSeen: 1 }, { expireAfterSeconds: 30 });
+const now = Date.now();
+db.sessions.insertMany([
+  { _id: 'stale', lastSeen: new Date(now - 120 * 1000) },
+  { _id: 'fresh', lastSeen: new Date(now + 600 * 1000) }
+]);
+print('right after insert:', db.sessions.countDocuments());
+sleep(65 * 1000);                                                // the TTL monitor runs every 60 seconds
+print('65 seconds later:  ', db.sessions.countDocuments(), JSON.stringify(db.sessions.find().toArray().map(d =&gt; d._id)));
+db.sessions.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · timeseries.js · the plain copy's sizes vary slightly by run</div>
+<pre><code class="language-plaintext">time-series: 0.8 MB data + 0.4 MB indexes
+plain:       20.1 MB data + 38.9 MB indexes
+{ _id: ISODate('2026-03-05T00:00:00.000Z'), avgCpu: 50.3, samples: 60 }
+{ _id: ISODate('2026-03-05T01:00:00.000Z'), avgCpu: 50.3, samples: 60 }
+{ _id: ISODate('2026-03-05T02:00:00.000Z'), avgCpu: 50.3, samples: 60 }
+right after insert: 2
+65 seconds later:   1 ["fresh"]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>timeField</code></td><td>The measurement's timestamp; required</td></tr>
+            <tr><td><code>metaField</code></td><td>What identifies the series: host, sensor, account. Buckets never mix values</td></tr>
+            <tr><td><code>granularity</code></td><td><code>seconds</code>, <code>minutes</code> or <code>hours</code>: how far apart samples arrive, which sizes the buckets</td></tr>
+            <tr><td><code>expireAfterSeconds</code></td><td>Retention: whole buckets are deleted once older</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">Twenty-five times smaller</span>The 1,008,000 samples took 0.8 MB of data as a time-series collection, against 20.1 MB as plain documents, and 0.4 MB of indexes against 38.9 MB. Synthetic samples this regular compress unusually well; with real metrics expect a smaller saving, but still several times.</div>
+    <div class="note warn"><span class="lbl">TTL is approximate</span>The stale session vanished within the 65 seconds, not at the 30-second mark: the TTL monitor runs once a minute and may fall behind on a busy server. Never rely on TTL for security expiry: also check the timestamp in the query that uses the document.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For metrics I use a time-series collection with the source as the meta field and a retention period, and I keep rollups in a separate collection via <code>$merge</code>. A TTL index handles expiry for sessions and tokens." The SQL side of the same store is in <a data-deck="db" data-slide="Case study: a metrics and monitoring store">the monitoring case study</a>.</div>
+  </div>
+</section>

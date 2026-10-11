@@ -1,0 +1,166 @@
+<section class="slide" data-sec="SQL essentials" data-title="Filtering, sorting and limiting rows">
+  <h2>"The top three" means sort first, then limit: ROWNUM and a TOP without ORDER BY both limit first</h2>
+  <p class="dek">Without <code>ORDER BY</code>, rows come back in whatever order the plan produces, and that order can change when the data or the plan changes. Oracle assigns <code>ROWNUM</code> as rows leave <code>WHERE</code>, before any sort. So <code>WHERE ROWNUM &lt;= 3 ORDER BY total DESC</code> sorts three arbitrary rows; it does not find the three largest. The standard <code>FETCH FIRST</code> and SQL Server's <code>TOP</code> with an <code>ORDER BY</code> sort first. <code>WITH TIES</code> returns every row that ties with the last one. Dates need the half-open range again: <code>BETWEEN</code> includes the end point, and for a timestamp that end point is midnight.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">limiting.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  ROWNUM is assigned before ORDER BY: these are 3 arbitrary orders, then sorted
+SELECT order_id, total FROM orders WHERE ROWNUM &lt;= 3 ORDER BY total DESC;
+
+--    sort first, then keep 3
+SELECT order_id, total FROM orders ORDER BY total DESC FETCH FIRST 3 ROWS ONLY;
+
+-- 2  FETCH FIRST sorts first; WITH TIES keeps rows equal to the last one
+SELECT emp_id, name, salary FROM employees ORDER BY salary DESC FETCH FIRST 6 ROWS ONLY;
+SELECT emp_id, name, salary FROM employees ORDER BY salary DESC FETCH FIRST 6 ROWS WITH TIES;
+
+-- 3  BETWEEN on a timestamp stops at midnight of the last day
+SELECT COUNT(*) AS between_feb_1_and_27
+FROM   orders WHERE placed_at BETWEEN DATE '2026-02-01' AND DATE '2026-02-27';
+SELECT COUNT(*) AS half_open_to_feb_28
+FROM   orders WHERE placed_at &gt;= DATE '2026-02-01' AND placed_at &lt; DATE '2026-02-28';</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · limiting.ora.sql</div>
+<pre><code class="language-plaintext">ORDER_ID   TOTAL
+-------- -------
+    1001 1328.90
+    1002  699.00
+    1003  187.00
+
+3 rows selected.
+
+ORDER_ID   TOTAL
+-------- -------
+    1007 2598.00
+    1013 1988.00
+    1005 1899.00
+
+3 rows selected.
+
+EMP_ID NAME         SALARY
+------ ------------ ------
+     1 Maya Iyer    250000
+     9 Wen Li       185000
+     2 Omar Haddad  180000
+     3 Lena Fischer 175000
+     6 Tom Becker   155000
+     4 Ravi Menon   150000
+
+6 rows selected.
+
+EMP_ID NAME         SALARY
+------ ------------ ------
+     1 Maya Iyer    250000
+     9 Wen Li       185000
+     2 Omar Haddad  180000
+     3 Lena Fischer 175000
+     6 Tom Becker   155000
+     4 Ravi Menon   150000
+     5 Sara Lopez   150000
+
+7 rows selected.
+
+BETWEEN_FEB_1_AND_27
+--------------------
+                   5
+
+1 row selected.
+
+HALF_OPEN_TO_FEB_28
+-------------------
+                  6
+
+1 row selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">limiting.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  TOP without ORDER BY: whichever 3 rows come first
+SELECT TOP (3) order_id, total FROM orders;
+
+--    sort first, then keep 3
+SELECT TOP (3) order_id, total FROM orders ORDER BY total DESC;
+
+-- 2  TOP with ORDER BY; WITH TIES keeps rows equal to the last one
+SELECT TOP (6) emp_id, name, salary FROM employees ORDER BY salary DESC;
+SELECT TOP (6) WITH TIES emp_id, name, salary FROM employees ORDER BY salary DESC;
+
+-- 3  BETWEEN on a timestamp stops at midnight of the last day
+SELECT COUNT(*) AS between_feb_1_and_27
+FROM   orders WHERE placed_at BETWEEN '2026-02-01' AND '2026-02-27';
+SELECT COUNT(*) AS half_open_to_feb_28
+FROM   orders WHERE placed_at &gt;= '2026-02-01' AND placed_at &lt; '2026-02-28';</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · limiting.mss.sql</div>
+<pre><code class="language-plaintext">order_id   total
+-------- -------
+    1001 1328.90
+    1002  699.00
+    1003  187.00
+
+(3 rows affected)
+order_id   total
+-------- -------
+    1007 2598.00
+    1013 1988.00
+    1005 1899.00
+
+(3 rows affected)
+emp_id name         salary
+------ ------------ ------
+     1 Maya Iyer    250000
+     9 Wen Li       185000
+     2 Omar Haddad  180000
+     3 Lena Fischer 175000
+     6 Tom Becker   155000
+     5 Sara Lopez   150000
+
+(6 rows affected)
+emp_id name         salary
+------ ------------ ------
+     1 Maya Iyer    250000
+     9 Wen Li       185000
+     2 Omar Haddad  180000
+     3 Lena Fischer 175000
+     6 Tom Becker   155000
+     4 Ravi Menon   150000
+     5 Sara Lopez   150000
+
+(7 rows affected)
+between_feb_1_and_27
+--------------------
+                   5
+
+(1 rows affected)
+half_open_to_feb_28
+-------------------
+                  6
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Need</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th></tr></thead>
+      <tbody>
+        <tr><td>First n after sorting</td><td><code>ORDER BY … FETCH FIRST n ROWS ONLY</code></td><td><code>SELECT TOP (n) … ORDER BY …</code></td><td><code>.sort({…}).limit(n)</code></td></tr>
+        <tr><td>Page k of size n</td><td colspan="2"><code>ORDER BY … OFFSET (k-1)*n ROWS FETCH NEXT n ROWS ONLY</code> works in both. For deep pages, prefer keyset paging: see <a data-deck="db" data-slide="Pagination: OFFSET against keyset">OFFSET against keyset</a>.</td><td><code>.skip((k-1)*n).limit(n)</code></td></tr>
+        <tr><td>Include ties at the cut</td><td><code>FETCH FIRST n ROWS WITH TIES</code></td><td><code>TOP (n) WITH TIES</code></td><td>No direct equivalent; filter on the nth value</td></tr>
+        <tr><td>One calendar day</td><td colspan="3"><code>col &gt;= day AND col &lt; day + 1</code>: index-friendly, and the boundary belongs to exactly one day</td></tr>
+        <tr><td>Case-insensitive match</td><td><code>UPPER(name) LIKE 'ASHA%'</code>, plus a function-based index</td><td>Already case-insensitive under a <code>CI</code> collation</td><td>A collation on the query or the index</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The ROWNUM trap</span>Query 1 returned orders 1001 to 1003, the first three rows read, sorted among themselves. The real top three by total are 1007, 1013 and 1005. Old code that pages with <code>ROWNUM</code> needs the sort in an inner query: <code>SELECT * FROM (SELECT … ORDER BY total DESC) WHERE ROWNUM &lt;= 3</code>.</div>
+    <div class="note warn"><span class="lbl">BETWEEN and timestamps</span><code>BETWEEN '2026-02-01' AND '2026-02-27'</code> found 5 orders, because order 1011 at 21:10 on the 27th falls after the upper bound, midnight. The half-open range found all 6. Never write <code>23:59:59</code> as an upper bound either: it misses the last second's fractions.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Row order is undefined without <code>ORDER BY</code>, so any limit needs one, and a unique tie-breaker such as the primary key to make paging stable. Then I use <code>FETCH FIRST</code> or <code>TOP</code>, never <code>ROWNUM</code> with an outer sort."</div>
+  </div>
+</section>

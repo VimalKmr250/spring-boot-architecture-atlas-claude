@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Advanced SQL" data-title="ROW_NUMBER, RANK and DENSE_RANK">
+  <h2>Window functions compute across related rows without collapsing them; the three ranking functions differ only on ties</h2>
+  <p class="dek">A window function sees a <b>window</b> of rows related to the current one, defined by <code>OVER (PARTITION BY … ORDER BY …)</code>, and returns one value per row; <code>GROUP BY</code> would return one row per group. The ranking functions number rows within each partition. <code>ROW_NUMBER</code> gives every row a distinct number, breaking ties arbitrarily. <code>RANK</code> gives tied rows the same number, then skips. <code>DENSE_RANK</code> gives tied rows the same number and does not skip. Ravi and Sara both earn 150,000, which is where the three disagree.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ranking.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  three ways to number rows within each department, highest salary first
+SELECT dept, name, salary,
+       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC) AS row_num,
+       RANK()       OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk,
+       DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS dense_rnk
+FROM   employees
+WHERE  dept IN ('Engineering', 'Payments')
+ORDER  BY dept, salary DESC, name;
+
+-- 2  a window function cannot go in WHERE: filter it one level up
+SELECT dept, name, salary
+FROM  (SELECT dept, name, salary,
+              DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS dense_rnk
+       FROM   employees) ranked
+WHERE  dense_rnk &lt;= 2
+ORDER  BY dept, salary DESC, name;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · ranking.sql</div>
+<pre><code class="language-plaintext">DEPT        NAME         SALARY ROW_NUM RNK DENSE_RNK
+----------- ------------ ------ ------- --- ---------
+Engineering Omar Haddad  180000       1   1         1
+Engineering Tom Becker   155000       2   2         2
+Engineering Ravi Menon   150000       3   3         3
+Engineering Sara Lopez   150000       4   3         3
+Payments    Wen Li       185000       1   1         1
+Payments    Lena Fischer 175000       2   2         2
+Payments    Uma Nair     140000       3   3         3
+Payments    Victor Chan  140000       4   3         3
+
+8 rows selected.
+
+DEPT        NAME         SALARY
+----------- ------------ ------
+Engineering Omar Haddad  180000
+Engineering Tom Becker   155000
+Executive   Maya Iyer    250000
+Payments    Wen Li       185000
+Payments    Lena Fischer 175000
+Support     Yara Saleh    90000
+Support     Kai Tanaka    72000
+
+7 rows selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span>The same file prints the same rows on SQL Server, ties included.</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ranking.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// $setWindowFields: the same three numberings in MongoDB 5.0+
+show(db.employees.aggregate([
+  { $match: { dept: 'Payments' } },
+  { $setWindowFields: {
+      partitionBy: '$dept', sortBy: { salary: -1 },
+      output: { rowNum: { $documentNumber: {} }, rnk: { $rank: {} }, denseRnk: { $denseRank: {} } } } },
+  { $project: { _id: 0, name: 1, salary: 1, rowNum: 1, rnk: 1, denseRnk: 1 } }
+]));</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · ranking.js</div>
+<pre><code class="language-plaintext">{ name: 'Wen Li', salary: 185000, rowNum: 1, rnk: 1, denseRnk: 1 }
+{ name: 'Lena Fischer', salary: 175000, rowNum: 2, rnk: 2, denseRnk: 2 }
+{ name: 'Uma Nair', salary: 140000, rowNum: 3, rnk: 3, denseRnk: 3 }
+{ name: 'Victor Chan', salary: 140000, rowNum: 4, rnk: 3, denseRnk: 3 }</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Question</th><th>Use</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td>Exactly one row per group: the latest payment per order</td><td><code>ROW_NUMBER() … = 1</code></td><td>Ties must not produce two rows. Add a unique tie-breaker to the <code>ORDER BY</code> so the choice is repeatable</td></tr>
+        <tr><td>Top 3 salaries per department, ties included</td><td><code>DENSE_RANK() &lt;= 3</code></td><td>Three distinct salary levels, however many people share them</td></tr>
+        <tr><td>Competition ranking: 1, 2, 2, 4</td><td><code>RANK()</code></td><td>The position after a tie reflects how many rows came before</td></tr>
+        <tr><td>Remove duplicates, keep one</td><td><code>ROW_NUMBER() OVER (PARTITION BY the duplicate key …) &gt; 1</code></td><td>Numbers each copy; delete all but number 1. See <a data-deck="db" data-slide="Find and delete duplicate rows">the duplicates drill</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Non-deterministic ROW_NUMBER</span>Ravi and Sara got row numbers 3 and 4 because the outer <code>ORDER BY</code> sorted by name; inside the window, the order between them is arbitrary. A query that keeps "row 1" with a tie in the window's <code>ORDER BY</code> can return a different row tomorrow. Always end the window's sort with a unique column.</div>
+    <div class="note warn"><span class="lbl">Filtering on a window</span>Window functions run at the <code>SELECT</code> step, after <code>WHERE</code>, so <code>WHERE dense_rnk &lt;= 2</code> is not allowed in the same query level. Wrap it in a subquery or CTE, as query 2 does. Oracle 26ai also accepts <code>QUALIFY ROW_NUMBER() OVER (…) = 1</code>, a clause that filters on a window function directly; SQL Server 2025 rejects it, and so do older Oracle releases.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Top N per group is a ranking window partitioned by the group, filtered in an outer query. I pick <code>DENSE_RANK</code> when ties should share a place and <code>ROW_NUMBER</code> when I need exactly N rows." It is the most common SQL coding question: see <a data-deck="db" data-slide="Top N per group">Top N per group</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,122 @@
+<section class="slide" data-sec="Java and Spring" data-title="Dialect traps under JPA and JDBC">
+  <h2>The same JDBC code can fail, or quietly slow down, depending on which database is behind the DataSource</h2>
+  <p class="dek">JDBC and JPA hide most of the differences between databases, but not all of them, and the ones that leak through are found in production. The program below sends identical calls to both engines. A long <code>IN</code> list, which is what <code>findAllById(ids)</code> generates, hits a parameter limit. An empty string becomes NULL on Oracle. An isolation level is refused. And a <code>String</code> parameter arrives at SQL Server as <code>NVARCHAR</code>, which turns an index seek into a scan.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DialectTraps.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.Collections;
+
+/** Four ways the same JDBC code behaves differently on Oracle and SQL Server. */
+public class DialectTraps {
+    static final String ORACLE = "jdbc:oracle:thin:@//localhost:1521/FREEPDB1";
+    static final String MSSQL = "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false";
+
+    public static void main(String[] args) throws SQLException {
+        try (Connection ora = DriverManager.getConnection(ORACLE, "shop", "Atlas_pw1");
+             Connection mss = DriverManager.getConnection(MSSQL, "sa", "Atlas_pw1!")) {
+
+            // 1  a long IN list, as an ORM builds for findAllById(ids): each engine has a limit
+            System.out.println("1 IN list with 65,536 values on Oracle:  " + inList(ora, 65_536));
+            System.out.println("  IN list with 2,101 values on SQL Server: " + inList(mss, 2_101));
+
+            // 2  the empty string: Oracle stores NULL, so a NOT NULL column rejects it
+            for (Connection c : new Connection[] {ora, mss}) {
+                c.setAutoCommit(false);
+                try (PreparedStatement ps = c.prepareStatement(
+                        "UPDATE customers SET name = ? WHERE customer_id = 10")) {
+                    ps.setString(1, "");
+                    System.out.println("2 setString(\"\") on " + engine(c) + ": " + ps.executeUpdate() + " row updated");
+                } catch (SQLException e) {
+                    System.out.println("2 setString(\"\") on " + engine(c) + ": " + firstLine(e));
+                }
+                c.rollback();
+                c.setAutoCommit(true);
+            }
+
+            // 3  isolation levels: Oracle accepts only READ COMMITTED and SERIALIZABLE
+            try {
+                ora.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            } catch (SQLException e) {
+                System.out.println("3 REPEATABLE_READ on Oracle: " + firstLine(e));
+            }
+
+            // 4  String parameters reach SQL Server as NVARCHAR unless the driver is told otherwise
+            try (Statement s = mss.createStatement()) {
+                s.execute("CREATE INDEX big_customers_email_ix ON big_customers (email)");
+                s.execute("DBCC FREEPROCCACHE WITH NO_INFOMSGS");
+            }
+            lookups(mss);                                             // default: sendStringParametersAsUnicode=true
+            try (Connection ascii = DriverManager.getConnection(MSSQL + ";sendStringParametersAsUnicode=false", "sa", "Atlas_pw1!")) {
+                lookups(ascii);
+            }
+            try (Statement s = mss.createStatement(); ResultSet rs = s.executeQuery("""
+                    SELECT SUBSTRING(t.text, 2, CHARINDEX(')', t.text) - 1) AS parameter,
+                           qs.execution_count, qs.total_logical_reads / qs.execution_count AS reads_per_lookup
+                    FROM   sys.dm_exec_query_stats qs CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) t
+                    WHERE  t.text LIKE '%FROM big_customers WHERE email%' AND t.text NOT LIKE '%dm_exec%'
+                    ORDER  BY reads_per_lookup DESC""")) {
+                while (rs.next()) System.out.printf("4 %-20s %d lookups, %d page reads each%n",
+                        rs.getString(1), rs.getLong(2), rs.getLong(3));
+                s.execute("DROP INDEX big_customers_email_ix ON big_customers");
+            }
+        }
+    }
+
+    static String inList(Connection c, int n) {
+        String sql = "SELECT COUNT(*) FROM big_customers WHERE customer_id IN (" + String.join(",", Collections.nCopies(n, "?")) + ")";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            for (int i = 1; i &lt;= n; i++) ps.setInt(i, i);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1) + " rows"; }
+        } catch (SQLException e) {
+            return firstLine(e);
+        }
+    }
+
+    static void lookups(Connection c) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement("SELECT customer_id FROM big_customers WHERE email = ?")) {
+            for (int i = 1; i &lt;= 100; i++) {
+                ps.setString(1, "user" + i + "@example.com");
+                try (ResultSet rs = ps.executeQuery()) { rs.next(); }
+            }
+        }
+    }
+
+    static String engine(Connection c) throws SQLException { return c.getMetaData().getDatabaseProductName(); }
+
+    static String firstLine(SQLException e) { return e.getMessage().lines().findFirst().orElse(""); }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · DialectTraps.java</div>
+<pre><code class="language-plaintext">1 IN list with 65,536 values on Oracle:  ORA-01795: maximum number of expressions in a list is 65535
+  IN list with 2,101 values on SQL Server: The incoming request has too many parameters. The server supports a maximum of 2100 parameters. Reduce the number of parameters and resend the request.
+2 setString("") on Oracle: ORA-01407: cannot update ("SHOP"."CUSTOMERS"."NAME") to NULL
+2 setString("") on Microsoft SQL Server: 1 row updated
+3 REPEATABLE_READ on Oracle: ORA-17030: READ_COMMITTED and SERIALIZABLE are the only valid transaction levels.
+4 @P0 nvarchar(4000)   100 lookups, 88 page reads each
+4 @P0 varchar(8000)    100 lookups, 2 page reads each</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Trap</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td>IN-list limits: 2,100 parameters per statement on SQL Server; 65,535 list items on Oracle 26ai, 1,000 on 19c</td><td>Chunk the ids, join to a temporary table, or pass an array (Oracle <code>MEMBER OF</code>, SQL Server <code>OPENJSON</code> or a table-valued parameter)</td></tr>
+            <tr><td><code>''</code> is NULL on Oracle</td><td>Validate before saving; never use <code>''</code> as "no value" in portable code</td></tr>
+            <tr><td>Oracle has no REPEATABLE READ</td><td>READ COMMITTED with locking or versions, or SERIALIZABLE</td></tr>
+            <tr><td>Unicode parameters on <code>VARCHAR</code> columns</td><td><code>sendStringParametersAsUnicode=false</code>, or <code>NVARCHAR</code> columns throughout</td></tr>
+            <tr><td>Generated keys</td><td>Name the column: <code>prepareStatement(sql, new String[] {"ID"})</code> works on both</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">88 pages instead of 2</span>The same 100 lookups by email cost 88 page reads each with the driver's default, <code>@P0 nvarchar(4000)</code>, and 2 each with <code>sendStringParametersAsUnicode=false</code>, <code>@P0 varchar(8000)</code>. Nothing fails; the database just works 44 times harder on every login. See <a data-deck="db" data-slide="Why the optimiser ignores your index">Why the optimiser ignores your index</a> for the plan.</div>
+    <div class="note warn"><span class="lbl">Limits move between releases</span>The well-known Oracle limit of 1,000 items in an <code>IN</code> list (ORA-01795) is 65,535 on 26ai, as the error message above states. Code that chunks at 1,000 still works everywhere; code written against 26ai's limit fails on 19c. Test against the version you run in production.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Portability ends at the edges: parameter limits, empty strings, isolation levels, Unicode parameters, identity retrieval. I run integration tests against the real engine and version, not H2." That is the <a data-deck="db" data-slide="Testing against real engines with Testcontainers">Testcontainers slide</a>.</div>
+  </div>
+</section>

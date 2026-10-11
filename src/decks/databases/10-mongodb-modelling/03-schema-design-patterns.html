@@ -1,0 +1,73 @@
+<section class="slide" data-sec="MongoDB modelling" data-title="Schema design patterns">
+  <h2>A handful of named patterns cover most document designs; each trades write work for cheaper reads</h2>
+  <p class="dek">MongoDB's documentation names a set of recurring schema patterns, and interviews use the names. The script shows three of them. The <b>attribute</b> pattern stores varying properties as key-value pairs, so one index serves them all. The <b>bucket</b> pattern groups many small time-series entries into one document per period. <b>Schema versioning</b> lets old and new shapes coexist while the application migrates them lazily. The table covers the others, all of which appear elsewhere in this tab.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">patterns.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  attribute pattern: varying product specs as key-value pairs, one index serves every key
+db.specs.drop();
+db.specs.insertMany([
+  { _id: 101, name: 'Aero 14 Laptop', specs: [{ k: 'ram_gb', v: 16 }, { k: 'weight_kg', v: 1.2 }] },
+  { _id: 102, name: 'Forge 16 Laptop', specs: [{ k: 'ram_gb', v: 32 }, { k: 'weight_kg', v: 2.1 }] },
+  { _id: 109, name: 'Burr Grinder', specs: [{ k: 'burr_mm', v: 40 }, { k: 'weight_kg', v: 2.9 }] }
+]);
+db.specs.createIndex({ 'specs.k': 1, 'specs.v': 1 });
+const light = db.specs.find({ specs: { $elemMatch: { k: 'weight_kg', v: { $lt: 2.5 } } } }, { name: 1 });
+show(light);
+print('plan:', stages(light.explain()));
+
+// 2  bucket pattern: one document per host per hour instead of one per sample
+db.cpu_buckets.drop();
+for (const [m, v] of [[0, 41], [1, 44], [2, 93]]) {
+  db.cpu_buckets.updateOne(
+    { host: 'db-1', hour: ISODate('2026-03-01T10:00:00Z'), count: { $lt: 60 } },
+    { $push: { samples: { m, v } }, $inc: { count: 1, sum: v }, $max: { peak: v } },
+    { upsert: true });
+}
+show(db.cpu_buckets.find({}, { _id: 0 }));
+
+// 3  schema versioning: old and new shapes live side by side, the reader handles both
+db.people.drop();
+db.people.insertMany([
+  { _id: 1, name: 'Asha Rao', phone: '+91 98450 00001' },                                   // version 1
+  { _id: 2, schemaVersion: 2, name: 'Ben Clark', phones: [{ type: 'mobile', n: '+44 7700 900002' }] }
+]);
+db.people.find().sort({ _id: 1 }).forEach(p =&gt;
+  print(p.name, '-&gt;', (p.schemaVersion ?? 1) &gt;= 2 ? p.phones.map(x =&gt; x.n) : [p.phone]));
+db.specs.drop(); db.cpu_buckets.drop(); db.people.drop();</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · patterns.js</div>
+<pre><code class="language-plaintext">{ _id: 101, name: 'Aero 14 Laptop' }
+{ _id: 102, name: 'Forge 16 Laptop' }
+plan: PROJECTION_SIMPLE &gt; FETCH &gt; IXSCAN specs.k_1_specs.v_1
+{ hour: ISODate('2026-03-01T10:00:00.000Z'), host: 'db-1', count: 3, peak: 93, samples: [ { m: 0, v: 41 }, { m: 1, v: 44 }, { m: 2, v: 93 } ], sum: 178 }
+Asha Rao -&gt; [ '+91 98450 00001' ]
+Ben Clark -&gt; [ '+44 7700 900002' ]</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Pattern</th><th>Problem</th><th>Shape</th><th>In this tab</th></tr></thead>
+      <tbody>
+        <tr><td>Attribute</td><td>Many optional fields, each needing an index</td><td><code>specs: [{ k, v }]</code>, one index on <code>(specs.k, specs.v)</code></td><td>Above: one index served the weight query</td></tr>
+        <tr><td>Bucket</td><td>Millions of tiny documents, one per measurement</td><td>One document per host per hour, with a capped array and running totals</td><td>Above; time-series collections automate it</td></tr>
+        <tr><td>Computed</td><td>An aggregate recomputed on every read</td><td>Maintain it on write with <code>$inc</code></td><td>The product rating</td></tr>
+        <tr><td>Subset</td><td>A large array of which only a few elements are shown</td><td>Embed the latest few; keep all of them in another collection</td><td>Latest reviews</td></tr>
+        <tr><td>Extended reference</td><td>A join on every read for one or two fields</td><td>Copy those fields next to the reference</td><td><code>customer: { id, name }</code> on orders</td></tr>
+        <tr><td>Outlier</td><td>A few documents far larger than the rest</td><td>An <code>overflow: true</code> flag and extra documents for those few</td><td>A product with 50,000 reviews</td></tr>
+        <tr><td>Polymorphic</td><td>Related entities with different fields</td><td>One collection, a <code>type</code> field, shared indexes</td><td>Card, UPI and wallet payments</td></tr>
+        <tr><td>Schema versioning</td><td>Changing shape without downtime</td><td>A <code>schemaVersion</code> field; read both, migrate gradually</td><td>Above; and <a data-deck="db" data-slide="Evolving a schema in SQL and in MongoDB">Evolving a schema</a></td></tr>
+        <tr><td>Tree</td><td>Hierarchies</td><td>Parent reference, ancestors array, or materialised path</td><td><code>categoryPath</code>; <a data-deck="db" data-slide="CTEs and recursive queries">$graphLookup</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">The bucket's upsert</span><code>count: { $lt: 60 }</code> in the filter means a full bucket no longer matches, so the next sample's upsert starts a new document. One statement either appends to the current bucket or opens the next. The running <code>sum</code>, <code>count</code> and <code>peak</code> answer most dashboard queries without reading the samples.</div>
+    <div class="note bad"><span class="lbl">Versioned shapes need tests</span>The reader above handles <code>phone</code> and <code>phones</code>. Every query and index must handle both until the old shape is gone, so track how many documents still carry version 1, and finish the migration.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Bucket for time series, computed and subset to keep a page to one read, extended reference instead of a join, attribute for sparse properties, and a schema version field for evolution. Each one moves work from read time to write time, so I apply it where reads dominate."</div>
+  </div>
+</section>

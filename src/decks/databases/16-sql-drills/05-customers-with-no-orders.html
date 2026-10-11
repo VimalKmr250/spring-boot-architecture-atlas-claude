@@ -1,0 +1,65 @@
+<section class="slide" data-sec="SQL drills" data-title="Customers with no orders">
+  <h2>Drill: "customers who never ordered", then "whose orders were all cancelled", then "who did not order this month"</h2>
+  <p class="dek">The first question is a plain anti-join, and the answer to give is <code>NOT EXISTS</code>, for the NULL reasons on <a data-deck="db" data-slide="EXISTS, IN, anti-joins and set operators">EXISTS, IN, anti-joins and set operators</a>. Interviewers then vary it. "Every order cancelled" is an EXISTS combined with a NOT EXISTS: at least one order, and no order that is not cancelled. "Nothing this month, and when did they last order" adds a date-bounded anti-join to an outer join that keeps the customers with no orders at all.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">no-orders.ora.sql · Oracle 26ai (no-orders.mss.sql differs only in the date literals)</div>
+<pre><code class="language-sql">-- 1  customers who have never ordered: the anti-join
+SELECT c.customer_id, c.name
+FROM   customers c
+WHERE  NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)
+ORDER  BY c.customer_id;
+
+-- 2  customers who ordered, but whose every order was cancelled
+SELECT c.customer_id, c.name
+FROM   customers c
+WHERE  EXISTS     (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)
+AND    NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id AND o.status &lt;&gt; 'CANCELLED')
+ORDER  BY c.customer_id;
+
+-- 3  customers with no order in March 2026, and when they last ordered at all
+SELECT c.customer_id, c.name, MAX(o.placed_at) AS last_order
+FROM   customers c
+LEFT   JOIN orders o ON o.customer_id = c.customer_id
+WHERE  NOT EXISTS (SELECT 1 FROM orders m
+                   WHERE m.customer_id = c.customer_id
+                   AND   m.placed_at &gt;= TIMESTAMP '2026-03-01 00:00:00'
+                   AND   m.placed_at &lt;  TIMESTAMP '2026-04-01 00:00:00')
+GROUP  BY c.customer_id, c.name
+ORDER  BY c.customer_id;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · no-orders.ora.sql</div>
+<pre><code class="language-plaintext">CUSTOMER_ID NAME
+----------- ---------
+          8 Hugo Lima
+         10 Jon Berg
+
+2 rows selected.
+
+CUSTOMER_ID NAME
+----------- ----------
+          9 Ines Sousa
+
+1 row selected.
+
+CUSTOMER_ID NAME      LAST_ORDER
+----------- --------- -------------------
+          2 Ben Clark 2026-02-20 07:55:00
+          8 Hugo Lima (null)
+         10 Jon Berg  (null)
+
+3 rows selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span><code>no-orders.mss.sql</code> returns the same rows. Its first draft used <code>CAST(… AS TIMESTAMP)</code> and failed with error 206: in SQL Server, <code>TIMESTAMP</code> is the old name of <code>ROWVERSION</code>, a row-version counter, not a date type.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>An anti-join is one hash or merge pass over both tables, or a seek per customer with an index on <code>orders.customer_id</code>. Query 3's LEFT JOIN with <code>MAX</code> keeps customers with no orders (last order NULL) instead of dropping them.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Why not <code>NOT IN</code>?" A NULL in the subquery returns nothing. "Why not <code>LEFT JOIN … IS NULL</code>?" It is fine on SQL Server, and stays an outer join on Oracle. "All orders cancelled, in one pass?" <code>GROUP BY</code> customer with <code>HAVING SUM(CASE WHEN status &lt;&gt; 'CANCELLED' THEN 1 ELSE 0 END) = 0</code>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Anti-join with NOT EXISTS. For 'only cancelled', EXISTS plus NOT EXISTS with the opposite condition, which is the shape of every 'all X are Y' question. And I check the time boundary: half-open, start of month inclusive, start of next month exclusive."</div>
+  </div>
+</section>

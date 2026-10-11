@@ -1,0 +1,116 @@
+<section class="slide" data-sec="Java and Spring" data-title="Testing against real engines with Testcontainers">
+  <h2>An in-memory database cannot reproduce Oracle's empty string or SQL Server's collation; a throwaway container of the real engine can</h2>
+  <p class="dek">Every trap in this tab is engine-specific: NULL handling, collations, parameter limits, locking, isolation. A test suite on H2 passes and production fails. <b>Testcontainers</b> starts a real database in Docker for the duration of a test class, with a random port, and removes it afterwards. The JUnit test below starts Oracle, SQL Server and MongoDB and checks one behaviour on each that an in-memory database would get wrong. With Spring Boot, <code>@ServiceConnection</code> on a container field also wires the application's <code>DataSource</code> or <code>MongoClient</code> to it automatically.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">EngineBehaviourTest.java · JUnit 6.0.3, Testcontainers 2.0.5</div>
+<pre><code class="language-java">import static org.junit.jupiter.api.Assertions.*;
+
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import java.sql.*;
+import java.util.List;
+import org.bson.Document;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.mongodb.MongoDBContainer;
+import org.testcontainers.mssqlserver.MSSQLServerContainer;
+import org.testcontainers.oracle.OracleContainer;
+
+/** Behaviour an in-memory database would get wrong, checked against the real engines in throwaway containers. */
+@Testcontainers
+class EngineBehaviourTest {
+    @Container static final MongoDBContainer mongo = new MongoDBContainer("mongo:8");
+    @Container static final MSSQLServerContainer mssql =
+            new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2025-latest")
+                    .acceptLicense()
+                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "1536");
+    @Container static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-free:slim");
+
+    @Test
+    void conditionalIncrementNeverOversells() {
+        try (var client = MongoClients.create(mongo.getConnectionString())) {
+            MongoCollection&lt;Document&gt; stock = client.getDatabase("test").getCollection("stock");
+            stock.insertOne(new Document("_id", "PHN-C2").append("onHand", 3).append("reserved", 0));
+            long granted = 0;
+            for (int i = 0; i &lt; 5; i++) {
+                granted += stock.updateOne(
+                        Filters.and(Filters.eq("_id", "PHN-C2"),
+                                    Filters.expr(new Document("$lt", List.of("$reserved", "$onHand")))),
+                        Updates.inc("reserved", 1)).getModifiedCount();
+            }
+            assertEquals(3, granted);
+        }
+    }
+
+    @Test
+    void emailUniquenessIgnoresCaseOnSqlServer() throws SQLException {
+        try (Connection c = DriverManager.getConnection(mssql.getJdbcUrl(), mssql.getUsername(), mssql.getPassword());
+             Statement s = c.createStatement()) {
+            s.execute("CREATE TABLE users (email VARCHAR(100) CONSTRAINT users_email_uk UNIQUE)");
+            s.execute("INSERT INTO users VALUES ('kai@example.com')");
+            SQLException e = assertThrows(SQLException.class, () -&gt; s.execute("INSERT INTO users VALUES ('KAI@example.com')"));
+            assertEquals(2627, e.getErrorCode());
+        }
+    }
+
+    @Test
+    void emptyStringIsNullOnOracle() throws SQLException {
+        try (Connection c = DriverManager.getConnection(oracle.getJdbcUrl(), oracle.getUsername(), oracle.getPassword());
+             Statement s = c.createStatement()) {
+            s.execute("CREATE TABLE users (name VARCHAR2(50) NOT NULL)");
+            try (PreparedStatement ps = c.prepareStatement("INSERT INTO users VALUES (?)")) {
+                ps.setString(1, "");
+                SQLException e = assertThrows(SQLException.class, ps::executeUpdate);
+                assertEquals(1400, e.getErrorCode());              // ORA-01400: cannot insert NULL
+            }
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · JUnit console launcher (excerpt: container start-up and results) · times vary by run</div>
+<pre><code class="language-plaintext">INFO  gvenzl/oracle-free:slim - Container gvenzl/oracle-free:slim started in PT42.1114801S
+…
+INFO  mongo:8 - Container mongo:8 started in PT3.9122512S
+…
+INFO  com/mssql/server:2025-latest - Container mcr.microsoft.com/mssql/server:2025-latest started in PT16.6546802S
+…
+╷
+├─ JUnit Jupiter ✔
+│  └─ EngineBehaviourTest ✔
+│     ├─ emptyStringIsNullOnOracle() ✔
+│     ├─ emailUniquenessIgnoresCaseOnSqlServer() ✔
+│     └─ conditionalIncrementNeverOversells() ✔
+├─ JUnit Platform Suite ✔
+└─ JUnit Vintage ✔
+
+Test run finished after 72379 ms
+…
+[         3 tests successful      ]
+[         0 tests failed          ]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Engine</th><th>Container class</th><th>Image used here</th></tr></thead>
+          <tbody>
+            <tr><td>Oracle</td><td><code>org.testcontainers.oracle.OracleContainer</code></td><td><code>gvenzl/oracle-free:slim</code>, a community image built for tests</td></tr>
+            <tr><td>SQL Server</td><td><code>org.testcontainers.mssqlserver.MSSQLServerContainer</code></td><td>Microsoft's image; <code>acceptLicense()</code> is required</td></tr>
+            <tr><td>MongoDB</td><td><code>org.testcontainers.mongodb.MongoDBContainer</code></td><td><code>mongo:8</code>, standalone; add <code>withReplicaSet()</code> for transactions and change streams</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">About a minute for three engines</span>Oracle took about 42 seconds to start, SQL Server about 17 and MongoDB about 4; the whole run, with the tests, took 72 seconds. Share containers across test classes, for example with a static base class or Spring's context caching, and the start-up is paid once per build.</div>
+    <div class="note warn"><span class="lbl">Resources</span>Three databases at once need several gigabytes of memory in Docker. The SQL Server container is capped here with <code>MSSQL_MEMORY_LIMIT_MB</code>. In CI, run the engine-specific suites in separate jobs if memory is tight.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Repository and SQL tests run against the same engine and major version as production, in Testcontainers, so dialect traps fail in the build. Unit tests of business logic don't touch a database at all." The wider strategy is on <a data-deck="deck" data-slide="Testing strategy">Testing strategy</a>.</div>
+  </div>
+</section>

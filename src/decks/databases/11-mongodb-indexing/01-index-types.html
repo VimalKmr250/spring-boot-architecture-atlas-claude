@@ -1,0 +1,63 @@
+<section class="slide" data-sec="MongoDB indexing" data-title="MongoDB index types">
+  <h2>MongoDB indexes are B-trees like SQL ones, with extras for documents: array elements, partial sets, collations and expiry</h2>
+  <p class="dek">Every collection has a unique index on <code>_id</code>. Further indexes are single-field or compound, ascending or descending, and the same reasoning applies as in SQL: selectivity, column order, covering. What is different comes from the document model. An index on a field inside an array is <b>multikey</b>: one entry per element. A <b>partial</b> index includes only documents matching a filter. A <b>collation</b> makes comparisons, uniqueness included, case-insensitive. A <b>TTL</b> option turns a date index into an expiry rule.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">index-types.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  multikey: an index on a field inside an array has one entry per element
+db.orders.createIndex({ 'items.productId': 1 });
+const mk = db.orders.find({ 'items.productId': 110 }).explain('executionStats');
+print('items.productId = 110:', mk.executionStats.nReturned, 'orders |', stages(mk),
+      '| multikey:', mk.queryPlanner.winningPlan.inputStage.isMultiKey);
+
+// 2  partial: only FAILED orders are indexed, so only queries that include that condition can use it
+db.big_orders.createIndex({ customerId: 1 }, { partialFilterExpression: { status: 'FAILED' }, name: 'failed_by_customer' });
+print('with status FAILED:   ', stages(db.big_orders.find({ customerId: 4242, status: 'FAILED' }).explain()));
+print('without the condition:', stages(db.big_orders.find({ customerId: 4242 }).explain()));
+
+// 3  unique with a case-insensitive collation: 'ASHA@example.com' counts as a duplicate
+db.customers.createIndex({ email: 1 }, { unique: true, name: 'email_ci', collation: { locale: 'en', strength: 2 } });
+try { db.customers.insertOne({ _id: 11, name: 'Asha R', email: 'ASHA@example.com' }); }
+catch (e) { print(e.message); }
+
+// 4  sizes: what each index costs
+show(db.big_orders.aggregate([{ $collStats: { storageStats: {} } },
+  { $project: { _id: 0, indexSizesKB: { $arrayToObject: { $map: { input: { $objectToArray: '$storageStats.indexSizes' },
+      in: { k: '$$this.k', v: { $round: [{ $divide: ['$$this.v', 1024] }, 0] } } } } } } }]));
+
+db.orders.dropIndex({ 'items.productId': 1 });
+db.big_orders.dropIndex('failed_by_customer');
+db.customers.dropIndex('email_ci');</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · index-types.js</div>
+<pre><code class="language-plaintext">items.productId = 110: 4 orders | FETCH &gt; IXSCAN items.productId_1 | multikey: true
+with status FAILED:    FETCH &gt; IXSCAN failed_by_customer
+without the condition: COLLSCAN
+E11000 duplicate key error collection: shop.customers index: email_ci collation: { locale: "en", caseLevel: false, caseFirst: "off", strength: 2, numericOrdering: false, alternate: "non-ignorable", maxVariable: "punct", normalization: false, backwards: false, version: "57.1" } dup key: { email: "CollationKey(0x294d37290a7a31572941473f31082d45410114)" }
+{ indexSizesKB: { _id_: 14440, failed_by_customer: 32 } }</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Index</th><th>Created with</th><th>Use it for</th></tr></thead>
+      <tbody>
+        <tr><td>Single / compound</td><td><code>{ a: 1, b: -1 }</code></td><td>Filters and sorts; compound order follows the ESR rule</td></tr>
+        <tr><td>Multikey</td><td>Automatic when an indexed field holds an array</td><td>"Orders containing product 110"; at most one array field per compound index</td></tr>
+        <tr><td>Unique</td><td><code>{ unique: true }</code></td><td>Natural keys, idempotency keys; with a collation, case-insensitive</td></tr>
+        <tr><td>Partial</td><td><code>{ partialFilterExpression: { status: 'FAILED' } }</code></td><td>Small hot subsets; also "unique among live documents"</td></tr>
+        <tr><td>TTL</td><td><code>{ expireAfterSeconds: n }</code> on a date</td><td>Sessions, tokens, raw events</td></tr>
+        <tr><td>Hashed</td><td><code>{ a: 'hashed' }</code></td><td>Even spread of a monotonic shard key; equality only</td></tr>
+        <tr><td>Text, wildcard, geospatial</td><td><code>'text'</code>, <code>'$**'</code>, <code>'2dsphere'</code></td><td>Simple word search, unpredictable fields, location queries</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">A partial index needs its condition</span>The query for customer 4242 without <code>status: 'FAILED'</code> could not use <code>failed_by_customer</code>, because the index does not contain the customer's other orders, and fell back to a collection scan. The query's filter must imply the index's filter expression.</div>
+    <div class="note warn"><span class="lbl">Size and write cost</span>The partial index took 32 KB against 14,440 KB for the <code>_id</code> index on the same 500,000 orders. Every index adds work to every insert, and a multikey index adds one entry per array element. <code>$indexStats</code> on the next slide finds the ones nobody uses.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Compound indexes in ESR order for the main queries; a unique index, with a collation if case should not matter, for anything that must be unique; partial indexes for hot subsets; TTL for expiry. Indexing an array field makes the index multikey, one entry per element."</div>
+  </div>
+</section>

@@ -1,0 +1,79 @@
+<section class="slide" data-sec="SQL drills" data-title="Top N per group">
+  <h2>Drill: "the two best-selling products in each category", the question every analytics interview asks in some form</h2>
+  <p class="dek">The pattern: compute the measure per item, number the items within each group with a window function, keep the first N in an outer query. The interesting work here is the grouping key. Products sit at different depths of the category tree, so <code>COALESCE</code> over two parent joins climbs to the top-level category. The second query shows the other classic form, <code>CROSS APPLY</code>: for each customer, run a small "top 2 orders" query. Both engines support it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">top-n.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- the two best-selling products (by revenue) in each top-level category
+WITH product_revenue AS (
+  SELECT top_cat.name AS category, p.sku, SUM(i.qty * i.unit_price) AS revenue
+  FROM   order_items i
+  JOIN   orders o       ON o.order_id = i.order_id AND o.status IN ('PAID', 'SHIPPED')
+  JOIN   products p     ON p.product_id = i.product_id
+  JOIN   categories c   ON c.category_id = p.category_id
+  LEFT   JOIN categories mid ON mid.category_id = c.parent_id
+  JOIN   categories top_cat  ON top_cat.category_id = COALESCE(mid.parent_id, c.parent_id, c.category_id)
+  GROUP  BY top_cat.name, p.sku
+)
+SELECT category, sku, revenue, rn
+FROM  (SELECT category, sku, revenue,
+              ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, sku) AS rn
+       FROM   product_revenue) ranked
+WHERE  rn &lt;= 2
+ORDER  BY category, rn;
+
+-- the same question per customer with CROSS APPLY: "for each customer, their two largest orders"
+SELECT c.name, t.order_id, t.total
+FROM   customers c
+CROSS  APPLY (SELECT o.order_id, o.total FROM orders o
+              WHERE  o.customer_id = c.customer_id
+              ORDER  BY o.total DESC
+              OFFSET 0 ROWS FETCH NEXT 2 ROWS ONLY) t
+WHERE  c.customer_id IN (1, 3)
+ORDER  BY c.name, t.total DESC;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · top-n.sql</div>
+<pre><code class="language-plaintext">CATEGORY    SKU     REVENUE RN
+----------- ------- ------- --
+Books       BK-DATA   45.00  1
+Books       BK-SQL    39.00  2
+Electronics LAP-14  3897.00  1
+Electronics LAP-16  1899.00  2
+Home        COF-GRD  278.00  1
+Home        COF-BNS  120.00  2
+
+6 rows selected.
+
+NAME     ORDER_ID   TOTAL
+-------- -------- -------
+Asha Rao     1001 1328.90
+Asha Rao     1011  748.50
+Chen Wei     1007 2598.00
+Chen Wei     1015  478.90
+
+4 rows selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span>The same file returns the same six products and four orders.</div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Variant</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Exactly N, ties broken</td><td><code>ROW_NUMBER</code> with a tie-breaker (here <code>sku</code>)</td></tr>
+            <tr><td>Top N values, ties included</td><td><code>DENSE_RANK</code></td></tr>
+            <tr><td>Per row of another table, with an index</td><td><code>CROSS APPLY (… OFFSET 0 ROWS FETCH NEXT 2 ROWS ONLY)</code>: a seek per customer</td></tr>
+            <tr><td>Just the maximum per group</td><td><code>GROUP BY</code> with <code>MAX</code>, or Oracle's <code>KEEP (DENSE_RANK FIRST …)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>The window version sorts all rows once by group and measure: O(n log n). <code>CROSS APPLY</code> runs one small query per outer row, so it wins with few outer rows and an index on <code>(customer_id, total)</code>, and loses badly without one.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Ties for second place?" Switch to <code>DENSE_RANK</code> and say how many rows that can return. "Include categories with no sales?" Start from <code>categories</code> with a LEFT JOIN. "Only this month?" Filter before ranking, not after.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>ROW_NUMBER() OVER (PARTITION BY group ORDER BY measure DESC)</code> in a CTE, then <code>WHERE rn &lt;= N</code>. If I need it per row of another table with a good index, <code>CROSS APPLY</code> with <code>OFFSET 0 ROWS FETCH NEXT N ROWS ONLY</code>, which both engines accept." The window functions are on <a data-deck="db" data-slide="ROW_NUMBER, RANK and DENSE_RANK">ROW_NUMBER, RANK and DENSE_RANK</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,63 @@
+<section class="slide" data-sec="MongoDB indexing" data-title="Reading explain and finding slow queries">
+  <h2>In MongoDB explain output, compare three numbers: documents returned, index keys examined, documents examined</h2>
+  <p class="dek"><code>cursor.explain('executionStats')</code> runs the query and reports the winning plan as a tree of stages, plus counters. The ideal is <code>nReturned ≈ totalKeysExamined ≈ totalDocsExamined</code>: every key read led to a document that was returned. A <code>COLLSCAN</code>, or many more documents examined than returned, means the index is missing or does not match the query. To find slow queries in the first place, the <b>profiler</b> records operations slower than a threshold, and <code>$indexStats</code> shows which indexes are actually used.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">explain.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// the numbers that matter in explain('executionStats')
+const report = (label, ex) =&gt; print(label.padEnd(18), stages(ex).padEnd(42),
+  'returned', String(ex.executionStats.nReturned).padStart(3),
+  '| keys', String(ex.executionStats.totalKeysExamined).padStart(6),
+  '| docs', String(ex.executionStats.totalDocsExamined).padStart(6));
+
+// 1  one customer's orders, before and after an index
+const q = { customerId: 4242 };
+report('no index', db.big_orders.find(q).explain('executionStats'));
+db.big_orders.createIndex({ customerId: 1 });
+report('{ customerId: 1 }', db.big_orders.find(q).explain('executionStats'));
+
+// 2  the profiler records operations slower than slowms, with their plan summary
+db.setProfilingLevel(1, { slowms: 20 });
+db.big_orders.find({ status: 'FAILED', total: { $gt: 400 } }).batchSize(1000).toArray();   // no index on status
+db.setProfilingLevel(0);
+show(db.system.profile.find({ ns: 'shop.big_orders', op: 'query' }, { _id: 0, planSummary: 1, docsExamined: 1, nreturned: 1 })
+  .sort({ ts: -1 }).limit(1));
+db.system.profile.drop();
+
+// 3  $indexStats: how often each index has been used since it was created (explain does not count)
+db.big_orders.find(q).toArray();
+show(db.big_orders.aggregate([{ $indexStats: {} }, { $project: { _id: 0, name: 1, ops: '$accesses.ops' } }, { $sort: { name: 1 } }]));
+db.big_orders.dropIndex({ customerId: 1 });</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · explain.js</div>
+<pre><code class="language-plaintext">no index           COLLSCAN                                   returned  25 | keys      0 | docs 500000
+{ customerId: 1 }  FETCH &gt; IXSCAN customerId_1                returned  25 | keys     25 | docs     25
+{ docsExamined: 500000, nreturned: 520, planSummary: 'COLLSCAN' }
+{ name: '_id_', ops: Long('0') }
+{ name: 'customerId_1', ops: Long('1') }</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Stage</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td><code>COLLSCAN</code></td><td>Every document read</td></tr>
+            <tr><td><code>IXSCAN</code></td><td>An index range was read; <code>indexBounds</code> shows the range</td></tr>
+            <tr><td><code>FETCH</code></td><td>Documents loaded for index entries: SQL's lookup</td></tr>
+            <tr><td><code>SORT</code></td><td>An in-memory sort: the index did not provide the order</td></tr>
+            <tr><td><code>PROJECTION_COVERED</code></td><td>Answered from the index alone</td></tr>
+            <tr><td><code>SKIP</code>, <code>LIMIT</code></td><td>Applied after the stage below them</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">500,000 examined for 25</span>Without an index the customer's 25 orders cost a scan of all 500,000 documents; with one, 25 keys and 25 documents. The profiler caught the other query: 500,000 documents examined to return 520, with plan summary <code>COLLSCAN</code>. That ratio is the first thing to look for.</div>
+    <div class="note warn"><span class="lbl">Profiler and index statistics in production</span>Profiling level 1 writes every operation slower than <code>slowms</code> to <code>system.profile</code>, a small capped collection. Turn it on briefly, or rely on the slow-query log, which records the same operations. <code>$indexStats</code> counts real uses since the index was created; <code>explain</code> does not count. An index at zero after a full business cycle is a candidate to drop.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I run <code>explain('executionStats')</code> and compare <code>nReturned</code>, <code>totalKeysExamined</code> and <code>totalDocsExamined</code>, and look for <code>COLLSCAN</code> and <code>SORT</code> stages. To find what to fix, I use the slow-query log or the profiler, sorted by time and frequency." The SQL equivalents are on <a data-deck="db" data-slide="Reading an Oracle execution plan">Reading an Oracle execution plan</a>.</div>
+  </div>
+</section>

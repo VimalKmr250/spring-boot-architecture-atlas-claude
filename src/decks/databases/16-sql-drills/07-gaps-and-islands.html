@@ -1,0 +1,66 @@
+<section class="slide" data-sec="SQL drills" data-title="Payment failure streaks: gaps and islands">
+  <h2>Drill: "flag orders whose payment failed three or more times in a row", the islands question for rows with no regular interval</h2>
+  <p class="dek">The minute-based trick on <a data-deck="db" data-slide="LAG, LEAD, gaps and islands">LAG, LEAD, gaps and islands</a> subtracts a row number from a timestamp, so it needs evenly spaced rows. Payment attempts have no fixed spacing, so the general form uses <b>two row numbers</b>. One counts every attempt on the order. The other counts the attempts with the same status. While the status stays the same, both go up by one, so their difference stays constant. Grouping by order, status and that difference turns each run into one row.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">streaks.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  the two numbers side by side: their difference stays constant within a run of one status
+SELECT order_id, payment_id, status,
+       ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at)          AS attempt_no,
+       ROW_NUMBER() OVER (PARTITION BY order_id, status ORDER BY created_at)  AS status_no,
+       ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at)
+     - ROW_NUMBER() OVER (PARTITION BY order_id, status ORDER BY created_at)  AS run_key
+FROM   payments
+WHERE  order_id IN (1003, 1005, 1011)
+ORDER  BY order_id, created_at;
+
+-- 2  payment attempts that failed three or more times in a row on the same order
+WITH attempts AS (
+  SELECT order_id, payment_id, status,
+         ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at)          AS attempt_no,
+         ROW_NUMBER() OVER (PARTITION BY order_id, status ORDER BY created_at)  AS status_no
+  FROM   payments
+),
+runs AS (
+  SELECT order_id, status, attempt_no - status_no AS run_key, COUNT(*) AS run_length,
+         MIN(payment_id) AS first_payment, MAX(payment_id) AS last_payment
+  FROM   attempts
+  GROUP  BY order_id, status, attempt_no - status_no
+)
+SELECT order_id, run_length, first_payment, last_payment
+FROM   runs
+WHERE  status = 'FAILED' AND run_length &gt;= 3
+ORDER  BY order_id;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · streaks.sql</div>
+<pre><code class="language-plaintext">ORDER_ID PAYMENT_ID STATUS   ATTEMPT_NO STATUS_NO RUN_KEY
+-------- ---------- -------- ---------- --------- -------
+    1003          3 FAILED            1         1       0
+    1003          4 CAPTURED          2         1       1
+    1005          6 FAILED            1         1       0
+    1005          7 FAILED            2         2       0
+    1005          8 FAILED            3         3       0
+    1011         15 FAILED            1         1       0
+    1011         16 CAPTURED          2         1       1
+
+7 rows selected.
+
+ORDER_ID RUN_LENGTH FIRST_PAYMENT LAST_PAYMENT
+-------- ---------- ------------- ------------
+    1005          3             6            8
+
+1 row selected.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span>The same file returns the same seven rows and the same run: order 1005, payments 6 to 8.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note"><span class="lbl">Why the key works</span>Take an order with attempts F, F, C, F, F, F. Attempt numbers are 1 to 6. The FAILED rows are numbered 1, 2, then 3, 4, 5 within their status, so the differences are 0, 0, then 1, 1, 1: two runs of failures with different keys. The CAPTURED row gets 3 − 1 = 2, in its own group because status is part of the key.</div>
+    <div class="card"><h4>Follow-ups</h4><p>"Longest streak per order?" <code>MAX(run_length)</code> over the runs, grouped by order. "Ongoing streaks only?" Keep runs whose last attempt is the order's last attempt. "Where did the run start and end in time?" <code>MIN</code> and <code>MAX</code> of <code>created_at</code> in the same <code>GROUP BY</code>. "Ties on <code>created_at</code>?" Add <code>payment_id</code> to both <code>ORDER BY</code>s, or the numbering is not deterministic.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Two <code>ROW_NUMBER</code>s: one over the entity, one over entity and status. Their difference is constant inside a run, so I group by it and filter on the count. One sort per window, no self-join." The same trick finds consecutive login days or a run of failed health checks.</div>
+  </div>
+</section>

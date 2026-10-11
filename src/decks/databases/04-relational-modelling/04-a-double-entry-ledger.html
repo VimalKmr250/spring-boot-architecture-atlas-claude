@@ -1,0 +1,156 @@
+<section class="slide" data-sec="Relational modelling" data-title="Modelling money: a double-entry ledger">
+  <h2>A payment system never updates a balance in place: it appends entries that sum to zero, and derives balances from them</h2>
+  <p class="dek">A <code>balance</code> column that is overwritten answers "how much?" but never "why?", and one lost update corrupts it for good. A ledger records every money movement as a <b>journal</b>: one business event, such as a capture, a fee or a refund. Each journal has two or more <b>entries</b>, signed so that debits are positive and credits negative. Every journal sums to zero, so the whole ledger sums to zero. Entries are inserted and never updated. A mistake is corrected with a reversing journal, and any balance is a <code>SUM</code>. An idempotency key on the journal makes "post the capture" safe to retry.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 200" role="img" aria-label="Three ledger accounts: psp_receivable, an asset; merchant_payable, a liability; and fee_revenue, revenue. Journal 1, the capture of order 1001, debits psp_receivable 1328.90 and credits merchant_payable 1328.90. Journal 2, the fee, debits merchant_payable 38.54 and credits fee_revenue 38.54. Resulting balances: psp_receivable plus 1328.90, merchant_payable minus 1290.36, fee_revenue minus 38.54, summing to zero.">
+        <g font-size="11" fill="currentColor">
+          <rect x="20" y="60" width="210" height="90" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="125" y="82" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">psp_receivable</text>
+          <text x="125" y="100" text-anchor="middle" font-size="10" opacity="0.75">asset: the card processor owes us</text>
+          <text x="125" y="132" text-anchor="middle" font-family="IBM Plex Mono, monospace">+1328.90</text>
+          <rect x="345" y="60" width="210" height="90" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+          <text x="450" y="82" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">merchant_payable</text>
+          <text x="450" y="100" text-anchor="middle" font-size="10" opacity="0.75">liability: we owe the merchant</text>
+          <text x="450" y="132" text-anchor="middle" font-family="IBM Plex Mono, monospace">−1328.90 +38.54 = −1290.36</text>
+          <rect x="670" y="60" width="210" height="90" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="775" y="82" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">fee_revenue</text>
+          <text x="775" y="100" text-anchor="middle" font-size="10" opacity="0.75">revenue: what we earned</text>
+          <text x="775" y="132" text-anchor="middle" font-family="IBM Plex Mono, monospace">−38.54</text>
+        </g>
+        <line x1="232" y1="88" x2="343" y2="88" stroke="#8A94A3" stroke-width="1.3" marker-start="url(#arw)"></line>
+        <text x="288" y="40" text-anchor="middle" font-size="10.5" fill="currentColor">journal 1: capture</text>
+        <text x="288" y="54" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Dr 1328.90 / Cr 1328.90</text>
+        <line x1="557" y1="88" x2="668" y2="88" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="612" y="40" text-anchor="middle" font-size="10.5" fill="currentColor">journal 2: fee</text>
+        <text x="612" y="54" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Dr 38.54 / Cr 38.54</text>
+        <text x="450" y="185" text-anchor="middle" font-size="10.5" fill="currentColor">1328.90 − 1290.36 − 38.54 = 0: every journal balances, so the ledger does</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ledger.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- accounts, journals (one per business event) and entries (debits positive, credits negative)
+CREATE TABLE gl_accounts (
+  code  VARCHAR2(30) PRIMARY KEY,
+  kind  VARCHAR2(10) NOT NULL CHECK (kind IN ('ASSET', 'LIABILITY', 'REVENUE'))
+);
+CREATE TABLE journals (
+  journal_id       NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  idempotency_key  VARCHAR2(64) NOT NULL CONSTRAINT journals_idem_uk UNIQUE,
+  event            VARCHAR2(20) NOT NULL
+);
+CREATE TABLE entries (
+  journal_id    NUMBER       NOT NULL REFERENCES journals,
+  line_no       NUMBER(2)    NOT NULL,
+  account_code  VARCHAR2(30) NOT NULL REFERENCES gl_accounts,
+  amount        NUMBER(12,2) NOT NULL CHECK (amount &lt;&gt; 0),
+  CONSTRAINT entries_pk PRIMARY KEY (journal_id, line_no)
+);
+INSERT INTO gl_accounts VALUES ('psp_receivable', 'ASSET');
+INSERT INTO gl_accounts VALUES ('merchant_payable', 'LIABILITY');
+INSERT INTO gl_accounts VALUES ('fee_revenue', 'REVENUE');
+
+-- order 1001 is captured: the card processor owes us, we owe the merchant
+INSERT INTO journals (idempotency_key, event) VALUES ('capture-pay-1001-1', 'CAPTURE');
+INSERT INTO entries VALUES (1, 1, 'psp_receivable', 1328.90);
+INSERT INTO entries VALUES (1, 2, 'merchant_payable', -1328.90);
+-- our 2.9% fee comes out of what we owe the merchant
+INSERT INTO journals (idempotency_key, event) VALUES ('fee-pay-1001-1', 'FEE');
+INSERT INTO entries VALUES (2, 1, 'merchant_payable', 38.54);
+INSERT INTO entries VALUES (2, 2, 'fee_revenue', -38.54);
+COMMIT;
+
+-- the capture message is delivered twice: the unique key makes the retry a no-op
+INSERT INTO journals (idempotency_key, event) VALUES ('capture-pay-1001-1', 'CAPTURE');
+
+-- a buggy posting with one leg only: no single-row constraint can catch it
+INSERT INTO journals (idempotency_key, event) VALUES ('fee-pay-1002-1', 'FEE');
+INSERT INTO entries VALUES (4, 1, 'merchant_payable', 20.27);
+COMMIT;
+
+-- so check that every journal balances, and that the books do
+SELECT journal_id, SUM(amount) AS imbalance FROM entries GROUP BY journal_id HAVING SUM(amount) &lt;&gt; 0;
+SELECT COALESCE(account_code, '(all: must be 0)') AS account, SUM(amount) AS balance
+FROM   entries GROUP BY ROLLUP (account_code) ORDER BY GROUPING(account_code), account_code;
+
+DROP TABLE entries PURGE;
+DROP TABLE journals PURGE;
+DROP TABLE gl_accounts PURGE;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · ledger.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+Table created.
+
+Table created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+Commit complete.
+
+INSERT INTO journals (idempotency_key, event) VALUES ('capture-pay-1001-1', 'CAPTURE')
+*
+ERROR at line 1:
+ORA-00001: unique constraint (SHOP.JOURNALS_IDEM_UK) violated on table SHOP.JOURNALS columns (IDEMPOTENCY_KEY)
+ORA-03301: (ORA-00001 details) row with column values (IDEMPOTENCY_KEY:'capture-pay-1001-1') already exists
+Help: https://docs.oracle.com/error-help/db/ora-00001/
+
+1 row created.
+
+1 row created.
+
+Commit complete.
+
+JOURNAL_ID IMBALANCE
+---------- ---------
+         4     20.27
+
+1 row selected.
+
+ACCOUNT           BALANCE
+---------------- --------
+fee_revenue        -38.54
+merchant_payable -1270.09
+psp_receivable    1328.90
+(all: must be 0)    20.27
+
+4 rows selected.
+
+Table dropped.
+
+Table dropped.
+
+Table dropped.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span><code>ledger.mss.sql</code> (the same with <code>INT IDENTITY</code>, <code>DECIMAL</code> and <code>BEGIN TRANSACTION</code>) rejected the duplicate capture with error 2627 and found the same unbalanced journal 4.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">What constraints cannot check</span>"The entries of a journal sum to zero" is a rule across rows, and <code>CHECK</code> sees one row at a time. Journal 4 was accepted with one leg. Post journals only through one function that inserts all entries in one transaction and verifies the sum before committing, and run the imbalance query as a scheduled check.</div>
+    <div class="note warn"><span class="lbl">Retries are normal</span>Payment events arrive twice: a webhook is redelivered, a consumer restarts. The unique <code>idempotency_key</code> turned the second capture into ORA-00001 instead of a second 1328.90. The application treats that error as "already done". Journal 3 is missing for the same reason: the failed insert consumed its identity value.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Money is append-only: journals of balanced entries, exact decimals, an idempotency key per external event, and balances derived by summing, optionally cached in a snapshot table. I never overwrite a balance." How this fits a whole payment flow is in <a data-deck="db" data-slide="Case study: a payment system">the payment case study</a>.</div>
+  </div>
+</section>
