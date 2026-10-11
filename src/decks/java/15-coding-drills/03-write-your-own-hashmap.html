@@ -1,0 +1,127 @@
+<section class="slide" data-sec="Coding drills" data-title="Write your own HashMap">
+  <h2>Drill: "implement a HashMap with put, get and remove", in about sixty lines</h2>
+  <p class="dek">Interviewers ask for this because it touches everything: generics, <code>equals</code> and <code>hashCode</code>, arrays of a generic type, collisions, resizing and null keys. Aim for separate chaining, a power-of-two table, a stored hash per node and a resize at 75% full. Then prove it, here by running 100,000 random operations against <code>java.util.HashMap</code> and comparing every answer.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">MyHashMap.java · the map, and a randomised check against the JDK's</div>
+<pre><code class="language-java">import java.util.*;
+
+// Separate chaining, power-of-two table, resize at 0.75, null key allowed.
+public class MyHashMap&lt;K, V&gt; {
+    private static final class Node&lt;K, V&gt; {
+        final int hash;
+        final K key;
+        V value;
+        Node&lt;K, V&gt; next;
+        Node(int hash, K key, V value, Node&lt;K, V&gt; next) { this.hash = hash; this.key = key; this.value = value; this.next = next; }
+    }
+
+    private Node&lt;K, V&gt;[] table = newTable(16);
+    private int size;
+
+    @SuppressWarnings("unchecked")
+    private static &lt;K, V&gt; Node&lt;K, V&gt;[] newTable(int n) { return (Node&lt;K, V&gt;[]) new Node&lt;?, ?&gt;[n]; }
+
+    private static int hash(Object key) {
+        if (key == null) return 0;
+        int h = key.hashCode();
+        return h ^ (h &gt;&gt;&gt; 16);                                   // spread the high bits
+    }
+
+    public V get(Object key) {
+        int h = hash(key);
+        for (Node&lt;K, V&gt; n = table[h &amp; (table.length - 1)]; n != null; n = n.next)
+            if (n.hash == h &amp;&amp; Objects.equals(n.key, key)) return n.value;
+        return null;
+    }
+
+    public V put(K key, V value) {
+        int h = hash(key), i = h &amp; (table.length - 1);
+        for (Node&lt;K, V&gt; n = table[i]; n != null; n = n.next)
+            if (n.hash == h &amp;&amp; Objects.equals(n.key, key)) { V old = n.value; n.value = value; return old; }
+        table[i] = new Node&lt;&gt;(h, key, value, table[i]);           // prepend: O(1)
+        if (++size &gt; table.length * 3 / 4) resize();
+        return null;
+    }
+
+    public V remove(Object key) {
+        int h = hash(key), i = h &amp; (table.length - 1);
+        for (Node&lt;K, V&gt; n = table[i], prev = null; n != null; prev = n, n = n.next)
+            if (n.hash == h &amp;&amp; Objects.equals(n.key, key)) {
+                if (prev == null) table[i] = n.next; else prev.next = n.next;
+                size--;
+                return n.value;
+            }
+        return null;
+    }
+
+    public int size() { return size; }
+
+    private void resize() {
+        Node&lt;K, V&gt;[] old = table;
+        table = newTable(old.length * 2);
+        for (Node&lt;K, V&gt; head : old)
+            for (Node&lt;K, V&gt; n = head, next; n != null; n = next) {
+                next = n.next;
+                int i = n.hash &amp; (table.length - 1);             // the stored hash: no hashCode call
+                n.next = table[i];
+                table[i] = n;
+            }
+    }
+
+    int capacity() { return table.length; }
+
+    public static void main(String[] args) {
+        MyHashMap&lt;String, Integer&gt; mine = new MyHashMap&lt;&gt;();
+        Map&lt;String, Integer&gt; real = new HashMap&lt;&gt;();
+        Random random = new Random(7);                           // seeded: the same run every time
+        int mismatches = 0;
+        for (int op = 0; op &lt; 100_000; op++) {
+            String key = random.nextInt(20) == 0 ? null : "k" + random.nextInt(5_000);
+            int kind = random.nextInt(3), value = random.nextInt();
+            Object a, b;
+            if (kind == 0) { a = mine.put(key, value); b = real.put(key, value); }
+            else if (kind == 1) { a = mine.get(key); b = real.get(key); }
+            else { a = mine.remove(key); b = real.remove(key); }
+            if (!Objects.equals(a, b) || mine.size() != real.size()) mismatches++;
+        }
+        System.out.println("100,000 random put/get/remove against java.util.HashMap: " + mismatches
+                + " mismatches; size " + mine.size() + ", capacity " + mine.capacity());
+
+        MyHashMap&lt;String, String&gt; collide = new MyHashMap&lt;&gt;();
+        collide.put("Aa", "first");
+        collide.put("BB", "second");                             // same hashCode: same bucket
+        System.out.println("colliding keys: " + collide.get("Aa") + ", " + collide.get("BB") + "; remove(Aa) -&gt; "
+                + collide.remove("Aa") + ", get(BB) still " + collide.get("BB"));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · MyHashMap.java</div>
+<pre><code class="language-plaintext">100,000 random put/get/remove against java.util.HashMap: 0 mismatches; size 2485, capacity 4096
+colliding keys: first, second; remove(Aa) -&gt; first, get(BB) still second</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Choice</th><th>Say why</th></tr></thead>
+          <tbody>
+            <tr><td>Power-of-two length</td><td>The index is <code>hash &amp; (length - 1)</code>, no division</td></tr>
+            <tr><td><code>h ^ (h &gt;&gt;&gt; 16)</code></td><td>The mask uses only low bits; this lets the high bits count</td></tr>
+            <tr><td>Hash stored in the node</td><td>Cheap rejection before <code>equals</code>; resize never calls <code>hashCode</code></td></tr>
+            <tr><td><code>Objects.equals</code></td><td>Handles the null key, which hashes to bucket 0</td></tr>
+            <tr><td>Prepend on insert</td><td>O(1), after the scan that checked the key is absent</td></tr>
+            <tr><td><code>new Node&lt;?, ?&gt;[n]</code> and one cast</td><td>Generic arrays cannot be created; one unchecked cast, suppressed at the smallest scope</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p><code>get</code>, <code>put</code> and <code>remove</code> are O(1) on average, O(n) if every key collides. A resize is O(n), but doubling makes it O(1) amortised per insert. Memory: the table plus one node per entry.</p></div>
+    <div class="card"><h4>Follow-ups to expect</h4><p>"Make the worst case O(log n)": tree bins, as Java 8 did. "Make it thread-safe": one lock is easy, lock striping or per-bin locking is what <code>ConcurrentHashMap</code> does. "Iterate it": walk the table, and track a modification count to fail fast.</p></div>
+    <div class="note tip"><span class="lbl">Test it the way it was tested here</span>A randomised comparison against a trusted implementation, with a seeded <code>Random</code>, finds edge cases you would not think to write. Add deliberate collisions (<code>"Aa"</code> and <code>"BB"</code>) and the null key. The real one's internals are on <a data-deck="cj" data-slide="HashMap internals: hashing and buckets">HashMap internals</a>.</div>
+  </div>
+</section>

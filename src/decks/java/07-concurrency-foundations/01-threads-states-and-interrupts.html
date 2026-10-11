@@ -1,0 +1,131 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Threads, states and interrupts">
+  <h2>A thread is always in one of six states, and an interrupt is a request it must choose to honour</h2>
+  <p class="dek"><code>getState()</code> reports one of six values. <code>RUNNABLE</code> covers running on a CPU, waiting for one, and blocking inside most native I/O. Interrupting a thread only sets a flag: blocking methods notice it, throw <code>InterruptedException</code> and clear it, and computing code must check it itself. Nothing can stop a thread from outside. <code>Thread.stop()</code> has thrown <code>UnsupportedOperationException</code> since JDK 20.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Thread states. NEW goes to RUNNABLE on start. RUNNABLE goes to BLOCKED when it tries to enter a synchronized block whose monitor another thread holds, and back when it acquires it. RUNNABLE goes to WAITING on wait, join, park or await, and back on notify, signal, unpark or interrupt. RUNNABLE goes to TIMED_WAITING on sleep or the timed versions, and back on timeout, notify or interrupt. RUNNABLE goes to TERMINATED when run returns or throws.">
+        <g font-size="11.5" font-family="IBM Plex Mono, monospace" text-anchor="middle" fill="currentColor">
+          <rect x="30" y="80" width="110" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="85" y="101">NEW</text>
+          <rect x="200" y="10" width="140" height="174" rx="8" fill="#D26A3F" fill-opacity="0.1" stroke="#D26A3F" stroke-width="1.4"></rect><text x="270" y="94">RUNNABLE</text>
+          <rect x="200" y="214" width="140" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="270" y="235">TERMINATED</text>
+          <rect x="580" y="10" width="190" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="675" y="31">BLOCKED</text>
+          <rect x="580" y="80" width="190" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="675" y="101">WAITING</text>
+          <rect x="580" y="150" width="190" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="675" y="171">TIMED_WAITING</text>
+        </g>
+        <text x="270" y="112" text-anchor="middle" font-size="9.5" fill="currentColor" opacity="0.75">running, ready, or in native I/O</text>
+        <line x1="140" y1="97" x2="197" y2="97" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="168" y="90" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">start()</text>
+        <line x1="270" y1="184" x2="270" y2="211" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="280" y="203" font-size="10" fill="currentColor">run() returns or throws</text>
+        <g stroke-width="1.3">
+          <line x1="340" y1="21" x2="577" y2="21" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="580" y1="33" x2="343" y2="33" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+          <line x1="340" y1="91" x2="577" y2="91" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="580" y1="103" x2="343" y2="103" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+          <line x1="340" y1="161" x2="577" y2="161" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="580" y1="173" x2="343" y2="173" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="10" fill="currentColor" text-anchor="middle">
+          <text x="460" y="16">synchronized: another thread holds it</text>
+          <text x="460" y="47" opacity="0.8">acquires the monitor</text>
+          <text x="460" y="86" font-family="IBM Plex Mono, monospace">wait() join() park() await()</text>
+          <text x="460" y="117" opacity="0.8">notify, signal, unpark, interrupt</text>
+          <text x="460" y="156" font-family="IBM Plex Mono, monospace">sleep(t) wait(t) join(t) …</text>
+          <text x="460" y="187" opacity="0.8">time up, notify, interrupt</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ThreadStates.java · each state on cue, then two ways to answer an interrupt</div>
+<pre><code class="language-java">import java.util.concurrent.CountDownLatch;
+
+public class ThreadStates {
+    static void waitFor(Thread t, Thread.State s) throws InterruptedException {
+        while (t.getState() != s) Thread.sleep(1);
+    }
+
+    public static void main(String[] args) throws Exception {
+        Object lock = new Object();
+        CountDownLatch release = new CountDownLatch(1);
+        Thread worker = new Thread(() -&gt; {
+            System.out.println("inside run()        " + Thread.currentThread().getState());
+            try {
+                Thread.sleep(200);                           // TIMED_WAITING
+                synchronized (lock) { }                      // BLOCKED while main holds the lock
+                release.await();                             // WAITING
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "worker");
+
+        System.out.println("after new           " + worker.getState());
+        synchronized (lock) {
+            worker.start();
+            waitFor(worker, Thread.State.TIMED_WAITING);
+            System.out.println("in sleep(200)       " + worker.getState());
+            waitFor(worker, Thread.State.BLOCKED);
+            System.out.println("at synchronized     " + worker.getState());
+        }
+        waitFor(worker, Thread.State.WAITING);
+        System.out.println("in await()          " + worker.getState());
+        release.countDown();
+        worker.join();
+        System.out.println("after run() returns " + worker.getState());
+
+        Thread sleeper = new Thread(() -&gt; {
+            try {
+                Thread.sleep(60_000);
+            } catch (InterruptedException e) {
+                System.out.println("sleeper woke with InterruptedException; flag is now "
+                        + Thread.currentThread().isInterrupted());
+                Thread.currentThread().interrupt();          // restore it for whoever runs next
+                System.out.println("sleeper restored the flag: " + Thread.currentThread().isInterrupted());
+            }
+        });
+        sleeper.start();
+        waitFor(sleeper, Thread.State.TIMED_WAITING);
+        sleeper.interrupt();
+        sleeper.join();
+
+        Thread spinner = new Thread(() -&gt; {
+            long spins = 0;
+            while (!Thread.currentThread().isInterrupted()) spins++;   // CPU work must poll the flag
+            System.out.println("spinner saw the flag and stopped: " + (spins &gt; 0));
+        });
+        spinner.start();
+        Thread.sleep(50);
+        spinner.interrupt();
+        spinner.join();
+
+        Thread virtual = Thread.ofVirtual().name("vt-", 1).start(() -&gt; { });
+        virtual.join();
+        Thread heartbeat = Thread.ofPlatform().name("heartbeat").daemon().unstarted(() -&gt; { });
+        System.out.println(virtual.getName() + " virtual=" + virtual.isVirtual() + " daemon=" + virtual.isDaemon()
+                + "; " + heartbeat.getName() + " daemon=" + heartbeat.isDaemon());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ThreadStates.java</div>
+<pre><code class="language-plaintext">after new           NEW
+inside run()        RUNNABLE
+in sleep(200)       TIMED_WAITING
+at synchronized     BLOCKED
+in await()          WAITING
+after run() returns TERMINATED
+sleeper woke with InterruptedException; flag is now false
+sleeper restored the flag: true
+spinner saw the flag and stopped: true
+vt-1 virtual=true daemon=true; heartbeat daemon=true</code></pre>
+      </div>
+      <div class="note bad"><span class="lbl">Never swallow an interrupt</span>A method that throws <code>InterruptedException</code> clears the flag first, as line 7 of the output shows. An empty <code>catch</code> means a shutdown request, or a <code>Future.cancel(true)</code>, is lost, and the thread runs on. Either rethrow it or call <code>Thread.currentThread().interrupt()</code> before returning.</div>
+      <div class="note warn"><span class="lbl">RUNNABLE does not mean busy</span>A thread blocked in a socket read or a JDBC call shows as <code>RUNNABLE</code> in a thread dump, because the JVM cannot see inside native code. Two hundred <code>RUNNABLE</code> threads in <code>SocketInputStream.read</code> usually means a slow dependency, not a CPU problem.</div>
+      <div class="note tip"><span class="lbl">Daemon threads</span>The JVM exits when only daemon threads are left, without running their <code>finally</code> blocks. Virtual threads are always daemon threads. The builders <span class="tag a">21</span> <code>Thread.ofPlatform()</code> and <code>Thread.ofVirtual()</code> set names, daemon status and handlers in one place.</div>
+    </div>
+  </div>
+</section>

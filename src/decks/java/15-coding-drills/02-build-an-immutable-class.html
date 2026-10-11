@@ -1,0 +1,113 @@
+<section class="slide" data-sec="Coding drills" data-title="Build an immutable class">
+  <h2>Drill: "make this Booking class immutable", and prove that it is</h2>
+  <p class="dek">You get a class with a setter, a <code>Date</code>, and a list it shares with its callers. A full answer fixes six things and shows each fix working: the caller's list, the getter's list, the <code>Date</code>, the setter, subclassing, and invalid input. Then it adds value-based equality, because an immutable object is usually a value.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">DrillImmutable.java · the given class, the answer, and the attacks</div>
+<pre><code class="language-java">import java.time.*;
+import java.util.*;
+
+public class DrillImmutable {
+    // The class you are given: "make this immutable".
+    static class Booking {
+        private String guest;
+        private Date checkIn;
+        private List&lt;String&gt; rooms;
+        Booking(String guest, Date checkIn, List&lt;String&gt; rooms) { this.guest = guest; this.checkIn = checkIn; this.rooms = rooms; }
+        String guest() { return guest; }
+        Date checkIn() { return checkIn; }
+        List&lt;String&gt; rooms() { return rooms; }
+        void setGuest(String guest) { this.guest = guest; }
+    }
+
+    // The answer.
+    static final class ImmutableBooking {                          // 1 final: no mutable subclass
+        private final String guest;                                // 2 private final fields
+        private final LocalDate checkIn;                           // 3 an immutable type, not Date
+        private final List&lt;String&gt; rooms;
+
+        ImmutableBooking(String guest, LocalDate checkIn, List&lt;String&gt; rooms) {
+            this.guest = Objects.requireNonNull(guest, "guest");
+            this.checkIn = Objects.requireNonNull(checkIn, "checkIn");
+            if (rooms.isEmpty()) throw new IllegalArgumentException("at least one room");
+            this.rooms = List.copyOf(rooms);                       // 4 copy in; also rejects null rooms
+        }
+        String guest() { return guest; }
+        LocalDate checkIn() { return checkIn; }
+        List&lt;String&gt; rooms() { return rooms; }                     // 5 already unmodifiable
+        ImmutableBooking withGuest(String newGuest) {              // 6 change = new object
+            return new ImmutableBooking(newGuest, checkIn, rooms);
+        }
+        @Override public boolean equals(Object o) {
+            return o instanceof ImmutableBooking b &amp;&amp; guest.equals(b.guest) &amp;&amp; checkIn.equals(b.checkIn) &amp;&amp; rooms.equals(b.rooms);
+        }
+        @Override public int hashCode() { return Objects.hash(guest, checkIn, rooms); }
+        @Override public String toString() { return guest + " " + checkIn + " " + rooms; }
+    }
+
+    static String attempt(Runnable attack) {
+        try { attack.run(); return "changed it"; }
+        catch (UnsupportedOperationException e) { return "blocked"; }
+    }
+
+    public static void main(String[] args) {
+        List&lt;String&gt; rooms = new ArrayList&lt;&gt;(List.of("101"));
+        Date date = new Date(0);
+        Booking given = new Booking("Ana", date, rooms);
+        rooms.add("102");
+        date.setTime(86_400_000L);
+        given.rooms().add("103");
+        given.setGuest("Bo");
+        System.out.println("given class after 4 outside changes: " + given.guest() + " " + given.checkIn().toInstant() + " " + given.rooms());
+
+        List&lt;String&gt; rooms2 = new ArrayList&lt;&gt;(List.of("101"));
+        ImmutableBooking b = new ImmutableBooking("Ana", LocalDate.of(2026, 10, 8), rooms2);
+        rooms2.add("102");
+        System.out.println("caller adds to its list: " + b.rooms());
+        System.out.println("getter's list .add():    " + attempt(() -&gt; b.rooms().add("103")));
+        ImmutableBooking renamed = b.withGuest("Bo");
+        System.out.println("withGuest: " + renamed + ", original still " + b);
+        System.out.println("equal by value: " + b.equals(new ImmutableBooking("Ana", LocalDate.of(2026, 10, 8), List.of("101"))));
+        for (Runnable bad : List.&lt;Runnable&gt;of(() -&gt; new ImmutableBooking(null, LocalDate.EPOCH, List.of("1")),
+                () -&gt; new ImmutableBooking("X", LocalDate.EPOCH, List.of()),
+                () -&gt; new ImmutableBooking("X", LocalDate.EPOCH, Arrays.asList("1", null)))) {
+            try { bad.run(); } catch (RuntimeException e) { System.out.println("rejected: " + e.getClass().getSimpleName() + " " + e.getMessage()); }
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · DrillImmutable.java</div>
+<pre><code class="language-plaintext">given class after 4 outside changes: Bo 1970-01-02T00:00:00Z [101, 102, 103]
+caller adds to its list: [101]
+getter's list .add():    blocked
+withGuest: Bo 2026-10-08 [101], original still Ana 2026-10-08 [101]
+equal by value: true
+rejected: NullPointerException guest
+rejected: IllegalArgumentException at least one room
+rejected: NullPointerException null</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Step</th><th>Closes</th></tr></thead>
+          <tbody>
+            <tr><td>1 <code>final</code> class</td><td>A subclass that adds a setter or overrides <code>rooms()</code></td></tr>
+            <tr><td>2 private final fields</td><td>Reassignment, including by this class's own code later</td></tr>
+            <tr><td>3 <code>LocalDate</code></td><td><code>date.setTime(…)</code> by anyone who held the <code>Date</code></td></tr>
+            <tr><td>4 <code>List.copyOf</code> in</td><td>The caller's later <code>add</code>; also rejects null elements</td></tr>
+            <tr><td>5 return the unmodifiable copy</td><td><code>rooms().add(…)</code> from readers</td></tr>
+            <tr><td>6 <code>withGuest</code></td><td>The need for a setter at all</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">The record version</span>Say it next: <code>record Booking(String guest, LocalDate checkIn, List&lt;String&gt; rooms)</code> with a compact constructor holding the same checks and <code>rooms = List.copyOf(rooms)</code>. It gives steps 1, 2 and the equality for free. The interviewer often wants to hear that you know both.</div>
+    <div class="note warn"><span class="lbl">Follow-up: "what if Room were a class?"</span><code>List.copyOf</code> copies references, not rooms. If <code>Room</code> is mutable, the booking is not immutable either: copy each room, or make <code>Room</code> immutable too. Immutability is only as deep as the types you hold.</div>
+    <div class="note"><span class="lbl">Follow-up: "why bother?"</span>Thread safety without locks, safe as map keys, safe to cache and share, and simpler reasoning: nothing changes behind your back. The background is on <a data-deck="cj" data-slide="Writing an immutable class">writing an immutable class</a>.</div>
+  </div>
+</section>

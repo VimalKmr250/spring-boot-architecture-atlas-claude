@@ -1,0 +1,86 @@
+<section class="slide" data-sec="Everyday library" data-title="java.time">
+  <h2>Store an Instant, show a ZonedDateTime, and let the zone rules handle the hours that do not exist</h2>
+  <p class="dek"><code>java.time</code> <span class="tag a">8</span> separates what the old <code>Date</code> mixed together: a point on the timeline (<code>Instant</code>), a wall-clock reading with no zone (<code>LocalDateTime</code>), and a wall-clock reading in a zone, which knows that London's clocks jump at 01:00 on 29 March 2026 (<code>ZonedDateTime</code>). Every type is immutable and thread-safe. Most date bugs come from choosing the wrong one of them.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">TimeDemo.java · a fixed clock, two DST changes, calendar against elapsed time</div>
+<pre><code class="language-java">import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Locale;
+
+public class TimeDemo {
+    public static void main(String[] args) {
+        Clock clock = Clock.fixed(Instant.parse("2026-03-28T23:30:00Z"), ZoneOffset.UTC);   // inject, so tests are repeatable
+        Instant now = Instant.now(clock);
+        ZoneId london = ZoneId.of("Europe/London"), kolkata = ZoneId.of("Asia/Kolkata");
+        System.out.println("Instant        " + now + "  (a point on the timeline, in UTC)");
+        System.out.println("in London      " + now.atZone(london));
+        System.out.println("in Kolkata     " + now.atZone(kolkata));
+        System.out.println("LocalDateTime  " + LocalDateTime.now(clock) + "  (no zone: not a point in time)");
+
+        ZonedDateTime gap = ZonedDateTime.of(LocalDateTime.of(2026, 3, 29, 1, 30), london);
+        System.out.println("01:30 on 29 Mar 2026 in London does not exist; it becomes " + gap);
+        ZonedDateTime overlap = ZonedDateTime.of(LocalDateTime.of(2026, 10, 25, 1, 30), london);
+        System.out.println("01:30 on 25 Oct 2026 happens twice: " + overlap.getOffset() + " first, then "
+                + overlap.withLaterOffsetAtOverlap().getOffset());
+
+        ZonedDateTime saturdayNoon = ZonedDateTime.of(2026, 3, 28, 12, 0, 0, 0, london);
+        System.out.println("plusDays(1)                " + saturdayNoon.plusDays(1));
+        System.out.println("plus(Duration.ofHours(24)) " + saturdayNoon.plus(Duration.ofHours(24)));
+        System.out.println("hours in that 'day': " + ChronoUnit.HOURS.between(saturdayNoon, saturdayNoon.plusDays(1)));
+
+        System.out.println("31 Jan plusMonths(1) = " + LocalDate.of(2026, 1, 31).plusMonths(1)
+                + "; Period 15 Jan -&gt; 20 Mar = " + Period.between(LocalDate.of(2026, 1, 15), LocalDate.of(2026, 3, 20))
+                + "; Duration of 90 min = " + Duration.ofMinutes(90));
+
+        DateTimeFormatter shown = DateTimeFormatter.ofPattern("dd MMM uuuu HH:mm", Locale.UK);
+        LocalDateTime parsed = LocalDateTime.parse("07 Oct 2026 14:05", shown);
+        System.out.println("parsed " + parsed + ", as ISO with an offset " + parsed.atOffset(ZoneOffset.ofHours(2)));
+
+        LocalDate monday = LocalDate.of(2025, 12, 29);
+        System.out.println("29 Dec 2025 as yyyy-MM-dd " + monday.format(DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.UK))
+                + ", as YYYY-MM-dd " + monday.format(DateTimeFormatter.ofPattern("YYYY-MM-dd", Locale.UK)) + "  (week-based year)");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · TimeDemo.java</div>
+<pre><code class="language-plaintext">Instant        2026-03-28T23:30:00Z  (a point on the timeline, in UTC)
+in London      2026-03-28T23:30Z[Europe/London]
+in Kolkata     2026-03-29T05:00+05:30[Asia/Kolkata]
+LocalDateTime  2026-03-28T23:30  (no zone: not a point in time)
+01:30 on 29 Mar 2026 in London does not exist; it becomes 2026-03-29T02:30+01:00[Europe/London]
+01:30 on 25 Oct 2026 happens twice: +01:00 first, then Z
+plusDays(1)                2026-03-29T12:00+01:00[Europe/London]
+plus(Duration.ofHours(24)) 2026-03-29T13:00+01:00[Europe/London]
+hours in that 'day': 23
+31 Jan plusMonths(1) = 2026-02-28; Period 15 Jan -&gt; 20 Mar = P2M5D; Duration of 90 min = PT1H30M
+parsed 2026-10-07T14:05, as ISO with an offset 2026-10-07T14:05+02:00
+29 Dec 2025 as yyyy-MM-dd 2025-12-29, as YYYY-MM-dd 2026-12-29  (week-based year)</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Type</th><th>Is</th><th>Use it for</th></tr></thead>
+          <tbody>
+            <tr><td><code>Instant</code></td><td>A point on the timeline, in UTC</td><td>Storing and comparing when things happened</td></tr>
+            <tr><td><code>ZonedDateTime</code></td><td>An instant plus a zone's rules</td><td>Showing times to people; calendar arithmetic in a place</td></tr>
+            <tr><td><code>OffsetDateTime</code></td><td>An instant plus a fixed offset</td><td>APIs and databases: <code>TIMESTAMP WITH TIME ZONE</code></td></tr>
+            <tr><td><code>LocalDateTime</code></td><td>A date and time with no zone</td><td>"The store opens at 09:00", wherever the store is</td></tr>
+            <tr><td><code>LocalDate</code></td><td>A date</td><td>Birthdays, invoice dates, business days</td></tr>
+            <tr><td><code>Duration</code>, <code>Period</code></td><td>Exact seconds; calendar years, months, days</td><td>Timeouts; "one month later"</td></tr>
+            <tr><td><code>Clock</code></td><td>The source of "now"</td><td>Injected, so tests can fix time</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">A day is not 24 hours</span>Noon Saturday plus one day is noon Sunday; plus 24 hours is 13:00, because that Sunday in London had 23 hours. Use <code>plusDays</code> for "same time tomorrow" and a <code>Duration</code> for "in 24 hours". The non-existent 01:30 was moved forward to 02:30, and the repeated one defaults to the earlier offset.</div>
+    <div class="note bad"><span class="lbl">YYYY is not yyyy</span><code>YYYY</code> is the week-based year, so 29 December 2025, in the first week of 2026, printed as <code>2026-12-29</code>. It passes every test that does not run in the last days of December. Use <code>yyyy</code> or <code>uuuu</code>.</div>
+    <div class="note tip"><span class="lbl">The legacy classes</span><code>Date</code> and <code>Calendar</code> are mutable, <code>SimpleDateFormat</code> is not thread-safe, and <code>Calendar</code> months start at 0. Convert at the boundary: <code>date.toInstant()</code>, <code>Date.from(instant)</code>. JDBC 4.2 and JPA read and write <code>java.time</code> types directly.</div>
+  </div>
+</section>

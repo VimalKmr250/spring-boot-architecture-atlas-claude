@@ -1,0 +1,93 @@
+<section class="slide" data-sec="Concurrent collections" data-title="Copy-on-write and lock-free collections">
+  <h2>Copy-on-write makes reads free by making every write copy the whole array</h2>
+  <p class="dek"><code>CopyOnWriteArrayList</code> never changes its array: each write builds a new one and swaps a volatile reference. Readers and iterators work on whichever array they started with, with no lock and no <code>ConcurrentModificationException</code>. The bill arrives on writes: 10,000 appends allocated 200 MB below. The other concurrent collections trade differently, using CAS-based linked structures.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CowDemo.java · snapshots, the write cost, a lock-free queue, a concurrent sorted map</div>
+<pre><code class="language-java">import java.lang.management.ManagementFactory;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class CowDemo {
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+
+    static long bytesFor(List&lt;Integer&gt; list, int adds) {
+        long before = MX.getCurrentThreadAllocatedBytes();
+        for (int i = 0; i &lt; adds; i++) list.add(i);
+        return MX.getCurrentThreadAllocatedBytes() - before;
+    }
+
+    public static void main(String[] args) throws Exception {
+        List&lt;String&gt; listeners = new CopyOnWriteArrayList&lt;&gt;(List.of("audit", "email"));
+        Iterator&lt;String&gt; snapshot = listeners.iterator();
+        listeners.add("sms");                                  // a write copies the array
+        List&lt;String&gt; seen = new ArrayList&lt;&gt;();
+        snapshot.forEachRemaining(seen::add);
+        System.out.println("iterator made before add(\"sms\") sees " + seen + "; list is " + listeners);
+        try {
+            listeners.iterator().remove();
+        } catch (UnsupportedOperationException e) {
+            System.out.println("CopyOnWriteArrayList iterator.remove -&gt; UnsupportedOperationException");
+        }
+
+        System.out.printf("10,000 adds allocate: ArrayList %,d bytes, CopyOnWriteArrayList %,d bytes%n",
+                bytesFor(new ArrayList&lt;&gt;(), 10_000), bytesFor(new CopyOnWriteArrayList&lt;&gt;(), 10_000));
+
+        Queue&lt;Integer&gt; jobs = new ConcurrentLinkedQueue&lt;&gt;();
+        try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+            for (int p = 0; p &lt; 4; p++) {
+                int base = p * 1_000;
+                pool.submit(() -&gt; { for (int i = 0; i &lt; 1_000; i++) jobs.offer(base + i); });   // lock-free
+            }
+        }
+        System.out.println("ConcurrentLinkedQueue after 4 producers: " + jobs.size() + " jobs (size() walks the whole queue)");
+
+        ConcurrentSkipListMap&lt;Integer, String&gt; slots = new ConcurrentSkipListMap&lt;&gt;();
+        try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+            for (int h = 9; h &lt;= 17; h++) { int hour = h; pool.submit(() -&gt; slots.put(hour * 100, "free")); }
+        }
+        System.out.println("ConcurrentSkipListMap: next slot after 12:30 is " + slots.ceilingKey(1230)
+                + ", first " + slots.firstKey() + ", afternoon " + slots.tailMap(1300).keySet());
+
+        List&lt;Integer&gt; shared = Collections.synchronizedList(new ArrayList&lt;&gt;(List.of(1, 2, 3)));
+        int sum = 0;
+        synchronized (shared) {                               // required: iteration is many calls
+            for (int n : shared) sum += n;
+        }
+        System.out.println("synchronizedList iterated under its own lock: sum " + sum);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · CowDemo.java</div>
+<pre><code class="language-plaintext">iterator made before add("sms") sees [audit, email]; list is [audit, email, sms]
+CopyOnWriteArrayList iterator.remove -&gt; UnsupportedOperationException
+10,000 adds allocate: ArrayList 327,064 bytes, CopyOnWriteArrayList 200,357,952 bytes
+ConcurrentLinkedQueue after 4 producers: 4000 jobs (size() walks the whole queue)
+ConcurrentSkipListMap: next slot after 12:30 is 1300, first 900, afternoon [1300, 1400, 1500, 1600, 1700]
+synchronizedList iterated under its own lock: sum 6</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Built on</th><th>Use it for</th></tr></thead>
+          <tbody>
+            <tr><td><code>CopyOnWriteArrayList</code>, <code>…ArraySet</code></td><td>An array copied on every write</td><td>Read constantly, changed rarely: listeners, routing tables, feature flags</td></tr>
+            <tr><td><code>ConcurrentLinkedQueue</code>, <code>…Deque</code></td><td>A lock-free linked list (CAS on the links)</td><td>An unbounded queue shared by many threads, with no waiting</td></tr>
+            <tr><td><code>ConcurrentSkipListMap</code>, <code>…Set</code></td><td>A lock-free skip list, O(log n)</td><td>A sorted map shared between threads: the concurrent <code>TreeMap</code></td></tr>
+            <tr><td><code>ConcurrentHashMap.newKeySet()</code></td><td>A <code>ConcurrentHashMap</code></td><td>A concurrent <code>HashSet</code></td></tr>
+            <tr><td><code>Collections.synchronizedList</code></td><td>One lock around every method</td><td>Legacy code; iterate inside <code>synchronized (list)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">The write cost is quadratic</span>Each <code>add</code> copies n references, so n appends copy about n²/2 of them: 10,000 adds made 200 MB of garbage against 327 KB for an <code>ArrayList</code>. Fine for a list of 12 listeners changed at startup; a disaster for a log of events.</div>
+    <div class="note"><span class="lbl">Snapshot means stale</span>The iterator made before <code>add("sms")</code> never saw it. That is the point, and also the trap: a reader can act on an element that was removed a moment ago. Snapshot iterators cannot <code>remove</code> either.</div>
+    <div class="note tip"><span class="lbl">size() is not free everywhere</span><code>ConcurrentLinkedQueue.size()</code> walks the whole queue, and its answer may be stale before it returns. Use <code>isEmpty()</code>, or keep a separate counter. A queue that needs a bound or blocking is a <a data-deck="cj" data-slide="The BlockingQueue family">BlockingQueue</a>.</div>
+  </div>
+</section>

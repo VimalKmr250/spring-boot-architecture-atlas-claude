@@ -1,0 +1,83 @@
+<section class="slide" data-sec="Coding drills" data-title="Concurrent word counter">
+  <h2>Drill: "count word frequencies across many lines, using all the cores"</h2>
+  <p class="dek">There are three good answers and one common wrong one. The wrong one shares a <code>HashMap</code>, or does <code>get</code> then <code>put</code> on a <code>ConcurrentHashMap</code>, and loses counts. The good ones either share nothing (a parallel stream that collects), or share a concurrent map updated atomically. The answer that scores best checks itself: all three results below are compared against a plain sequential count.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">WordCount.java · sequential, parallel stream, pool plus LongAdder, all compared</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Function;
+import java.util.stream.*;
+
+public class WordCount {
+    static List&lt;String&gt; lines() {                                    // 20,000 lines of seeded random words
+        String[] vocab = {"order", "ship", "pay", "refund", "cart", "stock", "price", "tax", "the", "a"};
+        Random r = new Random(42);
+        return IntStream.range(0, 20_000)
+                .mapToObj(i -&gt; IntStream.range(0, 12).mapToObj(j -&gt; vocab[r.nextInt(vocab.length)]).collect(Collectors.joining(" ")))
+                .toList();
+    }
+
+    static Stream&lt;String&gt; words(String line) { return Arrays.stream(line.toLowerCase().split("\\s+")).filter(w -&gt; !w.isEmpty()); }
+
+    public static void main(String[] args) throws Exception {
+        List&lt;String&gt; lines = lines();
+
+        Map&lt;String, Long&gt; sequential = new HashMap&lt;&gt;();                 // 1 the baseline
+        for (String line : lines) words(line).forEach(w -&gt; sequential.merge(w, 1L, Long::sum));
+
+        Map&lt;String, Long&gt; parallel = lines.parallelStream()             // 2 a parallel stream, no shared state
+                .flatMap(WordCount::words)
+                .collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()));
+
+        ConcurrentHashMap&lt;String, LongAdder&gt; counts = new ConcurrentHashMap&lt;&gt;();   // 3 a pool and a shared map
+        int chunk = 1_000;
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            for (int from = 0; from &lt; lines.size(); from += chunk) {
+                List&lt;String&gt; part = lines.subList(from, Math.min(from + chunk, lines.size()));
+                pool.submit(() -&gt; part.forEach(line -&gt; words(line)
+                        .forEach(w -&gt; counts.computeIfAbsent(w, k -&gt; new LongAdder()).increment())));
+            }
+        }
+        Map&lt;String, Long&gt; pooled = new HashMap&lt;&gt;();
+        counts.forEach((w, n) -&gt; pooled.put(w, n.sum()));
+
+        System.out.println("words counted: " + sequential.values().stream().mapToLong(Long::longValue).sum()
+                + ", distinct " + sequential.size());
+        System.out.println("parallel stream matches: " + sequential.equals(parallel) + ", pool + LongAdder matches: " + sequential.equals(pooled));
+
+        List&lt;Map.Entry&lt;String, Long&gt;&gt; top3 = sequential.entrySet().stream()
+                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .limit(3).toList();
+        System.out.println("top 3: " + top3);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · WordCount.java</div>
+<pre><code class="language-plaintext">words counted: 240000, distinct 10
+parallel stream matches: true, pool + LongAdder matches: true
+top 3: [order=24196, refund=24087, cart=24059]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Approach</th><th>Why it is correct</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>1 <code>merge</code> into a <code>HashMap</code></td><td>One thread</td><td>Small input; and always as the reference answer</td></tr>
+            <tr><td>2 <code>groupingByConcurrent</code> in a parallel stream</td><td>The collector owns the concurrent map; your code shares nothing</td><td>The data is already in memory</td></tr>
+            <tr><td>3 <code>computeIfAbsent(…).increment()</code> on <code>LongAdder</code>s</td><td><code>computeIfAbsent</code> is atomic per key; <code>LongAdder</code> handles contention on hot words</td><td>Work arrives from many producers, or from files, or over time</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The answer that loses counts</span><code>map.put(w, map.getOrDefault(w, 0L) + 1)</code> from several threads: two threads read 41 and both write 42. It loses nothing in a single-threaded test. On a <code>ConcurrentHashMap</code> use <code>merge(w, 1L, Long::sum)</code>; with very hot keys, the <code>LongAdder</code> version.</div>
+    <div class="note tip"><span class="lbl">Follow-up: the top k words</span>Sort the entries by count descending, with a tie-break on the word so the order is stable, and take k: shown above. For millions of distinct words, keep a min-heap of size k instead: O(n log k).</div>
+    <div class="note"><span class="lbl">Follow-up: the input is 50 GB</span>Stream it line by line with <code>Files.lines</code>, in chunks handed to a bounded pool, so memory holds the counts and not the file. Beyond one machine, the same shape is map-reduce, or a Kafka Streams aggregation.</div>
+  </div>
+</section>

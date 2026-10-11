@@ -1,0 +1,122 @@
+<section class="slide" data-sec="Exceptions" data-title="Designing exceptions">
+  <h2>A good exception carries a cause, the data to act on, and no more cost than it needs</h2>
+  <p class="dek">Exceptions cross layers: a <code>SQLException</code> from the repository becomes a domain failure in the service, and an HTTP status at the edge. Each translation must keep the cause, or the stack trace that explains the incident stops at the layer that translated it. Creating an exception is also not free: filling in the stack trace costs far more than the allocation.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ExceptionDesign.java · translation, lost causes, interrupts, cost</div>
+<pre><code class="language-java">import java.io.*;
+import java.sql.SQLException;
+
+public class ExceptionDesign {
+    // A domain exception: unchecked, with the data a caller needs, and always a cause.
+    static class PaymentDeclinedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String orderId;
+        PaymentDeclinedException(String orderId, String reason, Throwable cause) {
+            super("payment declined for " + orderId + ": " + reason, cause);
+            this.orderId = orderId;
+        }
+        String orderId() { return orderId; }
+    }
+
+    // An exception used for flow control: no stack trace to capture.
+    static class OutOfStock extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        OutOfStock(String sku) { super(sku, null, false, false); }   // no suppression, no trace
+    }
+
+    static void gatewayCall() throws SQLException { throw new SQLException("connection reset", "08S01"); }
+
+    static void chargeKeepingCause(String orderId) {
+        try {
+            gatewayCall();
+        } catch (SQLException e) {
+            throw new PaymentDeclinedException(orderId, "gateway unavailable", e);   // translate, keep cause
+        }
+    }
+
+    static void chargeLosingCause() {
+        try {
+            gatewayCall();
+        } catch (SQLException e) {
+            throw new RuntimeException(e.getMessage());       // the original stack trace is gone
+        }
+    }
+
+    static void waitForStock() {
+        try {
+            Thread.sleep(10_000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();               // restore the flag before translating
+            throw new IllegalStateException("interrupted while waiting for stock", e);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        try {
+            chargeKeepingCause("ORD-9");
+        } catch (PaymentDeclinedException e) {
+            var trace = new StringWriter();
+            e.printStackTrace(new PrintWriter(trace));
+            trace.toString().lines().filter(l -&gt; !l.contains("ExceptionDesign.main")).forEach(System.out::println);
+        }
+        try {
+            chargeLosingCause();
+        } catch (RuntimeException e) {
+            System.out.println("lost: " + e + ", cause " + e.getCause());
+        }
+
+        Thread waiter = new Thread(ExceptionDesign::waitForStock);
+        waiter.setUncaughtExceptionHandler((t, e) -&gt; System.out.println(
+                "uncaught in " + t.getName() + ": " + e.getMessage() + ", interrupted flag restored: " + t.isInterrupted()));
+        waiter.setName("stock-waiter");
+        waiter.start();
+        waiter.interrupt();
+        waiter.join();
+
+        long t0 = System.nanoTime();
+        for (int i = 0; i &lt; 1_000_000; i++) new IllegalStateException("x");
+        long withTrace = System.nanoTime() - t0;
+        t0 = System.nanoTime();
+        for (int i = 0; i &lt; 1_000_000; i++) new OutOfStock("x");
+        long without = System.nanoTime() - t0;
+        System.out.printf("1M exceptions: %d ms with stack traces, %d ms without (one run)%n",
+                withTrace / 1_000_000, without / 1_000_000);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ExceptionDesign.java · the timings vary by run</div>
+<pre><code class="language-plaintext">ExceptionDesign$PaymentDeclinedException: payment declined for ORD-9: gateway unavailable
+	at ExceptionDesign.chargeKeepingCause(ExceptionDesign.java:28)
+Caused by: java.sql.SQLException: connection reset
+	at ExceptionDesign.gatewayCall(ExceptionDesign.java:22)
+	at ExceptionDesign.chargeKeepingCause(ExceptionDesign.java:26)
+	... 1 more
+lost: java.lang.RuntimeException: connection reset, cause null
+uncaught in stock-waiter: interrupted while waiting for stock, interrupted flag restored: true
+1M exceptions: 535 ms with stack traces, 35 ms without (one run)</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Do</th><th>Instead of</th></tr></thead>
+          <tbody>
+            <tr><td>Translate at a boundary, passing the cause: <code>new X(msg, e)</code></td><td><code>new X(e.getMessage())</code>: "cause null" above, and no trace to follow</td></tr>
+            <tr><td>Put identifiers in the message and in fields: <code>orderId()</code></td><td>"Payment failed", with no way to find which one</td></tr>
+            <tr><td>Restore the flag before translating <code>InterruptedException</code></td><td>Swallowing it, so the thread keeps running after a shutdown request</td></tr>
+            <tr><td>Log once, where the exception is handled</td><td>Log and rethrow, so the same failure appears five times</td></tr>
+            <tr><td>Catch the specific type you can handle</td><td><code>catch (Exception e) {}</code>, which hides the next bug too</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Exceptions as control flow</span>Capturing a stack trace walks the whole stack: more than ten times the cost of the object itself here. For an expected outcome such as out of stock, return a result type (a sealed <code>Result</code>, an <code>Optional</code>), or use the four-argument constructor with <code>writableStackTrace = false</code>, as <code>OutOfStock</code> does.</div>
+    <div class="note tip"><span class="lbl">Checked or unchecked for domain errors</span>Unchecked, as most modern Java code and every Spring API does, with the class name stating the business meaning. A checked exception in a widely used signature forces every caller, and every lambda that calls it, to deal with it.</div>
+    <div class="note"><span class="lbl">At the edge</span>Map exception types to one HTTP error body in one place, not in every controller. The reference deck shows the shape: <a data-deck="deck" data-slide="One error shape">one error shape</a>. Helpful NullPointerException messages <span class="tag a">14</span> name the null expression for free.</div>
+  </div>
+</section>

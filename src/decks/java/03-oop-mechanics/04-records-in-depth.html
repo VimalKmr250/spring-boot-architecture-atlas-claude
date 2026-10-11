@@ -1,0 +1,91 @@
+<section class="slide" data-sec="OOP mechanics" data-title="Records in depth">
+  <h2>A record is a final class whose state is its components, and the compact constructor guards it</h2>
+  <p class="dek">Declare the components and javac writes the private final fields, the canonical constructor, the accessors and value-based <code>equals</code>, <code>hashCode</code> and <code>toString</code> <span class="tag a">since 16</span>. The compact constructor runs before the fields are assigned, so it can validate and normalise the arguments. What a record cannot do is hide a mutable component: it is only as immutable as the types it holds.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Records.java · validation, normalisation, generic records, the two traps</div>
+<pre><code class="language-java">import java.util.*;
+
+public class Records {
+    record Money(long cents, String currency) {
+        static final Money ZERO_EUR = new Money(0, "EUR");      // static fields are allowed
+        Money {                                                // compact canonical constructor
+            if (cents &lt; 0) throw new IllegalArgumentException("negative amount: " + cents);
+            currency = currency.toUpperCase(Locale.ROOT);      // normalise before assignment
+        }
+        Money(long cents) { this(cents, "EUR"); }               // others must delegate
+        Money plus(Money other) {
+            if (!currency.equals(other.currency)) throw new IllegalArgumentException("currency mismatch");
+            return new Money(cents + other.cents, currency);
+        }
+        @Override public String toString() { return String.format("%d.%02d %s", cents / 100, cents % 100, currency); }
+    }
+
+    record Batch(String sku, int[] quantities) { }             // array component: a trap
+    record Basket(List&lt;String&gt; items) { }                      // no defensive copy
+    record Pair&lt;A, B&gt;(A first, B second) { }                   // records can be generic
+
+    public static void main(String[] args) {
+        Money a = new Money(1250, "eur");
+        System.out.println(a + " plus " + new Money(99) + " = " + a.plus(new Money(99)));
+        System.out.println("equal by value: " + a.equals(new Money(1250, "EUR"))
+                + ", same hash: " + (a.hashCode() == new Money(1250, "EUR").hashCode()));
+        try {
+            new Money(-1, "EUR");
+        } catch (IllegalArgumentException e) {
+            System.out.println("rejected: " + e.getMessage());
+        }
+
+        Batch b1 = new Batch("A-1", new int[] {1, 2});
+        Batch b2 = new Batch("A-1", new int[] {1, 2});
+        System.out.println("batches with equal arrays equal? " + b1.equals(b2));
+        System.out.println("batch toString: " + b1.toString().replaceAll("@[0-9a-f]+", "@…"));
+
+        var items = new ArrayList&lt;&gt;(List.of("tea"));
+        Basket basket = new Basket(items);
+        items.add("milk");
+        System.out.println("basket after the caller's add: " + basket);
+
+        var pair = new Pair&lt;&gt;("SKU-1", 3);
+        System.out.println(pair + ", components: " + Arrays.stream(Pair.class.getRecordComponents())
+                .map(c -&gt; c.getName() + ":" + c.getType().getSimpleName()).toList());
+        System.out.println("is a record, final: " + Money.class.isRecord() + ", "
+                + java.lang.reflect.Modifier.isFinal(Money.class.getModifiers())
+                + ", superclass " + Money.class.getSuperclass().getName());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Records.java</div>
+<pre><code class="language-plaintext">12.50 EUR plus 0.99 EUR = 13.49 EUR
+equal by value: true, same hash: true
+rejected: negative amount: -1
+batches with equal arrays equal? false
+batch toString: Batch[sku=A-1, quantities=[I@…]
+basket after the caller's add: Basket[items=[tea, milk]]
+Pair[first=SKU-1, second=3], components: [first:Object, second:Object]
+is a record, final: true, true, superclass java.lang.Record</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>A record can</th><th>A record cannot</th></tr></thead>
+          <tbody>
+            <tr><td>Implement interfaces</td><td>Extend a class: it already extends <code>java.lang.Record</code></td></tr>
+            <tr><td>Declare static fields, static methods, nested types</td><td>Declare instance fields beyond its components</td></tr>
+            <tr><td>Add constructors that delegate to the canonical one</td><td>Be extended: it is implicitly final</td></tr>
+            <tr><td>Override an accessor, keeping its public signature</td><td>Make a component mutable: every field is final</td></tr>
+            <tr><td>Be generic, local or nested (nested ones are static)</td><td>Be abstract</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Array components</span>The generated <code>equals</code> compares each component with <code>equals</code>, and for an array that means identity. Two batches with equal contents are unequal, and <code>toString</code> prints <code>[I@…</code>. Hold a <code>List</code> instead, or override all three methods.</div>
+    <div class="note warn"><span class="lbl">Shallow immutability</span><code>Basket</code> kept the caller's list, so the caller's later <code>add</code> changed the record. Copy in the compact constructor: <code>items = List.copyOf(items)</code>, as on <a data-deck="cj" data-slide="Writing an immutable class">writing an immutable class</a>.</div>
+    <div class="note tip"><span class="lbl">Where records fit</span>DTOs, API payloads, query projections, map keys, events and messages. Not JPA entities, which need a no-argument constructor, mutable state and subclassing proxies. Jackson binds records through the canonical constructor, and Java serialization calls it too, so validation also runs on deserialization.</div>
+  </div>
+</section>

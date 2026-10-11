@@ -1,0 +1,129 @@
+<section class="slide" data-sec="The JVM" data-title="GC roots and reference types">
+  <h2>Garbage is whatever cannot be reached from a GC root, and four kinds of reference decide what counts as reachable</h2>
+  <p class="dek">The collector does not count references. It starts from the roots (every thread's locals, static fields, JNI handles and held monitors), marks everything it can reach, and reclaims the rest. That is why a cycle of objects that point at each other is still garbage. The <code>java.lang.ref</code> classes let code hold an object without keeping it alive, which is how caches, canonical maps and native-resource cleanup work.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="GC roots on the left: local variables on every thread's stack, static fields of loaded classes, JNI references, and objects used as monitors. From the roots, object A is reachable, and from A objects B and C, and from C object D: all kept. Objects X and Y reference each other but nothing reachable references them, so the cycle is collected.">
+        <rect x="20" y="20" width="210" height="150" rx="8" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F"></rect>
+        <text x="36" y="42" font-size="11.5" font-weight="600" fill="currentColor">GC roots</text>
+        <g font-size="10.5" fill="currentColor">
+          <text x="36" y="66">locals on every thread's stack</text>
+          <text x="36" y="88">static fields of loaded classes</text>
+          <text x="36" y="110">JNI references</text>
+          <text x="36" y="132">objects held as monitors</text>
+        </g>
+        <g font-size="11" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <circle cx="320" cy="70" r="18" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></circle><text x="320" y="74">A</text>
+          <circle cx="430" cy="40" r="18" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></circle><text x="430" y="44">B</text>
+          <circle cx="430" cy="110" r="18" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></circle><text x="430" y="114">C</text>
+          <circle cx="545" cy="110" r="18" fill="#D26A3F" fill-opacity="0.14" stroke="#D26A3F"></circle><text x="545" y="114">D</text>
+          <circle cx="700" cy="60" r="18" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></circle><text x="700" y="64">X</text>
+          <circle cx="810" cy="110" r="18" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.5" stroke-dasharray="4 3"></circle><text x="810" y="114">Y</text>
+        </g>
+        <g stroke-width="1.3">
+          <line x1="230" y1="70" x2="299" y2="70" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="337" y1="62" x2="410" y2="46" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="336" y1="80" x2="411" y2="103" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="448" y1="110" x2="524" y2="110" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="716" y1="70" x2="793" y2="100" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+          <line x1="794" y1="118" x2="718" y2="72" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)" transform="translate(-8 8)"></line>
+        </g>
+        <text x="430" y="160" text-anchor="middle" font-size="10.5" fill="currentColor">reachable: marked and kept</text>
+        <text x="755" y="160" text-anchor="middle" font-size="10.5" fill="currentColor">a cycle nothing reaches: collected</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">References.java · weak, soft, cycles, WeakHashMap, Cleaner</div>
+<pre><code class="language-java">// Run with: java -Xmx64m References.java
+import java.lang.ref.*;
+import java.util.*;
+
+public class References {
+    static final class Node {
+        Node other;
+        final byte[] payload = new byte[1024];
+    }
+
+    static void collect() throws InterruptedException {
+        System.gc();                                    // a request; G1 runs a full collection here
+        Thread.sleep(100);
+    }
+
+    public static void main(String[] args) throws Exception {
+        Object strongTarget = new Object();
+        WeakReference&lt;Object&gt; weak = new WeakReference&lt;&gt;(new Object());
+        WeakReference&lt;Object&gt; weakButHeld = new WeakReference&lt;&gt;(strongTarget);
+        SoftReference&lt;byte[]&gt; soft = new SoftReference&lt;&gt;(new byte[1024 * 1024]);
+        collect();
+        System.out.println("after a GC: weak cleared " + (weak.get() == null) + ", weak to a held object cleared "
+                + (weakButHeld.get() == null) + ", soft cleared " + (soft.get() == null));
+
+        List&lt;byte[]&gt; pressure = new ArrayList&lt;&gt;();
+        try {
+            while (true) pressure.add(new byte[1024 * 1024]);
+        } catch (OutOfMemoryError e) {
+            pressure.clear();
+        }
+        System.out.println("after memory pressure: soft cleared " + (soft.get() == null) + " (cleared before any OutOfMemoryError)");
+
+        Node a = new Node(), b = new Node();
+        a.other = b;
+        b.other = a;                                    // a cycle
+        WeakReference&lt;Node&gt; cycle = new WeakReference&lt;&gt;(a);
+        a = null;
+        b = null;
+        collect();
+        System.out.println("an unreachable cycle was collected: " + (cycle.get() == null));
+
+        Map&lt;Object, String&gt; sessions = new WeakHashMap&lt;&gt;();
+        Object key = new Object();
+        sessions.put(key, "session data");
+        System.out.println("WeakHashMap size with the key held: " + sessions.size());
+        key = null;
+        collect();
+        System.out.println("WeakHashMap size after the key became unreachable: " + sessions.size());
+
+        Cleaner cleaner = Cleaner.create();
+        Object resource = new Object();
+        cleaner.register(resource, () -&gt; System.out.println("Cleaner action ran: release the native handle"));
+        resource = null;
+        collect();
+        System.out.println("strongTarget kept alive to the end: " + (strongTarget != null));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · References.java</div>
+<pre><code class="language-plaintext">after a GC: weak cleared true, weak to a held object cleared false, soft cleared false
+after memory pressure: soft cleared true (cleared before any OutOfMemoryError)
+an unreachable cycle was collected: true
+WeakHashMap size with the key held: 1
+WeakHashMap size after the key became unreachable: 0
+Cleaner action ran: release the native handle
+strongTarget kept alive to the end: true</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Reference</th><th>Cleared when</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Strong (ordinary)</td><td>Never, while reachable</td><td>Everything</td></tr>
+            <tr><td><code>SoftReference</code></td><td>The JVM needs memory; always before an <code>OutOfMemoryError</code></td><td>Memory-sensitive caches, though a bounded cache is usually better</td></tr>
+            <tr><td><code>WeakReference</code></td><td>The next collection that finds no strong path</td><td><code>WeakHashMap</code> keys, listeners, canonical maps</td></tr>
+            <tr><td><code>PhantomReference</code></td><td>After the object is finalised; <code>get()</code> always returns <code>null</code></td><td>Cleanup of native resources, which <code>Cleaner</code> <span class="tag a">9</span> wraps</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Generations</h4><p>Most objects die young, so new objects go into a small young generation that is collected often and cheaply, by copying the few survivors. Objects that survive several collections move to the old generation, which is collected rarely. Every collector in the JDK except Epsilon builds on this idea.</p></div>
+    <div class="card"><h4>The collectors</h4><p><b>G1</b>: the default since 9, region-based, with a pause-time goal. <b>ZGC</b>: pauses under a millisecond at any heap size, generational since 21 and only generational since 24. <b>Parallel</b>: throughput for batch work. <b>Serial</b>: small heaps. Choosing and reading one: <a data-deck="sb" data-slide="Garbage collection">garbage collection</a>.</p></div>
+    <div class="note warn"><span class="lbl">System.gc() and finalize</span><code>System.gc()</code> is a request the JVM may ignore, and <code>-XX:+DisableExplicitGC</code> makes it a no-op; this demo relies on G1 honouring it. <code>finalize()</code> is deprecated for removal (JEP 421, 18): it ran late, or never, and could resurrect objects. Use try-with-resources, then <code>Cleaner</code> as a safety net.</div>
+  </div>
+</section>

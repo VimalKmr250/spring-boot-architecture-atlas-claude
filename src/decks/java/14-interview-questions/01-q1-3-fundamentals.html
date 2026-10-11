@@ -1,0 +1,24 @@
+<section class="slide" data-sec="Interview questions" data-title="Q1–3 · Fundamentals">
+  <h2>Three questions that open almost every Java interview</h2>
+  <p class="dek">These thirty questions are the core-Java questions that keep recurring in 2025 and 2026 interviews, from screening calls to senior deep-dives. Each has a <b>30-second answer</b> to say first and a <b>go deeper</b> paragraph for the follow-up, and each links to the slides in this tab that cover it, with the code that proves it.</p>
+
+  <div class="note"><span class="lbl">How to practise with these</span>Read the question, look away, and answer out loud for thirty seconds. Then compare with the 30-second answer: whatever you left out is your study list, and the links under each answer open the slide that covers it. The browser's Back button returns you here.</div>
+
+  <article class="q"><header><i>Q1</i><h3>Is Java pass-by-value or pass-by-reference?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Always pass-by-value. For a primitive, the value copied is the number; for an object, the value copied is the reference. So a method can change the object the caller passed in, because both references point at it, but assigning a new object to the parameter only moves the method's own copy. That is why you cannot write a <code>swap(a, b)</code> in Java.</div>
+    <p class="deeper"><b>Go deeper:</b> Draw the two stack frames and the one heap object. "Objects are passed by reference" is the answer interviewers are listening for as a mistake: in a pass-by-reference language the callee could rebind the caller's variable, and Java cannot. Strings and wrappers look as if they were copied because they are immutable, so no method can change them at all. To return two values, return a record.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="cj" data-slide="Pass-by-value, stack and heap">Pass-by-value</a><a data-deck="cj" data-slide="Primitives, wrappers and autoboxing">Primitives and wrappers</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q2</i><h3>Why is String immutable, and what is the string pool?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span>Every method that seems to modify a <code>String</code> returns a new one. That makes strings safe to share between threads, safe as hash keys (the hash is cached), and safe for security checks, because a path or class name cannot change after it was checked. It also lets the JVM pool them: identical literals and compile-time constants share one instance. <code>new String(…)</code> always makes a new object, and <code>intern()</code> returns the pooled one.</div>
+    <p class="deeper"><b>Go deeper:</b> The pool has been in the heap since Java 7. <code>"ord" + "er"</code> is folded by javac into the literal, so it is the pooled instance; <code>part + "er"</code> is built at run time and is not. Hence <code>==</code> on strings passes tests and fails on input. Since Java 9 a Latin-1 string uses one byte per character (compact strings). And <code>+=</code> in a loop copies everything each time: 57.8 MB against 98 KB for <code>StringBuilder</code> in this tab's demo.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="cj" data-slide="Strings: immutability and the pool">Strings and the pool</a></p>
+  </div></article>
+
+  <article class="q"><header><i>Q3</i><h3>What is the difference between == and equals, and why must hashCode be overridden with equals?</h3></header><div class="qb">
+    <div class="snap"><span class="lbl">30-second answer</span><code>==</code> compares primitives by value and objects by identity: is it the same object? <code>equals</code> compares meaning, as each class defines it; <code>Object</code>'s default is identity. Hash collections pick a bucket by <code>hashCode</code> and call <code>equals</code> only inside it. If two equal objects have different hash codes they land in different buckets, so a <code>HashSet</code> holds both "duplicates" and <code>contains</code> fails. Equal objects must have equal hash codes.</div>
+    <p class="deeper"><b>Go deeper:</b> Name the contract: reflexive, symmetric, transitive, consistent, false for <code>null</code>. Then the traps: a hash code built from a mutable field loses the entry when the field changes; <code>instanceof</code> equality across a subclass that adds fields breaks symmetry; <code>equals(Order)</code> is an overload, not an override, which <code>@Override</code> catches. javac's <code>-Xlint:overrides</code> warns about <code>equals</code> without <code>hashCode</code>. A record generates both correctly.</p>
+    <p class="xrefs"><span class="lbl">In this tab</span><a data-deck="cj" data-slide="The Object contract">The Object contract</a><a data-deck="cj" data-slide="Equality and hashing bugs">Equality bugs</a></p>
+  </div></article>
+</section>

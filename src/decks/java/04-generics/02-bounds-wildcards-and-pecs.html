@@ -1,0 +1,97 @@
+<section class="slide" data-sec="Generics" data-title="Bounds, wildcards and PECS">
+  <h2>Producer extends, consumer super: wildcards make generic methods accept what they should</h2>
+  <p class="dek">Generic types are <b>invariant</b>: a <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>, because otherwise you could add a <code>Double</code> to a list of integers. Wildcards win the flexibility back safely. <code>? extends T</code> means you can read <code>T</code>s out; <code>? super T</code> means you can put <code>T</code>s in. Arrays chose covariance instead, and pay for it at run time.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Pecs.java · extends to read, super to write, and why arrays differ</div>
+<pre><code class="language-java">import java.util.*;
+
+public class Pecs {
+    // Producer: we only read from it, so accept any list of a Number subtype.
+    static double total(Collection&lt;? extends Number&gt; amounts) {
+        double sum = 0;
+        for (Number n : amounts) sum += n.doubleValue();
+        return sum;
+    }
+
+    // Consumer: we only write Integers into it, so accept a list of any supertype.
+    static void fillIds(List&lt;? super Integer&gt; sink, int count) {
+        for (int i = 1; i &lt;= count; i++) sink.add(i);
+    }
+
+    // The JDK's shape: read from src (extends), write to dest (super).
+    static &lt;T&gt; void copyInto(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src) {
+        for (T item : src) dest.add(item);
+    }
+
+    // Comparable&lt;? super T&gt;: works when the comparison is inherited from a superclass.
+    static &lt;T extends Comparable&lt;? super T&gt;&gt; T largest(List&lt;? extends T&gt; items) {
+        T best = items.get(0);
+        for (T item : items) if (item.compareTo(best) &gt; 0) best = item;
+        return best;
+    }
+
+    static class Amount implements Comparable&lt;Amount&gt; {
+        final long cents;
+        Amount(long cents) { this.cents = cents; }
+        @Override public int compareTo(Amount o) { return Long.compare(cents, o.cents); }
+        @Override public String toString() { return getClass().getSimpleName() + "(" + cents + ")"; }
+    }
+    static class Refund extends Amount {               // a Comparable&lt;Amount&gt;, not Comparable&lt;Refund&gt;
+        Refund(long cents) { super(cents); }
+    }
+
+    public static void main(String[] args) {
+        List&lt;Integer&gt; ints = List.of(1, 2, 3);
+        List&lt;Double&gt; doubles = List.of(0.5, 1.5);
+        System.out.println("total ints " + total(ints) + ", total doubles " + total(doubles));
+
+        List&lt;Number&gt; numbers = new ArrayList&lt;&gt;();
+        List&lt;Object&gt; objects = new ArrayList&lt;&gt;();
+        fillIds(numbers, 3);
+        fillIds(objects, 2);
+        copyInto(objects, doubles);
+        System.out.println("numbers " + numbers + ", objects " + objects);
+
+        List&lt;Refund&gt; refunds = List.of(new Refund(500), new Refund(1200), new Refund(90));
+        System.out.println("largest refund " + largest(refunds));
+
+        // List&lt;Number&gt; wide = ints;                  // does not compile: generics are invariant
+        Object[] slots = new String[2];               // arrays are covariant, so this compiles
+        try {
+            slots[0] = 42;                            // and fails at run time
+        } catch (ArrayStoreException e) {
+            System.out.println("ArrayStoreException: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Pecs.java</div>
+<pre><code class="language-plaintext">total ints 6.0, total doubles 2.0
+numbers [1, 2, 3], objects [1, 2, 0.5, 1.5]
+largest refund Refund(1200)
+ArrayStoreException: java.lang.Integer</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Declared as</th><th>Accepts</th><th>You can</th></tr></thead>
+          <tbody>
+            <tr><td><code>List&lt;Number&gt;</code></td><td>Exactly <code>List&lt;Number&gt;</code></td><td>Read <code>Number</code>s, add any <code>Number</code></td></tr>
+            <tr><td><code>List&lt;? extends Number&gt;</code></td><td><code>List&lt;Integer&gt;</code>, <code>List&lt;Double&gt;</code>, …</td><td>Read <code>Number</code>s. Add nothing but <code>null</code>.</td></tr>
+            <tr><td><code>List&lt;? super Integer&gt;</code></td><td><code>List&lt;Integer&gt;</code>, <code>List&lt;Number&gt;</code>, <code>List&lt;Object&gt;</code></td><td>Add <code>Integer</code>s. Read only <code>Object</code>s.</td></tr>
+            <tr><td><code>List&lt;?&gt;</code></td><td>Any list</td><td>Read <code>Object</code>s, call <code>size</code>, <code>clear</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>PECS in the JDK</h4><p><code>Collections.copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src)</code>. <code>addAll(Collection&lt;? extends E&gt;)</code>. <code>forEach(Consumer&lt;? super T&gt;)</code>. <code>Stream.map(Function&lt;? super T, ? extends R&gt;)</code>. Parameters get wildcards; return types should not, or every caller inherits them.</p></div>
+    <div class="card"><h4>Why <code>Comparable&lt;? super T&gt;</code></h4><p><code>Refund</code> inherits <code>compareTo</code> from <code>Amount</code>, so it is a <code>Comparable&lt;Amount&gt;</code>, not a <code>Comparable&lt;Refund&gt;</code>. With <code>&lt;T extends Comparable&lt;T&gt;&gt;</code>, <code>largest(refunds)</code> would not compile. That is why <code>Collections.max</code> is declared with <code>? super T</code>.</p></div>
+    <div class="note bad"><span class="lbl">Covariant arrays</span><code>Object[] slots = new String[2]</code> compiles, so every store into an array of references is checked at run time, and the wrong one throws <code>ArrayStoreException</code>. Generics moved that check to compile time. It is also why generic arrays are not allowed.</div>
+  </div>
+</section>

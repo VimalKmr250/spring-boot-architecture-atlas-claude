@@ -1,0 +1,100 @@
+<section class="slide" data-sec="Language fundamentals" data-title="Primitives, wrappers and autoboxing">
+  <h2>Eight primitives, eight wrappers, and boxing that converts between them without a word</h2>
+  <p class="dek">A primitive holds a value. A wrapper is an object: it can be <code>null</code>, it lives in collections, and it has identity. The compiler boxes and unboxes for you, so a <code>==</code> that compares objects, an unboxed <code>null</code> and a <code>remove(1)</code> that removes the wrong element all compile cleanly.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Boxing.java · the cache, unboxing null, the overload, silent narrowing</div>
+<pre><code class="language-java">import java.util.*;
+
+public class Boxing {
+    static Integer discount;                          // a field nobody set: null
+
+    public static void main(String[] args) {
+        Integer a = 127, b = 127, c = 128, d = 128;
+        System.out.println("127 == 127     " + (a == b));      // the same cached object
+        System.out.println("128 == 128     " + (c == d));      // two different objects
+        System.out.println("128 equals 128 " + c.equals(d));
+
+        Long total = 128L;
+        System.out.println("Long 128 equals int 128   " + total.equals(128));   // 128 boxes to Integer
+        System.out.println("Long 128 equals long 128  " + total.equals(128L));
+
+        Map&lt;String, Integer&gt; stock = new HashMap&lt;&gt;();
+        try {
+            int left = stock.get("SKU-1");                   // auto-unboxing a null
+            System.out.println(left);
+        } catch (NullPointerException e) {
+            System.out.println("NPE: " + e.getMessage());
+        }
+
+        boolean member = false;
+        try {
+            Integer off = member ? 10 : discount;            // int ? int : Integer is an int
+            System.out.println(off);
+        } catch (NullPointerException e) {
+            System.out.println("NPE: " + e.getMessage());
+        }
+
+        List&lt;Integer&gt; ids = new ArrayList&lt;&gt;(List.of(10, 20, 30));
+        ids.remove(1);                                       // remove(int index): drops 20
+        ids.remove(Integer.valueOf(10));                     // remove(Object): drops 10
+        System.out.println("after both removes " + ids);
+
+        System.out.println("(byte) 200      " + (byte) 200);
+        System.out.println("'a' + 1         " + ('a' + 1));
+        System.out.println("(char) ('a' + 1) " + (char) ('a' + 1));
+        System.out.println("7 / 2 = " + (7 / 2) + ", 7 / 2.0 = " + (7 / 2.0));
+        short s = 1;
+        s += 70_000;                                         // compound assignment narrows silently
+        System.out.println("short 1 += 70000 " + s);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Boxing.java</div>
+<pre><code class="language-plaintext">127 == 127     true
+128 == 128     false
+128 equals 128 true
+Long 128 equals int 128   false
+Long 128 equals long 128  true
+NPE: Cannot invoke "java.lang.Integer.intValue()" because the return value of "java.util.Map.get(Object)" is null
+NPE: Cannot invoke "java.lang.Integer.intValue()" because "Boxing.discount" is null
+after both removes [30]
+(byte) 200      -56
+'a' + 1         98
+(char) ('a' + 1) b
+7 / 2 = 3, 7 / 2.0 = 3.5
+short 1 += 70000 4465</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javac --release 21 -Xlint:all · Boxing.java</div>
+<pre><code class="language-plaintext">Boxing.java:42: warning: [lossy-conversions] implicit cast from int to short in compound assignment is possibly lossy
+        s += 70_000;                                         // compound assignment narrows silently
+             ^
+1 warning</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Primitive</th><th>Size</th><th>Wrapper cache</th></tr></thead>
+          <tbody>
+            <tr><td><code>byte</code></td><td>8-bit signed</td><td><code>Byte</code>: all 256 values</td></tr>
+            <tr><td><code>short</code></td><td>16-bit signed</td><td><code>Short</code>: −128 to 127</td></tr>
+            <tr><td><code>char</code></td><td>16-bit unsigned, a UTF-16 code unit</td><td><code>Character</code>: 0 to 127</td></tr>
+            <tr><td><code>int</code></td><td>32-bit signed</td><td><code>Integer</code>: −128 to 127; raise the top with <code>-XX:AutoBoxCacheMax</code></td></tr>
+            <tr><td><code>long</code></td><td>64-bit signed</td><td><code>Long</code>: −128 to 127</td></tr>
+            <tr><td><code>float</code>, <code>double</code></td><td>32- and 64-bit IEEE 754</td><td>None</td></tr>
+            <tr><td><code>boolean</code></td><td>Left to the JVM; a byte in arrays</td><td><code>Boolean.TRUE</code> and <code>FALSE</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">== on wrappers</span>It passes every test that uses small numbers, because <code>Integer.valueOf</code> returns cached objects from −128 to 127. Real order IDs are bigger, and <code>==</code> compares two different objects. Compare wrappers with <code>equals</code>, or unbox first.</div>
+    <div class="note warn"><span class="lbl">The ternary that unboxes</span><code>member ? 10 : discount</code> mixes an <code>int</code> and an <code>Integer</code>, so the whole expression is an <code>int</code> and <code>discount</code> is unboxed even though only the <code>else</code> branch was chosen. The helpful NPE message (Java 14+) names the field.</div>
+    <div class="note tip"><span class="lbl">Long is not Integer</span><code>Long.equals(128)</code> is false because <code>128</code> boxes to an <code>Integer</code>. The same bug makes <code>Map&lt;Long, Order&gt;.get(5)</code> return <code>null</code>. Boxing in a hot loop costs allocations too: see <a data-deck="cj" data-slide="Resource and memory bugs">resource and memory bugs</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,122 @@
+<section class="slide" data-sec="Concurrent collections" data-title="Synchronizers">
+  <h2>Latches, barriers, semaphores and phasers coordinate threads so you never write wait and notify</h2>
+  <p class="dek">Five classes in <code>java.util.concurrent</code> exist only to make threads wait for each other in a particular shape. Pick by the shape: one event that many threads wait for, a group that meets repeatedly, a limit on how many may proceed, a group whose size changes, or two threads swapping data. Each is built on the same internal queue as <code>ReentrantLock</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Synchronizers.java · all five, each in its typical shape</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Synchronizers {
+    public static void main(String[] args) throws Exception {
+        // CountDownLatch: a start gate for N workers, and a finish line for the coordinator.
+        CountDownLatch startGate = new CountDownLatch(1), finished = new CountDownLatch(5);
+        AtomicInteger started = new AtomicInteger();
+        try (ExecutorService pool = Executors.newFixedThreadPool(5)) {
+            for (int i = 0; i &lt; 5; i++)
+                pool.submit(() -&gt; {
+                    startGate.await();                         // everyone waits for the gun
+                    started.incrementAndGet();
+                    finished.countDown();
+                    return null;
+                });
+            System.out.println("before countDown: " + started.get() + " started");
+            startGate.countDown();
+            finished.await();
+            System.out.println("after the gate opened and all finished: " + started.get() + " started; latch count " + finished.getCount());
+        }
+
+        // CyclicBarrier: 3 parties meet each round; the barrier action runs once per round.
+        List&lt;String&gt; rounds = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        AtomicInteger round = new AtomicInteger();
+        CyclicBarrier barrier = new CyclicBarrier(3, () -&gt; rounds.add("round " + round.incrementAndGet() + " merged"));
+        try (ExecutorService pool = Executors.newFixedThreadPool(3)) {
+            for (int p = 0; p &lt; 3; p++)
+                pool.submit(() -&gt; {
+                    for (int r = 0; r &lt; 2; r++) barrier.await();   // reused: no reset needed
+                    return null;
+                });
+        }
+        System.out.println("CyclicBarrier: " + rounds);
+
+        // Semaphore: at most 3 callers inside at any moment.
+        Semaphore permits = new Semaphore(3);
+        AtomicInteger inside = new AtomicInteger(), peak = new AtomicInteger();
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 50; i++)
+                pool.submit(() -&gt; {
+                    permits.acquire();
+                    try {
+                        peak.accumulateAndGet(inside.incrementAndGet(), Math::max);
+                        Thread.sleep(10);
+                        inside.decrementAndGet();
+                    } finally { permits.release(); }
+                    return null;
+                });
+        }
+        System.out.println("Semaphore(3): 50 tasks, at most " + peak.get() + " inside at once");
+
+        // Phaser: parties register and leave between phases.
+        Phaser phaser = new Phaser(1);                          // the coordinator
+        List&lt;String&gt; log = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        try (ExecutorService pool = Executors.newFixedThreadPool(3)) {
+            for (int w = 1; w &lt;= 3; w++) {
+                int id = w;
+                phaser.register();
+                pool.submit(() -&gt; {
+                    phaser.arriveAndAwaitAdvance();             // phase 0: everyone loaded
+                    if (id == 3) { phaser.arriveAndDeregister(); return; }   // leaves after phase 0
+                    log.add("worker " + id + " in phase " + phaser.getPhase());
+                    phaser.arriveAndDeregister();
+                });
+            }
+            phaser.arriveAndAwaitAdvance();                     // wait for phase 0
+            phaser.arriveAndAwaitAdvance();                     // and phase 1
+            phaser.arriveAndDeregister();
+        }
+        Collections.sort(log);
+        System.out.println("Phaser: " + log + ", terminated " + phaser.isTerminated());
+
+        // Exchanger: two threads swap buffers.
+        Exchanger&lt;String&gt; exchanger = new Exchanger&lt;&gt;();
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future&lt;String&gt; a = pool.submit(() -&gt; exchanger.exchange("full buffer"));
+            Future&lt;String&gt; b = pool.submit(() -&gt; exchanger.exchange("empty buffer"));
+            System.out.println("Exchanger: filler got the " + a.get() + ", drainer got the " + b.get());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Synchronizers.java</div>
+<pre><code class="language-plaintext">before countDown: 0 started
+after the gate opened and all finished: 5 started; latch count 0
+CyclicBarrier: [round 1 merged, round 2 merged]
+Semaphore(3): 50 tasks, at most 3 inside at once
+Phaser: [worker 1 in phase 1, worker 2 in phase 1], terminated true
+Exchanger: filler got the empty buffer, drainer got the full buffer</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Class</th><th>Shape</th><th>Reusable</th></tr></thead>
+          <tbody>
+            <tr><td><code>CountDownLatch</code></td><td>Wait until a count reaches zero: a start gate, or "these N tasks are done"</td><td>No</td></tr>
+            <tr><td><code>CyclicBarrier</code></td><td>N threads wait for each other, then an optional action runs once per round</td><td>Yes</td></tr>
+            <tr><td><code>Semaphore</code></td><td>At most N permits out at once: a concurrency limit</td><td>Yes</td></tr>
+            <tr><td><code>Phaser</code></td><td>Like a barrier, but parties register and leave between phases</td><td>Yes</td></tr>
+            <tr><td><code>Exchanger</code></td><td>Two threads meet and swap one object each</td><td>Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">Semaphore with virtual threads</span>The natural way to bound a downstream: 50 virtual threads, a <code>Semaphore(3)</code>, and never more than three calls in flight. Release in <code>finally</code>. A permit has no owner, so any thread can release it, which also means a missing release is never caught for you.</div>
+    <div class="note warn"><span class="lbl">Broken barriers</span>If one party of a <code>CyclicBarrier</code> is interrupted or times out, every other party gets <code>BrokenBarrierException</code> and the barrier stays broken until <code>reset()</code>. A latch has no such failure mode, and also no way back: it cannot count up again.</div>
+    <div class="note"><span class="lbl">Often there is a simpler tool</span>Waiting for N submitted tasks is <code>invokeAll</code>, or <code>allOf</code> on <code>CompletableFuture</code>s. Waiting for one thread is <code>join</code>. Reach for a latch when the threads are not yours to join, such as in a test that starts a server.</div>
+  </div>
+</section>

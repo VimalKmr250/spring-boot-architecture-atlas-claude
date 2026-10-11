@@ -1,0 +1,101 @@
+<section class="slide" data-sec="Collections" data-title="HashMap internals: resize and treeify">
+  <h2>The table doubles at 75% full, and a crowded bucket turns into a red-black tree</h2>
+  <p class="dek">When the size passes capacity × 0.75, the table doubles and every node moves to either its old index or old index + old capacity, decided by one bit of the stored hash. When one bucket collects too many keys, Java 8 and later convert it from a linked list into a red-black tree, so even a flood of colliding keys costs O(log n) per lookup instead of O(n). The demo watches both happen.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">HashMapResize.java · normal growth, then eleven keys with one hash code</div>
+<pre><code class="language-java">// Run with: java --add-opens java.base/java.util=ALL-UNNAMED HashMapResize.java
+import java.lang.reflect.Field;
+import java.util.*;
+
+public class HashMapResize {
+    static Field table;
+
+    static int length(HashMap&lt;?, ?&gt; map) throws IllegalAccessException {
+        Object[] tab = (Object[]) table.get(map);
+        return tab == null ? 0 : tab.length;
+    }
+
+    // Every key collides: the worst case that treeification exists for.
+    record BadKey(int id) implements Comparable&lt;BadKey&gt; {
+        @Override public int hashCode() { return 42; }
+        @Override public int compareTo(BadKey o) { return Integer.compare(id, o.id); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        table = HashMap.class.getDeclaredField("table");
+        table.setAccessible(true);
+
+        var map = new HashMap&lt;String, Integer&gt;();
+        System.out.println("new HashMap: table length " + length(map) + " (allocated on first put)");
+        List&lt;String&gt; orderAt12 = null;
+        for (int i = 1; i &lt;= 25; i++) {
+            int before = length(map);
+            map.put("order-" + i, i);
+            if (i == 12) orderAt12 = new ArrayList&lt;&gt;(map.keySet()).subList(0, 6);
+            if (length(map) != before) System.out.println("put #" + i + ": table " + before + " -&gt; " + length(map));
+        }
+        System.out.println("first keys at size 12: " + orderAt12);
+        System.out.println("first keys at size 25: " + new ArrayList&lt;&gt;(map.keySet()).subList(0, 6));
+
+        var bad = new HashMap&lt;BadKey, Integer&gt;();
+        for (int i = 1; i &lt;= 11; i++) {
+            int before = length(bad);
+            bad.put(new BadKey(i), i);
+            Object[] tab = (Object[]) table.get(bad);
+            Object bin = tab[42 &amp; (tab.length - 1)];
+            System.out.println("colliding key " + String.format("%2d", i) + ": table " + before + " -&gt; " + tab.length
+                    + ", bin is a " + bin.getClass().getSimpleName());
+        }
+        var sized = new HashMap&lt;String, Integer&gt;(1_000);
+        sized.put("x", 1);
+        System.out.println("new HashMap&lt;&gt;(1_000): table length " + length(sized)
+                + "; HashMap.newHashMap(1_000): " + length(put(HashMap.newHashMap(1_000))));
+    }
+
+    static HashMap&lt;String, Integer&gt; put(HashMap&lt;String, Integer&gt; m) { m.put("x", 1); return m; }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · HashMapResize.java</div>
+<pre><code class="language-plaintext">new HashMap: table length 0 (allocated on first put)
+put #1: table 0 -&gt; 16
+put #13: table 16 -&gt; 32
+put #25: table 32 -&gt; 64
+first keys at size 12: [order-12, order-7, order-8, order-9, order-3, order-4]
+first keys at size 25: [order-20, order-22, order-21, order-13, order-12, order-15]
+colliding key  1: table 0 -&gt; 16, bin is a Node
+colliding key  2: table 16 -&gt; 16, bin is a Node
+colliding key  3: table 16 -&gt; 16, bin is a Node
+colliding key  4: table 16 -&gt; 16, bin is a Node
+colliding key  5: table 16 -&gt; 16, bin is a Node
+colliding key  6: table 16 -&gt; 16, bin is a Node
+colliding key  7: table 16 -&gt; 16, bin is a Node
+colliding key  8: table 16 -&gt; 16, bin is a Node
+colliding key  9: table 16 -&gt; 32, bin is a Node
+colliding key 10: table 32 -&gt; 64, bin is a Node
+colliding key 11: table 64 -&gt; 64, bin is a TreeNode
+new HashMap&lt;&gt;(1_000): table length 1024; HashMap.newHashMap(1_000): 2048</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Constant in HashMap</th><th>Value</th><th>Seen above</th></tr></thead>
+          <tbody>
+            <tr><td>Default capacity, load factor</td><td class="num">16, 0.75</td><td>The 13th put passes 16 × 0.75 = 12 and doubles the table; the 25th passes 24.</td></tr>
+            <tr><td><code>TREEIFY_THRESHOLD</code></td><td class="num">8</td><td>Adding a 9th key to a bin with 8 asks for a tree.</td></tr>
+            <tr><td><code>MIN_TREEIFY_CAPACITY</code></td><td class="num">64</td><td>Below 64 slots, resizing is tried first: keys 9 and 10 doubled the table instead. At 64, key 11 made the tree.</td></tr>
+            <tr><td><code>UNTREEIFY_THRESHOLD</code></td><td class="num">6</td><td>A tree bin split by a resize back to 6 nodes or fewer becomes a list again.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">The capacity argument is not a size</span><code>new HashMap&lt;&gt;(1_000)</code> makes 1,024 slots with a threshold of 768, so it still resizes at the 769th entry. <code>HashMap.newHashMap(1_000)</code> <span class="tag a">19</span> sizes the table for 1,000 entries. Before 19, pass <code>(int) (n / 0.75f) + 1</code>.</div>
+    <div class="note"><span class="lbl">Why trees, and their limits</span>Treeification arrived in Java 8 (JEP 180) to blunt hash-flooding attacks, where crafted keys all collide. Tree bins order nodes by hash, then by <code>compareTo</code> if the keys are <code>Comparable</code>. Colliding keys that are not comparable can still need a search of both subtrees. A <code>TreeNode</code> is about twice the size of a <code>Node</code>.</div>
+    <div class="note tip"><span class="lbl">Resizes are cheap, but not free</span>Each resize allocates a new table and walks every node, but never calls <code>hashCode</code> again: the stored hash decides the new index. Under concurrent writes a plain <code>HashMap</code> resize can lose entries. Java 7's head insertion could even create a cycle that spun a CPU forever. Use <a data-deck="cj" data-slide="ConcurrentHashMap internals">ConcurrentHashMap</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,47 @@
+<section class="slide" data-sec="Coding drills" data-title="Spot the bug">
+  <h2>Drill: five short snippets, each with one bug the compiler accepts</h2>
+  <p class="dek">Code-reading rounds hand you a few lines and ask what they print, or what is wrong. Each snippet below is a line or two from real code, with the comment saying what the author meant. Find the bug before reading the answers. Every snippet compiles cleanly with <code>-Xlint:all</code>.</p>
+
+  <div class="grid3">
+    <div class="codewrap"><div class="codelabel">1 · remove the zero quantities</div>
+<pre><code class="language-java">List&lt;Integer&gt; qty = new ArrayList&lt;&gt;(List.of(0, 0, 5, 0, 7));
+for (int i = 0; i &lt; qty.size(); i++)
+    if (qty.get(i) == 0) qty.remove(i);                    // Bug 1: remove empty lines</code></pre></div>
+    <div class="codewrap"><div class="codelabel">2 · a fallback region</div>
+<pre><code class="language-java">Optional&lt;String&gt; configured = Optional.of("eu-west");
+String region = configured.orElse(loadDefault());         // Bug 2: a default, if missing</code></pre></div>
+    <div class="codewrap"><div class="codelabel">3 · the average order value</div>
+<pre><code class="language-java">int totalCents = 1_000, orders = 3;
+double average = totalCents / orders;                       // Bug 3: average order value</code></pre></div>
+    <div class="codewrap"><div class="codelabel">4 · build the report in the background</div>
+<pre><code class="language-java">Thread worker = new Thread(() -&gt; System.out.println("4 report built on " + Thread.currentThread().getName()));
+worker.run();                                               // Bug 4: build it in the background</code></pre></div>
+    <div class="codewrap"><div class="codelabel">5 · the label "A1 band"</div>
+<pre><code class="language-java">char grade = 'A';
+String label = grade + 1 + " band";                         // Bug 5: "A1 band"</code></pre></div>
+    <div class="codewrap"><div class="codelabel">Output on JDK 25 · SpotTheBug.java · bug, then fix</div>
+<pre><code class="language-plaintext">1 after removing zeros by index: [0, 5, 7]
+  removeIf: [5, 7]
+2 region eu-west, but loadDefault() ran 1 time(s)
+  orElseGet ran it 0 time(s)
+3 average 333.0  -&gt;  333.3333333333333
+4 report built on main
+4 report built on Thread-0
+5 label 66 band  -&gt;  A1 band</code></pre></div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>The bug</th><th>The fix</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Removing at <code>i</code> shifts the next element into <code>i</code>, and <code>i++</code> skips it, so two zeros in a row leave one behind.</td><td><code>removeIf</code>, an <code>Iterator</code>, or loop backwards</td></tr>
+        <tr><td class="num">2</td><td><code>orElse(loadDefault())</code> evaluates its argument first, every time, even when the value is present. A database call there runs on every request.</td><td><code>orElseGet(SpotTheBug::loadDefault)</code>, which runs only when empty</td></tr>
+        <tr><td class="num">3</td><td><code>totalCents / orders</code> is integer division; the result is truncated before it is widened to <code>double</code>.</td><td>Cast one operand: <code>(double) totalCents / orders</code>; for money, <code>BigDecimal</code></td></tr>
+        <tr><td class="num">4</td><td><code>run()</code> just calls the method on the current thread: the report was built on <code>main</code>, blocking it.</td><td><code>start()</code>, or better, submit it to an executor</td></tr>
+        <tr><td class="num">5</td><td><code>grade + 1</code> is evaluated first, as <code>char</code> plus <code>int</code>: 65 + 1 = 66. Concatenation only starts when a <code>String</code> appears, from the left.</td><td>Start with a string: <code>"" + grade + 1</code>, or <code>String.valueOf(grade) + 1</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip"><span class="lbl">More of the same</span>The pitfalls section is a longer bug hunt, by category: <a data-deck="cj" data-slide="Equality and hashing bugs">equality</a>, <a data-deck="cj" data-slide="Concurrency bugs in real code">concurrency</a> and <a data-deck="cj" data-slide="Resource and memory bugs">resources</a>. In an interview, read the snippet aloud line by line before answering: most of these are found by saying what each line does.</div>
+</section>

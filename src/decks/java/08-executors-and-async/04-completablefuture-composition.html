@@ -1,0 +1,101 @@
+<section class="slide" data-sec="Executors and async" data-title="CompletableFuture: composition">
+  <h2>CompletableFuture chains async steps without blocking, and the method name says sequence or parallel</h2>
+  <p class="dek">A <code>CompletableFuture</code> is a <code>Future</code> you can attach the next step to. <code>thenApply</code> transforms the value, <code>thenCompose</code> starts another async call that depends on it, and <code>thenCombine</code> joins two calls that run at the same time. The timings below show the difference: two dependent 100 ms calls take 200 ms, and five independent 200 ms calls also take 200 ms.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">CfCompose.java · four simulated services on a dedicated I/O pool</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+
+public class CfCompose {
+    static final ExecutorService IO = Executors.newFixedThreadPool(8, Thread.ofPlatform().name("io-", 1).factory());
+
+    static void pause(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+    static CompletableFuture&lt;Long&gt; priceOf(String sku) {
+        return CompletableFuture.supplyAsync(() -&gt; { pause(200); return sku.length() * 100L; }, IO);
+    }
+    static CompletableFuture&lt;Integer&gt; stockOf(String sku) {
+        return CompletableFuture.supplyAsync(() -&gt; { pause(200); return sku.equals("tea") ? 0 : 12; }, IO);
+    }
+    static CompletableFuture&lt;String&gt; customerTier(String id) {
+        return CompletableFuture.supplyAsync(() -&gt; { pause(100); return id.startsWith("vip") ? "GOLD" : "BASIC"; }, IO);
+    }
+    static CompletableFuture&lt;Double&gt; discountFor(String tier) {
+        return CompletableFuture.supplyAsync(() -&gt; { pause(100); return tier.equals("GOLD") ? 0.1 : 0.0; }, IO);
+    }
+    static long ms(long t0) { return Math.round((System.nanoTime() - t0) / 1e8) * 100; }   // to 100 ms
+
+    public static void main(String[] args) {
+        priceOf("warm-up").join();                       // start the pool threads, load classes
+        long t0 = System.nanoTime();
+        String label = priceOf("milk")
+                .thenApply(cents -&gt; String.format("%.2f", cents / 100.0))       // transform the value
+                .join();
+        System.out.println("thenApply   " + label + " after ~" + ms(t0) + " ms");
+
+        t0 = System.nanoTime();
+        double discount = customerTier("vip-7")
+                .thenCompose(CfCompose::discountFor)                           // the next async call
+                .join();
+        System.out.println("thenCompose " + discount + " after ~" + ms(t0) + " ms (two calls in sequence)");
+
+        t0 = System.nanoTime();
+        String line = priceOf("bread")
+                .thenCombine(stockOf("bread"), (p, s) -&gt; p + " cents, " + s + " in stock")   // both at once
+                .join();
+        System.out.println("thenCombine " + line + " after ~" + ms(t0) + " ms (two calls in parallel)");
+
+        t0 = System.nanoTime();
+        List&lt;String&gt; skus = List.of("tea", "milk", "bread", "eggs", "jam");
+        List&lt;CompletableFuture&lt;Long&gt;&gt; prices = skus.stream().map(CfCompose::priceOf).toList();
+        CompletableFuture.allOf(prices.toArray(CompletableFuture[]::new)).join();   // wait for all
+        List&lt;Long&gt; all = prices.stream().map(CompletableFuture::join).toList();      // none block now
+        System.out.println("allOf       " + all + " after ~" + ms(t0) + " ms (five calls in parallel)");
+
+        CompletableFuture&lt;String&gt; fast = CompletableFuture.supplyAsync(() -&gt; { pause(50); return "replica-b"; }, IO);
+        CompletableFuture&lt;String&gt; slow = CompletableFuture.supplyAsync(() -&gt; { pause(300); return "replica-a"; }, IO);
+        System.out.println("anyOf       " + CompletableFuture.anyOf(slow, fast).join());
+
+        priceOf("jam").thenAccept(p -&gt; System.out.println("thenAccept  saw " + p))
+                      .thenRun(() -&gt; System.out.println("thenRun     ran after it"))
+                      .join();
+        IO.shutdown();
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · CfCompose.java · times rounded to 100 ms</div>
+<pre><code class="language-plaintext">thenApply   4.00 after ~200 ms
+thenCompose 0.1 after ~200 ms (two calls in sequence)
+thenCombine 500 cents, 12 in stock after ~200 ms (two calls in parallel)
+allOf       [300, 400, 500, 400, 300] after ~200 ms (five calls in parallel)
+anyOf       replica-b
+thenAccept  saw 300
+thenRun     ran after it</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Method</th><th>Takes</th><th>Like</th></tr></thead>
+          <tbody>
+            <tr><td><code>thenApply(fn)</code></td><td><code>T -&gt; U</code></td><td><code>Optional.map</code></td></tr>
+            <tr><td><code>thenCompose(fn)</code></td><td><code>T -&gt; CompletableFuture&lt;U&gt;</code></td><td><code>Optional.flatMap</code>: one call after the other</td></tr>
+            <tr><td><code>thenCombine(other, fn)</code></td><td>A second future and <code>(T, U) -&gt; V</code></td><td>Two calls at once, joined</td></tr>
+            <tr><td><code>allOf(…)</code></td><td>Any number of futures</td><td>Completes with <code>Void</code> when all have; then <code>join</code> each</td></tr>
+            <tr><td><code>anyOf(…)</code></td><td>Any number of futures</td><td>The first to complete, typed as <code>Object</code></td></tr>
+            <tr><td><code>thenAccept</code>, <code>thenRun</code></td><td>A consumer, a runnable</td><td>The end of a chain: side effects</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">thenApply with an async function</span><code>tier.thenApply(CfCompose::discountFor)</code> compiles, and gives a <code>CompletableFuture&lt;CompletableFuture&lt;Double&gt;&gt;</code>. Whenever the function itself returns a future, the method you want is <code>thenCompose</code>.</div>
+    <div class="note warn"><span class="lbl">Start them, then wait</span><code>allOf</code> is fast because all five calls were started before anything waited. Calling <code>priceOf(s).join()</code> inside a loop starts each one only after the last has finished, and turns 200 ms into 1,000 ms.</div>
+    <div class="note tip"><span class="lbl">Or write it blocking</span>With virtual threads, the same fan-out can be plain blocking code: a virtual thread per call and a <code>Future</code> each, as the LLD tab's <a data-deck="lld" data-slide="Virtual threads and structured concurrency">virtual threads</a> slide does. Choose by what your team can read and debug.</div>
+  </div>
+</section>

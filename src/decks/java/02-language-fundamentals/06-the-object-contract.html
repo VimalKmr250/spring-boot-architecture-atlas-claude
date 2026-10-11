@@ -1,0 +1,95 @@
+<section class="slide" data-sec="Language fundamentals" data-title="The Object contract">
+  <h2><code>equals</code> and <code>hashCode</code> are a contract with every hash-based collection, and the compiler only warns</h2>
+  <p class="dek">Every class inherits <code>equals</code>, <code>hashCode</code>, <code>toString</code> and <code>clone</code> from <code>Object</code>. The defaults use identity. Override <code>equals</code> and you must override <code>hashCode</code> to match, or <code>HashSet</code> and <code>HashMap</code> stop working for that type. The four bugs below compile; only the first gets a warning, and only with <code>-Xlint</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ObjectContract.java · four ways to break the contract</div>
+<pre><code class="language-java">import java.util.*;
+
+public class ObjectContract {
+    static final class Sku {                         // equals, but no hashCode
+        final String code;
+        Sku(String code) { this.code = code; }
+        @Override public boolean equals(Object o) { return o instanceof Sku s &amp;&amp; s.code.equals(code); }
+    }
+
+    static class Point {
+        final int x, y;
+        Point(int x, int y) { this.x = x; this.y = y; }
+        @Override public boolean equals(Object o) { return o instanceof Point p &amp;&amp; p.x == x &amp;&amp; p.y == y; }
+        @Override public int hashCode() { return Objects.hash(x, y); }
+    }
+    static class ColorPoint extends Point {
+        final String color;
+        ColorPoint(int x, int y, String color) { super(x, y); this.color = color; }
+        @Override public boolean equals(Object o) {
+            return o instanceof ColorPoint c &amp;&amp; super.equals(c) &amp;&amp; c.color.equals(color);
+        }
+        @Override public int hashCode() { return Objects.hash(x, y, color); }
+    }
+
+    static class Basket implements Cloneable {
+        List&lt;String&gt; items = new ArrayList&lt;&gt;(List.of("tea"));
+        @Override public Basket clone() {
+            try { return (Basket) super.clone(); }     // field-by-field copy: shares the list
+            catch (CloneNotSupportedException e) { throw new AssertionError(e); }
+        }
+    }
+
+    public static void main(String[] args) {
+        Set&lt;Sku&gt; skus = new HashSet&lt;&gt;(List.of(new Sku("A-1"), new Sku("A-1")));
+        System.out.println("equal Skus in a HashSet: " + skus.size());
+
+        Point p = new Point(1, 2);
+        ColorPoint cp = new ColorPoint(1, 2, "red");
+        System.out.println("p.equals(cp) " + p.equals(cp) + ", cp.equals(p) " + cp.equals(p));
+
+        List&lt;String&gt; key = new ArrayList&lt;&gt;(List.of("a"));
+        Set&lt;List&lt;String&gt;&gt; seen = new HashSet&lt;&gt;();
+        seen.add(key);
+        key.add("b");                                  // its hashCode just changed
+        System.out.println("mutated key: contains " + seen.contains(key) + ", size " + seen.size());
+
+        Basket original = new Basket();
+        Basket copy = original.clone();
+        copy.items.add("milk");
+        System.out.println("clone shares state: original now " + original.items);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">javac --release 21 -Xlint:all · ObjectContract.java</div>
+<pre><code class="language-plaintext">ObjectContract.java:4: warning: [overrides] Class Sku overrides equals, but neither it nor any superclass overrides hashCode method
+    static final class Sku {                         // equals, but no hashCode
+                 ^
+1 warning</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ObjectContract.java</div>
+<pre><code class="language-plaintext">equal Skus in a HashSet: 2
+p.equals(cp) true, cp.equals(p) false
+mutated key: contains false, size 1
+clone shares state: original now [tea, milk]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Bug</th><th>What went wrong</th></tr></thead>
+          <tbody>
+            <tr><td>2 equal Skus</td><td>Equal objects with identity hash codes land in different buckets, so the set never compares them.</td></tr>
+            <tr><td>Symmetry</td><td><code>Point</code> accepts any <code>Point</code>; <code>ColorPoint</code> accepts only <code>ColorPoint</code>. Mixing <code>instanceof</code> equality with subclasses that add fields cannot be made symmetric.</td></tr>
+            <tr><td>Mutated key</td><td>The set filed the list under its old hash. It is still inside, unreachable by <code>contains</code> or <code>remove</code>.</td></tr>
+            <tr><td><code>clone</code></td><td><code>Object.clone</code> copies fields, so both baskets share one list.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>The rules</h4><p><code>equals</code> is reflexive, symmetric, transitive, consistent, and false for <code>null</code>. Equal objects must have equal hash codes; unequal ones may collide. Neither may depend on a field that changes while the object sits in a hash collection.</p></div>
+    <div class="card"><h4>The practical fix</h4><p>Use a record for anything compared by value: it generates all three methods from its components. For a class, make it final and use the same fields in both methods. <a data-deck="lld" data-slide="Value objects, equals and hashCode">Value objects</a> in the LLD tab shows the pattern.</p></div>
+    <div class="card"><h4>The other two</h4><p>Default <code>toString</code> is <code>getClass().getName() + "@" + Integer.toHexString(hashCode())</code>. Avoid <code>clone</code>: write a copy constructor or factory. <code>finalize</code> is deprecated for removal <span class="tag a">18</span>; use try-with-resources or a <code>Cleaner</code>.</p></div>
+  </div>
+</section>

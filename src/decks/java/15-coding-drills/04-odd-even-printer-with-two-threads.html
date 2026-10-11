@@ -1,0 +1,90 @@
+<section class="slide" data-sec="Coding drills" data-title="Odd/even printer with two threads">
+  <h2>Drill: "print 1 to 10 with two threads, one odd and one even, in order"</h2>
+  <p class="dek">The classic hand-off problem. Each thread must wait for its turn and then pass the turn on, with no busy-waiting and no missed signals. Give two solutions: one with a monitor and <code>wait</code>/<code>notifyAll</code>, which shows you understand the mechanism, and one with two semaphores, which shows you would not write the first in production.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">OddEven.java · wait/notify, then semaphores, then 200 repeat runs</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+
+public class OddEven {
+    static final int MAX = 10;
+
+    // Solution 1: one monitor, a shared counter, wait in a loop.
+    static final class Printer {
+        private int next = 1;
+        private final List&lt;String&gt; out = new ArrayList&lt;&gt;();
+        synchronized void print(boolean odd) throws InterruptedException {
+            while (true) {
+                while (next &lt;= MAX &amp;&amp; (next % 2 == 1) != odd) wait();   // not my turn
+                if (next &gt; MAX) { notifyAll(); return; }
+                out.add(Thread.currentThread().getName() + ":" + next++);
+                notifyAll();                                            // wake the other thread
+            }
+        }
+    }
+
+    // Solution 2: two semaphores pass the turn back and forth.
+    static List&lt;String&gt; withSemaphores() throws InterruptedException {
+        Semaphore oddTurn = new Semaphore(1), evenTurn = new Semaphore(0);
+        List&lt;String&gt; out = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        Thread odd = new Thread(() -&gt; {
+            try {
+                for (int i = 1; i &lt;= MAX; i += 2) { oddTurn.acquire(); out.add("odd:" + i); evenTurn.release(); }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }, "odd");
+        Thread even = new Thread(() -&gt; {
+            try {
+                for (int i = 2; i &lt;= MAX; i += 2) { evenTurn.acquire(); out.add("even:" + i); oddTurn.release(); }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }, "even");
+        odd.start(); even.start();
+        odd.join(); even.join();
+        return out;
+    }
+
+    public static void main(String[] args) throws Exception {
+        Printer p = new Printer();
+        Thread odd = new Thread(() -&gt; { try { p.print(true); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }, "odd");
+        Thread even = new Thread(() -&gt; { try { p.print(false); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }, "even");
+        odd.start(); even.start();
+        odd.join(); even.join();
+        System.out.println("wait/notify: " + p.out);
+        System.out.println("semaphores:  " + withSemaphores());
+
+        boolean allInOrder = true;
+        for (int run = 0; run &lt; 200; run++) {                            // repeat: races show up in repetition
+            List&lt;String&gt; r = withSemaphores();
+            for (int i = 0; i &lt; MAX; i++) if (!r.get(i).endsWith(":" + (i + 1))) allInOrder = false;
+        }
+        System.out.println("200 more runs, every one in order: " + allInOrder);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · OddEven.java</div>
+<pre><code class="language-plaintext">wait/notify: [odd:1, even:2, odd:3, even:4, odd:5, even:6, odd:7, even:8, odd:9, even:10]
+semaphores:  [odd:1, even:2, odd:3, even:4, odd:5, even:6, odd:7, even:8, odd:9, even:10]
+200 more runs, every one in order: true</code></pre>
+      </div>
+      <div class="panel">
+        <h3>What to say while writing it</h3>
+        <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>The invariant:</b> <code>next</code> is the number to print, and only the thread whose parity matches may print it.</li>
+          <li><b><code>while</code>, not <code>if</code>:</b> a thread can wake spuriously, or wake when it is still not its turn.</li>
+          <li><b><code>notifyAll</code>:</b> with only two threads <code>notify</code> works, but <code>notifyAll</code> stays correct when the problem grows to three.</li>
+          <li><b>Termination:</b> the last thread must wake the other, or it waits forever; the <code>next &gt; MAX</code> check handles both.</li>
+          <li><b>Semaphores:</b> a permit is the turn. Odd starts with it; each thread releases the other's.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">Follow-up: three threads, round robin</span>Generalise the monitor version: thread <code>k</code> of <code>n</code> prints when <code>next % n == k</code>. Or use <code>n</code> semaphores in a ring, or one <code>ReentrantLock</code> with a <code>Condition</code> per thread, so each signal wakes exactly the next thread.</div>
+    <div class="note warn"><span class="lbl">Why repeat the run</span>A concurrency bug can pass a single run and fail one time in a hundred. Two hundred repeated runs, all in order, is evidence; one run is a hope. Say this, and the interviewer hears that you have debugged threads before.</div>
+    <div class="note"><span class="lbl">The mechanisms</span><a data-deck="cj" data-slide="synchronized, wait and notify">synchronized, wait and notify</a> explains the monitor and why waits sit in loops; <a data-deck="cj" data-slide="Synchronizers">synchronizers</a> covers <code>Semaphore</code> and its relatives.</div>
+  </div>
+</section>

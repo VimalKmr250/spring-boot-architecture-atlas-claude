@@ -1,0 +1,41 @@
+<section class="slide" data-sec="Collections" data-title="Which collection for which job">
+  <h2>Pick the collection by the operation you do most, then by the order you need</h2>
+  <p class="dek">The interfaces say what a collection promises: <code>List</code> keeps positions, <code>Set</code> rejects duplicates, <code>Queue</code> hands out elements in some order, <code>Map</code> looks up by key. The implementation decides what each operation costs. In practice three classes cover most code: <code>ArrayList</code>, <code>HashMap</code> and <code>ArrayDeque</code>. The others earn their place with one specific property.</p>
+
+  <div class="split">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="tree"><span class="h">Iterable</span>
+└─ <span class="h">Collection</span>
+   ├─ <span class="h">List</span>          <span class="g">ArrayList</span>, LinkedList, CopyOnWriteArrayList
+   ├─ <span class="h">Set</span>           <span class="g">HashSet</span>, LinkedHashSet, EnumSet
+   │  └─ <span class="h">SortedSet</span> → NavigableSet   TreeSet, ConcurrentSkipListSet
+   └─ <span class="h">Queue</span>         PriorityQueue, the BlockingQueues
+      └─ <span class="h">Deque</span>      <span class="g">ArrayDeque</span>, LinkedList, ConcurrentLinkedDeque
+<span class="h">Map</span>                <span class="g">HashMap</span>, LinkedHashMap, EnumMap, IdentityHashMap,
+│                  WeakHashMap, ConcurrentHashMap
+└─ <span class="h">SortedMap</span> → NavigableMap    TreeMap, ConcurrentSkipListMap
+<span class="c">// Java 21: SequencedCollection sits above List, Deque, LinkedHashSet and</span>
+<span class="c">// SortedSet; SequencedMap above LinkedHashMap and SortedMap.</span></div>
+      <div class="note tip"><span class="lbl">How to choose</span>Need positions or duplicates: <code>ArrayList</code>. Lookups by key: <code>HashMap</code>, or <code>HashSet</code> for membership. Insertion order on iteration: the <code>Linked</code> variants. Sorted order or range queries: <code>TreeMap</code>, <code>TreeSet</code>. Stack, queue or both ends: <code>ArrayDeque</code>. Smallest or largest first: <code>PriorityQueue</code>. Enum keys: <code>EnumMap</code>, <code>EnumSet</code>. Shared between threads: the concurrent ones, on <a data-deck="cj" data-slide="Choosing a concurrency tool">choosing a concurrency tool</a>.</div>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Class</th><th>Order</th><th>Cost of the main operations</th><th>Nulls</th></tr></thead>
+        <tbody>
+          <tr><td><code>ArrayList</code></td><td>Index</td><td><code>get(i)</code> O(1); add at end amortised O(1); insert, remove, <code>contains</code> O(n)</td><td>Yes</td></tr>
+          <tr><td><code>LinkedList</code></td><td>Index</td><td>Ends O(1); <code>get(i)</code> O(n), and slow even then</td><td>Yes</td></tr>
+          <tr><td><code>ArrayDeque</code></td><td>Insertion</td><td>Both ends O(1)</td><td>No</td></tr>
+          <tr><td><code>PriorityQueue</code></td><td>Heap</td><td><code>peek</code> O(1); <code>offer</code>, <code>poll</code> O(log n); <code>contains</code> O(n)</td><td>No</td></tr>
+          <tr><td><code>HashMap</code>, <code>HashSet</code></td><td>None</td><td>O(1) on average; a crowded bin falls back to a tree</td><td>One null key</td></tr>
+          <tr><td><code>LinkedHashMap</code>, <code>LinkedHashSet</code></td><td>Insertion, or access</td><td>O(1), plus a linked list through the entries</td><td>Yes</td></tr>
+          <tr><td><code>TreeMap</code>, <code>TreeSet</code></td><td>Sorted</td><td>O(log n), with floor, ceiling and range views</td><td>Not as keys</td></tr>
+          <tr><td><code>EnumMap</code>, <code>EnumSet</code></td><td>Ordinal</td><td>O(1): an array, or a bit vector</td><td>Not as keys</td></tr>
+          <tr><td><code>ConcurrentHashMap</code></td><td>None</td><td>O(1); thread-safe without a global lock</td><td>No</td></tr>
+          <tr><td><code>CopyOnWriteArrayList</code></td><td>Index</td><td>Reads O(1) and lock-free; each write copies the array</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note"><span class="lbl">Complexity is only half the cost</span>An O(1) <code>HashMap</code> lookup with a slow <code>hashCode</code>, or an O(n) <code>contains</code> on a list inside a loop, decides more performance reviews than the table above. The DSA tab collects the library calls whose cost surprises people: <a data-deck="dsa" data-slide="Hidden costs in the Java library">hidden costs in the Java library</a>.</div>
+</section>

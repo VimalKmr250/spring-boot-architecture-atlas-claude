@@ -1,0 +1,138 @@
+<section class="slide" data-sec="The JVM" data-title="Object layout and memory cost">
+  <h2>Every object pays a header and rounds up to 8 bytes, so a boxed int costs four times an int</h2>
+  <p class="dek">On a 64-bit HotSpot with a heap under 32 GB, an object starts with a 12-byte header: an 8-byte mark word for the hash, locking and GC age, and a 4-byte compressed class pointer. Fields follow, and the total rounds up to a multiple of 8. References are 4 bytes. JDK 25 can shrink the header to 8 bytes with compact object headers (JEP 519), an opt-in product flag. The per-object rows below count allocated bytes; the map line measures heap in use after a full GC.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="Byte layouts at 20 pixels per byte. An Integer with default headers: an 8-byte mark word, a 4-byte class pointer and the 4-byte int value, 16 bytes. A Long with default headers: mark word, class pointer, 4 bytes of padding to align the long, then the 8-byte value, 24 bytes. A Long with compact object headers: one 8-byte header holding both, then the 8-byte value, 16 bytes.">
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="20" y="34">Integer</text>
+          <rect x="160" y="18" width="160" height="26" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.45"></rect><text x="240" y="35" text-anchor="middle">mark word 8</text>
+          <rect x="320" y="18" width="80" height="26" fill="currentColor" fill-opacity="0.14" stroke="currentColor" stroke-opacity="0.45"></rect><text x="360" y="35" text-anchor="middle">class 4</text>
+          <rect x="400" y="18" width="80" height="26" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="440" y="35" text-anchor="middle">int 4</text>
+          <text x="500" y="35">= 16 bytes</text>
+
+          <text x="20" y="80">Long</text>
+          <rect x="160" y="64" width="160" height="26" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.45"></rect><text x="240" y="81" text-anchor="middle">mark word 8</text>
+          <rect x="320" y="64" width="80" height="26" fill="currentColor" fill-opacity="0.14" stroke="currentColor" stroke-opacity="0.45"></rect><text x="360" y="81" text-anchor="middle">class 4</text>
+          <rect x="400" y="64" width="80" height="26" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="3 3"></rect><text x="440" y="81" text-anchor="middle">pad 4</text>
+          <rect x="480" y="64" width="160" height="26" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="560" y="81" text-anchor="middle">long 8</text>
+          <text x="660" y="81">= 24 bytes</text>
+
+          <text x="20" y="126">Long, compact</text>
+          <rect x="160" y="110" width="160" height="26" fill="#3AA79B" fill-opacity="0.15" stroke="#3AA79B"></rect><text x="240" y="127" text-anchor="middle">header 8</text>
+          <rect x="320" y="110" width="160" height="26" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F"></rect><text x="400" y="127" text-anchor="middle">long 8</text>
+          <text x="500" y="127">= 16 bytes</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ObjectSize.java · bytes per object, then a map against an array</div>
+<pre><code class="language-java">import java.lang.management.ManagementFactory;
+import java.util.*;
+import java.util.function.IntFunction;
+
+public class ObjectSize {
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+
+    record Money(long cents) { }
+    record Line(int qty, long cents) { }
+
+    // Average bytes per object over many allocations, so the measurement itself is noise.
+    static long each(IntFunction&lt;Object&gt; make) {
+        int n = 100_000;
+        Object[] keep = new Object[n];                     // allocated first: not counted
+        long before = MX.getCurrentThreadAllocatedBytes();
+        for (int i = 0; i &lt; n; i++) keep[i] = make.apply(i);
+        long bytes = MX.getCurrentThreadAllocatedBytes() - before;
+        return Math.round(bytes / (double) n);
+    }
+
+    static long liveHeap() {
+        System.gc();
+        return ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
+    }
+
+    public static void main(String[] args) {
+        System.out.println("compact object headers: " + ManagementFactory.getRuntimeMXBean().getInputArguments()
+                .contains("-XX:+UseCompactObjectHeaders"));
+        System.out.printf("%-26s %3d bytes%n", "new Object()", each(i -&gt; new Object()));
+        System.out.printf("%-26s %3d bytes%n", "Integer (not cached)", each(i -&gt; Integer.valueOf(1_000 + i)));
+        System.out.printf("%-26s %3d bytes%n", "Long", each(i -&gt; Long.valueOf(1_000 + i)));
+        System.out.printf("%-26s %3d bytes%n", "record Money(long)", each(i -&gt; new Money(i)));
+        System.out.printf("%-26s %3d bytes%n", "record Line(int, long)", each(i -&gt; new Line(i, i)));
+        System.out.printf("%-26s %3d bytes%n", "new int[0]", each(i -&gt; new int[0]));
+        System.out.printf("%-26s %3d bytes%n", "new int[10]", each(i -&gt; new int[10]));
+        System.out.printf("%-26s %3d bytes%n", "new Object[10]", each(i -&gt; new Object[10]));
+        System.out.printf("%-26s %3d bytes%n", "String.valueOf(10_000 + i)", each(i -&gt; String.valueOf(10_000 + i)));
+
+        int n = 1_000_000;                                 // retained size, measured after a full GC
+        long base = liveHeap();
+        Map&lt;Integer, Integer&gt; boxed = HashMap.newHashMap(n);
+        for (int i = 0; i &lt; n; i++) boxed.put(i + 1_000, i + 1_000);
+        long mapBytes = liveHeap() - base;
+        base = liveHeap();
+        int[] plain = new int[n];
+        for (int i = 0; i &lt; n; i++) plain[i] = i;
+        long arrayBytes = liveHeap() - base;
+        System.out.printf("1M int-&gt;int entries kept alive: HashMap %d bytes each, int[] %d bytes each (%d, %d)%n",
+                mapBytes / n, arrayBytes / n, boxed.size(), plain.length);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="split" style="gap:12px">
+        <div class="codewrap">
+          <div class="codelabel">Output on JDK 25 · defaults</div>
+<pre><code class="language-plaintext">compact object headers: false
+new Object()                16 bytes
+Integer (not cached)        16 bytes
+Long                        24 bytes
+record Money(long)          24 bytes
+record Line(int, long)      24 bytes
+new int[0]                  16 bytes
+new int[10]                 56 bytes
+new Object[10]              56 bytes
+String.valueOf(10_000 + i)  48 bytes
+1M int-&gt;int entries kept alive: HashMap 74 bytes each, int[] 4 bytes each (1000000, 1000000)</code></pre>
+        </div>
+        <div class="codewrap">
+          <div class="codelabel">-XX:+UseCompactObjectHeaders</div>
+<pre><code class="language-plaintext">compact object headers: true
+new Object()                 8 bytes
+Integer (not cached)        16 bytes
+Long                        16 bytes
+record Money(long)          16 bytes
+record Line(int, long)      24 bytes
+new int[0]                  16 bytes
+new int[10]                 56 bytes
+new Object[10]              56 bytes
+String.valueOf(10_000 + i)  48 bytes
+1M int-&gt;int entries kept alive: HashMap 67 bytes each, int[] 4 bytes each (1000000, 1000000)</code></pre>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Row</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>new Object()</code> 16 → 8</td><td>A header and nothing else, rounded to 8. Compact headers halve it.</td></tr>
+            <tr><td><code>Long</code> 24 → 16</td><td>12 bytes of header leave the 8-byte field misaligned, so 4 bytes are wasted. An 8-byte header fixes both.</td></tr>
+            <tr><td><code>int[10]</code> 56</td><td>An array header holds its length too (16 bytes here), plus 4 bytes per element.</td></tr>
+            <tr><td>String of 5 digits: 48</td><td>A 24-byte <code>String</code> plus a 24-byte <code>byte[5]</code>. Latin-1 text stores one byte per character.</td></tr>
+            <tr><td>HashMap, about 70 per entry</td><td>A 32-byte node, two 16-byte <code>Integer</code>s and table slots: over 16 times the <code>int[]</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Big numeric data</span>A million boxed entries cost about 70 MB, where two <code>int[]</code> arrays cost 8 MB. For large sets of numbers use primitive arrays, <code>IntStream</code>, or a primitive collection library such as fastutil or Eclipse Collections.</div>
+    <div class="note"><span class="lbl">The 32 GB cliff</span>Compressed references work up to about 32 GB of heap. Above that every reference doubles to 8 bytes, so a 33 GB heap can hold less than a 31 GB one. Stay below 32 GB, or go well above it.</div>
+    <div class="note tip"><span class="lbl">Measuring your own objects</span>JOL (Java Object Layout) prints the exact field layout of any class. <code>jcmd &lt;pid&gt; GC.class_histogram</code> shows which classes fill a live heap, and a heap dump shows who holds them: see <a data-deck="sb" data-slide="Memory leaks">memory leaks</a>.</div>
+  </div>
+</section>

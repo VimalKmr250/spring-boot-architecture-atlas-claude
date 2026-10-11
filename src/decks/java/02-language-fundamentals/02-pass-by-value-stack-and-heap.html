@@ -1,0 +1,98 @@
+<section class="slide" data-sec="Language fundamentals" data-title="Pass-by-value, stack and heap">
+  <h2>Java passes everything by value; for an object, the value is a reference</h2>
+  <p class="dek">A call copies each argument into the new stack frame. For an <code>int</code> the copy is the number. For an object the copy is the reference, so caller and callee point at the same object: the callee can change that object, but reassigning its parameter only moves its own copy. There is no way to write <code>swap(a, b)</code> in Java.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 230" role="img" aria-label="Two stack frames on the left and the heap on the right. The main frame holds count equal to 1 and a reference sb to a StringBuilder holding original. The rename frame holds its own copy of sb. On entry the copy points at the same StringBuilder as main. After sb = new StringBuilder, the copy points at a second StringBuilder holding renamed, which main never sees and which is garbage once rename returns.">
+        <text x="195" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Stack · one frame per call</text>
+        <text x="700" y="18" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">Heap · every object</text>
+        <rect x="30" y="34" width="330" height="88" rx="7" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect>
+        <text x="44" y="54" font-size="11" font-weight="600" fill="currentColor" font-family="IBM Plex Mono, monospace">main()</text>
+        <g font-size="11" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="54" y="82">count</text><text x="170" y="82">1</text>
+          <text x="54" y="106">sb</text>
+        </g>
+        <circle cx="174" cy="102" r="4" fill="#8A94A3"></circle>
+        <rect x="30" y="138" width="330" height="66" rx="7" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-opacity="0.7"></rect>
+        <text x="44" y="158" font-size="11" font-weight="600" fill="currentColor" font-family="IBM Plex Mono, monospace">rename(StringBuilder sb)</text>
+        <text x="54" y="188" font-size="11" fill="currentColor" font-family="IBM Plex Mono, monospace">sb</text>
+        <circle cx="174" cy="184" r="4" fill="#D26A3F"></circle>
+
+        <rect x="540" y="84" width="320" height="36" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="556" y="107" font-size="11" fill="currentColor" font-family="IBM Plex Mono, monospace">StringBuilder "original"</text>
+        <rect x="540" y="166" width="320" height="36" rx="6" fill="#D26A3F" fill-opacity="0.1" stroke="#D26A3F" stroke-width="1.3"></rect>
+        <text x="556" y="189" font-size="11" fill="currentColor" font-family="IBM Plex Mono, monospace">StringBuilder "renamed"</text>
+        <text x="700" y="222" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">unreachable once rename returns</text>
+
+        <line x1="178" y1="102" x2="536" y2="102" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="178" y1="181" x2="536" y2="110" stroke="#8A94A3" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arw)"></line>
+        <line x1="178" y1="184" x2="536" y2="184" stroke="#D26A3F" stroke-width="1.4" marker-end="url(#arwA)"></line>
+        <text x="252" y="160" font-size="12" fill="currentColor" opacity="0.85">①</text>
+        <text x="330" y="178" font-size="12" fill="#D26A3F">②</text>
+      </svg>
+    </div>
+    <figcaption>Inside <code>rename</code>. ① On entry its <code>sb</code> is a copy of main’s reference, so both point at one object. ② <code>sb = new StringBuilder("renamed")</code> moves only the copy. When <code>rename</code> returns, its frame is gone and main still sees <code>"original"</code>. <code>append</code>, called next, goes through its copy to the shared object, so that change is visible.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">PassByValue.java · every method gets copies</div>
+<pre><code class="language-java">import java.util.*;
+
+public class PassByValue {
+    static void bump(int n) { n++; }                                  // changes the copy
+    static void rename(StringBuilder sb) { sb = new StringBuilder("renamed"); }
+    static void append(StringBuilder sb) { sb.append(" + appended"); }  // through the copy
+    static void swap(Integer x, Integer y) { Integer t = x; x = y; y = t; }
+    static void replace(List&lt;String&gt; list) { list = new ArrayList&lt;&gt;(List.of("new")); }
+    static void clear(List&lt;String&gt; list) { list.clear(); }
+
+    public static void main(String[] args) {
+        int count = 1;
+        bump(count);
+        System.out.println("int after bump        " + count);
+
+        var sb = new StringBuilder("original");
+        rename(sb);
+        System.out.println("after rename          " + sb);
+        append(sb);
+        System.out.println("after append          " + sb);
+
+        Integer a = 1, b = 2;
+        swap(a, b);
+        System.out.println("after swap            a=" + a + " b=" + b);
+
+        List&lt;String&gt; items = new ArrayList&lt;&gt;(List.of("x", "y"));
+        replace(items);
+        System.out.println("after replace         " + items);
+        clear(items);
+        System.out.println("after clear           " + items);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · PassByValue.java</div>
+<pre><code class="language-plaintext">int after bump        1
+after rename          original
+after append          original + appended
+after swap            a=1 b=2
+after replace         [x, y]
+after clear           []</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Inside the method</th><th>Does the caller see it?</th></tr></thead>
+          <tbody>
+            <tr><td>Change a primitive parameter</td><td>No. It changed a copy.</td></tr>
+            <tr><td>Call a mutating method on an object parameter</td><td>Yes. Both references point at that object.</td></tr>
+            <tr><td>Assign a new object to the parameter</td><td>No. Only the callee's copy now points elsewhere.</td></tr>
+            <tr><td>Swap two parameters</td><td>No, and it cannot be done. Return a value, or pass a holder object.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note tip"><span class="lbl">What lives where</span>Locals and parameters live in the frame: primitives as values, objects as references. Every object lives on the heap, as far as your code can tell. The JIT may allocate a non-escaping object on the stack or remove it altogether, which changes the speed but never the result: see <a data-deck="cj" data-slide="The JIT compiler">the JIT compiler</a>.</div>
+    </div>
+  </div>
+</section>

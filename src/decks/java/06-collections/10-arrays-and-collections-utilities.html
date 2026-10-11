@@ -1,0 +1,89 @@
+<section class="slide" data-sec="Collections" data-title="Arrays and Collections utilities">
+  <h2>The utility classes save a loop each, and each one has a trap that comes up in interviews</h2>
+  <p class="dek"><code>Arrays</code> and <code>Collections</code> hold the sorting, searching, copying and wrapping methods. Most are one-liners you should reach for instead of writing loops. A few behave in ways that look like bugs until you know the rule: <code>Arrays.asList</code> on an <code>int[]</code>, a binary search on unsorted data, and <code>equals</code> on arrays.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Utilities.java · asList, stable sorting, binary search, array equality</div>
+<pre><code class="language-java">import java.util.*;
+
+public class Utilities {
+    record Order(String id, String status, int day) {
+        @Override public String toString() { return id + "/" + status + "/d" + day; }
+    }
+
+    public static void main(String[] args) {
+        int[] ids = {3, 1, 2};
+        List&lt;int[]&gt; oops = Arrays.asList(ids);                  // one element: the int[] itself
+        List&lt;Integer&gt; boxed = Arrays.stream(ids).boxed().toList();
+        System.out.println("Arrays.asList(int[]) size " + oops.size() + "; boxed " + boxed);
+
+        String[] codes = {"b", "a", "c"};
+        List&lt;String&gt; fixed = Arrays.asList(codes);              // fixed-size, backed by the array
+        fixed.set(0, "z");
+        System.out.println("set through the list changed the array: " + Arrays.toString(codes));
+        try { fixed.add("d"); } catch (UnsupportedOperationException e) { System.out.println("Arrays.asList(...).add -&gt; UnsupportedOperationException"); }
+
+        List&lt;Order&gt; orders = new ArrayList&lt;&gt;(List.of(new Order("o1", "PAID", 3), new Order("o2", "NEW", 1),
+                new Order("o3", "PAID", 1), new Order("o4", "NEW", 2), new Order("o5", "PAID", 2)));
+        orders.sort(Comparator.comparingInt(Order::day));
+        orders.sort(Comparator.comparing(Order::status));        // stable: day order kept within a status
+        System.out.println("stable sort by status after day " + orders);
+
+        int[] sorted = {10, 20, 30, 40};
+        System.out.println("binarySearch 30 -&gt; " + Arrays.binarySearch(sorted, 30)
+                + ", 25 -&gt; " + Arrays.binarySearch(sorted, 25) + " (= -(insertion point 2) - 1)");
+        int[] unsorted = {40, 10, 30, 20};
+        System.out.println("binarySearch on unsorted data for 40 -&gt; " + Arrays.binarySearch(unsorted, 40));
+
+        int[] a = {1, 2}, b = {1, 2};
+        System.out.println("a == b " + (a == b) + ", a.equals(b) " + a.equals(b) + ", Arrays.equals " + Arrays.equals(a, b));
+        System.out.println("2-D toString " + Arrays.toString(new int[][] {{1}, {2}}).replaceAll("@[0-9a-f]+", "@…")
+                + ", deepToString " + Arrays.deepToString(new int[][] {{1}, {2}}));
+
+        List&lt;String&gt; tags = new ArrayList&lt;&gt;(List.of("x", "y", "x", "z", "x"));
+        Collections.shuffle(tags, new Random(42));               // seeded: the same order every run
+        System.out.println("frequency(x) " + Collections.frequency(tags, "x") + ", nCopies " + Collections.nCopies(3, "-")
+                + ", shuffled " + tags + ", max " + Collections.max(tags) + ", disjoint " + Collections.disjoint(tags, List.of("q")));
+
+        List&lt;String&gt; withNulls = new ArrayList&lt;&gt;(Arrays.asList("b", null, "a"));
+        withNulls.sort(Comparator.nullsFirst(Comparator.naturalOrder()));
+        System.out.println("nullsFirst " + withNulls);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Utilities.java</div>
+<pre><code class="language-plaintext">Arrays.asList(int[]) size 1; boxed [3, 1, 2]
+set through the list changed the array: [z, a, c]
+Arrays.asList(...).add -&gt; UnsupportedOperationException
+stable sort by status after day [o2/NEW/d1, o4/NEW/d2, o3/PAID/d1, o5/PAID/d2, o1/PAID/d3]
+binarySearch 30 -&gt; 2, 25 -&gt; -3 (= -(insertion point 2) - 1)
+binarySearch on unsorted data for 40 -&gt; -5
+a == b false, a.equals(b) false, Arrays.equals true
+2-D toString [[I@…, [I@…], deepToString [[1], [2]]
+frequency(x) 3, nCopies [-, -, -], shuffled [y, x, z, x, x], max z, disjoint true
+nullsFirst [null, a, b]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Method</th><th>The rule</th></tr></thead>
+          <tbody>
+            <tr><td><code>Arrays.asList(T...)</code></td><td>A fixed-size list backed by the array: <code>set</code> writes through, <code>add</code> and <code>remove</code> throw. On an <code>int[]</code>, <code>T</code> is <code>int[]</code>, so you get a list of one array.</td></tr>
+            <tr><td><code>Arrays.sort</code></td><td>Primitives: dual-pivot quicksort. Objects: TimSort, which is <b>stable</b>, so sorting by day and then by status keeps the day order within each status.</td></tr>
+            <tr><td><code>Arrays.binarySearch</code></td><td>Requires sorted input; on unsorted data the answer is meaningless. A miss returns <code>-(insertion point) - 1</code>, always negative.</td></tr>
+            <tr><td>Array <code>equals</code>, <code>hashCode</code>, <code>toString</code></td><td>Inherited from <code>Object</code>: identity. Use <code>Arrays.equals</code>, <code>Arrays.hashCode</code>, <code>Arrays.toString</code>, and the <code>deep</code> versions for nested arrays.</td></tr>
+            <tr><td><code>Collections.shuffle(list, rnd)</code></td><td>Pass a seeded <code>Random</code> when a test needs the same order every run.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Arrays, worth knowing</h4><p><code>fill</code>, <code>setAll</code>, <code>copyOf</code>, <code>copyOfRange</code>, <code>stream</code>, <code>parallelSort</code>, <code>mismatch</code> <span class="tag a">9</span>, <code>compare</code> <span class="tag a">9</span>. <code>System.arraycopy</code> is the fast primitive under most of them.</p></div>
+    <div class="card"><h4>Collections, worth knowing</h4><p><code>frequency</code>, <code>nCopies</code>, <code>disjoint</code>, <code>max</code> and <code>min</code> with a comparator, <code>reverse</code>, <code>swap</code>, <code>rotate</code>, and the <code>empty…</code>, <code>singleton…</code>, <code>unmodifiable…</code>, <code>checked…</code> and <code>synchronized…</code> wrappers.</p></div>
+    <div class="note warn"><span class="lbl">synchronizedList is half the job</span>Each method takes a lock, but iteration is many calls, so you must hold <code>synchronized (list)</code> around the whole loop yourself or risk <code>ConcurrentModificationException</code>. A concurrent collection is usually the better fix: see <a data-deck="cj" data-slide="Copy-on-write and lock-free collections">copy-on-write and lock-free collections</a>.</div>
+  </div>
+</section>

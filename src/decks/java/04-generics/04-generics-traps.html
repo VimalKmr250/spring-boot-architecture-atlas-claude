@@ -1,0 +1,116 @@
+<section class="slide" data-sec="Generics" data-title="Generics traps">
+  <h2>Every unchecked warning is a ClassCastException somewhere else, later</h2>
+  <p class="dek">Raw types, unchecked casts and generic varargs all switch the compiler's checks off for one line. The program still compiles. The wrong object then travels until some code that trusts the generic type reads it, and the <code>ClassCastException</code> names that innocent line, not the one that caused it. javac warns about every one of them if you let it.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">GenericsTraps.java · heap pollution, three ways</div>
+<pre><code class="language-java">import java.time.LocalTime;
+import java.util.*;
+
+public class GenericsTraps {
+    static void legacyAdd(List list) {                    // a raw type: generics switched off
+        list.add(42);
+    }
+
+    @SuppressWarnings("unchecked")
+    static &lt;T&gt; T unsafeCast(Object o) { return (T) o; }   // erased to Object: checks nothing
+
+    static &lt;T&gt; T[] toArray(T... items) { return items; }  // hands out the varargs array
+    static &lt;T&gt; T[] pair(T a, T b) { return toArray(a, b); }   // here T[] is made as Object[]
+
+    @SafeVarargs                                          // safe: it only reads the array
+    static &lt;T&gt; List&lt;T&gt; listOf(T... items) {
+        List&lt;T&gt; list = new ArrayList&lt;&gt;(items.length);
+        for (T item : items) list.add(item);
+        return list;
+    }
+
+    static String brief(ClassCastException e) {           // drop the module details
+        return e.getMessage().substring(0, e.getMessage().indexOf(" ("));
+    }
+
+    public static void main(String[] args) {
+        List&lt;String&gt; names = new ArrayList&lt;&gt;(List.of("ana"));
+        legacyAdd(names);                                 // compiles, with a warning
+        System.out.println("names holds " + names.size() + " elements: " + names);
+        try {
+            String second = names.get(1);                 // the failure surfaces here, later
+            System.out.println(second);
+        } catch (ClassCastException e) {
+            System.out.println("1 " + brief(e));
+        }
+
+        try {
+            String text = unsafeCast(LocalTime.NOON);     // javac's checkcast sits on this line
+            System.out.println(text);
+        } catch (ClassCastException e) {
+            System.out.println("2 " + brief(e));
+        }
+
+        try {
+            String[] both = pair("a", "b");
+            System.out.println(both.length);
+        } catch (ClassCastException e) {
+            System.out.println("3 " + brief(e));
+        }
+
+        System.out.println("4 " + listOf("a", "b") + " " + listOf(1, 2));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">javac --release 21 -Xlint:all · GenericsTraps.java</div>
+<pre><code class="language-plaintext">GenericsTraps.java:5: warning: [rawtypes] found raw type: List
+    static void legacyAdd(List list) {                    // a raw type: generics switched off
+                          ^
+  missing type arguments for generic class List&lt;E&gt;
+  where E is a type-variable:
+    E extends Object declared in interface List
+GenericsTraps.java:6: warning: [unchecked] unchecked call to add(E) as a member of the raw type List
+        list.add(42);
+                ^
+  where E is a type-variable:
+    E extends Object declared in interface List
+GenericsTraps.java:12: warning: [unchecked] Possible heap pollution from parameterized vararg type T
+    static &lt;T&gt; T[] toArray(T... items) { return items; }  // hands out the varargs array
+                                ^
+  where T is a type-variable:
+    T extends Object declared in method &lt;T&gt;toArray(T...)
+GenericsTraps.java:13: warning: [unchecked] unchecked generic array creation for varargs parameter of type T[]
+    static &lt;T&gt; T[] pair(T a, T b) { return toArray(a, b); }   // here T[] is made as Object[]
+                                                  ^
+  where T is a type-variable:
+    T extends Object declared in method &lt;T&gt;pair(T,T)
+4 warnings</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · GenericsTraps.java</div>
+<pre><code class="language-plaintext">names holds 2 elements: [ana, 42]
+1 class java.lang.Integer cannot be cast to class java.lang.String
+2 class java.time.LocalTime cannot be cast to class java.lang.String
+3 class [Ljava.lang.Object; cannot be cast to class [Ljava.lang.String;
+4 [a, b] [1, 2]</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>#</th><th>The cause</th><th>Where it fails</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>A raw <code>List</code> parameter lets <code>42</code> into a <code>List&lt;String&gt;</code>. Printing the list works, because <code>toString</code> treats elements as <code>Object</code>.</td><td>The first line that reads an element as a <code>String</code></td></tr>
+          <tr><td class="num">2</td><td><code>(T) o</code> erases to <code>(Object) o</code> and checks nothing. javac puts the real <code>checkcast String</code> at the call site.</td><td>The caller's assignment, nowhere near the cast</td></tr>
+          <tr><td class="num">3</td><td>Inside <code>pair</code>, <code>T</code> is unknown, so the varargs array is created as <code>Object[]</code> and returned as a <code>T[]</code>.</td><td>The caller, when it treats the array as a <code>String[]</code></td></tr>
+          <tr><td class="num">4</td><td><code>@SafeVarargs</code> on a method that only reads the array is a true promise, so there is no warning and no failure.</td><td>Nowhere</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note bad"><span class="lbl">@SuppressWarnings is a promise</span>Suppress an unchecked warning only on the smallest scope, a single variable declaration as in <code>Erasure.newArray</code>, with a comment saying why it is safe. A class-level suppression hides the next one too.</div>
+      <div class="note tip"><span class="lbl">Make the build enforce it</span>Compile with <code>-Xlint:all -Werror</code>, or set <code>options.compilerArgs</code> in Gradle, and none of these reach main. In legacy code, wrap raw APIs once at the boundary with a checked copy: <code>Collections.checkedList(list, String.class)</code> fails at the bad <code>add</code> instead of the later read.</div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,112 @@
+<section class="slide" data-sec="Concurrent collections" data-title="The BlockingQueue family">
+  <h2>A BlockingQueue is a hand-off with back-pressure: producers wait when it is full, consumers when it is empty</h2>
+  <p class="dek">Every producer-consumer design in Java is a <code>BlockingQueue</code> underneath, including every <code>ThreadPoolExecutor</code>. Its value is in the blocking: <code>put</code> waits for space and <code>take</code> waits for an element, so a fast producer is slowed to the consumers' pace instead of filling the heap. Each method also comes in throwing, non-blocking and timed forms.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">BlockingQueues.java · four method forms, the implementations, poison pills</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+
+public class BlockingQueues {
+    record Reminder(String text, long dueAtMs) implements Delayed {
+        @Override public long getDelay(TimeUnit unit) {
+            return unit.convert(dueAtMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        }
+        @Override public int compareTo(Delayed o) {
+            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
+        }
+    }
+
+    static final String POISON = "__STOP__";
+
+    public static void main(String[] args) throws Exception {
+        BlockingQueue&lt;String&gt; bounded = new ArrayBlockingQueue&lt;&gt;(2);
+        bounded.put("a");
+        bounded.put("b");
+        System.out.println("full queue: offer -&gt; " + bounded.offer("c")
+                + ", offer(50 ms) -&gt; " + bounded.offer("c", 50, TimeUnit.MILLISECONDS));
+        Thread taker = new Thread(() -&gt; {
+            try { Thread.sleep(100); bounded.take(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+        taker.start();
+        long t0 = System.nanoTime();
+        bounded.put("c");                                      // blocks until the taker makes room
+        System.out.printf("put blocked for ~%d ms until a take made room%n", Math.round((System.nanoTime() - t0) / 1e8) * 100);
+        taker.join();
+
+        SynchronousQueue&lt;String&gt; handoff = new SynchronousQueue&lt;&gt;();
+        System.out.println("SynchronousQueue offer with no taker -&gt; " + handoff.offer("x") + ", size " + handoff.size());
+
+        System.out.println("LinkedBlockingQueue() capacity: " + new LinkedBlockingQueue&lt;String&gt;().remainingCapacity());
+
+        long now = System.currentTimeMillis();
+        DelayQueue&lt;Reminder&gt; reminders = new DelayQueue&lt;&gt;(List.of(new Reminder("in 150 ms", now + 150),
+                new Reminder("in 50 ms", now + 50), new Reminder("in 100 ms", now + 100)));
+        System.out.print("DelayQueue releases:");
+        for (int i = 0; i &lt; 3; i++) System.out.print(" [" + reminders.take().text() + "]");
+        System.out.println();
+
+        PriorityBlockingQueue&lt;Integer&gt; urgent = new PriorityBlockingQueue&lt;&gt;(List.of(5, 1, 3));
+        System.out.println("PriorityBlockingQueue take -&gt; " + urgent.take());
+
+        BlockingQueue&lt;String&gt; work = new LinkedBlockingQueue&lt;&gt;(100);
+        List&lt;String&gt; done = Collections.synchronizedList(new ArrayList&lt;&gt;());
+        int consumers = 3;
+        try (ExecutorService pool = Executors.newFixedThreadPool(consumers)) {
+            for (int c = 0; c &lt; consumers; c++)
+                pool.submit(() -&gt; {
+                    for (String job; !(job = work.take()).equals(POISON); ) done.add(job);
+                    return null;                                // a poison pill ends each consumer
+                });
+            for (int i = 1; i &lt;= 30; i++) work.put("job-" + i);
+            for (int c = 0; c &lt; consumers; c++) work.put(POISON);
+        }
+        System.out.println("poison pills: 3 consumers finished " + done.size() + " jobs and stopped");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · BlockingQueues.java</div>
+<pre><code class="language-plaintext">full queue: offer -&gt; false, offer(50 ms) -&gt; false
+put blocked for ~100 ms until a take made room
+SynchronousQueue offer with no taker -&gt; false, size 0
+LinkedBlockingQueue() capacity: 2147483647
+DelayQueue releases: [in 50 ms] [in 100 ms] [in 150 ms]
+PriorityBlockingQueue take -&gt; 1
+poison pills: 3 consumers finished 30 jobs and stopped</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Throws</th><th>Returns</th><th>Blocks</th><th>Times out</th></tr></thead>
+          <tbody>
+            <tr><td>Insert</td><td><code>add</code></td><td><code>offer</code></td><td><code>put</code></td><td><code>offer(e, t, unit)</code></td></tr>
+            <tr><td>Remove</td><td><code>remove</code></td><td><code>poll</code></td><td><code>take</code></td><td><code>poll(t, unit)</code></td></tr>
+            <tr><td>Examine</td><td><code>element</code></td><td><code>peek</code></td><td></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Implementation</th><th>Shape</th></tr></thead>
+        <tbody>
+          <tr><td><code>ArrayBlockingQueue</code></td><td>Bounded array, one lock. The predictable choice; optionally fair.</td></tr>
+          <tr><td><code>LinkedBlockingQueue</code></td><td>Linked nodes, separate locks for put and take, so more throughput. Unbounded unless you pass a capacity: 2,147,483,647 above.</td></tr>
+          <tr><td><code>SynchronousQueue</code></td><td>No capacity: each <code>put</code> waits for a <code>take</code>. The cached thread pool's queue.</td></tr>
+          <tr><td><code>PriorityBlockingQueue</code></td><td>Unbounded heap: the smallest element first.</td></tr>
+          <tr><td><code>DelayQueue</code></td><td>Unbounded; an element can be taken only once its delay has expired.</td></tr>
+          <tr><td><code>LinkedTransferQueue</code></td><td><code>transfer</code> waits until a consumer has received the element.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note warn"><span class="lbl">Bound every queue</span>An unbounded queue turns overload into memory growth and seconds of hidden latency, and the first symptom is an <code>OutOfMemoryError</code>. A bounded one turns it into blocked producers or rejections, which the caller can see and act on.</div>
+      <div class="note tip"><span class="lbl">Stopping consumers</span>Put one poison pill per consumer after the last real item, as above, or interrupt them with <code>shutdownNow</code>. The LLD tab builds the pattern by hand: <a data-deck="lld" data-slide="Producer-consumer and deadlock">producer-consumer and deadlock</a>.</div>
+    </div>
+  </div>
+</section>

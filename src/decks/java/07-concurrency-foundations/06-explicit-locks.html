@@ -1,0 +1,132 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="Explicit locks">
+  <h2>ReentrantLock does what synchronized does, plus timeouts, interruption, fairness and several conditions</h2>
+  <p class="dek">The locks in <code>java.util.concurrent.locks</code> are ordinary objects. You lock and unlock them yourself, which means you must unlock in <code>finally</code>, and in return you can give up after a timeout, abandon the wait when interrupted, and hold several wait queues on one lock. Read-write locks and <code>StampedLock</code> go further for data that is read far more often than written.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Locks.java · tryLock, lockInterruptibly, re-entrancy, readers together, optimistic reads</div>
+<pre><code class="language-java">import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.*;
+
+public class Locks {
+    static final class Point {                       // StampedLock's optimistic read
+        private final StampedLock sl = new StampedLock();
+        private double x, y;
+        void move(double dx, double dy) {
+            long stamp = sl.writeLock();
+            try { x += dx; y += dy; } finally { sl.unlockWrite(stamp); }
+        }
+        double distance(Runnable between) {
+            long stamp = sl.tryOptimisticRead();     // no lock taken at all
+            double cx = x, cy = y;
+            between.run();                           // lets the demo slip a write in here
+            if (!sl.validate(stamp)) {               // a write happened: fall back to a real read lock
+                System.out.println("optimistic read invalidated, retrying under the read lock");
+                stamp = sl.readLock();
+                try { cx = x; cy = y; } finally { sl.unlockRead(stamp); }
+            }
+            return Math.hypot(cx, cy);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        ReentrantLock lock = new ReentrantLock();
+        CountDownLatch held = new CountDownLatch(1), done = new CountDownLatch(1);
+        Thread holder = new Thread(() -&gt; {
+            lock.lock();
+            try { held.countDown(); done.await(); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            finally { lock.unlock(); }
+        });
+        holder.start();
+        held.await();
+        long t0 = System.nanoTime();
+        boolean got = lock.tryLock(100, TimeUnit.MILLISECONDS);
+        System.out.printf("tryLock(100 ms) while another thread holds it: %b after ~%d ms%n",
+                got, Math.round((System.nanoTime() - t0) / 1e8) * 100);
+
+        Thread impatient = new Thread(() -&gt; {
+            try {
+                lock.lockInterruptibly();
+                lock.unlock();
+            } catch (InterruptedException e) {
+                System.out.println("lockInterruptibly gave up when interrupted");
+            }
+        });
+        impatient.start();
+        while (!lock.hasQueuedThread(impatient)) Thread.sleep(1);
+        impatient.interrupt();
+        impatient.join();
+        done.countDown();
+        holder.join();
+
+        lock.lock();
+        lock.lock();
+        System.out.println("held twice by one thread: holdCount " + lock.getHoldCount());
+        lock.unlock();
+        lock.unlock();
+
+        ReadWriteLock rw = new ReentrantReadWriteLock();
+        AtomicInteger reading = new AtomicInteger(), peak = new AtomicInteger();
+        CountDownLatch allIn = new CountDownLatch(3);
+        try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+            for (int i = 0; i &lt; 3; i++)
+                pool.submit(() -&gt; {
+                    rw.readLock().lock();
+                    try {
+                        peak.accumulateAndGet(reading.incrementAndGet(), Math::max);
+                        allIn.countDown();
+                        allIn.await();                    // all three readers hold the lock at once
+                        reading.decrementAndGet();
+                    } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    finally { rw.readLock().unlock(); }
+                    return null;
+                });
+            allIn.await();
+            Future&lt;Integer&gt; writer = pool.submit(() -&gt; {
+                rw.writeLock().lock();                   // waits until every reader is gone
+                try { return reading.get(); } finally { rw.writeLock().unlock(); }
+            });
+            System.out.println("readers inside together: " + peak.get() + "; readers left when the writer got in: " + writer.get());
+        }
+
+        var p = new Point();
+        p.move(3, 4);
+        System.out.println("distance " + p.distance(() -&gt; { }));
+        System.out.println("distance " + p.distance(() -&gt; p.move(3, 4)));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Locks.java</div>
+<pre><code class="language-plaintext">tryLock(100 ms) while another thread holds it: false after ~100 ms
+lockInterruptibly gave up when interrupted
+held twice by one thread: holdCount 2
+readers inside together: 3; readers left when the writer got in: 0
+distance 5.0
+optimistic read invalidated, retrying under the read lock
+distance 10.0</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th><code>synchronized</code></th><th><code>ReentrantLock</code></th></tr></thead>
+          <tbody>
+            <tr><td>Release</td><td>Automatic, at the end of the block</td><td>Manual: <code>lock()</code> before <code>try</code>, <code>unlock()</code> in <code>finally</code></td></tr>
+            <tr><td>Give up waiting</td><td>No</td><td><code>tryLock()</code>, <code>tryLock(timeout)</code>, <code>lockInterruptibly()</code></td></tr>
+            <tr><td>Wait queues</td><td>One per object: <code>wait</code>, <code>notify</code></td><td>Any number: <code>newCondition()</code>, with <code>await</code> and <code>signal</code></td></tr>
+            <tr><td>Fairness</td><td>No</td><td>Optional: <code>new ReentrantLock(true)</code> hands the lock over in FIFO order, more slowly</td></tr>
+            <tr><td>Inspection</td><td><code>Thread.holdsLock</code></td><td><code>getHoldCount</code>, <code>hasQueuedThreads</code>, <code>isLocked</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4><code>ReentrantReadWriteLock</code></h4><p>Any number of readers together, or one writer alone: three readers held it at once above, and the writer waited until they left. A read lock can be taken while holding the write lock (downgrading), never the reverse: upgrading deadlocks. Only worth it when reads are long and frequent.</p></div>
+    <div class="card"><h4><code>StampedLock</code></h4><p><code>tryOptimisticRead()</code> takes no lock: read the fields, then <code>validate(stamp)</code>. If a write slipped in, as the demo forced, retry under a real read lock. Fastest for tiny read-mostly sections. Not re-entrant, and it has no conditions.</p></div>
+    <div class="note tip"><span class="lbl">Which to pick</span><code>synchronized</code> by default. <code>ReentrantLock</code> when you need a timeout, interruption or two conditions, such as <code>notFull</code> and <code>notEmpty</code> in a bounded buffer. The LLD tab's <a data-deck="lld" data-slide="Locks, atomics and concurrent collections">locks, atomics and collections</a> puts them to work in designs.</div>
+  </div>
+</section>

@@ -1,0 +1,77 @@
+<section class="slide" data-sec="Collections" data-title="Sets, and comparators consistent with equals">
+  <h2>A TreeSet decides equality with compareTo, so a careless comparator deletes data</h2>
+  <p class="dek"><code>HashSet</code> is a <code>HashMap</code> whose values are all one shared dummy object, so it uses <code>hashCode</code> and <code>equals</code>. <code>TreeSet</code> is a <code>TreeMap</code>, and it never calls <code>equals</code>: two elements that compare as 0 are the same element. Sort by length and every word of the same length is a duplicate.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SetsDemo.java · three orders, two vanishing acts, BigDecimal</div>
+<pre><code class="language-java">import java.math.BigDecimal;
+import java.util.*;
+
+public class SetsDemo {
+    public static void main(String[] args) {
+        List&lt;String&gt; fruit = List.of("pear", "Apple", "fig", "apple", "plum", "kiwi");
+        System.out.println("HashSet       " + new HashSet&lt;&gt;(fruit));
+        System.out.println("LinkedHashSet " + new LinkedHashSet&lt;&gt;(fruit));
+        System.out.println("TreeSet       " + new TreeSet&lt;&gt;(fruit) + "  (uppercase sorts first)");
+
+        Set&lt;String&gt; byLength = new TreeSet&lt;&gt;(Comparator.comparing(String::length));
+        byLength.addAll(fruit);
+        System.out.println("TreeSet by length          " + byLength + "  &lt;- three fruits vanished");
+        Set&lt;String&gt; byLengthThenName = new TreeSet&lt;&gt;(Comparator.comparing(String::length)
+                .thenComparing(Comparator.naturalOrder()));
+        byLengthThenName.addAll(fruit);
+        System.out.println("by length, then by name    " + byLengthThenName);
+
+        Set&lt;String&gt; ignoreCase = new TreeSet&lt;&gt;(String.CASE_INSENSITIVE_ORDER);
+        ignoreCase.addAll(fruit);
+        Set&lt;String&gt; exact = new HashSet&lt;&gt;(fruit);
+        System.out.println("case-insensitive TreeSet   " + ignoreCase + ", contains(\"APPLE\") " + ignoreCase.contains("APPLE")
+                + "; HashSet contains(\"APPLE\") " + exact.contains("APPLE"));
+
+        List&lt;BigDecimal&gt; prices = List.of(new BigDecimal("2.0"), new BigDecimal("2.00"));
+        System.out.println("BigDecimal 2.0 and 2.00: HashSet size " + new HashSet&lt;&gt;(prices).size()
+                + ", TreeSet size " + new TreeSet&lt;&gt;(prices).size()
+                + "  (equals " + prices.get(0).equals(prices.get(1)) + ", compareTo " + prices.get(0).compareTo(prices.get(1)) + ")");
+
+        try {
+            Set.of("a", "b", "a");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Set.of with a duplicate: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · SetsDemo.java</div>
+<pre><code class="language-plaintext">HashSet       [plum, apple, pear, Apple, kiwi, fig]
+LinkedHashSet [pear, Apple, fig, apple, plum, kiwi]
+TreeSet       [Apple, apple, fig, kiwi, pear, plum]  (uppercase sorts first)
+TreeSet by length          [fig, pear, Apple]  &lt;- three fruits vanished
+by length, then by name    [fig, kiwi, pear, plum, Apple, apple]
+case-insensitive TreeSet   [Apple, fig, kiwi, pear, plum], contains("APPLE") true; HashSet contains("APPLE") false
+BigDecimal 2.0 and 2.00: HashSet size 2, TreeSet size 1  (equals false, compareTo 0)
+Set.of with a duplicate: duplicate element: a</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Set</th><th>Equal means</th><th>Order</th></tr></thead>
+          <tbody>
+            <tr><td><code>HashSet</code></td><td><code>hashCode</code> and <code>equals</code></td><td>None, and it can change</td></tr>
+            <tr><td><code>LinkedHashSet</code></td><td><code>hashCode</code> and <code>equals</code></td><td>Insertion</td></tr>
+            <tr><td><code>TreeSet</code></td><td><code>compare(a, b) == 0</code></td><td>The comparator's</td></tr>
+            <tr><td><code>EnumSet</code></td><td>Same constant</td><td>Declaration</td></tr>
+            <tr><td><code>Set.of</code> <span class="tag a">9</span></td><td><code>equals</code>; duplicates and nulls rejected at creation</td><td>Randomised per JVM run</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Three fruits vanished</span><code>pear</code>, <code>plum</code> and <code>kiwi</code> all have four letters, so to the length comparator they are one element: the first is kept and the others are dropped without an error. Always break ties down to a total order: <code>.thenComparing(Comparator.naturalOrder())</code>.</div>
+    <div class="note warn"><span class="lbl">BigDecimal disagrees with itself</span><code>2.0</code> and <code>2.00</code> have different scales, so <code>equals</code> is false while <code>compareTo</code> is 0. The same two prices make a <code>HashSet</code> of 2 and a <code>TreeSet</code> of 1. Normalise with <code>stripTrailingZeros()</code>, or choose one collection on purpose.</div>
+    <div class="note tip"><span class="lbl">When inconsistency is the point</span>A <code>TreeSet</code> with <code>String.CASE_INSENSITIVE_ORDER</code> is a case-insensitive set by design: it found <code>"APPLE"</code> where the <code>HashSet</code> did not. That is legitimate, but it breaks the <code>Set</code> contract, so do not pass it to code that expects <code>equals</code> semantics.</div>
+  </div>
+</section>

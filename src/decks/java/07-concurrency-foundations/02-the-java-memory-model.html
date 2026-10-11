@@ -1,0 +1,94 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="The Java Memory Model">
+  <h2>Without a happens-before edge, another thread may never see your write</h2>
+  <p class="dek">The Java Memory Model (JLS chapter 17) defines when a write in one thread must be visible to a read in another. In between, the compiler, the JIT and the CPU may keep values in registers, reorder instructions and buffer stores, as long as no single thread can tell. Two threads can tell. The promise in return: a program with <b>no data races</b> behaves as if its actions ran in one sequential order.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 220" role="img" aria-label="Two CPU cores. Core 1 runs thread A, which writes x = 1 into its private store buffer, then reads y from its cache and gets 0. Core 2 runs thread B, which writes y = 1 into its own store buffer, then reads x and gets 0. Shared memory still holds x = 0 and y = 0, because neither store buffer has drained yet. So both threads read 0, which no interleaving of the source code allows.">
+        <g font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="30" y="14" width="360" height="132" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="46" y="36" font-size="11.5" font-weight="600">core 1 · thread A</text>
+          <text x="46" y="58" font-size="11">x = 1;  r1 = y;</text>
+          <rect x="46" y="70" width="150" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+          <text x="58" y="90" font-size="10">store buffer</text><text x="58" y="112" font-size="11">x = 1</text>
+          <rect x="220" y="70" width="150" height="56" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="232" y="90" font-size="10">cache read</text><text x="232" y="112" font-size="11">y → 0</text>
+
+          <rect x="510" y="14" width="360" height="132" rx="8" fill="currentColor" fill-opacity="0.04" stroke="currentColor" stroke-opacity="0.35"></rect>
+          <text x="526" y="36" font-size="11.5" font-weight="600">core 2 · thread B</text>
+          <text x="526" y="58" font-size="11">y = 1;  r2 = x;</text>
+          <rect x="526" y="70" width="150" height="56" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F"></rect>
+          <text x="538" y="90" font-size="10">store buffer</text><text x="538" y="112" font-size="11">y = 1</text>
+          <rect x="700" y="70" width="150" height="56" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="712" y="90" font-size="10">cache read</text><text x="712" y="112" font-size="11">x → 0</text>
+
+          <rect x="30" y="172" width="840" height="34" rx="7" fill="currentColor" fill-opacity="0.07" stroke="currentColor" stroke-opacity="0.4"></rect>
+          <text x="450" y="193" font-size="11" text-anchor="middle">shared memory: x = 0, y = 0 until the store buffers drain</text>
+        </g>
+        <g stroke-width="1.2">
+          <line x1="121" y1="126" x2="121" y2="169" stroke="#D26A3F" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+          <line x1="295" y1="170" x2="295" y2="129" stroke="#8A94A3" marker-end="url(#arw)"></line>
+          <line x1="601" y1="126" x2="601" y2="169" stroke="#D26A3F" stroke-dasharray="4 3" marker-end="url(#arwA)"></line>
+          <line x1="775" y1="170" x2="775" y2="129" stroke="#8A94A3" marker-end="url(#arw)"></line>
+        </g>
+        <text x="450" y="70" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">drains later</text>
+        <text x="450" y="84" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.8">(dashed)</text>
+      </svg>
+    </div>
+    <figcaption>Why the next slide's test can print "both reads saw 0". Each write waits in its core's store buffer while the read that follows it goes ahead. A single thread always sees its own buffered write, so it cannot tell; the other thread can.</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Visibility.java · a flag that one thread sets and another never sees</div>
+<pre><code class="language-java">public class Visibility {
+    static boolean plainStop;                      // no happens-before between writer and reader
+    static volatile boolean volatileStop;
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread plain = new Thread(() -&gt; {
+            long spins = 0;
+            while (!plainStop) spins++;            // the JIT may read plainStop once, outside the loop
+            System.out.println("plain reader stopped after " + spins + " spins");
+        });
+        plain.setDaemon(true);                     // so the JVM can still exit
+        plain.start();
+        Thread.sleep(500);                         // long enough for the loop to be compiled
+        plainStop = true;
+        plain.join(2_000);
+        System.out.println("plain flag: reader still running 2 s after the write? " + plain.isAlive());
+
+        Thread reader = new Thread(() -&gt; {
+            long spins = 0;
+            while (!volatileStop) spins++;         // a volatile read on every iteration
+            System.out.println("volatile reader stopped" + (spins &gt; 0 ? "" : " at once"));
+        });
+        reader.start();
+        Thread.sleep(500);
+        volatileStop = true;
+        reader.join(2_000);
+        System.out.println("volatile flag: reader still running? " + reader.isAlive());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Visibility.java · the same on every run here</div>
+<pre><code class="language-plaintext">plain flag: reader still running 2 s after the write? true
+volatile reader stopped
+volatile flag: reader still running? false</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>What goes wrong</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>Visibility</td><td>The JIT compiled <code>while (!plainStop)</code> into a loop that reads the field once. Legal: nothing in the loop synchronises, so no other thread's write has to be seen.</td></tr>
+            <tr><td>Reordering</td><td>Writes and reads swap places, in the compiler or the CPU. The next slide catches it happening tens of thousands of times.</td></tr>
+            <tr><td>Atomicity</td><td><code>count++</code> is a read, an add and a write; a thread can lose the race between them. On 32-bit JVMs a non-volatile <code>long</code> or <code>double</code> can even tear into two halves (JLS 17.7).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn"><span class="lbl">Fixed by accident is not fixed</span>Put a <code>System.out.println</code> in the plain loop and it usually stops, because <code>PrintStream</code> synchronises internally. Remove the logging and the bug returns. The definition to remember: a <b>data race</b> is two accesses to one variable, at least one a write, not ordered by happens-before.</div>
+    </div>
+  </div>
+</section>

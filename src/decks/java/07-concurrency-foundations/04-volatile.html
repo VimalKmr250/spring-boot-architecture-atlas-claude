@@ -1,0 +1,94 @@
+<section class="slide" data-sec="Concurrency foundations" data-title="volatile">
+  <h2>volatile gives visibility and ordering for one variable, never atomicity for a sequence of steps</h2>
+  <p class="dek">Every read of a <code>volatile</code> field sees the most recent write to it, and everything written before that write. That makes it right for a stop flag, or for a reference to an immutable snapshot that one thread replaces and many read. It does nothing for <code>count++</code>, which is a read, an add and a write: two threads can both read 41 and both write 42.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">VolatileDemo.java · lost updates, then two lazy singletons done right</div>
+<pre><code class="language-java">import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+
+public class VolatileDemo {
+    static volatile int volatileCount;
+    static int lockedCount;
+    static final AtomicInteger atomicCount = new AtomicInteger();
+    static final Object lock = new Object();
+
+    // Double-checked locking: correct only because the field is volatile.
+    static final class Config {
+        private static volatile Config instance;
+        final String region;
+        private Config() { region = "eu-west"; }
+        static Config get() {
+            Config c = instance;                     // one volatile read on the fast path
+            if (c == null) {
+                synchronized (Config.class) {
+                    c = instance;
+                    if (c == null) instance = c = new Config();
+                }
+            }
+            return c;
+        }
+    }
+
+    // The holder idiom: lazy and thread-safe, with no volatile and no lock.
+    static final class Rates {
+        private Rates() { }
+        private static final class Holder { static final Rates INSTANCE = new Rates(); }
+        static Rates get() { return Holder.INSTANCE; }
+    }
+
+    public static void main(String[] args) throws Exception {
+        int threads = 4, each = 1_000_000;
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int t = 0; t &lt; threads; t++)
+                pool.submit(() -&gt; {
+                    for (int i = 0; i &lt; each; i++) {
+                        volatileCount++;                  // read, add, write: three steps
+                        atomicCount.incrementAndGet();    // one atomic step
+                        synchronized (lock) { lockedCount++; }
+                    }
+                });
+        }
+        System.out.printf("expected      %,d%n", threads * each);
+        System.out.printf("volatile ++   %,d%n", volatileCount);
+        System.out.printf("AtomicInteger %,d%n", atomicCount.get());
+        System.out.printf("synchronized  %,d%n", lockedCount);
+
+        var configs = ConcurrentHashMap.&lt;Config&gt;newKeySet();
+        var rates = ConcurrentHashMap.&lt;Rates&gt;newKeySet();
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i &lt; 1_000; i++) pool.submit(() -&gt; { configs.add(Config.get()); rates.add(Rates.get()); });
+        }
+        System.out.println("1,000 concurrent callers saw " + configs.size() + " Config and " + rates.size() + " Rates instance");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · VolatileDemo.java · the volatile count varies by run</div>
+<pre><code class="language-plaintext">expected      4,000,000
+volatile ++   3,985,659
+AtomicInteger 4,000,000
+synchronized  4,000,000
+1,000 concurrent callers saw 1 Config and 1 Rates instance</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>volatile guarantees</th><th>volatile does not give</th></tr></thead>
+          <tbody>
+            <tr><td>Each read sees the latest write</td><td>Atomic read-modify-write: <code>++</code>, <code>+=</code>, check-then-set</td></tr>
+            <tr><td>Writes before a volatile write are visible after a read of it</td><td>A consistent view of two fields at once</td></tr>
+            <tr><td>Atomic 64-bit reads and writes of <code>long</code> and <code>double</code></td><td>Mutual exclusion of any kind</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Why double-checked locking needs it</span><code>instance = new Config()</code> is three steps: allocate, construct, assign. Without <code>volatile</code>, the assignment may become visible before the constructor's writes, so a thread on the fast path sees a non-null <code>Config</code> whose <code>region</code> is still <code>null</code>. The local <code>c</code> saves a second volatile read.</div>
+    <div class="note good"><span class="lbl">The holder idiom needs nothing</span>The JVM initialises <code>Holder</code> on first use, exactly once, under its own lock, and class initialisation creates a happens-before edge. Lazy, thread-safe and free after the first call. An enum is simpler still: <a data-deck="lld" data-slide="Singleton: the safe ways">singleton, the safe ways</a>.</div>
+    <div class="note tip"><span class="lbl">Good uses</span>A <code>volatile boolean running</code> checked by a worker loop. A <code>volatile</code> reference to an immutable config, replaced whole on reload. Counters belong in <code>AtomicLong</code> or <code>LongAdder</code>, on <a data-deck="cj" data-slide="Atomics and CAS">atomics and CAS</a>.</div>
+  </div>
+</section>

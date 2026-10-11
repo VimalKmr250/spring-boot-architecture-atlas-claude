@@ -1,0 +1,25 @@
+<section class="slide" data-sec="Orientation" data-title="Topics by interview level">
+  <h2>The same topics come up at every level; what changes is how deep the follow-up goes</h2>
+  <p class="dek">A junior candidate is asked what a <code>HashMap</code> does; a senior one is asked what happens when two threads resize it. Use this table to see where your level's bar sits for each area, and which slides to read first. Each cell links to where that depth is covered.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Area</th><th>Junior (0–2 years)</th><th>Mid (2–5 years)</th><th>Senior (5+ years)</th></tr></thead>
+      <tbody>
+        <tr><td>Language and OOP</td><td><code>==</code> and <code>equals</code>, pass-by-value, why strings are immutable: <a data-deck="cj" data-slide="Q1–3 · Fundamentals">Q1–3</a></td><td>Overload resolution, the <code>equals</code> contract, immutable classes: <a data-deck="cj" data-slide="The Object contract">Object contract</a></td><td>Dispatch and the JIT, records against sealed hierarchies, API design: <a data-deck="cj" data-slide="Dynamic dispatch">dispatch</a></td></tr>
+        <tr><td>Generics and exceptions</td><td>Checked against unchecked, try-with-resources: <a data-deck="cj" data-slide="Q7–9 · Exceptions and immutability">Q7–9</a></td><td>Erasure, PECS, exception translation: <a data-deck="cj" data-slide="Bounds, wildcards and PECS">PECS</a></td><td>Heap pollution and API signatures, error-handling strategy across layers: <a data-deck="cj" data-slide="Designing exceptions">designing exceptions</a></td></tr>
+        <tr><td>Collections</td><td>Which collection when, <code>ArrayList</code> against <code>LinkedList</code>: <a data-deck="cj" data-slide="Which collection for which job">choosing one</a></td><td><code>HashMap</code> internals, fail-fast iterators, comparators: <a data-deck="cj" data-slide="Q10–12 · HashMap">Q10–12</a></td><td>Tree bins and hash flooding, memory cost per entry, concurrent maps: <a data-deck="cj" data-slide="Object layout and memory cost">object layout</a></td></tr>
+        <tr><td>Concurrency</td><td>Thread states, <code>synchronized</code>, what a race is: <a data-deck="cj" data-slide="Threads, states and interrupts">threads</a></td><td><code>volatile</code>, executors, <code>ConcurrentHashMap</code>, <code>CompletableFuture</code>: <a data-deck="cj" data-slide="Q22–24 · Executors and CompletableFuture">Q22–24</a></td><td>The memory model, happens-before, pool sizing, virtual threads and pinning: <a data-deck="cj" data-slide="Q16–18 · Memory model and volatile">Q16–18</a></td></tr>
+        <tr><td>The JVM</td><td>Heap against stack, what garbage collection does: <a data-deck="cj" data-slide="Runtime memory areas">memory areas</a></td><td>Class loading, <code>OutOfMemoryError</code> kinds, GC roots: <a data-deck="cj" data-slide="Q25–27 · JVM and GC">Q25–27</a></td><td>JIT, escape analysis, warm-up, leak diagnosis in production: <a data-deck="cj" data-slide="The JIT compiler">the JIT</a></td></tr>
+        <tr><td>Modern Java</td><td>Records, <code>var</code>, text blocks: <a data-deck="cj" data-slide="The new syntax on one slide">the new syntax</a></td><td>Pattern matching, sealed types, sequenced collections: <a data-deck="cj" data-slide="Sealed types and pattern matching">sealed types</a></td><td>What each LTS changed and what broke on upgrade: <a data-deck="cj" data-slide="What each LTS changed">each LTS</a></td></tr>
+        <tr><td>Coding round</td><td>An immutable class, <code>equals</code> and <code>hashCode</code>: <a data-deck="cj" data-slide="Build an immutable class">the drill</a></td><td>Your own <code>HashMap</code>, a concurrent counter: <a data-deck="cj" data-slide="Write your own HashMap">the drill</a></td><td>Threads in turn, parallel calls with deadlines, and the follow-ups: <a data-deck="cj" data-slide="Parallel calls with CompletableFuture">the drill</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">If you have one evening</span>Read the 30 questions, saying each answer aloud first. Then do two drills without looking: the immutable class and your own <code>HashMap</code>. Those two cover most of what a screening round asks.</div>
+    <div class="note"><span class="lbl">If you have a week</span>One section a day, in order: language, collections, concurrency (two days), the JVM, then pitfalls and drills. Run each program yourself and change one line to see what breaks; that is what makes the answer stick.</div>
+    <div class="note warn"><span class="lbl">What raises the bar fastest</span>Answering with a mechanism and a number: "the table doubles at 75% full", "the 9th colliding key resizes, the 11th treeifies", "both reads saw 0 tens of thousands of times". This tab gives you the numbers; the interview page shows <a href="#levels">what each level is scored on</a>.</div>
+  </div>
+</section>

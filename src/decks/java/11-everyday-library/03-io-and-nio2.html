@@ -1,0 +1,98 @@
+<section class="slide" data-sec="Everyday library" data-title="I/O and NIO.2">
+  <h2>Files and Path do most file work in one line, and every stream over a file must be closed</h2>
+  <p class="dek">The <code>java.nio.file</code> API <span class="tag a">7</span> replaced <code>java.io.File</code>: <code>Path</code> names a file, and the static methods on <code>Files</code> read, write, copy, move, list and walk. Two rules prevent most bugs. Bytes become text only through a charset, so name one or know the default. And anything that keeps a file open, including the streams from <code>Files.lines</code> and <code>Files.walk</code>, goes in try-with-resources.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FilesDemo.java · read, write, a wrong charset, copy, move, walk, clean up</div>
+<pre><code class="language-java">import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.util.Comparator;
+import java.util.stream.Stream;
+
+public class FilesDemo {
+    static String slash(Path p) { return p.toString().replace('\\', '/'); }   // the same on every OS
+
+    public static void main(String[] args) throws IOException {
+        System.out.println("default charset " + Charset.defaultCharset() + " (UTF-8 by default since JDK 18)");
+        Path dir = Files.createTempDirectory("orders");
+        try {
+            Path csv = dir.resolve("orders.csv");
+            Files.writeString(csv, "id,customer,total\nORD-1,Zoë,12.50\nORD-2,Ana,7.00\n");   // UTF-8
+            System.out.println("orders.csv: " + Files.size(csv) + " bytes, " + Files.readString(csv).length() + " chars");
+
+            try (Stream&lt;String&gt; lines = Files.lines(csv)) {               // holds a file handle until closed
+                lines.skip(1).map(l -&gt; l.split(",")).forEach(f -&gt; System.out.println("  " + f[0] + " " + f[1] + " " + f[2]));
+            }
+            String wrong = Files.readString(csv, StandardCharsets.ISO_8859_1);
+            System.out.println("read as ISO-8859-1: " + wrong.lines().skip(1).findFirst().orElseThrow());
+
+            try (BufferedWriter w = Files.newBufferedWriter(dir.resolve("report.txt"))) {
+                w.write("2 orders, 19.50");
+                w.newLine();
+            }
+            try (BufferedReader r = Files.newBufferedReader(dir.resolve("report.txt"))) {
+                System.out.println("report.txt: " + r.readLine());
+            }
+
+            Path p = Path.of("data", "2026", "..", "orders.csv");
+            System.out.println("path " + slash(p) + " normalises to " + slash(p.normalize()) + ", file name " + p.getFileName());
+
+            Path archive = Files.createDirectories(dir.resolve("archive/2026"));
+            Files.copy(csv, archive.resolve("orders.csv"));
+            try {
+                Files.copy(csv, archive.resolve("orders.csv"));
+            } catch (FileAlreadyExistsException e) {
+                System.out.println("copy onto an existing file: FileAlreadyExistsException");
+            }
+            Files.copy(csv, archive.resolve("orders.csv"), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(dir.resolve("report.txt"), dir.resolve("archive/report.txt"), StandardCopyOption.ATOMIC_MOVE);
+            try (Stream&lt;Path&gt; all = Files.walk(dir)) {                     // also must be closed; the first entry is dir itself
+                System.out.println("tree: " + all.skip(1).map(dir::relativize).map(FilesDemo::slash).sorted().toList());
+            }
+        } finally {
+            try (Stream&lt;Path&gt; all = Files.walk(dir)) {
+                all.sorted(Comparator.reverseOrder()).forEach(path -&gt; path.toFile().delete());   // children first
+            }
+            System.out.println("temp directory removed: " + !Files.exists(dir));
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · FilesDemo.java</div>
+<pre><code class="language-plaintext">default charset UTF-8 (UTF-8 by default since JDK 18)
+orders.csv: 50 bytes, 49 chars
+  ORD-1 Zoë 12.50
+  ORD-2 Ana 7.00
+read as ISO-8859-1: ORD-1,ZoÃ«,12.50
+report.txt: 2 orders, 19.50
+path data/2026/../orders.csv normalises to data/orders.csv, file name orders.csv
+copy onto an existing file: FileAlreadyExistsException
+tree: [archive, archive/2026, archive/2026/orders.csv, archive/report.txt, orders.csv]
+temp directory removed: true</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Task</th><th>NIO.2</th></tr></thead>
+          <tbody>
+            <tr><td>Whole file as text</td><td><code>Files.readString</code>, <code>writeString</code> <span class="tag a">11</span>; <code>readAllLines</code> for a list</td></tr>
+            <tr><td>Large file, line by line</td><td><code>Files.lines</code> in try-with-resources, or <code>newBufferedReader</code></td></tr>
+            <tr><td>Bytes</td><td><code>Files.readAllBytes</code>, <code>newInputStream</code>, <code>newOutputStream</code></td></tr>
+            <tr><td>Directories</td><td><code>createDirectories</code>, <code>list</code>, <code>walk</code>, <code>find</code>; all three streams must be closed</td></tr>
+            <tr><td>Copy and move</td><td><code>REPLACE_EXISTING</code> to overwrite; <code>ATOMIC_MOVE</code> for a rename readers never see half-done</td></tr>
+            <tr><td>Names</td><td><code>Path.of</code> <span class="tag a">11</span>, <code>resolve</code>, <code>normalize</code>, <code>relativize</code>, <code>getFileName</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">ZoÃ«</span>The file holds UTF-8, where <code>ë</code> is two bytes, so 50 bytes held 49 characters. Read as ISO-8859-1, each of those bytes became a character. Before JDK 18 the default charset was the platform's (windows-1252 on Windows), so the same code printed different text on a laptop and on a Linux server. JDK 18 made UTF-8 the default (JEP 400).</div>
+    <div class="note warn"><span class="lbl">Unclosed streams</span><code>Files.lines</code> reads lazily and keeps the file open until the stream is closed. Leaked handles end in "too many open files" on Linux; on Windows an open file also cannot be deleted or moved. The stream from <code>Files.walk</code> has the same rule, which is why the clean-up uses try-with-resources too.</div>
+    <div class="note tip"><span class="lbl">Bytes, characters, buffers</span><code>InputStream</code> and <code>OutputStream</code> carry bytes; <code>Reader</code> and <code>Writer</code> carry characters through a charset. Always buffer: an unbuffered stream makes a system call per <code>read</code>. For very large files or high throughput, use <code>FileChannel</code>, <code>ByteBuffer</code> and memory-mapped files.</div>
+  </div>
+</section>

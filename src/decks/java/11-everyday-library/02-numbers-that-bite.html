@@ -1,0 +1,115 @@
+<section class="slide" data-sec="Everyday library" data-title="Numbers that bite">
+  <h2>double cannot hold 0.1, int wraps without a word, and BigDecimal's equals compares scale</h2>
+  <p class="dek">A <code>double</code> stores binary fractions, and 0.1 has no exact binary form, so money in <code>double</code> drifts by fractions of a cent. Integer arithmetic wraps around on overflow with no exception. <code>BigDecimal</code> fixes the first problem and brings its own rules: build it from a string, choose a rounding mode for every division, and compare with <code>compareTo</code>.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Numbers.java · floating point, BigDecimal, overflow, division, casts</div>
+<pre><code class="language-java">import java.math.*;
+
+public class Numbers {
+    public static void main(String[] args) {
+        System.out.println("0.1 + 0.2 = " + (0.1 + 0.2) + ", 1.10 * 3 = " + (1.10 * 3));
+        double sum = 0;
+        for (int i = 0; i &lt; 10; i++) sum += 0.1;
+        System.out.println("ten 0.1s = " + sum + ", equal to 1.0? " + (sum == 1.0));
+
+        System.out.println("new BigDecimal(0.1)     " + new BigDecimal(0.1));
+        System.out.println("BigDecimal.valueOf(0.1) " + BigDecimal.valueOf(0.1));
+        System.out.println("new BigDecimal(\"0.1\")   " + new BigDecimal("0.1"));
+
+        BigDecimal a = new BigDecimal("2.0"), b = new BigDecimal("2.00");
+        System.out.println("2.0 vs 2.00: equals " + a.equals(b) + ", compareTo " + a.compareTo(b)
+                + ", equal after stripTrailingZeros " + a.stripTrailingZeros().equals(b.stripTrailingZeros()));
+        try {
+            BigDecimal.ONE.divide(new BigDecimal(3));
+        } catch (ArithmeticException e) {
+            System.out.println("1 / 3: " + e.getMessage());
+        }
+        System.out.println("1 / 3 to 4 places, HALF_UP: " + BigDecimal.ONE.divide(new BigDecimal(3), 4, RoundingMode.HALF_UP));
+        for (String s : new String[] {"2.345", "2.355", "-2.345"}) {
+            BigDecimal v = new BigDecimal(s);
+            System.out.println(s + " -&gt; HALF_UP " + v.setScale(2, RoundingMode.HALF_UP) + ", HALF_EVEN " + v.setScale(2, RoundingMode.HALF_EVEN));
+        }
+        BigDecimal bill = new BigDecimal("100.00"), people = BigDecimal.valueOf(3);
+        BigDecimal share = bill.divide(people, 2, RoundingMode.DOWN);
+        System.out.println("100.00 split three ways: " + share + " each, " + bill.subtract(share.multiply(people)) + " left to assign");
+
+        int max = Integer.MAX_VALUE;
+        System.out.println("MAX_VALUE + 1 = " + (max + 1));
+        try {
+            Math.addExact(max, 1);
+        } catch (ArithmeticException e) {
+            System.out.println("Math.addExact: " + e.getMessage());
+        }
+        System.out.println("Math.abs(Integer.MIN_VALUE) = " + Math.abs(Integer.MIN_VALUE));
+        long microsPerDay = 24 * 60 * 60 * 1000 * 1000;        // int arithmetic, widened too late
+        long correct = 24L * 60 * 60 * 1000 * 1000;
+        System.out.println("micros per day: " + microsPerDay + " (should be " + correct + ")");
+        System.out.println("-7 / 2 = " + (-7 / 2) + ", -7 % 2 = " + (-7 % 2)
+                + ", floorDiv " + Math.floorDiv(-7, 2) + ", floorMod " + Math.floorMod(-7, 2));
+        System.out.println("(int) 3.99 = " + (int) 3.99 + ", (int) 1e10 = " + (int) 1e10
+                + ", (int) 3_000_000_000L = " + (int) 3_000_000_000L);
+        System.out.println("Math.round(2.5) = " + Math.round(2.5) + ", Math.round(-2.5) = " + Math.round(-2.5));
+
+        System.out.println("NaN == NaN " + (Double.NaN == Double.NaN) + ", Double.isNaN " + Double.isNaN(0.0 / 0)
+                + "; 0.0 == -0.0 " + (0.0 == -0.0) + ", Double.compare(0.0, -0.0) " + Double.compare(0.0, -0.0));
+        int zero = 0;
+        System.out.println("1.0 / 0 = " + (1.0 / zero));
+        try {
+            System.out.println(1 / zero);
+        } catch (ArithmeticException e) {
+            System.out.println("1 / 0: ArithmeticException: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Numbers.java</div>
+<pre><code class="language-plaintext">0.1 + 0.2 = 0.30000000000000004, 1.10 * 3 = 3.3000000000000003
+ten 0.1s = 0.9999999999999999, equal to 1.0? false
+new BigDecimal(0.1)     0.1000000000000000055511151231257827021181583404541015625
+BigDecimal.valueOf(0.1) 0.1
+new BigDecimal("0.1")   0.1
+2.0 vs 2.00: equals false, compareTo 0, equal after stripTrailingZeros true
+1 / 3: Non-terminating decimal expansion; no exact representable decimal result.
+1 / 3 to 4 places, HALF_UP: 0.3333
+2.345 -&gt; HALF_UP 2.35, HALF_EVEN 2.34
+2.355 -&gt; HALF_UP 2.36, HALF_EVEN 2.36
+-2.345 -&gt; HALF_UP -2.35, HALF_EVEN -2.34
+100.00 split three ways: 33.33 each, 0.01 left to assign
+MAX_VALUE + 1 = -2147483648
+Math.addExact: integer overflow
+Math.abs(Integer.MIN_VALUE) = -2147483648
+micros per day: 500654080 (should be 86400000000)
+-7 / 2 = -3, -7 % 2 = -1, floorDiv -4, floorMod 1
+(int) 3.99 = 3, (int) 1e10 = 2147483647, (int) 3_000_000_000L = -1294967296
+Math.round(2.5) = 3, Math.round(-2.5) = -2
+NaN == NaN false, Double.isNaN true; 0.0 == -0.0 true, Double.compare(0.0, -0.0) 1
+1.0 / 0 = Infinity
+1 / 0: ArithmeticException: / by zero</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Trap</th><th>Do this</th></tr></thead>
+          <tbody>
+            <tr><td>Money in <code>double</code></td><td><code>BigDecimal</code>, or a <code>long</code> of minor units (cents)</td></tr>
+            <tr><td><code>new BigDecimal(0.1)</code></td><td><code>new BigDecimal("0.1")</code> or <code>BigDecimal.valueOf(0.1)</code></td></tr>
+            <tr><td><code>divide</code> without a scale</td><td><code>divide(x, scale, RoundingMode)</code>; it throws on 1/3 otherwise</td></tr>
+            <tr><td><code>equals</code> on amounts</td><td><code>compareTo(...) == 0</code>; <code>2.0</code> and <code>2.00</code> are not <code>equals</code></td></tr>
+            <tr><td>Overflow</td><td><code>Math.addExact</code>, <code>multiplyExact</code>, <code>toIntExact</code>, or a <code>long</code></td></tr>
+            <tr><td>Constants that overflow</td><td>Make the first factor a <code>long</code>: <code>24L * 60 * …</code></td></tr>
+            <tr><td>Negative remainders</td><td><code>Math.floorMod</code> for bucket indexes and clock arithmetic</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">Pick the rounding on purpose</span><code>HALF_UP</code> is what people learn at school. <code>HALF_EVEN</code>, banker's rounding, sends halves to the even neighbour, so rounding many amounts does not drift upwards: <code>2.345</code> becomes <code>2.34</code>. Splitting 100.00 three ways leaves a cent that some line must take explicitly.</div>
+    <div class="note bad"><span class="lbl">The quiet integer bugs</span><code>Math.abs(Integer.MIN_VALUE)</code> is still negative, so <code>Math.abs(hash) % n</code> can return a negative index. <code>24 * 60 * 60 * 1000 * 1000</code> overflowed as an <code>int</code> before it was widened. Casting a <code>double</code> clamps to the range; casting a <code>long</code> keeps the low 32 bits.</div>
+    <div class="note"><span class="lbl">The floating-point oddities</span><code>NaN</code> is not equal to itself, so test with <code>Double.isNaN</code>. <code>0.0 == -0.0</code>, yet <code>Double.compare</code> and <code>Double.equals</code> tell them apart. Division by zero gives <code>Infinity</code> for doubles and an <code>ArithmeticException</code> for ints. <code>Math.round(-2.5)</code> is <code>-2</code>.</div>
+  </div>
+</section>

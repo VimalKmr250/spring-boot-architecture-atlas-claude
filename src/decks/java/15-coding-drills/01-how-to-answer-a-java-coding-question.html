@@ -1,0 +1,36 @@
+<section class="slide" data-sec="Coding drills" data-title="How to answer a Java coding question">
+  <h2>Core-Java coding questions test whether your code survives two threads, a null and a follow-up</h2>
+  <p class="dek">The drills in this section are the ones Java interviews set over and over: an immutable class, a hash map from scratch, two threads in turn, parallel calls with timeouts, a concurrent counter, and a bug hunt. The code matters less than the way you get there. Interviewers score the questions you ask, the invariant you state, whether you test your own code, and how you answer "and now make it thread-safe".</p>
+
+  <div class="split">
+    <div class="panel">
+      <h3>The five steps, out loud</h3>
+      <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><b>Pin the contract.</b> Inputs, nulls, sizes, ordering, and above all: is it used by one thread or many? Each answer changes the design.</li>
+        <li><b>State the invariant.</b> "Each key lives in exactly one bucket, chosen by its hash." "Exactly one thread prints at a time, odd first." Code is easier to check against a sentence.</li>
+        <li><b>Write compilable Java.</b> Real types, real imports, generics where they belong. A record or a final class with private final fields is a quick signal of care.</li>
+        <li><b>Test it in front of them.</b> A <code>main</code> with the normal case, an edge case and a failing input. For concurrency, repeat the run, and say why the code cannot race.</li>
+        <li><b>Name the cost and the next step.</b> Time and space, then the follow-up you would expect: resize, thread safety, back-pressure, timeouts.</li>
+      </ol>
+    </div>
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Drill</th><th>What it really tests</th></tr></thead>
+        <tbody>
+          <tr><td><a data-deck="cj" data-slide="Build an immutable class">Immutable class</a></td><td>Defensive copies, final, the difference between a view and a copy</td></tr>
+          <tr><td><a data-deck="cj" data-slide="Write your own HashMap">Your own HashMap</a></td><td><code>equals</code> and <code>hashCode</code>, resizing, collisions, a generic API</td></tr>
+          <tr><td><a data-deck="cj" data-slide="Odd/even printer with two threads">Odd/even printer</a></td><td>Monitors, waiting in a loop, hand-off between threads</td></tr>
+          <tr><td><a data-deck="cj" data-slide="Parallel calls with CompletableFuture">Parallel calls</a></td><td>Composition, timeouts, fallbacks, which failures are fatal</td></tr>
+          <tr><td><a data-deck="cj" data-slide="Concurrent word counter">Word counter</a></td><td>Atomic updates, no shared mutable state, checking the answer</td></tr>
+          <tr><td><a data-deck="cj" data-slide="Spot the bug">Spot the bug</a></td><td>Reading code for what it does, not what it says</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">What sinks candidates</span>Coding before asking whether it must be thread-safe. <code>if</code> instead of <code>while</code> around <code>wait</code>. A <code>HashMap</code> shared between threads "because it's only a counter". Never running the code, so the interviewer finds the off-by-one.</div>
+    <div class="note tip"><span class="lbl">How to use these slides</span>Read the prompt in the heading, close the slide, write your version, and run it. Then compare. Every listing here compiles with <code>javac --release 21 -Xlint:all</code> and checks itself, so its output is the bar to meet.</div>
+    <div class="note"><span class="lbl">Stream-heavy questions</span>"Group employees by department", "find the second-highest salary": those live in the Streams tab's <a data-deck="st" data-slide="How to answer a stream coding question">coding drills</a>, and algorithm questions in the <a data-deck="dsa" data-slide="What this deck is">DSA tab</a>.</div>
+  </div>
+</section>

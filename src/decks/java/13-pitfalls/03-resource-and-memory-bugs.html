@@ -1,0 +1,128 @@
+<section class="slide" data-sec="Pitfalls" data-title="Resource and memory bugs">
+  <h2>Leaks and waste rarely crash a test; they show up days later as a full pool, a slow GC or an OutOfMemoryError</h2>
+  <p class="dek">A garbage collector frees memory nobody can reach, so a Java leak is memory something still reaches by mistake: a static map, a registered listener, an unclosed resource. Waste is the milder cousin: code that allocates far more than it needs, making the collector work harder. The numbers below are allocated or retained bytes, measured, and they do not change from run to run.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ResourceBugs.java · unclosed resources, boxing, regexes, caches, listeners</div>
+<pre><code class="language-java">// Run with: java -Xmx512m ResourceBugs.java
+import java.lang.management.ManagementFactory;
+import java.lang.ref.WeakReference;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
+
+public class ResourceBugs {
+    static final com.sun.management.ThreadMXBean MX =
+            (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+
+    static final class Connection implements AutoCloseable {
+        static int open;
+        Connection() { open++; }
+        void query(String sql) { if (sql.contains("bad")) throw new IllegalStateException("syntax error"); }
+        @Override public void close() { open--; }
+    }
+
+    static void leaky(String sql) {
+        Connection c = new Connection();
+        c.query(sql);                                       // throws: close() is never reached
+        c.close();
+    }
+    static void safe(String sql) {
+        try (Connection c = new Connection()) { c.query(sql); }
+    }
+
+    static final Map&lt;String, byte[]&gt; CACHE = new HashMap&lt;&gt;();             // grows forever
+    static final List&lt;Consumer&lt;String&gt;&gt; LISTENERS = new ArrayList&lt;&gt;();    // never unregistered
+    static final Pattern SKU = Pattern.compile("[A-Z]{3}-\\d{4}");
+
+    static WeakReference&lt;byte[]&gt; openPage() {
+        byte[] page = new byte[10 * 1024 * 1024];
+        LISTENERS.add(event -&gt; { if (event.equals("refresh")) System.out.println(page.length); });   // captures page
+        return new WeakReference&lt;&gt;(page);
+    }                                                       // the page's owner is gone after this returns
+
+    public static void main(String[] args) throws Exception {
+        for (String sql : List.of("select 1", "bad sql", "select 2", "bad again")) {
+            try { leaky(sql); } catch (IllegalStateException e) { }
+        }
+        System.out.println("1 without try-with-resources: " + Connection.open + " connections leaked out of 4");
+        Connection.open = 0;
+        for (String sql : List.of("select 1", "bad sql", "select 2", "bad again")) {
+            try { safe(sql); } catch (IllegalStateException e) { }
+        }
+        System.out.println("  with it: " + Connection.open + " leaked");
+
+        long before = MX.getCurrentThreadAllocatedBytes();
+        Long boxed = 0L;
+        for (long i = 0; i &lt; 1_000_000; i++) boxed += i;                   // a new Long every time
+        long boxedBytes = MX.getCurrentThreadAllocatedBytes() - before;
+        before = MX.getCurrentThreadAllocatedBytes();
+        long plain = 0;
+        for (long i = 0; i &lt; 1_000_000; i++) plain += i;
+        long plainBytes = MX.getCurrentThreadAllocatedBytes() - before;
+        System.out.printf("2 summing 1M values: Long %,d bytes allocated, long %,d (same sum: %b)%n",
+                boxedBytes, plainBytes, boxed == plain);
+
+        String[] skus = new String[10_000];
+        for (int i = 0; i &lt; skus.length; i++) skus[i] = "ABC-" + (1_000 + i % 9_000);
+        before = MX.getCurrentThreadAllocatedBytes();
+        int matched = 0;
+        for (String s : skus) if (s.matches("[A-Z]{3}-\\d{4}")) matched++;   // compiles the regex each call
+        long matchesBytes = MX.getCurrentThreadAllocatedBytes() - before;
+        before = MX.getCurrentThreadAllocatedBytes();
+        int matched2 = 0;
+        for (String s : skus) if (SKU.matcher(s).matches()) matched2++;
+        long patternBytes = MX.getCurrentThreadAllocatedBytes() - before;
+        System.out.printf("3 10,000 regex checks: String.matches %,d bytes, precompiled Pattern %,d (%d, %d matched)%n",
+                matchesBytes, patternBytes, matched, matched2);
+
+        for (int request = 0; request &lt; 150; request++)
+            CACHE.put("report-" + request, new byte[1024 * 1024]);          // one entry per distinct key
+        System.out.println("4 unbounded static cache after 150 requests: " + CACHE.size() + " MB held, and never released");
+        CACHE.clear();
+
+        WeakReference&lt;byte[]&gt; watch = openPage();
+        System.gc();
+        Thread.sleep(100);
+        System.out.println("5 a 10 MB page dropped by its owner, but its listener is still registered: reachable "
+                + (watch.get() != null));
+        LISTENERS.clear();
+        System.gc();
+        Thread.sleep(100);
+        System.out.println("  after removing the listener: reachable " + (watch.get() != null));
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ResourceBugs.java</div>
+<pre><code class="language-plaintext">1 without try-with-resources: 2 connections leaked out of 4
+  with it: 0 leaked
+2 summing 1M values: Long 24,000,256 bytes allocated, long 0 (same sum: true)
+3 10,000 regex checks: String.matches 11,280,000 bytes, precompiled Pattern 1,360,168 (10000, 10000 matched)
+4 unbounded static cache after 150 requests: 150 MB held, and never released
+5 a 10 MB page dropped by its owner, but its listener is still registered: reachable true
+  after removing the listener: reachable false</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th class="num">#</th><th>Bug</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td><code>close()</code> after the work, skipped by any exception</td><td>try-with-resources, for every <code>AutoCloseable</code></td></tr>
+            <tr><td class="num">2</td><td>A <code>Long</code> accumulator in a loop: 24 bytes per iteration</td><td>A primitive; watch for boxing in generic code and streams</td></tr>
+            <tr><td class="num">3</td><td><code>String.matches</code>, <code>split</code> with a regex, <code>replaceAll</code> in a loop</td><td>A <code>static final Pattern</code>, compiled once</td></tr>
+            <tr><td class="num">4</td><td>A static map used as a cache, keyed by request data</td><td>A bounded cache with eviction: Caffeine, or an LRU <code>LinkedHashMap</code></td></tr>
+            <tr><td class="num">5</td><td>A listener registered and never removed</td><td>Unregister in <code>close()</code>; return a handle from <code>register</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The listener holds the page</span>The lambda captured <code>page</code>, the static list holds the lambda, so 10 MB stayed reachable after its owner forgot it. Event buses, observer lists, caches of callbacks and inner classes (with their hidden <code>this$0</code>) all leak this way. The weak reference showed the page was freed only once the listener went.</div>
+    <div class="note warn"><span class="lbl">Leaks that are not memory</span>The two leaked connections in case 1 would be pool connections in a real service: after enough failures the pool is empty and every request waits for its timeout. <code>ThreadLocal</code>s in pools leak data between requests, as <a data-deck="cj" data-slide="Thread-safety strategies">thread-safety strategies</a> showed.</div>
+    <div class="note tip"><span class="lbl">Finding them</span>A heap that does not drop back after full collections is the sign. Take a heap dump and look at the dominator tree: the culprit is usually one map or list with millions of entries. The Spring Boot tab walks through it: <a data-deck="sb" data-slide="Memory leaks">memory leaks</a>.</div>
+  </div>
+</section>

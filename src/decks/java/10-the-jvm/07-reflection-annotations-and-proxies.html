@@ -1,0 +1,125 @@
+<section class="slide" data-sec="The JVM" data-title="Reflection, annotations and proxies">
+  <h2>Reflection reads classes at run time, and a dynamic proxy is how a framework puts code around your calls</h2>
+  <p class="dek">Reflection lists a class's fields, methods and annotations and calls them by name. A dynamic proxy is a class generated at run time that implements your interfaces and routes every call to one handler. Spring's <code>@Transactional</code>, <code>@Cacheable</code> and <code>@Async</code> work this way: the bean you inject is a proxy, and the annotation is read by reflection. Both limits that surprise people follow from that.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="The caller calls place on what it thinks is an OrderService. It is a proxy, class $Proxy0. The proxy passes the call to an InvocationHandler, which reads the Audited annotation, writes an audit entry and calls the real DefaultOrderService. Inside the real object, placeTwice calls this.place directly, which never passes through the proxy, so those calls are not audited.">
+        <g font-size="11" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="10" y="50" width="110" height="40" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="65" y="74">caller</text>
+          <rect x="190" y="50" width="160" height="40" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="270" y="68">$Proxy0</text><text x="270" y="83" font-size="9.5">implements OrderService</text>
+          <rect x="420" y="50" width="170" height="40" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="505" y="68">InvocationHandler</text><text x="505" y="83" font-size="9.5">reads @Audited, logs</text>
+          <rect x="660" y="30" width="230" height="90" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="775" y="50">DefaultOrderService</text>
+          <text x="720" y="80" font-size="10">placeTwice()</text><text x="840" y="80" font-size="10">place()</text>
+        </g>
+        <g stroke-width="1.3">
+          <line x1="120" y1="70" x2="187" y2="70" stroke="#8A94A3" marker-end="url(#arw)"></line>
+          <line x1="350" y1="70" x2="417" y2="70" stroke="#D26A3F" marker-end="url(#arwA)"></line>
+          <line x1="590" y1="70" x2="657" y2="70" stroke="#3AA79B" marker-end="url(#arwB)"></line>
+          <path d="M 755 86 C 775 108, 805 108, 822 88" fill="none" stroke="#8A94A3" stroke-dasharray="4 3" marker-end="url(#arw)"></path>
+        </g>
+        <text x="775" y="136" text-anchor="middle" font-size="10" fill="currentColor">this.place(): no proxy, no audit</text>
+        <text x="152" y="62" text-anchor="middle" font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">place()</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ProxyDemo.java · an annotation, a proxy that reads it, and reflection's limits</div>
+<pre><code class="language-java">import java.lang.annotation.*;
+import java.lang.reflect.*;
+import java.util.*;
+
+public class ProxyDemo {
+    @Retention(RetentionPolicy.RUNTIME)                 // without this, reflection cannot see it
+    @Target(ElementType.METHOD)
+    @interface Audited { String value(); }
+
+    interface OrderService {
+        String place(String sku);
+        String placeTwice(String sku);
+    }
+
+    static class DefaultOrderService implements OrderService {
+        private int placed;
+        @Audited("order.place")
+        @Override public String place(String sku) { placed++; return "ORD-" + placed + ":" + sku; }
+        @Override public String placeTwice(String sku) { return place(sku) + " " + place(sku); }   // this.place
+    }
+
+    // What a framework does: wrap the target in a proxy that adds behaviour around calls.
+    @SuppressWarnings("unchecked")
+    static &lt;T&gt; T audited(T target, Class&lt;T&gt; type, List&lt;String&gt; log) {
+        InvocationHandler handler = (proxy, method, args) -&gt; {
+            Method impl = target.getClass().getMethod(method.getName(), method.getParameterTypes());
+            Audited a = impl.getAnnotation(Audited.class);
+            if (a != null) log.add("audit " + a.value() + " " + Arrays.toString(args));
+            try {
+                return method.invoke(target, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();                     // unwrap, as Spring does
+            }
+        };
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class&lt;?&gt;[] {type}, handler);
+    }
+
+    public static void main(String[] args) throws Exception {
+        List&lt;String&gt; log = new ArrayList&lt;&gt;();
+        DefaultOrderService target = new DefaultOrderService();
+        OrderService service = audited(target, OrderService.class, log);
+
+        System.out.println(service.place("tea"));
+        System.out.println(service.placeTwice("milk"));
+        System.out.println("audit log: " + log + "  &lt;- placeTwice's inner calls were not audited");
+        System.out.println("proxy class " + service.getClass().getName() + ", is an OrderService "
+                + (service instanceof OrderService) + ", is a DefaultOrderService " + (service instanceof DefaultOrderService));
+
+        Field placed = DefaultOrderService.class.getDeclaredField("placed");
+        placed.setAccessible(true);                     // fine for your own classes
+        System.out.println("private field read by reflection: placed = " + placed.getInt(target));
+
+        try {
+            Field value = String.class.getDeclaredField("value");
+            value.setAccessible(true);                  // the JDK's internals are closed since 17
+        } catch (InaccessibleObjectException e) {
+            System.out.println("InaccessibleObjectException: " + e.getMessage().replaceAll(" @[0-9a-f]+", ""));
+        }
+
+        Method m = DefaultOrderService.class.getMethod("place", String.class);
+        System.out.println("@Audited on place: " + m.getAnnotation(Audited.class).value()
+                + "; parameter count " + m.getParameterCount() + "; return type " + m.getReturnType().getSimpleName());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · ProxyDemo.java</div>
+<pre><code class="language-plaintext">ORD-1:tea
+ORD-2:milk ORD-3:milk
+audit log: [audit order.place [tea]]  &lt;- placeTwice's inner calls were not audited
+proxy class $Proxy0, is an OrderService true, is a DefaultOrderService false
+private field read by reflection: placed = 3
+InaccessibleObjectException: Unable to make field private final byte[] java.lang.String.value accessible: module java.base does not "opens java.lang" to unnamed module
+@Audited on place: order.place; parameter count 1; return type String</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Line</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>One audit entry, not three</td><td><code>placeTwice</code> calls <code>this.place</code> on the real object, never through the proxy. Spring's self-invocation problem, exactly.</td></tr>
+            <tr><td>Not a <code>DefaultOrderService</code></td><td>A JDK proxy implements only the interfaces. Spring Boot proxies classes with CGLIB subclasses by default, so injection by class works, but final methods cannot be intercepted.</td></tr>
+            <tr><td><code>InaccessibleObjectException</code></td><td>The JDK's own internals are closed to reflection since JDK 17 (JEP 403). <code>--add-opens</code> reopens one package, as the HashMap slides do.</td></tr>
+            <tr><td><code>RetentionPolicy.RUNTIME</code></td><td>Without it the annotation stays in the class file but is invisible to reflection, and the framework silently ignores it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note tip"><span class="lbl">The Spring consequences</span>Self-invocation skips <code>@Transactional</code>; private and final methods cannot be advised; the proxy, not your bean, is what other beans hold. All of it is on <a data-deck="sb" data-slide="AOP limits">AOP limits</a>.</div>
+    <div class="note warn"><span class="lbl">Reflection's costs</span>Each call checks access and boxes arguments, and it hides calls from the compiler, the IDE and tree shaking. Cache <code>Method</code> objects, or use <code>MethodHandle</code>s, which the JIT inlines once the handle is constant.</div>
+    <div class="note"><span class="lbl">Records and reflection</span><code>getRecordComponents()</code> lists a record's components in order, which is how Jackson and other serialisers bind records through the canonical constructor without setters.</div>
+  </div>
+</section>

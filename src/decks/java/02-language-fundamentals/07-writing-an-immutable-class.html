@@ -1,0 +1,103 @@
+<section class="slide" data-sec="Language fundamentals" data-title="Writing an immutable class">
+  <h2>Immutable means nothing can change it after construction, including the caller who passed the list in</h2>
+  <p class="dek"><code>final</code> fields and no setters are not enough. If the constructor keeps the caller's list, the caller can still change it; if a getter returns that list, every reader can. An immutable class copies every mutable input on the way in and never hands out anything mutable on the way out.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Immutable.java · the leaky version, the fixed class, the record</div>
+<pre><code class="language-java">import java.time.Instant;
+import java.util.*;
+
+public class Immutable {
+    // Looks immutable: final fields, no setters. It is not.
+    static final class LeakyOrder {
+        private final List&lt;String&gt; lines;
+        private final Date placed;
+        LeakyOrder(List&lt;String&gt; lines, Date placed) { this.lines = lines; this.placed = placed; }
+        List&lt;String&gt; lines() { return lines; }
+        Date placed() { return placed; }
+        @Override public String toString() { return lines + " @ " + placed.toInstant(); }
+    }
+
+    // Immutable: final class, final fields, copies in, nothing mutable out.
+    static final class Order {
+        private final List&lt;String&gt; lines;
+        private final Instant placed;              // immutable type instead of Date
+        Order(List&lt;String&gt; lines, Instant placed) {
+            this.lines = List.copyOf(lines);       // copy in (and reject nulls)
+            this.placed = Objects.requireNonNull(placed);
+        }
+        List&lt;String&gt; lines() { return lines; }    // already unmodifiable: safe to return
+        Instant placed() { return placed; }
+        Order withLine(String line) {              // "modification" returns a new object
+            var next = new ArrayList&lt;&gt;(lines);
+            next.add(line);
+            return new Order(next, placed);
+        }
+        @Override public String toString() { return lines + " @ " + placed; }
+    }
+
+    // The same guarantees as a record
+    record OrderRecord(List&lt;String&gt; lines, Instant placed) {
+        OrderRecord {
+            lines = List.copyOf(lines);
+            Objects.requireNonNull(placed);
+        }
+    }
+
+    public static void main(String[] args) {
+        var input = new ArrayList&lt;&gt;(List.of("tea"));
+        var when = new Date(0);
+        var leaky = new LeakyOrder(input, when);
+        input.add("milk");                         // the caller still holds the list
+        leaky.lines().add("sugar");                // and the getter hands it out
+        when.setTime(86_400_000L);                 // Date is mutable too
+        System.out.println("leaky   " + leaky);
+
+        var input2 = new ArrayList&lt;&gt;(List.of("tea"));
+        var order = new Order(input2, Instant.EPOCH);
+        input2.add("milk");
+        try {
+            order.lines().add("sugar");
+        } catch (UnsupportedOperationException e) {
+            System.out.println("order.lines().add -&gt; UnsupportedOperationException");
+        }
+        System.out.println("order   " + order);
+        System.out.println("with    " + order.withLine("milk") + "  (original " + order.lines() + ")");
+
+        var input3 = new ArrayList&lt;&gt;(List.of("tea"));
+        var rec = new OrderRecord(input3, Instant.EPOCH);
+        input3.add("milk");
+        System.out.println("record  " + rec);
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Immutable.java</div>
+<pre><code class="language-plaintext">leaky   [tea, milk, sugar] @ 1970-01-02T00:00:00Z
+order.lines().add -&gt; UnsupportedOperationException
+order   [tea] @ 1970-01-01T00:00:00Z
+with    [tea, milk] @ 1970-01-01T00:00:00Z  (original [tea])
+record  OrderRecord[lines=[tea], placed=1970-01-01T00:00:00Z]</code></pre>
+      </div>
+      <div class="panel">
+        <h3>The checklist</h3>
+        <ol class="tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+          <li><b>Final class</b>, or a private constructor with factories, so no subclass can add mutable state or override accessors.</li>
+          <li><b>Private final fields</b>, all assigned in the constructor.</li>
+          <li><b>No setters.</b> A change is a method that returns a new object, like <code>withLine</code>.</li>
+          <li><b>Copy mutable inputs in</b>: <code>List.copyOf</code>, <code>Map.copyOf</code>. Prefer immutable types such as <code>Instant</code> over <code>Date</code>.</li>
+          <li><b>Never return mutable internals.</b> A list from <code>List.copyOf</code> is already unmodifiable, so it is safe to return as it is.</li>
+          <li><b>Check the elements.</b> <code>List.copyOf</code> copies the list, not the objects in it. Immutability is only as deep as the types you hold.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">What it buys</span>Thread safety with no locks, because there is nothing to race on. Safe sharing and caching. Stable <code>hashCode</code>, so it is a safe map key. Final fields also make it safely published to other threads once the constructor returns.</div>
+    <div class="note tip"><span class="lbl">Records do most of it</span>A record is final with private final fields and no setters. You still write the defensive copy, in the compact constructor, as <code>OrderRecord</code> does. Without it, the record holds the caller's list.</div>
+    <div class="note warn"><span class="lbl">copyOf is not a view</span><code>Collections.unmodifiableList</code> wraps the original, so changes to the original show through. <code>List.copyOf</code> takes a snapshot, and returns its argument unchanged if that is already an unmodifiable list. See <a data-deck="cj" data-slide="Immutable, unmodifiable and sequenced">unmodifiable collections</a>.</div>
+  </div>
+</section>

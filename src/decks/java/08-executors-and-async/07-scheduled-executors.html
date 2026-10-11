@@ -1,0 +1,91 @@
+<section class="slide" data-sec="Executors and async" data-title="Scheduled executors">
+  <h2>Fixed rate keeps a timetable, fixed delay keeps a gap, and either one stops for good after an exception</h2>
+  <p class="dek"><code>ScheduledExecutorService</code> runs tasks after a delay or periodically, on a small thread pool. The two periodic methods differ only when a run takes longer than the period, which in production is exactly when it matters. And both share one dangerous rule: if a run throws, the task is never scheduled again, and nothing is logged.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Scheduling.java · rate against delay, a task that throws, java.util.Timer</div>
+<pre><code class="language-java">import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Scheduling {
+    static long t0;
+    static long at() { return Math.round((System.nanoTime() - t0) / 5e7) * 50; }   // to 50 ms
+
+    static void work(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        try (ScheduledExecutorService ses = Executors.newScheduledThreadPool(2)) {
+            List&lt;Long&gt; rate = new CopyOnWriteArrayList&lt;&gt;(), delay = new CopyOnWriteArrayList&lt;&gt;();
+            t0 = System.nanoTime();
+            ScheduledFuture&lt;?&gt; r = ses.scheduleAtFixedRate(() -&gt; { rate.add(at()); work(150); }, 0, 100, TimeUnit.MILLISECONDS);
+            ScheduledFuture&lt;?&gt; d = ses.scheduleWithFixedDelay(() -&gt; { delay.add(at()); work(150); }, 0, 100, TimeUnit.MILLISECONDS);
+            Thread.sleep(1_000);
+            r.cancel(false);
+            d.cancel(false);
+            System.out.println("150 ms task, period 100 ms, start times in ms:");
+            System.out.println("  scheduleAtFixedRate     " + rate);
+            System.out.println("  scheduleWithFixedDelay  " + delay);
+
+            AtomicInteger runs = new AtomicInteger();
+            ScheduledFuture&lt;?&gt; fragile = ses.scheduleAtFixedRate(() -&gt; {
+                if (runs.incrementAndGet() == 3) throw new IllegalStateException("feed unavailable");
+            }, 0, 20, TimeUnit.MILLISECONDS);
+            Thread.sleep(300);
+            System.out.println("a periodic task that threw on run 3 ran " + runs.get() + " times in 300 ms; done=" + fragile.isDone());
+            try {
+                fragile.get();
+            } catch (ExecutionException e) {
+                System.out.println("  the exception was kept in the future: " + e.getCause().getMessage());
+            }
+        }
+
+        Timer timer = new Timer("legacy-timer", true);
+        timer.schedule(new TimerTask() {
+            @Override public void run() { throw new IllegalStateException("one bad task"); }
+        }, 0);
+        Thread.sleep(100);
+        try {
+            timer.schedule(new TimerTask() { @Override public void run() { } }, 0);
+        } catch (IllegalStateException e) {
+            System.out.println("java.util.Timer after one task threw: " + e.getMessage());
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Scheduling.java · times rounded to 50 ms</div>
+<pre><code class="language-plaintext">150 ms task, period 100 ms, start times in ms:
+  scheduleAtFixedRate     [0, 150, 300, 450, 600, 750, 900]
+  scheduleWithFixedDelay  [0, 250, 500, 750]
+a periodic task that threw on run 3 ran 3 times in 300 ms; done=true
+  the exception was kept in the future: feed unavailable
+Exception in thread "legacy-timer" java.lang.IllegalStateException: one bad task
+	at Scheduling$1.run(Scheduling.java:41)
+	at java.base/java.util.TimerThread.mainLoop(Timer.java:572)
+	at java.base/java.util.TimerThread.run(Timer.java:522)
+java.util.Timer after one task threw: Timer already cancelled.</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Method</th><th>Next run starts</th><th>Here</th></tr></thead>
+          <tbody>
+            <tr><td><code>schedule(task, delay)</code></td><td>Once, after the delay</td><td></td></tr>
+            <tr><td><code>scheduleAtFixedRate(…, period)</code></td><td>Previous <b>start</b> + period; at once if the run overran. Runs never overlap.</td><td>Every 150 ms: as soon as each run ends</td></tr>
+            <tr><td><code>scheduleWithFixedDelay(…, delay)</code></td><td>Previous <b>end</b> + delay</td><td>Every 250 ms: 150 work + 100 gap</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">One exception ends the schedule</span>The task that threw on its third run never ran again: its future is done, and the exception waits inside it for a <code>get</code> nobody calls. Wrap every periodic body in <code>try</code> / <code>catch (Exception e)</code> that logs, so one bad run does not stop the feed for good.</div>
+    <div class="note warn"><span class="lbl">java.util.Timer is worse</span>One thread runs every task, so a slow task delays all the others, and one exception kills that thread: every later <code>schedule</code> fails with <code>Timer already cancelled.</code> It also follows the wall clock, so a clock change shifts its timetable. The scheduled executor uses <code>System.nanoTime</code>.</div>
+    <div class="note tip"><span class="lbl">In a cluster</span>Every instance runs its own schedule, so a nightly job on four pods runs four times. Use a lock such as ShedLock, or a scheduler with a shared store. Spring's <code>@Scheduled</code> uses a single thread by default. See <a data-deck="sb" data-slide="Batch, scheduling, cloud & ops">batch and scheduling</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,103 @@
+<section class="slide" data-sec="Executors and async" data-title="Callable, Future and shutdown">
+  <h2>A Future is a handle to a result that may not exist yet, and shutting a pool down takes two decisions</h2>
+  <p class="dek"><code>submit</code> returns a <code>Future</code> at once; <code>get</code> blocks until the task finishes, and rethrows its failure wrapped in <code>ExecutionException</code>. Two details cause most production surprises: a timed-out <code>get</code> does not stop the task, and an exception in a task whose <code>Future</code> nobody reads disappears without a trace. Shutting down means deciding what happens to queued work, and how long to wait for running work.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">FutureShutdown.java · timeouts, cancellation, lost exceptions, shutdownNow</div>
+<pre><code class="language-java">import java.util.List;
+import java.util.concurrent.*;
+
+public class FutureShutdown {
+    static String slowQuote() throws InterruptedException {
+        Thread.sleep(5_000);
+        return "quote";
+    }
+
+    public static void main(String[] args) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        Future&lt;String&gt; slow = pool.submit(FutureShutdown::slowQuote);
+        try {
+            slow.get(100, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            System.out.println("get(100 ms): TimeoutException; the task keeps running: done=" + slow.isDone());
+        }
+        System.out.println("cancel(true) " + slow.cancel(true) + ", state " + slow.state());
+
+        Future&lt;Integer&gt; failing = pool.submit(() -&gt; Integer.parseInt("12x"));
+        try {
+            failing.get();
+        } catch (ExecutionException e) {
+            System.out.println("ExecutionException wraps " + e.getCause());
+        }
+        System.out.println("exceptionNow(): " + failing.exceptionNow().getClass().getSimpleName());
+
+        Future&lt;?&gt; forgotten = pool.submit(() -&gt; { throw new IllegalStateException("nobody will see this"); });
+        while (!forgotten.isDone()) Thread.sleep(1);
+        System.out.println("submit() kept the exception inside the Future: state " + forgotten.state());
+
+        Future&lt;Integer&gt; ok = pool.submit(() -&gt; 6 * 7);
+        System.out.println("resultNow() " + ok.get() + " / " + ok.resultNow());
+
+        List&lt;Callable&lt;String&gt;&gt; calls = List.of(() -&gt; "price", () -&gt; "stock", () -&gt; "tax");
+        System.out.println("invokeAll: " + pool.invokeAll(calls).stream().map(Future::resultNow).toList());
+
+        CountDownLatch busy = new CountDownLatch(1);
+        pool.submit(() -&gt; { busy.await(); return null; });
+        pool.submit(() -&gt; { busy.await(); return null; });   // both threads now busy
+        for (int i = 0; i &lt; 3; i++) pool.submit(() -&gt; "queued");
+        List&lt;Runnable&gt; neverStarted = pool.shutdownNow();     // interrupts the running two
+        System.out.println("shutdownNow: " + neverStarted.size() + " queued tasks never ran; terminated "
+                + pool.awaitTermination(1, TimeUnit.SECONDS));
+        try {
+            pool.submit(() -&gt; "late");
+        } catch (RejectedExecutionException e) {
+            System.out.println("submit after shutdown: RejectedExecutionException");
+        }
+
+        ThreadFactory withHandler = r -&gt; {
+            Thread th = new Thread(r, "worker");
+            th.setUncaughtExceptionHandler((x, e) -&gt; System.out.println("uncaught handler got: " + e.getMessage()));
+            return th;
+        };
+        try (ExecutorService single = Executors.newSingleThreadExecutor(withHandler)) {
+            single.execute(() -&gt; { throw new IllegalStateException("thrown inside execute()"); });
+        }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · FutureShutdown.java</div>
+<pre><code class="language-plaintext">get(100 ms): TimeoutException; the task keeps running: done=false
+cancel(true) true, state CANCELLED
+ExecutionException wraps java.lang.NumberFormatException: For input string: "12x"
+exceptionNow(): NumberFormatException
+submit() kept the exception inside the Future: state FAILED
+resultNow() 42 / 42
+invokeAll: [price, stock, tax]
+shutdownNow: 3 queued tasks never ran; terminated true
+submit after shutdown: RejectedExecutionException
+uncaught handler got: thrown inside execute()</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Future method</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>get()</code>, <code>get(timeout)</code></td><td>Blocks for the result. The timed form throws <code>TimeoutException</code> and leaves the task running.</td></tr>
+            <tr><td><code>cancel(true)</code></td><td>Stops a queued task from starting, and interrupts a running one, which must honour it.</td></tr>
+            <tr><td><code>state()</code>, <code>resultNow()</code>, <code>exceptionNow()</code> <span class="tag a">19</span></td><td>Inspect a finished future without blocking or catching checked exceptions.</td></tr>
+            <tr><td><code>invokeAll</code>, <code>invokeAny</code></td><td>Run a batch and wait for all of them, or for the first success.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The exception nobody saw</span><code>submit</code> catches everything the task throws and stores it in the <code>Future</code>. If nobody calls <code>get</code>, nothing is logged: the <code>forgotten</code> task failed in silence. Use <code>execute</code> for fire-and-forget work, whose exceptions reach the thread's uncaught-exception handler, or catch and log inside the task.</div>
+    <div class="note warn"><span class="lbl">Shutting down properly</span><code>shutdown()</code> refuses new work and lets queued tasks finish. <code>shutdownNow()</code> also interrupts running tasks and returns the ones that never started. The usual sequence: <code>shutdown</code>, <code>awaitTermination</code> with a deadline, then <code>shutdownNow</code>. A pool of non-daemon threads that is never shut down keeps the JVM alive after <code>main</code> ends.</div>
+    <div class="note tip"><span class="lbl">Timeouts end work, not just waits</span>After <code>get(timeout)</code> fails, call <code>cancel(true)</code>, or the task keeps holding a thread and a connection. <code>CompletableFuture</code> composes timeouts and fallbacks more cleanly: the <a data-deck="cj" data-slide="CompletableFuture: errors and threads">next slides</a>.</div>
+  </div>
+</section>

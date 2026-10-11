@@ -1,0 +1,85 @@
+<section class="slide" data-sec="Modern Java" data-title="Java 25 features and their status">
+  <h2>Java 25 makes small programs shorter and large ones leaner, and some of its headline features are still previews</h2>
+  <p class="dek">JDK 25, from September 2025, is the current LTS. Its final features fall into three groups: a simpler on-ramp for small programs, language changes that remove old restrictions, and runtime work that cuts memory and start-up time. The file below is a real compact source file, compiled with <code>--release 25</code>: no class around it, an instance <code>main</code>, and <code>java.base</code> imported automatically.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Java25.java · compiled with javac --release 25 -Xlint:all, no warnings</div>
+<pre><code class="language-java">// A compact source file (JEP 512): no class declaration, an instance main, java.base imported for you.
+// Run with: java Java25.java
+
+/// Markdown documentation comments work too (JEP 467, JDK 23).
+static final ScopedValue&lt;String&gt; USER = ScopedValue.newInstance();      // JEP 506, final in 25
+
+record Rate(double fraction) { }
+
+class Discount {
+    final Rate rate;
+    Discount(int percent) {
+        if (percent &lt; 0 || percent &gt; 100)                               // JEP 513: code before this(...)
+            throw new IllegalArgumentException("percent out of range: " + percent);
+        this(new Rate(percent / 100.0));
+    }
+    Discount(Rate rate) { this.rate = rate; }
+}
+
+String whoAmI() { return USER.isBound() ? USER.get() : "nobody"; }
+
+void main() {
+    IO.println("compact source file on JDK " + Runtime.version().feature());   // java.lang.IO, JEP 512
+    List&lt;String&gt; skus = List.of("tea", "milk", "jam");                  // no import needed
+    IO.println("skus " + skus);
+
+    ScopedValue.where(USER, "alice").run(() -&gt; IO.println("inside the scope: " + whoAmI()));
+    IO.println("outside it: " + whoAmI());
+
+    IO.println("10% off: " + new Discount(10).rate);
+    try {
+        new Discount(140);
+    } catch (IllegalArgumentException _) {                              // JEP 456: unnamed variable, 22
+        IO.println("rejected before any field was set");
+    }
+
+    var windows = Stream.of(1, 2, 3, 4, 5, 6, 7).gather(Gatherers.windowFixed(3)).toList();   // JEP 485, 24
+    IO.println("windowFixed(3) " + windows);
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Java25.java</div>
+<pre><code class="language-plaintext">compact source file on JDK 25
+skus [tea, milk, jam]
+inside the scope: alice
+outside it: nobody
+10% off: Rate[fraction=0.1]
+rejected before any field was set
+windowFixed(3) [[1, 2, 3], [4, 5, 6], [7]]</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Feature</th><th>JEP</th><th>Status in 25</th></tr></thead>
+          <tbody>
+            <tr><td>Compact source files, instance <code>main</code>, <code>java.lang.IO</code></td><td class="num">512</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Module import declarations</td><td class="num">511</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Flexible constructor bodies</td><td class="num">513</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Scoped values</td><td class="num">506</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Compact object headers</td><td class="num">519</td><td><span class="tag g">product</span> opt-in flag</td></tr>
+            <tr><td>AOT method profiling, AOT command-line ergonomics</td><td class="num">515, 514</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Generational Shenandoah</td><td class="num">521</td><td><span class="tag g">product</span></td></tr>
+            <tr><td>Key Derivation Function API</td><td class="num">510</td><td><span class="tag g">final</span></td></tr>
+            <tr><td>Structured concurrency</td><td class="num">505</td><td><span class="tag w">fifth preview</span></td></tr>
+            <tr><td>Primitive types in patterns</td><td class="num">507</td><td><span class="tag w">third preview</span></td></tr>
+            <tr><td>Stable values, PEM encodings</td><td class="num">502, 470</td><td><span class="tag w">preview</span></td></tr>
+            <tr><td>Vector API</td><td class="num">508</td><td><span class="tag w">tenth incubator</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">Code before this() and super()</span>Flexible constructor bodies let a constructor validate its arguments, or compute values, before it calls <code>this(…)</code> or <code>super(…)</code>, as long as it does not touch the object being built. <code>Discount(140)</code> was rejected before any field existed, without the old static-helper workaround.</div>
+    <div class="note tip"><span class="lbl">What production code gains</span>Scoped values to replace <code>ThreadLocal</code> request context, safely, with virtual threads. Compact headers: a header 4 bytes smaller, often 8 bytes less per object after alignment, measured on <a data-deck="cj" data-slide="Object layout and memory cost">object layout</a>. AOT profiles: faster warm-up, from method profiles recorded in a training run.</div>
+    <div class="note warn"><span class="lbl">Previews are not for production</span>Preview APIs can change between releases, and code that uses them needs <code>--enable-preview</code> and runs only on that exact JDK version. Structured concurrency has changed shape across its previews. Talk about it in interviews; wait to ship it.</div>
+  </div>
+</section>

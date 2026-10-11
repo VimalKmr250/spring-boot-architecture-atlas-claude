@@ -1,0 +1,126 @@
+<section class="slide" data-sec="The JVM" data-title="From source to running code">
+  <h2>javac compiles to bytecode for an abstract stack machine; the JVM interprets it, then compiles the hot parts</h2>
+  <p class="dek">A <code>.class</code> file holds bytecode: instructions for a stack machine that exists only in the JVM specification. The JVM loads it, verifies it, links it, and starts by interpreting it. Methods that turn out to be hot are compiled to machine code, first quickly by C1 and then thoroughly by C2. If an assumption behind compiled code stops being true, the JVM throws that code away and interprets again.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 180" role="img" aria-label="Order.java is compiled by javac into Order.class, which holds bytecode. A class loader loads it, the JVM verifies and links it, and the interpreter runs it. Hot methods go to C1 at tier 3, which compiles quickly and collects a profile, then to C2 at tier 4, which optimises using that profile. If an assumption breaks, C2's code is deoptimised and the method returns to the interpreter.">
+        <g font-size="11" text-anchor="middle" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="10" y="30" width="110" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="65" y="51">Order.java</text>
+          <rect x="170" y="30" width="150" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="245" y="51">Order.class</text>
+          <rect x="380" y="30" width="180" height="34" rx="6" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45"></rect><text x="470" y="51">load · verify · link</text>
+          <rect x="620" y="30" width="130" height="34" rx="6" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.3"></rect><text x="685" y="51">interpreter</text>
+          <rect x="610" y="120" width="150" height="34" rx="6" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B"></rect><text x="685" y="141">C1 · tier 3</text>
+          <rect x="785" y="120" width="105" height="34" rx="6" fill="#3AA79B" fill-opacity="0.2" stroke="#3AA79B" stroke-width="1.3"></rect><text x="837" y="141">C2 · tier 4</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="120" y1="47" x2="167" y2="47" marker-end="url(#arw)"></line>
+          <line x1="320" y1="47" x2="377" y2="47" marker-end="url(#arw)"></line>
+          <line x1="560" y1="47" x2="617" y2="47" marker-end="url(#arw)"></line>
+          <line x1="685" y1="64" x2="685" y2="117" marker-end="url(#arw)"></line>
+          <line x1="760" y1="137" x2="782" y2="137" marker-end="url(#arw)"></line>
+        </g>
+        <path d="M 860 120 L 860 47 L 753 47" fill="none" stroke="#D26A3F" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arwA)"></path>
+        <g font-size="10" fill="currentColor">
+          <text x="144" y="40" text-anchor="middle" font-family="IBM Plex Mono, monospace">javac</text>
+          <text x="348" y="40" text-anchor="middle">loader</text>
+          <text x="588" y="40" text-anchor="middle">run</text>
+          <text x="694" y="96">hot method</text>
+          <text x="866" y="90" fill="#D26A3F">deopt</text>
+          <text x="245" y="84" text-anchor="middle" opacity="0.8">bytecode: portable, a stack machine</text>
+          <text x="470" y="84" text-anchor="middle" opacity="0.8">a bad class file is rejected here</text>
+          <text x="620" y="176" opacity="0.8">C1 compiles fast and records a profile; C2 optimises with it</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Bytecode.java · a small method, and the class file's own header</div>
+<pre><code class="language-java">import java.io.DataInputStream;
+import java.io.InputStream;
+
+public class Bytecode {
+    static int total(int[] prices, int discount) {
+        int sum = 0;
+        for (int p : prices) sum += p;
+        return sum - discount;
+    }
+
+    public static void main(String[] args) throws Exception {
+        System.out.println("total = " + total(new int[] {250, 120, 90}, 60));
+        try (InputStream raw = Bytecode.class.getResourceAsStream("Bytecode.class");
+             DataInputStream in = new DataInputStream(raw)) {
+            int magic = in.readInt();
+            int minor = in.readUnsignedShort(), major = in.readUnsignedShort();
+            System.out.printf("class file: magic %X, version %d.%d (%d = Java %d)%n",
+                    magic, major, minor, major, major - 44);
+        }
+        System.out.println("running on " + System.getProperty("java.vm.name") + " " + Runtime.version());
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Bytecode.java</div>
+<pre><code class="language-plaintext">total = 400
+class file: magic CAFEBABE, version 65.0 (65 = Java 21)
+running on OpenJDK 64-Bit Server VM 25.0.2+10-69</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">javap -c Bytecode · the total method</div>
+<pre><code class="language-plaintext">  static int total(int[], int);
+    Code:
+         0: iconst_0
+         1: istore_2
+         2: aload_0
+         3: astore_3
+         4: aload_3
+         5: arraylength
+         6: istore        4
+         8: iconst_0
+         9: istore        5
+        11: iload         5
+        13: iload         4
+        15: if_icmpge     35
+        18: aload_3
+        19: iload         5
+        21: iaload
+        22: istore        6
+        24: iload_2
+        25: iload         6
+        27: iadd
+        28: istore_2
+        29: iinc          5, 1
+        32: goto          11
+        35: iload_2
+        36: iload_1
+        37: isub
+        38: ireturn</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Reading the bytecode</th><th>Means</th></tr></thead>
+        <tbody>
+          <tr><td><code>iconst_0</code>, <code>istore_2</code></td><td>Push the int 0, pop it into local slot 2 (<code>sum</code>). Slot 0 is <code>prices</code>, slot 1 <code>discount</code>.</td></tr>
+          <tr><td><code>arraylength</code>, <code>iaload</code></td><td>The enhanced <code>for</code> became an index loop over a copy of the array reference.</td></tr>
+          <tr><td><code>if_icmpge 35</code>, <code>goto 11</code></td><td>The loop test and the jump back: no structured loops in bytecode.</td></tr>
+          <tr><td><code>iadd</code>, <code>isub</code>, <code>ireturn</code></td><td>Pop two ints, push the result; return the top of the stack.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">The same Order class compiled with --release 25, run on JDK 21</div>
+<pre><code class="language-plaintext">Error: LinkageError occurred while loading main class Order
+	java.lang.UnsupportedClassVersionError: Order has been compiled by a more recent version of the Java Runtime (class file version 69.0), this version of the Java Runtime only recognizes class file versions up to 65.0</code></pre>
+      </div>
+      <div class="note tip"><span class="lbl">Class file versions</span>The major version is the Java release plus 44: 52 is Java 8, 55 is 11, 61 is 17, 65 is 21, 69 is 25. A JVM runs any older version and refuses newer ones, so build with <code>--release</code> set to the oldest JDK you deploy on. <code>--release</code> also checks the API you call, which <code>-target</code> alone does not.</div>
+    </div>
+  </div>
+</section>
