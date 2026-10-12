@@ -25,7 +25,7 @@ class PlaceOrderUseCase implements OrderService {
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Do not do this here</span><code>if (customer.isVip() &amp;&amp; total.gt(500)) discount = ...</code> — that is a pricing rule sitting in an orchestration class, invisible to the domain model and impossible to unit-test without Spring.</div>
-      <div class="note warn"><span class="lbl">Keep the transaction short</span>Never call an external HTTP API inside <code>@Transactional</code>. A 3-second gateway timeout becomes a 3-second database connection held, and a pool of 20 becomes an outage at 7 concurrent checkouts.</div>
+      <div class="note warn"><span class="lbl">Keep the transaction short</span>Never call an external HTTP API inside <code>@Transactional</code>. A 3-second gateway timeout becomes a 3-second database connection held, and a pool of 20 becomes an outage at about 7 checkouts per second (Little's law: 20 connections ÷ 3 s held).</div>
       <div class="note good"><span class="lbl">Read paths skip all this</span>Queries do not need aggregates. <code>@Transactional(readOnly = true)</code> + a <code>JdbcClient</code> projection straight to a record is faster, simpler and perfectly legitimate. CQRS-lite, no framework required.</div>
     </div>
   </div>

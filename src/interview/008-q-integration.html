@@ -33,7 +33,7 @@
 
       <article class="q"><header><i>Q29</i><h3>How do you debug a request that crossed four components and a queue?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>One trace id, propagated end to end — including through the Kafka message headers, which is the hop teams forget. Every log line carries it, every span carries it, and the customer's error page shows it. Support quotes the id, you get the whole journey in one query.</div>
-        <p class="deeper"><b>Go deeper:</b> In Spring terms: Micrometer Tracing with W3C <code>traceparent</code>, OTLP export, and <code>observation-enabled: true</code> on both the Kafka template and the listener container. Mention structured JSON logs with the correlation pattern, sampling at 10% with errors always sampled, and the cardinality rule — never tag a metric with an order id, that belongs in logs and traces.</p>
+        <p class="deeper"><b>Go deeper:</b> In Spring terms: Micrometer Tracing with W3C <code>traceparent</code>, OTLP export, and <code>observation-enabled: true</code> on both the Kafka template and the listener container. Mention structured JSON logs with the correlation pattern, head sampling at 10% plus tail sampling in the OpenTelemetry collector so every error trace is kept (a head sampler decides before any error exists), and the cardinality rule — never tag a metric with an order id, that belongs in logs and traces.</p>
         <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Observability">Deck · Observability</a><a data-deck="ed" data-slide="Observability">Events · Observability</a><a data-deck="sb" data-slide="Structured logging">Boot · Structured logging</a></p>
       </div></article>
 

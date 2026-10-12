@@ -112,7 +112,7 @@ class SupportTools {
             <tr><td>QA advisor + <code>audience</code> filter</td><td>Policy answers come from customer-facing articles only, never internal runbooks</td></tr>
             <tr><td>Tools with <code>ToolContext</code></td><td>Order questions answered from live data, scoped to the logged-in customer</td></tr>
             <tr><td>Escalation tool</td><td>The model can hand over; your code can also force it (keywords, repeated failures, VIP customers)</td></tr>
-            <tr><td>Streaming</td><td>First words in about a second, even when tools run</td></tr>
+            <tr><td>Streaming</td><td>First words in about a second on a plain answer. When a tool runs, the answer that uses its result cannot start until the tool round-trip finishes, so show a "checking your order…" status meanwhile</td></tr>
           </tbody>
         </table>
       </div>

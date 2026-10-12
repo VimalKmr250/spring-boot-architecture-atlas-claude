@@ -48,7 +48,7 @@ public class OrderJpaEntity {
 
   <div class="grid3">
     <div class="card"><h4><code>@Enumerated(ORDINAL)</code> is the default</h4><p>And it stores <code>0, 1, 2</code>. Insert a new enum constant in the middle a year later and every historical row silently changes meaning. Always <code>STRING</code>. This is the single most damaging JPA default.</p></div>
-    <div class="card"><h4><code>@Column</code> defaults you should set</h4><p><code>nullable</code> is <code>true</code> by default and only affects schema generation — the real constraint must be in your Flyway migration. <code>updatable = false</code> on immutable columns is genuinely enforced by Hibernate and catches bugs.</p></div>
+    <div class="card"><h4><code>@Column</code> defaults you should set</h4><p><code>nullable</code> is <code>true</code> by default and only affects schema generation — the real constraint must be in your Flyway migration. <code>updatable = false</code> on immutable columns protects them, but silently: Hibernate leaves the column out of the <code>UPDATE</code>, so a changed value is discarded with no error. Assert it in a test if it matters.</p></div>
     <div class="card"><h4><code>equals</code>/<code>hashCode</code></h4><p>Do not use Lombok's <code>@Data</code> on an entity — it generates them over all fields including lazy associations, which triggers loads and breaks <code>Set</code> semantics before the id is assigned. Use the business key, or the id with a stable hashCode.</p></div>
   </div>
 

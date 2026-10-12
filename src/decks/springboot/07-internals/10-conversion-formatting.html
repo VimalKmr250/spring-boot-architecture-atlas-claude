@@ -39,7 +39,7 @@ class WebConfig implements WebMvcConfigurer {
           <li><b>Set the JVM zone explicitly</b> (<code>-Duser.timezone=UTC</code>) so behaviour does not change between your laptop and the cluster.</li>
         </ul>
       </div>
-      <div class="note warn"><span class="lbl">The enum parameter trap</span>An unknown enum value in a request parameter produces a 400 whose message names your Java class and its constants — an internal detail leaking to the client. Register a converter that maps unknown values to a domain exception and returns a <code>ProblemDetail</code> listing the accepted values instead.</div>
+      <div class="note warn"><span class="lbl">The enum parameter trap</span>An unknown enum value in a request parameter fails conversion with a message that names your Java class — an internal detail. Boot keeps it out of its default error body (<code>server.error.include-message</code> is <code>never</code> by default), but any handler that echoes <code>ex.getMessage()</code> sends it straight to the client. Register a converter that maps unknown values to a domain exception and returns a <code>ProblemDetail</code> listing the accepted values instead.</div>
     </div>
   </div>
 </section>

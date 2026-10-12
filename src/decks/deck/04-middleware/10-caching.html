@@ -13,9 +13,10 @@ class CatalogQueryService {
 
     // invalidation is an EVENT, not a scheduled job
     @ApplicationModuleListener
-    void on(ProductUpdated e) {
-        cache.evict("product", e.sku());                 // local
-        redis.convertAndSend("cache.evict", e.sku());    // tell the other 11 instances
+    void on(ProductUpdated e) {                         // the two CacheManagers behind "twoLevel"
+        redisCaches.getCache("product").evict(e.sku());     // shared L2 FIRST — or the next
+        caffeineCaches.getCache("product").evict(e.sku());  // L1 miss refills from stale L2
+        redis.convertAndSend("cache.evict", e.sku());       // then the other 11 drop their L1
     }
 }</code></pre>
 <pre style="margin-top:12px"><code class="language-yaml"># "twoLevel" is YOUR CacheManager bean (Caffeine in front of Redis).

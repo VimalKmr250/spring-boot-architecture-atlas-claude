@@ -15,9 +15,9 @@
   </div>
 
   <div class="grid3">
-    <div class="card"><h4>RED, for every endpoint</h4><p><b>R</b>ate, <b>E</b>rrors, <b>D</b>uration. Three dashboards panels per service that answer "is it working" without domain knowledge.</p></div>
+    <div class="card"><h4>RED, for every endpoint</h4><p><b>R</b>ate, <b>E</b>rrors, <b>D</b>uration. Three dashboard panels per service that answer "is it working" without domain knowledge.</p></div>
     <div class="card"><h4>USE, for every resource</h4><p><b>U</b>tilisation, <b>S</b>aturation, <b>E</b>rrors — connection pool, thread pool, disk, heap. This is where you look <em>after</em> RED says something is wrong.</p></div>
-    <div class="card"><h4>Burn-rate alerts</h4><p>Two windows: fast (1 h at 14× burn → page) and slow (6 h at 6× → ticket). It catches both the outage and the slow bleed, without paging on a single blip.</p></div>
+    <div class="card"><h4>Burn-rate alerts</h4><p>Fast (1 h at 14× burn → page) and slow (6 h at 6× → also a page), each confirmed by a short window so it stops once the burn does; only the gentle burn (3 days at 1×) is a ticket. It catches both the outage and the slow bleed, without paging on a single blip. The full pattern: <a data-deck="hld" data-slide="Alerting on SLO burn">System design · Alerting on SLO burn</a>.</p></div>
   </div>
 
   <div class="note warn"><span class="lbl">The four dashboards a team needs</span><b>Journey</b> (SLOs, customer-visible) · <b>Service</b> (RED per endpoint) · <b>Dependencies</b> (latency and error rate per downstream, circuit-breaker state) · <b>Resources</b> (USE). More than four and nobody opens any of them during an incident.</div>

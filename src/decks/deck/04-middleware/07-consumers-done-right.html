@@ -7,9 +7,11 @@
 <pre><code class="language-java">@Component
 class OrderPlacedConsumer {
 
+    // Deliberately NOT @Transactional: under MANUAL_IMMEDIATE, ack.acknowledge()
+    // commits the offset at once — inside a listener transaction that would be
+    // BEFORE the database commit. reserve() has its own transaction instead.
     @KafkaListener(topics = "orders.placed.v1", groupId = "inventory",
                    concurrency = "6")
-    @Transactional
     public void handle(@Payload OrderPlaced event,
                        @Header(RECEIVED_KEY) String key,
                        Acknowledgment ack) {
@@ -19,8 +21,8 @@ class OrderPlacedConsumer {
             ack.acknowledge();                 // already done — a duplicate, not an error
             return;
         }
-        inventory.reserve(event.orderId(), event.lines());
-        ack.acknowledge();                     // commit offset only after the work committed
+        inventory.reserve(event.orderId(), event.lines());   // @Transactional: commits here
+        ack.acknowledge();                     // so the offset moves only after the work committed
     }
 }
 
@@ -33,7 +35,7 @@ class KafkaErrorConfig {
                 (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
         var handler = new DefaultErrorHandler(recoverer,
-                new ExponentialBackOffWithMaxRetries(3));   // 3 tries, then DLT — never infinite
+                new ExponentialBackOffWithMaxRetries(3));   // 3 retries = 4 deliveries, then DLT
         handler.addNotRetryableExceptions(
                 DeserializationException.class,             // a poison pill never gets better
                 IllegalArgumentException.class);

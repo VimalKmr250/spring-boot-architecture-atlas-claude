@@ -1,0 +1,125 @@
+<section class="slide" data-sec="29 · Grid DP" data-title="The six, in streams">
+  <h2>A row that reads only the row above is clean; a left neighbour is a running scan</h2>
+  <p class="dek">Grid DP sweeps rows, so the natural stream is <code>Stream.iterate</code> over rows with a fresh row per step. That is clean when a cell reads only the previous row, as in 931 and 120. 62, 63, 64 and 221 also read the cell to their left in the same row, which is a running scan. Java 17 streams have no scan operation (<code>Gatherers.scan</code> arrived in JDK 24), so the row is filled by a stream that reads what it just wrote. That is state, and it makes them correct only sequentially.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">62</td><td><a href="https://leetcode.com/problems/unique-paths/" target="_blank" rel="noopener">Unique Paths</a></td><td>One row of counts: <code>ways[j] += ways[j - 1]</code>, the left cell this pass just wrote.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">63</td><td><a href="https://leetcode.com/problems/unique-paths-ii/" target="_blank" rel="noopener">Unique Paths II</a></td><td>The same pass, with an obstacle forcing the cell to 0.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">64</td><td><a href="https://leetcode.com/problems/minimum-path-sum/" target="_blank" rel="noopener">Minimum Path Sum</a></td><td>grid + min(above, left), with left written a moment ago.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">221</td><td><a href="https://leetcode.com/problems/maximal-square/" target="_blank" rel="noopener">Maximal Square</a></td><td>1 + min(up, up-left, left) into two alternating rows; the max of each row, then of the rows.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">931</td><td><a href="https://leetcode.com/problems/minimum-falling-path-sum/" target="_blank" rel="noopener">Minimum Falling Path Sum</a></td><td>A fresh row per step: each cell plus the min of the up-to-three cells above it.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">120</td><td><a href="https://leetcode.com/problems/triangle/" target="_blank" rel="noopener">Triangle</a></td><td>Bottom-up, a fresh row per step: each cell plus the smaller of the two below.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 62 · Unique Paths · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int uniquePaths(int m, int n) {
+        int[] ways = new int[n];
+        Arrays.fill(ways, 1);               // the top row: one way to each cell
+        // Each later row: ways[j] (from above) + ways[j - 1] (from the
+        // left, written a moment ago by this same stream). Sequential only.
+        IntStream.range(1, m).forEach(i -&gt;
+                IntStream.range(1, n).forEach(j -&gt; ways[j] += ways[j - 1]));
+        return ways[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 63 · Unique Paths II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int uniquePathsWithObstacles(int[][] grid) {
+        int n = grid[0].length;
+        int[] ways = new int[n];
+        ways[0] = 1;                        // a virtual way in, above (0, 0)
+        // Every row, the first included: an obstacle zeroes the cell,
+        // otherwise add the left cell that this pass already updated.
+        Arrays.stream(grid).forEach(row -&gt;
+                IntStream.range(0, n).forEach(j -&gt;
+                        ways[j] = row[j] == 1 ? 0 : ways[j] + (j &gt; 0 ? ways[j - 1] : 0)));
+        return ways[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 64 · Minimum Path Sum · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minPathSum(int[][] grid) {
+        int n = grid[0].length;
+        int[] best = new int[n];
+        Arrays.fill(best, Integer.MAX_VALUE);
+        best[0] = 0;                        // a virtual 0 above the start
+        // best[j] = this cell + min(above = best[j], left = best[j - 1]),
+        // and the left entry was written a moment ago by this stream.
+        Arrays.stream(grid).forEach(row -&gt;
+                IntStream.range(0, n).forEach(j -&gt; best[j] = row[j]
+                        + (j == 0 ? best[0] : Math.min(best[j], best[j - 1]))));
+        return best[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 221 · Maximal Square · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maximalSquare(char[][] matrix) {
+        int n = matrix[0].length;
+        int[][] rows = new int[2][n + 1];   // this row and the one above, 0-padded
+        // side[j] = 1 + min(up, up-left, left) on a '1'. "left" was
+        // written a moment ago in this row, so it is sequential only.
+        int side = IntStream.range(0, matrix.length).map(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = matrix[i][j - 1] == '1'
+                    ? 1 + Math.min(Math.min(up[j], up[j - 1]), cur[j - 1]) : 0);
+            return Arrays.stream(cur).max().getAsInt();
+        }).max().getAsInt();
+        return side * side;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 931 · Minimum Falling Path Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minFallingPathSum(int[][] matrix) {
+        int n = matrix.length;
+        // Each row reads only the row above, at j - 1, j and j + 1 clamped
+        // to the edges. A fresh row per step, so the fold is clean.
+        record Row(int i, int[] sum) {}
+        Row last = Stream.iterate(new Row(0, matrix[0]), r -&gt; new Row(r.i() + 1,
+                        IntStream.range(0, n).map(j -&gt; matrix[r.i() + 1][j]
+                                + IntStream.rangeClosed(Math.max(0, j - 1), Math.min(n - 1, j + 1))
+                                        .map(k -&gt; r.sum()[k]).min().getAsInt())
+                                .toArray()))
+                .skip(n - 1).findFirst().get();
+        return Arrays.stream(last.sum()).min().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 120 · Triangle · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minimumTotal(List&lt;List&lt;Integer&gt;&gt; triangle) {
+        int rows = triangle.size();
+        // Bottom-up: row r holds the best sum from each cell down. Row
+        // r - 1 reads cells j and j + 1 of row r, which always exist.
+        record Row(int r, int[] best) {}
+        int[] bottom = triangle.get(rows - 1).stream().mapToInt(Integer::intValue).toArray();
+        return Stream.iterate(new Row(rows - 1, bottom), w -&gt; new Row(w.r() - 1,
+                        IntStream.range(0, w.r()).map(j -&gt; triangle.get(w.r() - 1).get(j)
+                                + Math.min(w.best()[j], w.best()[j + 1])).toArray()))
+                .skip(rows - 1).findFirst().get().best()[0];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The left neighbour is the state</span><code>ways[j] += ways[j - 1]</code> is a prefix sum along the row: each cell needs the one the stream wrote just before it, so a parallel stream would read stale or zero values. Sweeping anti-diagonals instead would make 62–64 clean, because every cell on a diagonal reads only cells on the previous one, but the index arithmetic is rarely worth it in an interview. 221 keeps two alternating rows because it also needs the up-left value, which a single in-place row has already overwritten.</div>
+  <div class="note good"><span class="lbl">A fresh row is the clean shape</span>931 and 120 never read their own row, so each step is a pure map from the old row to a new one. Clamping <code>j - 1</code> and <code>j + 1</code> with <code>Math.max</code> and <code>Math.min</code> is the whole edge case in 931. Going bottom-up in 120 means the row being built is always one shorter than the row it reads, so no index can fall off the end.</div>
+</section>
+

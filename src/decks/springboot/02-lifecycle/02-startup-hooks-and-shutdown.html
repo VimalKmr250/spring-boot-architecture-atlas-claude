@@ -24,7 +24,8 @@ class OrderMetrics {
     @PreDestroy   void close() { ... }   // on graceful shutdown
 }</code></pre>
       <div class="codelabel" style="margin-top:14px">Graceful shutdown — three settings that matter</div>
-<pre><code class="language-yaml">server.shutdown: graceful           # stop accepting, finish in-flight requests
+<pre><code class="language-yaml">server.shutdown: graceful           # stop accepting, finish in-flight requests —
+                                    # the DEFAULT since Boot 3.4; set it on 3.3 and older
 spring.lifecycle.timeout-per-shutdown-phase: 30s
 # Kubernetes: a preStop sleep of ~5s so the endpoint is removed from the
 # Service BEFORE the JVM stops accepting — otherwise the last few requests

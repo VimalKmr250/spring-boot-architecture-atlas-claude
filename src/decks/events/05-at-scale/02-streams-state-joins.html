@@ -39,6 +39,10 @@ payments.filter((k, p) -&gt; p.declined())
         .groupBy((k, p) -&gt; p.cardFingerprint())
         .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMinutes(10), Duration.ofMinutes(2)))
         .count()
+        // count() emits on EVERY decline, so "&gt;= 5" alone would alert again at
+        // 6, 7, 8... Emit one result per window instead — at the cost of
+        // waiting for the window and its grace to close (or dedupe downstream):
+        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
         .filter((windowedKey, count) -&gt; count &gt;= 5)
         .toStream()
         .to("risk.card.velocity.v1");</code></pre>

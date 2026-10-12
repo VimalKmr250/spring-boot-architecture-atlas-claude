@@ -23,7 +23,9 @@ List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
 @Value("#{'${shop.regions}'.split(',')}")
 
 // 5. Conditional bean registration
-@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active}'.contains('test')")</code></pre>
+@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active:}'.contains('test')")
+// The trailing ':' is an empty default — without it, startup fails when no
+// profile is set. For a profile check alone, @Profile("!test") is simpler.</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">

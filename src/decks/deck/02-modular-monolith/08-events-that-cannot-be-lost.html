@@ -39,7 +39,7 @@ class OrderPlacedListener {
 
   <div class="grid3">
     <div class="card"><h4><code>@ApplicationModuleListener</code></h4><p>Is just <code>@Async</code> + <code>@Transactional(REQUIRES_NEW)</code> + <code>@TransactionalEventListener(AFTER_COMMIT)</code> in one annotation — the three you would otherwise forget one of.</p></div>
-    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.republish-outstanding-events-on-restart=true</code> replays anything stuck. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
+    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.events.republish-outstanding-events-on-restart=true</code> replays anything stuck (the key without <code>.events</code> is deprecated). On several instances a restarting pod can replay events another is still handling, so there prefer one scheduled job calling <code>IncompleteEventPublications.resubmitIncompletePublicationsOlderThan(…)</code>. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
     <div class="card"><h4>Externalising later</h4><p>Add <code>@Externalized("order.placed::#{#this.orderId}")</code> and the same event goes to Kafka with the key you name. Nothing in the producing code changes.</p></div>
   </div>
 

@@ -9,7 +9,7 @@
         <tr><td>Baseline large Boot app</td><td class="num">4–8 s</td><td>—</td><td>Where most services sit</td></tr>
         <tr><td>Trim the classpath</td><td class="num">−0.5–2 s</td><td>An afternoon of dependency review</td><td><b>Do this first.</b> Free, and it shrinks the CVE surface too</td></tr>
         <tr><td><code>spring.main.lazy-initialization</code></td><td class="num">−30–50%</td><td>Startup failures move to first request</td><td>Dev only. Never in production — you lose fail-fast</td></tr>
-        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>None; on by default</td><td>Free win on upgrade</td></tr>
+        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>An AOT build step: on by default, but repositories are generated only by <code>process-aot</code>, and a JVM run needs <code>-Dspring.aot.enabled=true</code></td><td>Near-free on upgrade — a plain <code>java -jar</code> without the AOT step gains nothing</td></tr>
         <tr><td>AppCDS / AOT cache</td><td class="num">−20–40%</td><td>A training run in the build</td><td>Excellent value; no code change</td></tr>
         <tr><td>Checkpoint/restore (CRaC)</td><td class="num">to ~50 ms</td><td>Beans must handle checkpoint/restore; connections reopen</td><td>Niche but powerful where supported</td></tr>
         <tr><td>GraalVM native image</td><td class="num">to ~50 ms, low RSS</td><td>Long builds, reflection config, harder debugging, some libraries unsupported</td><td>Only for scale-to-zero or per-request billing</td></tr>

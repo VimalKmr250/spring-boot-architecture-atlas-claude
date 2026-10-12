@@ -8,16 +8,20 @@
       <tbody>
         <tr><td>Baseline</td><td>Java 17, Jakarta EE 10</td><td>Java 17 still (25 recommended), Jakarta EE 11, Servlet 6.1</td></tr>
         <tr><td>Module layout</td><td>Few large jars</td><td>Finer-grained modules — <b>the most common upgrade surprise</b>; imports move</td></tr>
+        <tr><td>Starters</td><td><code>spring-boot-starter-web</code>; one <code>-test</code> starter</td><td><code>spring-boot-starter-webmvc</code> (the old name is deprecated); a test starter per technology, <code>spring-boot-starter-&lt;technology&gt;-test</code></td></tr>
+        <tr><td>Platform versions</td><td>Hibernate 6, Spring Security 6, JUnit 5, Testcontainers 1.x</td><td>Hibernate 7, Spring Security 7, JUnit 6, Testcontainers 2 (<code>testcontainers-*</code> artifacts, <code>org.testcontainers.&lt;module&gt;</code> packages)</td></tr>
         <tr><td>Auto-config registry</td><td><code>AutoConfiguration.imports</code> only — <code>spring.factories</code> registration was already removed in <b>Boot 3.0</b></td><td>Unchanged. Worth knowing the removal date: a starter that silently contributes nothing broke at 3.0, not at 4.0</td></tr>
         <tr><td>HTTP clients</td><td><code>RestClient</code>, <code>HttpServiceProxyFactory</code> by hand</td><td><code>@ImportHttpServices</code> — declarative groups with shared config</td></tr>
         <tr><td>API versioning</td><td>Roll your own, or a gateway</td><td>First class: <code>@GetMapping(version = "2")</code> + <code>ApiVersionConfigurer</code></td></tr>
-        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code></td></tr>
+        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code>. Boot no longer manages a Spring Retry version, and Spring Kafka and Spring Batch now retry on the core API</td></tr>
         <tr><td>Null safety</td><td>Spring's own <code>@Nullable</code> (JSR-305 style)</td><td>JSpecify — <code>@NullMarked</code> at package level, real tooling support</td></tr>
-        <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — ISO-8601 dates by default, unchecked exceptions</td></tr>
-        <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — queries generated at build time, notably faster startup</td></tr>
+        <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — <code>tools.jackson</code> packages (annotations stay in <code>com.fasterxml.jackson.annotation</code>), ISO-8601 dates by default, unchecked exceptions; Jackson 2 support kept but deprecated</td></tr>
+        <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — repository queries generated during AOT processing, notably faster startup</td></tr>
+        <tr><td>Batch</td><td>Spring Batch 5; <code>-batch</code> stores job metadata in your database</td><td>Spring Batch 6; <code>-batch</code> runs <b>in memory</b> — restartable jobs need <code>spring-boot-starter-batch-jdbc</code></td></tr>
+        <tr><td>Observability</td><td>Micrometer Tracing + an OTel bridge, assembled by hand</td><td>New <code>spring-boot-starter-opentelemetry</code>; OTLP tracing keys move to <code>management.opentelemetry.tracing.export.otlp.*</code></td></tr>
         <tr><td>Test mocks</td><td><code>@MockBean</code> (deprecated in 3.4)</td><td><code>@MockitoBean</code> / <code>@MockitoSpyBean</code></td></tr>
         <tr><td>Testing API</td><td>MockMvc, WebTestClient, TestRestTemplate</td><td>Unified <code>RestTestClient</code> across all three</td></tr>
-        <tr><td>Removals</td><td>—</td><td>Spring JCL, <code>javax.annotation</code>, Undertow WebSocket, legacy path matching</td></tr>
+        <tr><td>Removals</td><td>—</td><td>Spring JCL, <code>javax.annotation</code>, <b>Undertow entirely</b> (it does not support Servlet 6.1), legacy path matching</td></tr>
         <tr><td>4.1 additions</td><td>—</td><td>Spring gRPC, lazy JDBC connections, <code>InetAddressFilter</code> SSRF mitigation, <code>@RedisListener</code></td></tr>
       </tbody>
     </table>

@@ -25,7 +25,9 @@ private Long id;
 
 // DB: CREATE SEQUENCE order_mgmt.order_id_seq INCREMENT BY 50;
 // Hibernate now fetches one value and hands out 50 ids without another round trip.
-// Mismatch here = duplicate key errors that appear only under concurrency.</code></pre>
+// Mismatch: Hibernate checks the sequence at boot and, by default, refuses to
+// start (MappingException). Silence that check and the id blocks overlap —
+// duplicate keys, on a single instance as well as many.</code></pre>
       <div class="codelabel" style="margin-top:14px">Composite keys — prefer @EmbeddedId</div>
 <pre><code class="language-java">@Embeddable
 record OrderLineId(UUID orderId, int lineNo) implements Serializable { }

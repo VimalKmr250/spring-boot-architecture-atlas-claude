@@ -19,7 +19,8 @@
 // @NotBlank — not null and contains non-whitespace. For strings, this is the one you want.</code></pre>
       <div class="codelabel" style="margin-top:14px">Two different annotations, two different jobs</div>
 <pre><code class="language-java">@Valid      // Jakarta: cascade validation into this object
-@Validated  // Spring: enables method-level validation on a bean,
+@Validated  // Spring: enables method-level validation on a bean (services —
+            //         controllers do it natively since Framework 6.1),
             //         and is the only one that supports groups</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -40,7 +41,7 @@ class SkuValidator implements ConstraintValidator&lt;ValidSku, String&gt; {
 }</code></pre>
       </div>
       <div class="note warn"><span class="lbl">Where the line is</span><b>Shape</b> — "currency is three letters", "at most 100 lines" — belongs here. <b>Rule</b> — "this customer may not ship to that country", "discount cannot exceed the order value" — belongs on the aggregate, where it can be unit-tested without HTTP and cannot be bypassed by a second entry point such as a Kafka consumer or a batch job.</div>
-      <div class="note tip"><span class="lbl">Turning violations into your error shape</span>Handle <code>MethodArgumentNotValidException</code> (body) and <code>ConstraintViolationException</code> (params) in your advice and emit a <code>ProblemDetail</code> with a <code>errors</code> property listing field and message. Without that, Boot's default body is a shape your frontend has to special-case.</div>
+      <div class="note tip"><span class="lbl">Turning violations into your error shape</span>Handle <code>MethodArgumentNotValidException</code> (a <code>@Valid</code> body on its own) and <code>HandlerMethodValidationException</code> (any handler with constraints directly on its parameters — it then covers the body too) in your advice — extending <code>ResponseEntityExceptionHandler</code> gives you both — and emit a <code>ProblemDetail</code> with an <code>errors</code> property listing field and message. <code>ConstraintViolationException</code> only appears if a class-level <code>@Validated</code> proxy does the validating. Without that, Boot's default body is a shape your frontend has to special-case.</div>
     </div>
   </div>
 </section>

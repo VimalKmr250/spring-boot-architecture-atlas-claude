@@ -11,13 +11,17 @@
 CREATE ROLE app_order LOGIN;
 GRANT USAGE ON SCHEMA order_mgmt TO app_order;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA order_mgmt TO app_order;
+-- ...which covers only the tables that exist NOW. Tables a later migration
+-- creates need default privileges, set for the role that runs migrations:
+ALTER DEFAULT PRIVILEGES FOR ROLE order_migrator IN SCHEMA order_mgmt
+  GRANT SELECT, INSERT, UPDATE ON TABLES TO app_order;
 -- and is granted NOTHING on payment.* or inventory.*
 
 -- a cross-schema join is now a runtime permission error in CI, not a review comment
 SELECT o.id, p.status
   FROM order_mgmt.orders o JOIN payment.payments p ON p.order_id = o.id;
 -- ERROR: permission denied for schema payment</code></pre>
-      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px">One PostgreSQL cluster, one connection pool per module role. You keep operational simplicity — one backup, one failover, one upgrade — while the logical boundary is real.</p>
+      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px">One PostgreSQL cluster, one connection pool per module role. You keep operational simplicity — one backup, one failover, one upgrade — while the logical boundary is real. The cost is connections: four module pools of 10 on 40 pods is 1,600, so keep each pool small and redo the <code>max_connections</code> sum from <a data-deck="deck" data-slide="Runtime and capacity">Runtime and capacity</a>.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">

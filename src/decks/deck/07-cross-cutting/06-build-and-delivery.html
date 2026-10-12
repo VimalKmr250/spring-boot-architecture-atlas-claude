@@ -6,15 +6,22 @@
     <div class="codewrap">
       <div class="codelabel">settings.gradle.kts — modules as Gradle projects, when you want hard walls</div>
 <pre><code class="language-java">rootProject.name = "shop"
-include("modules:order", "modules:payment", "modules:inventory",
-        "modules:catalog", "modules:shared", "app")
+// Each module is TWO projects: a project dependency exposes every public
+// class, so "sees only the api" needs the api in a project of its own.
+include("modules:order-api", "modules:order-impl",
+        "modules:payment-api", "modules:payment-impl",
+        "modules:inventory-api", "modules:inventory-impl",
+        "modules:catalog-api", "modules:catalog-impl",
+        "modules:shared", "app")
 
-// modules/order/build.gradle.kts
+// modules/order-impl/build.gradle.kts
 dependencies {
     api(project(":modules:shared"))
-    implementation(project(":modules:payment"))   // sees payment's api only
+    implementation(project(":modules:order-api"))
+    implementation(project(":modules:payment-api"))   // payment's internals: not on the classpath
     // a compile error is now impossible to merge, not just discouraged
-}</code></pre>
+}
+// app/build.gradle.kts depends on every *-impl, to wire them together</code></pre>
       <p style="font-size:13.5px;color:var(--text-2);margin-top:12px"><b>Trade-off:</b> Gradle modules give compiler-enforced boundaries and faster incremental builds, at the cost of more build files and slower IDE indexing. One source set plus ArchUnit is lighter and usually enough; escalate to Gradle modules when the rules keep getting suppressed.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">

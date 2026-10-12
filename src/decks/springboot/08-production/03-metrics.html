@@ -40,7 +40,9 @@ class OrderMetrics {
 }
 
 @Timed(value = "tax.calculate", percentiles = { 0.95, 0.99 })   // annotation form
-Tax calculate(Basket b) { ... }</code></pre>
+Tax calculate(Basket b) { ... }
+// ...which records NOTHING on its own: it needs a TimedAspect bean, or
+// management.observations.annotations.enabled=true (Boot 3.2+), plus AOP.</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Cardinality is the way monitoring dies</span>Every distinct combination of tag values is a separate time series. A tag of <code>orderId</code> on a service doing 1.2M orders a month creates 1.2M series a month — Prometheus falls over, and the bill if you are on a hosted product is memorable. <b>Tags must be bounded and small</b>: status, endpoint, channel, outcome, module. Ten values, not ten thousand.</div>

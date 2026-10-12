@@ -22,8 +22,8 @@ SecurityFilterChain api(HttpSecurity http) throws Exception {
 }</code></pre>
       <div class="codelabel" style="margin-top:14px">Layer 2 · method security — may you do this to this thing</div>
 <pre><code class="language-java">// CustomerId is a value type, so unwrap it — comparing the record
-// itself to a String is always false, and fails OPEN-looking (denies
-// everyone but the OPS role, so nobody notices until a customer calls).
+// itself to a String is always false. It fails closed — every customer is
+// denied — but OPS still gets through, so nobody notices until a customer calls.
 @PreAuthorize("hasRole('OPS') or #command.customerId.value() == authentication.name")
 public void cancel(CancelOrderCommand command) { ... }
 
@@ -38,23 +38,18 @@ public void cancel(CancelOrderCommand command) { ... }</code></pre>
       <div class="card accent">
         <h3>Layer 3 · the row</h3>
         <p>The layer most teams skip. A bug in a repository method that forgets <code>WHERE customer_id = ?</code> returns other customers' orders with a perfectly valid token.</p>
-<pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query
+<pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query.
+// Hibernate 6+: the ORM adds the predicate to every query, every insert
+// and every find-by-id, using your CurrentTenantIdentifierResolver.
 @Entity
-@FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
-@Filter(name = "tenant", condition = "tenant_id = :tenantId")
-class OrderJpaEntity { ... }
-
-@Component
-class TenantFilterActivator {
-    @PersistenceContext EntityManager em;
-
-    void activate() {   // called once per request, from an interceptor
-        em.unwrap(Session.class)
-          .enableFilter("tenant")
-          .setParameter("tenantId", TenantContext.current());
-    }
-}</code></pre>
-        <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed.</p>
+class OrderJpaEntity {
+    @TenantId String tenantId;
+    ...
+}
+// A Hibernate @Filter is the older route, with two traps: it is not
+// applied to findById, and it is enabled per Session — so per
+// transaction, not once per request.</code></pre>
+        <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed. Use <code>FORCE ROW LEVEL SECURITY</code> (the owning role bypasses it otherwise) and set the tenant in every transaction on pooled connections; details in <a data-deck="sb" data-slide="Tenancy & testing">Spring Boot · Tenancy</a>.</p>
       </div>
       <div class="note warn"><span class="lbl">Multi-tenancy: pick deliberately</span><b>Shared schema + tenant column</b> — cheapest, needs RLS discipline. <b>Schema per tenant</b> — good isolation, migrations across 500 schemas get slow. <b>Database per tenant</b> — strongest, viable only with tens of tenants. Enterprise default is shared schema with RLS; regulated customers buy the database.</div>
       <div class="note"><span class="lbl">Audit is a feature</span>Who changed what, when, from where — with the trace id. Append-only, its own schema, read-only role for auditors. Retrofitting it after an incident or an audit finding is far more expensive than adding it in week two.</div>

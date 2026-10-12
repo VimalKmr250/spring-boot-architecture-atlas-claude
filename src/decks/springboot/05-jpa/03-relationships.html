@@ -34,8 +34,12 @@ class OrderJpaEntity {
                inverseJoinColumns = @JoinColumn(name = "promotion_id"))
     private Set&lt;PromotionEntity&gt; promotions = new HashSet&lt;&gt;();
 
-    @OneToOne(mappedBy = "order", fetch = LAZY, optional = false)
-    private OrderPaymentEntity payment;
+    // NO inverse @OneToOne here. On the mappedBy side Hibernate cannot honour
+    // LAZY (it cannot tell null from a proxy without a query), so every order
+    // load would also load its payment. Map it one way, from the child
+    // (or turn on Hibernate bytecode enhancement):
+    //   @OneToOne(fetch = LAZY) @MapsId OrderJpaEntity order;   // in OrderPaymentEntity
+    // and read it by id: payments.findById(order.getId())
 }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">

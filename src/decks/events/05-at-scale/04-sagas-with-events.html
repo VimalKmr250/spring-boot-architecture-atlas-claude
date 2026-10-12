@@ -33,21 +33,25 @@ class OrderSaga {
 class OrderSagaHandler {
 
     @KafkaListener(topics = "inventory.stock.reserved.v1", groupId = "order-saga")
-    @Transactional
     void onStockReserved(StockReserved e, Acknowledgment ack) {
-        var saga = sagas.findById(e.orderId()).orElseThrow();
-        if (saga.state() != AWAITING_STOCK) { ack.acknowledge(); return; }  // idempotent
-        saga.transitionTo(AWAITING_PAYMENT, Duration.ofSeconds(60));
-        commands.send(new AuthorisePayment(e.orderId(), saga.totalMinor()));
-        ack.acknowledge();
+        tx.executeWithoutResult(status -&gt; {        // state + command commit together...
+            var saga = sagas.findById(e.orderId()).orElseThrow();
+            if (saga.state() != AWAITING_STOCK) return;                        // idempotent
+            saga.transitionTo(AWAITING_PAYMENT, Duration.ofSeconds(60));
+            outbox.add(new AuthorisePayment(e.orderId(), saga.totalMinor()));  // a ROW, not a send:
+        });                                        // a direct send here is a dual write
+        ack.acknowledge();                         // ...then the offset moves
     }
 
-    @Scheduled(fixedDelay = 5000)      // the timeout sweeper — the piece people omit
+    // The timeout sweeper — the piece people omit. It runs on EVERY pod, so
+    // lock the rows (SKIP LOCKED, or ShedLock) or each pod compensates the same
+    // saga; @Version stops a double state change, not a double command.
+    @Scheduled(fixedDelay = 5000)
     @Transactional
     void sweepTimeouts() {
-        sagas.findExpired(Instant.now()).forEach(saga -&gt; {
+        sagas.lockExpired(Instant.now()).forEach(saga -&gt; {   // ... FOR UPDATE SKIP LOCKED
             meters.counter("saga.timeout", "state", saga.state().name()).increment();
-            saga.compensate();          // or escalate to MANUAL_REVIEW
+            saga.compensate();          // its commands via the outbox too — or MANUAL_REVIEW
         });
     }
 }</code></pre>

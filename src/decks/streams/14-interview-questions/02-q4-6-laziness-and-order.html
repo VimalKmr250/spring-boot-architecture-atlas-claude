@@ -1,6 +1,6 @@
 <section class="slide" data-sec="Interview questions" data-title="Q4–6 · Laziness and order">
   <h2>Laziness and order: the questions behind the obvious ones</h2>
-  <p class="dek">These three separate people who use streams from people who understand them. Each answer is easier to give after pressing through the stepper on slide 5 once.</p>
+  <p class="dek">These three separate people who use streams from people who understand them. Each answer is easier to give after pressing through <a data-deck="st" data-slide="Laziness: one element at a time">the stepper</a> once.</p>
 
   <article class="q"><header><i>Q4</i><h3>What does it mean that streams are lazy? Why didn't my <code>peek</code> print anything?</h3></header><div class="qb">
     <div class="snap"><span class="lbl">30-second answer</span>Intermediate operations do not run when you call them. They run when a terminal operation pulls elements, and then one element at a time: each element goes through every stage before the next is read. So unneeded work is never done — <code>findFirst</code> after <code>filter</code> stops at the first match — and a pipeline with no terminal operation does nothing at all, which is why a lone <code>peek</code> prints nothing.</div>

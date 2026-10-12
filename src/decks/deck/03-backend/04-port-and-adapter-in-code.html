@@ -22,7 +22,7 @@ class OrderRepositoryAdapter implements OrderRepository {
     }
 
     @Override public Optional&lt;Order&gt; findById(OrderId id) {
-        return jpa.findWithLinesById(id.value()).map(mapper.toDomain());
+        return jpa.findWithLinesById(id.value()).map(mapper::toDomain);
     }
 }
 

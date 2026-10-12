@@ -10,13 +10,16 @@ class OrderHistoryProjection {
 
     @KafkaListener(topics = { "orders.order.placed.v1", "orders.order.statuschanged.v1" },
                    groupId = "projection-order-history")   // ← its OWN group: replayable
-    @Transactional
     void on(ConsumerRecord&lt;String, Object&gt; record, Acknowledgment ack) {
+        tx.executeWithoutResult(status -&gt; project(record));  // commit the view first...
+        ack.acknowledge();                                   // ...then move the offset
+    }
 
+    private void project(ConsumerRecord&lt;String, Object&gt; record) {
         var view = views.findById(key(record)).orElseGet(OrderHistoryView::empty);
 
         // 1. ORDERED + 2. IDEMPOTENT: one guard does both
-        if (version(record) &lt;= view.appliedVersion()) { ack.acknowledge(); return; }
+        if (version(record) &lt;= view.appliedVersion()) return;
 
         view.apply(record.value());
         view.setAppliedVersion(version(record));
@@ -25,8 +28,6 @@ class OrderHistoryProjection {
         // 3. OBSERVABLE: publish end-to-end staleness, not just lag
         meters.timer("projection.staleness", "name", "order-history")
               .record(Duration.between(occurredAt(record), Instant.now()));
-
-        ack.acknowledge();
     }
 }
 // 4. REBUILDABLE: truncate the table, reset the group to earliest, let it run.

@@ -6,14 +6,15 @@
     <div class="codelabel">OrderController.java — every common annotation in one place</div>
 <pre><code class="language-java">@RestController
 @RequestMapping("/api/orders")                    // class-level prefix
-@Validated                                        // enables @Min/@NotBlank on params
+// No class-level @Validated: since Framework 6.1 (Boot 3.2) MVC validates
+// @Size / @NotBlank on parameters itself → HandlerMethodValidationException.
 class OrderController {
 
     @GetMapping("/{id}")
     OrderView get(@PathVariable UUID id) { ... }
 
-    @GetMapping
-    Page&lt;OrderSummary&gt; list(
+    @GetMapping                                   // PagedModel, not Page: a raw Page's
+    PagedModel&lt;OrderSummary&gt; list(                // JSON shape is not stable (Data 3.3+)
             @RequestParam(defaultValue = "PLACED") OrderStatus status,
             @RequestParam(required = false) @Size(max = 64) String customerRef,
             @RequestHeader(value = "X-Channel", defaultValue = "web") String channel,

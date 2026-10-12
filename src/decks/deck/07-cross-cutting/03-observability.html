@@ -42,7 +42,7 @@
   endpoint.health.probes.enabled: true      # /readiness and /liveness, separately
   metrics.tags.application: ${spring.application.name}
   tracing.sampling.probability: 0.1
-  otlp.tracing.endpoint: http://collector:4318/v1/traces
+  opentelemetry.tracing.export.otlp.endpoint: http://collector:4318/v1/traces   # Boot 4 key
 
 spring:
   kafka:

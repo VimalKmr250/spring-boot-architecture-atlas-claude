@@ -52,7 +52,7 @@
         <text x="806" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">replay</text>
       </svg>
     </div>
-    <figcaption>Partition count caps consumer parallelism — twelve partitions means at most twelve useful consumers in a group. Keying on <code>orderId</code> guarantees that all events for one order land on one partition, and therefore arrive in order.</figcaption>
+    <figcaption>Partition count caps consumer parallelism — twelve partitions means at most twelve useful consumers in a group (a Kafka 4.2+ <b>share group</b> lifts that cap, at the price of per-key ordering — fine for work queues, wrong for these events). Keying on <code>orderId</code> guarantees that all events for one order land on one partition, and therefore arrive in order.</figcaption>
   </figure>
 
   <div class="grid3">

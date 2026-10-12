@@ -6,7 +6,7 @@
     <table class="tbl">
       <thead><tr><th>Starter</th><th>Pulls in</th><th>Gives you</th><th>First thing to set</th></tr></thead>
       <tbody>
-        <tr><td><code>-web</code></td><td>Spring MVC, embedded Tomcat, Jackson</td><td><code>DispatcherServlet</code>, JSON in/out, error page</td><td><code>server.shutdown: graceful</code></td></tr>
+        <tr><td><code>-web</code></td><td>Spring MVC, embedded Tomcat, Jackson</td><td><code>DispatcherServlet</code>, JSON in/out, error page</td><td><code>spring.lifecycle.timeout-per-shutdown-phase</code> — graceful shutdown itself is the default since 3.4</td></tr>
         <tr><td><code>-data-jpa</code></td><td>Hibernate, Spring Data, HikariCP, <code>spring-jdbc</code></td><td>Repositories, <code>EntityManager</code>, tx manager</td><td><code>spring.jpa.open-in-view: false</code></td></tr>
         <tr><td><code>-validation</code></td><td>Hibernate Validator (Jakarta Bean Validation)</td><td><code>@Valid</code> on request bodies, <code>@Validated</code> on beans</td><td>Nothing — but know it is <b>not</b> in <code>-web</code> since Boot 2.3</td></tr>
         <tr><td><code>-actuator</code></td><td>Micrometer, health contributors</td><td><code>/health</code>, <code>/metrics</code>, <code>/info</code>, <code>/conditions</code></td><td><code>endpoints.web.exposure.include</code> — and expose it on a separate port</td></tr>

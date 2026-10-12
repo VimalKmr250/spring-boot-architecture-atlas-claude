@@ -19,7 +19,8 @@ CREATE INDEX ON outbox (created_at) WHERE sent_at IS NULL;   -- partial: stays t
 @Transactional
 void relay() {
     // LIMIT comes BEFORE the locking clause — Postgres rejects the
-    // other order. FOR UPDATE SKIP LOCKED makes this safe on N pods.
+    // other order. SKIP LOCKED stops two pods sending the same row; it
+    // does NOT keep an aggregate's events in order across pods (see table).
     var batch = jdbc.sql("""
         SELECT * FROM outbox WHERE sent_at IS NULL
         ORDER BY id
@@ -27,12 +28,22 @@ void relay() {
         FOR UPDATE SKIP LOCKED
         """).query(OutboxRow.class).list();
 
-    for (var row : batch) {
-        kafka.send(topicFor(row), row.aggregateId(), row.payload());
+    var acks = batch.stream()
+        .map(row -&gt; kafka.send(topicFor(row), row.aggregateId(), row.payload()))
+        .toList();
+    // Confirm EACH send. flush() would not help: it waits, but a failed
+    // send only shows up in its own future, never as an exception.
+    var sent = new ArrayList&lt;Long&gt;();
+    for (int i = 0; i &lt; batch.size(); i++) {
+        try {
+            acks.get(i).join();
+            sent.add(batch.get(i).id());
+        } catch (CompletionException e) {
+            break;     // stop at the first failure: it and everything after it
+        }              // are re-sent next run, in order (consumers are idempotent)
     }
-    kafka.flush();                              // confirm before marking
     jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY(?)")
-        .param(batch.stream().map(OutboxRow::id).toArray(Long[]::new))
+        .param(sent.toArray(Long[]::new))
         .update();                              // ANY(?) needs an ARRAY, not a List
 }</code></pre>
       <div class="note warn" style="margin-top:10px"><span class="lbl">Yes, this holds a transaction across a network call</span>Everywhere else in this atlas the rule is "never call an external system inside <code>@Transactional</code>". The relay is the deliberate exception: the rows are locked with <code>SKIP LOCKED</code> so no other pod blocks on them, the batch is bounded, and the send has a <code>delivery.timeout.ms</code> that caps how long the transaction can live. Keep the batch small, keep the timeout short, and size the relay's pool separately from the request pool — then one slow broker delays events instead of exhausting the connections checkout needs.</div>
@@ -62,7 +73,7 @@ void relay() {
           <tbody>
             <tr><td>Latency</td><td class="num">200 ms–1 s</td><td class="num">~10 ms</td></tr>
             <tr><td>DB load</td><td>A query per interval</td><td>None — reads the WAL</td></tr>
-            <tr><td>Ordering</td><td>By id, per batch</td><td>Log order, exact</td></tr>
+            <tr><td>Ordering</td><td>By id with <b>one</b> active relay; parallel relays can reorder an aggregate's events</td><td>Log order, exact</td></tr>
             <tr><td>Infrastructure</td><td>None</td><td>Kafka Connect + replication slot</td></tr>
             <tr><td>Failure mode</td><td>Backlog grows; visible</td><td>A stalled slot fills the WAL and <b>can stop the database</b></td></tr>
           </tbody>

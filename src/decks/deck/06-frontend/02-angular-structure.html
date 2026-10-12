@@ -38,9 +38,10 @@ export class OrdersStore {
   readonly page    = signal(0);
 
   // declarative data fetching: refetches when filter or page changes
+  // (Angular 20 names: params + stream; 19's request + loader are gone)
   private readonly resource = rxResource({
-    request: () =&gt; ({ ...this.filter(), page: this.page() }),
-    loader: ({ request }) =&gt; this.api.listOrders(request),
+    params: () =&gt; ({ ...this.filter(), page: this.page() }),
+    stream: ({ params }) =&gt; this.api.listOrders(params),
   });
 
   readonly orders  = computed(() =&gt; this.resource.value()?.content ?? []);

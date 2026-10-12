@@ -1,6 +1,6 @@
 <section class="slide" data-sec="How a stream runs" data-title="Under the hood: stages, sinks and spliterators">
   <h2>How a pipeline is built, and how it runs</h2>
-  <p class="dek">Each intermediate call wraps the previous stage in a new pipeline object and records its flags. The terminal call walks back to the source, builds a chain of <code>Sink</code>s ending in the terminal's own sink, and pushes every element into that chain from a <code>Spliterator</code>. There is no queue between stages and no intermediate collection. This is the machinery the stepper on slide 5 animates.</p>
+  <p class="dek">Each intermediate call wraps the previous stage in a new pipeline object and records its flags. The terminal call walks back to the source, builds a chain of <code>Sink</code>s ending in the terminal's own sink, and pushes every element into that chain from a <code>Spliterator</code>. There is no queue between stages and no intermediate collection. This is the machinery the stepper on <a data-deck="st" data-slide="Laziness: one element at a time">Laziness: one element at a time</a> animates.</p>
 
   <figure>
     <div class="figbox">
