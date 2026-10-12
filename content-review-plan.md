@@ -311,7 +311,7 @@ Every item was re-checked against the slide source; version and behaviour claims
 - **#9 (tenancy):** both slides now lead with Hibernate `@TenantId`. The `@Filter` traps and the RLS caveats are kept, and the deck slide links to the Spring Boot one.
 - **Section 4, DSA:** the three missing "six in streams" slides are written for patterns 28–30. The orientation now says five slides per pattern on all three orientation slides, not only the first.
 - **Section 4, numbered references:** one more prose slide number was found and converted: the C4 slide's "slide 2 of this deck" (`deck/08-scale-and-governance/05`).
-- **Section 4, study plan:** `017-plan.html` now covers all nine tabs and points to the rounds table, which now also links the System design tab.
+- **Section 4, study plan:** `017-plan.html` now covers all ten tabs (including the SQL & NoSQL tab merged from main) and points to the rounds table, which now also links the System design tab.
 - **Section 4, graceful shutdown:** the Spring Boot examples now set `spring.lifecycle.timeout-per-shutdown-phase` instead of the default `server.shutdown: graceful`.
 
 **Not done**
