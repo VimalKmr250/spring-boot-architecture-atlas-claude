@@ -7,7 +7,7 @@
       <h3>1 · Set a property <span class="tag g">weakest, best</span></h3>
 <pre style="margin-top:6px"><code class="language-yaml">spring.jpa.open-in-view: false
 spring.datasource.hikari.maximum-pool-size: 20
-server.shutdown: graceful</code></pre>
+spring.lifecycle.timeout-per-shutdown-phase: 20s</code></pre>
       <p>Covers the large majority of real cases. Nothing to maintain, survives every upgrade.</p>
     </div>
     <div class="card">
@@ -19,8 +19,8 @@ ObjectMapper objectMapper() { ... }     // auto-config backs off</code></pre>
     <div class="card">
       <h3>3 · Customise instead of replace <span class="tag g">usually right</span></h3>
 <pre style="margin-top:6px"><code class="language-java">@Bean
-Jackson2ObjectMapperBuilderCustomizer dates() {
-    return b -&gt; b.simpleDateFormat("yyyy-MM-dd");
+Jackson2ObjectMapperBuilderCustomizer money() {
+    return b -&gt; b.serializerByType(Money.class, new MoneySerializer());
 }</code></pre>
       <p>Boot exposes a <code>*Customizer</code> for most things it builds. You change one setting and keep every default — almost always what you actually wanted in case 2.</p>
     </div>

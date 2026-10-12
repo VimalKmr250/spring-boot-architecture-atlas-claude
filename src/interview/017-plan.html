@@ -1,35 +1,39 @@
     <section class="ivsec" id="plan">
       <h2>A three-week plan</h2>
-      <p class="dek">If the interview is booked, this order gets the most out of the atlas per hour. It assumes about ninety minutes on weekdays and a longer session at the weekend. With less time, shorten each week but keep the order: mechanisms first, then systems, then rehearsal.</p>
+      <p class="dek">If the interview is booked, this order gets the most out of the atlas per hour. It assumes about ninety minutes on weekdays and a longer session at the weekend. Start from <a href="#rounds">the rounds in your loop</a> and drop the lines for rounds you will not face: an AI line for a role with no LLM work, the low-level design lines for a loop without machine coding. With less time, shorten each week but keep the order: mechanisms first, then systems, then rehearsal.</p>
       <div class="grid3">
         <div class="card">
           <h3>Week 1 · Mechanisms</h3>
           <ul class="checks tight">
+            <li>Core Java tab: Collections, Concurrency foundations and The JVM. Every Spring answer eventually lands on one of them.</li>
             <li>Spring Boot tab: Lifecycle, JPA and Internals. The proxy, the persistence context and transaction boundaries answer a third of any Spring deep-dive.</li>
+            <li>Java streams tab: How a stream runs, then Collectors. Laziness and ordering come up in both the deep-dive and the coding round.</li>
             <li>This page: Spring &amp; Java and Security, answered out loud before you read the answers.</li>
             <li>DSA: the orientation and complexity slides, then patterns 01–10, about two a day. Code the two "if you only drill two" problems for each.</li>
           </ul>
-          <p class="xrefs"><a data-deck="sb" data-sec="Lifecycle">Boot · Lifecycle</a><a data-deck="sb" data-sec="JPA">Boot · JPA</a><a data-deck="sb" data-sec="Internals">Boot · Internals</a><a data-deck="dsa" data-slide="What this deck is">DSA · Start</a></p>
+          <p class="xrefs"><a data-deck="cj" data-sec="Collections">Java · Collections</a><a data-deck="cj" data-sec="Concurrency foundations">Java · Concurrency</a><a data-deck="cj" data-sec="The JVM">Java · JVM</a><a data-deck="sb" data-sec="Lifecycle">Boot · Lifecycle</a><a data-deck="sb" data-sec="JPA">Boot · JPA</a><a data-deck="sb" data-sec="Internals">Boot · Internals</a><a data-deck="st" data-sec="How a stream runs">Streams · How it runs</a><a data-deck="dsa" data-slide="What this deck is">DSA · Start</a></p>
         </div>
         <div class="card">
-          <h3>Week 2 · Systems</h3>
+          <h3>Week 2 · Systems and design</h3>
           <ul class="checks tight">
-            <li>Reference deck: Modular monolith, Backend, Middleware and Data.</li>
-            <li>Event-driven tab: Guarantees and Kafka internals.</li>
+            <li>System design tab: Fundamentals, Estimation, Data and Caching, then two worked designs (URL shortener and news feed) drawn from memory before you read them.</li>
+            <li>Reference deck: Modular monolith, Backend, Middleware and Data. Event-driven tab: Guarantees and Kafka internals.</li>
+            <li>Low-level design tab: SOLID, then the parking lot and the elevator coded against a 45-minute timer.</li>
             <li>This page: Architecture, Data and Integration. Rehearse W1 and W2 out loud against a 45-minute timer.</li>
             <li>DSA patterns 11–20.</li>
           </ul>
-          <p class="xrefs"><a data-deck="deck" data-sec="Modular monolith">Deck · Modular monolith</a><a data-deck="deck" data-sec="Middleware">Deck · Middleware</a><a data-deck="ed" data-sec="Guarantees">Events · Guarantees</a><a data-deck="ed" data-sec="Kafka internals">Events · Kafka internals</a><a data-deck="dsa" data-sec="11 · Heap / top K">DSA · 11</a></p>
+          <p class="xrefs"><a data-deck="hld" data-sec="Fundamentals">HLD · Fundamentals</a><a data-deck="hld" data-sec="Estimation">HLD · Estimation</a><a data-deck="hld" data-sec="Design · News feed">HLD · News feed</a><a data-deck="deck" data-sec="Modular monolith">Deck · Modular monolith</a><a data-deck="deck" data-sec="Middleware">Deck · Middleware</a><a data-deck="ed" data-sec="Guarantees">Events · Guarantees</a><a data-deck="ed" data-sec="Kafka internals">Events · Kafka internals</a><a data-deck="lld" data-sec="SOLID and friends">LLD · SOLID</a><a data-deck="lld" data-sec="Parking lot">LLD · Parking lot</a><a data-deck="dsa" data-sec="11 · Heap / top K">DSA · 11</a></p>
         </div>
         <div class="card">
           <h3>Week 3 · Operating it, then rehearsal</h3>
           <ul class="checks tight">
-            <li>Spring Boot tab: Production. Reference deck: Cross-cutting.</li>
+            <li>Spring Boot tab: Production. Reference deck: Cross-cutting. System design tab: Reliability and Operate &amp; secure.</li>
+            <li>Spring AI tab, if the role touches LLMs: LLM fundamentals, RAG and Production, then its interview questions.</li>
             <li>This page: Production &amp; ops, scripts W3–W5, and the numbers.</li>
             <li>Two mock interviews, one design and one coding, with someone who will interrupt you. Write your five stories and time each at ninety seconds.</li>
             <li>DSA patterns 21–30.</li>
           </ul>
-          <p class="xrefs"><a data-deck="sb" data-sec="Production">Boot · Production</a><a data-deck="deck" data-sec="Cross-cutting">Deck · Cross-cutting</a><a data-deck="dsa" data-sec="21 · Topological sort">DSA · 21</a></p>
+          <p class="xrefs"><a data-deck="sb" data-sec="Production">Boot · Production</a><a data-deck="deck" data-sec="Cross-cutting">Deck · Cross-cutting</a><a data-deck="hld" data-sec="Reliability">HLD · Reliability</a><a data-deck="hld" data-sec="Operate & secure">HLD · Operate</a><a data-deck="ai" data-sec="LLM fundamentals">AI · Fundamentals</a><a data-deck="ai" data-sec="RAG">AI · RAG</a><a data-deck="ai" data-sec="Production">AI · Production</a><a data-deck="dsa" data-sec="21 · Topological sort">DSA · 21</a></p>
         </div>
       </div>
       <div class="note good"><span class="lbl">The day before</span>Re-read the numbers, the red flags and your five stories. Learn nothing new: new material the night before crowds out what you already know, and the interview rewards fluent recall of the basics far more than one extra pattern.</div>

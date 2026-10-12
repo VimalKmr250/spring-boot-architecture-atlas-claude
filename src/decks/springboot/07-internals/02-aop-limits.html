@@ -18,7 +18,7 @@
 
   <div class="split">
     <div class="note bad"><span class="lbl">The ordering bug worth internalising</span>Retry <b>outside</b> transaction: each attempt gets a fresh transaction — correct. Retry <b>inside</b> transaction: the first failure already marked it rollback-only, so every retry runs in a transaction that can never commit, and you get <code>UnexpectedRollbackException</code> after wasting three attempts.
-    <p style="margin-top:8px">Put <code>@Retryable</code> on the <em>caller</em> of the transactional method, not on the transactional method itself.</p></div>
+    <p style="margin-top:8px"><code>@Retryable</code> and <code>@Transactional</code> on the <em>same</em> method is fine: Spring Retry orders its advice just before the transaction's, and Framework 7's retry advisor is added in front of existing ones, so the retry wraps the transaction. The trap is a <code>@Retryable</code> method that <b>joins a transaction its caller already opened</b> — the retry must wrap the <em>outermost</em> transaction.</p></div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="codewrap">
         <div class="codelabel">Proving a proxy exists, in two lines</div>

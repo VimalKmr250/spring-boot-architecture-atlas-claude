@@ -4,9 +4,9 @@
 
   <div class="split">
     <div class="codewrap">
-      <div class="codelabel">The write path: aggregates, JPA, invariants</div>
+      <div class="codelabel">The write path: aggregates, JPA, invariants — as in <a data-deck="deck" data-slide="Use case and transaction">Use case and transaction</a></div>
 <pre><code class="language-java">@Transactional
-public OrderId place(PlaceOrderCommand cmd) { /* slide 15 */ }</code></pre>
+public OrderId place(PlaceOrderCommand cmd) { /* see "Use case and transaction" */ }</code></pre>
       <div class="codelabel" style="margin-top:14px">The read path: no entities, no mapping, one query</div>
 <pre><code class="language-java">@Transactional(readOnly = true)
 public List&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {

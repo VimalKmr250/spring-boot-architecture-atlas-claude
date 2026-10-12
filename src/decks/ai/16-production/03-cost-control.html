@@ -11,7 +11,7 @@
           <tr><td>Trim input</td><td>Smaller memory window, summaries, lower top-K, higher threshold</td><td>Input is most of the bill</td></tr>
           <tr><td>Cap output</td><td><code>maxTokens</code> / <code>maxCompletionTokens</code>; ask for short formats</td><td>Bounds worst cases</td></tr>
           <tr><td>Provider prompt caching</td><td>Stable prefix first; Anthropic <code>cache-options</code>; OpenAI caches long prefixes automatically and accepts a <code>prompt-cache-key</code></td><td>Cached input billed at a fraction of the normal price</td></tr>
-          <tr><td>Semantic cache</td><td>Answer repeated questions from a cache of similar ones (<code>spring-ai-redis-semantic-cache</code>, or your own advisor)</td><td>FAQ-heavy traffic</td></tr>
+          <tr><td>Semantic cache</td><td>Answer repeated questions from a cache of similar ones (<code>spring-ai-redis-semantic-cache</code>, or your own advisor). <b>Key it by tenant and permission set</b>, and never cache answers built from tools or personal data — otherwise one user's answer, grounded in their documents, is served to another (OWASP LLM02 and LLM08)</td><td>FAQ-heavy traffic over shared, public content</td></tr>
           <tr><td>Batch APIs</td><td>Provider batch endpoints for offline jobs</td><td>About half price, hours of latency</td></tr>
           <tr><td>Budgets and limits</td><td>Tool-call limits; a budget advisor (right)</td><td>Stops runaway spend</td></tr>
         </tbody>

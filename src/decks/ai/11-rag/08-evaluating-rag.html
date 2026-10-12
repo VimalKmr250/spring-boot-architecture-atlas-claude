@@ -63,8 +63,11 @@ class PolicyAssistantEvaluationTest {
                 if (answer.sources().isEmpty()) passed++;
                 continue;
             }
+            // Judge against the SAME context the assistant saw: same topK and the
+            // same 0.5 threshold (better still, have ask() return its documents).
             List&lt;Document&gt; context = vectorStore.similaritySearch(
-                    SearchRequest.builder().query(c.question()).topK(5).build());
+                    SearchRequest.builder().query(c.question()).topK(5)
+                            .similarityThreshold(0.5).build());
             var request = new EvaluationRequest(c.question(), context, answer.text());
             if (relevancy.evaluate(request).isPass() &amp;&amp; facts.evaluate(request).isPass()) passed++;
         }

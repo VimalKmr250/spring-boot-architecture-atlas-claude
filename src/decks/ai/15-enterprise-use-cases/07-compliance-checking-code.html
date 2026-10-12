@@ -21,7 +21,8 @@ import org.springframework.stereotype.Service;
 @Service
 class ContractComplianceService {
 
-    record Clause(String id, String heading, String text, Integer paymentDays, BigDecimal liabilityCap) {}
+    record Clause(String id, String heading, String category, String text,
+                  Integer paymentDays, BigDecimal liabilityCap) {}
 
     record ExtractedContract(String supplier, List&lt;Clause&gt; clauses) {}
 
@@ -49,6 +50,8 @@ class ContractComplianceService {
         this.extractor = builder.clone()
                 .defaultSystem("""
                         Split the contract into clauses. Copy each clause's text exactly.
+                        Set category to one of: payment, liability, termination,
+                        data-protection, other.
                         Fill paymentDays and liabilityCap only when the clause states them.""")
                 .build();
         this.judge = builder.clone()
@@ -69,15 +72,18 @@ class ContractComplianceService {
         var f = new FilterExpressionBuilder();
         for (Clause clause : contract.clauses()) {
             numericRules(clause).ifPresent(findings::add);                       // code, not model
+            // EVERY rule for the clause's category, not the few most similar: a
+            // clause that does not LOOK like its rule must still be judged by it.
             List&lt;Document&gt; rules = policies.similaritySearch(SearchRequest.builder()
                     .query(clause.heading() + "\n" + clause.text())
-                    .topK(3)
-                    .similarityThreshold(0.4)
-                    .filterExpression(f.and(f.eq("type", "policy-rule"),
-                            f.eq("version", POLICY_VERSION)).build())
+                    .topK(50)
+                    .similarityThresholdAll()
+                    .filterExpression(f.and(f.and(f.eq("type", "policy-rule"),
+                                    f.eq("version", POLICY_VERSION)),
+                            f.eq("category", clause.category())).build())
                     .build());
             if (rules.isEmpty()) {
-                continue;
+                continue;                                   // no rule governs this category
             }
             String ruleText = rules.stream()
                     .map(r -&gt; r.getMetadata().get("ruleId") + ": " + r.getText())

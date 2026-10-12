@@ -27,29 +27,29 @@
     <div class="codewrap">
       <div class="codelabel">A consumer that survives all three</div>
 <pre><code class="language-java">@KafkaListener(topics = "orders.order.statuschanged.v1", groupId = "projection")
-@Transactional
 public void on(OrderStatusChanged e, Acknowledgment ack) {
+    tx.executeWithoutResult(status -&gt; apply(e));   // commit the work first (TransactionTemplate)...
+    ack.acknowledge();                             // ...then move the offset
+}
 
+private void apply(OrderStatusChanged e) {
     var view = projections.findById(e.orderId()).orElseGet(() -&gt; OrderView.empty(e.orderId()));
 
     // out-of-order + duplicate in one guard
     if (e.aggregateVersion() &lt;= view.appliedVersion()) {
         meters.counter("events.stale", "type", e.type()).increment();
-        ack.acknowledge();
         return;
     }
 
     // late: a business decision, not a technical one
     if (Duration.between(e.occurredAt(), Instant.now()).toHours() &gt; 24) {
         lateEvents.quarantine(e);            // human review, do not silently apply
-        ack.acknowledge();
         return;
     }
 
     view.apply(e);
     view.setAppliedVersion(e.aggregateVersion());
     projections.save(view);
-    ack.acknowledge();
 }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">

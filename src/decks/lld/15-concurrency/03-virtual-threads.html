@@ -1,6 +1,6 @@
 <section class="slide" data-sec="Concurrency" data-title="Virtual threads and structured concurrency">
   <h2>Virtual threads: a thread per task is cheap again, but the downstream is not</h2>
-  <p class="dek">Java 21 made virtual threads final <span class="tag a">since 21</span>. A virtual thread that blocks on I/O or <code>sleep</code> unmounts from its carrier thread, so a program can hold millions of them. In an LLD answer this means "one virtual thread per request" is a reasonable design, and a fixed thread pool is no longer the default. The limit moves to the service you call, so bound that explicitly.</p>
+  <p class="dek">Virtual threads are a final feature <span class="tag a">since 21</span> (JEP 444). A virtual thread that blocks on I/O or <code>sleep</code> unmounts from its carrier thread, so a program can hold millions of them. In an LLD answer this means "one virtual thread per request" is a reasonable design, and a fixed thread pool is no longer the default. The limit moves to the service you call, so bound that explicitly.</p>
 
   <div class="split">
     <div class="codewrap">

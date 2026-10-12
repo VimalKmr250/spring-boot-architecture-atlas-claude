@@ -5,25 +5,32 @@
   <div class="split">
     <div class="codewrap">
       <div class="codelabel">Scoping applied centrally, not per query</div>
-<pre><code class="language-java">// Hibernate filter enabled once per request — every query gets the predicate
+<pre><code class="language-java">// Hibernate 6+: a tenant discriminator the ORM adds to EVERY query,
+// insert and find-by-id. The value comes from your
+// CurrentTenantIdentifierResolver (hibernate.tenant_identifier_resolver).
 @Entity
+class OrderJpaEntity {
+    @TenantId String tenantId;
+    ...
+}
+
+// A Hibernate @Filter also works, with two traps:
 @FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
 @Filter(name = "tenant", condition = "tenant_id = :tenantId")
-class OrderJpaEntity { ... }
-
-@Component
-class TenantFilterActivator {
-    @PersistenceContext EntityManager em;
-    void activate(String tenantId) {
-        em.unwrap(Session.class).enableFilter("tenant").setParameter("tenantId", tenantId);
-    }
-}
+// 1. It is NOT applied to find() / findById or to @ManyToOne loads — a
+//    cross-tenant read by id — unless @FilterDef(applyToLoadByKey = true),
+//    which is still incubating.
+// 2. enableFilter() lives on ONE Session. With open-in-view off, enable it at
+//    the start of every transaction (an aspect), not once per request.
 
 // Stronger: let PostgreSQL enforce it, so even a native query or a rogue
 // psql session cannot see another tenant's rows.
 // ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+// ALTER TABLE orders FORCE ROW LEVEL SECURITY;  -- else the owner bypasses it
 // CREATE POLICY tenant_isolation ON orders
-//   USING (tenant_id = current_setting('app.tenant_id'));</code></pre>
+//   USING (tenant_id = current_setting('app.tenant_id'));
+// Pooled connections: select set_config('app.tenant_id', ?, true) at the
+// start of EVERY transaction (true = local to it, so it cannot leak).</code></pre>
       <div class="codelabel" style="margin-top:14px">Testing security</div>
 <pre><code class="language-java">@WebMvcTest(OrderController.class)
 class OrderControllerSecurityTest {

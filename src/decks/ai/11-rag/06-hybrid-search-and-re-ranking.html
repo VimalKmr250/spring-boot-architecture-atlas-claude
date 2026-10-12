@@ -39,40 +39,49 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 
 /** Vector + keyword search merged with reciprocal rank fusion. */
 class HybridDocumentRetriever implements DocumentRetriever {
 
-    /** Your full-text search: PostgreSQL tsvector, Elasticsearch, OpenSearch… */
+    /** Your full-text search: PostgreSQL tsvector, Elasticsearch, OpenSearch…
+     *  It must enforce the same tenant and ACL filter as the vector store. */
     interface KeywordSearch {
-        List&lt;Document&gt; search(String text, int limit);
+        List&lt;Document&gt; search(String text, int limit, Filter.Expression access);
     }
 
     private static final int K = 60;          // the usual RRF constant
 
     private final VectorStore vectorStore;
     private final KeywordSearch keywordSearch;
+    private final Supplier&lt;Filter.Expression&gt; accessFilter;   // the caller's tenant + ACL groups
     private final int candidates;
     private final int topK;
 
     HybridDocumentRetriever(VectorStore vectorStore, KeywordSearch keywordSearch,
-                            int candidates, int topK) {
+                            Supplier&lt;Filter.Expression&gt; accessFilter, int candidates, int topK) {
         this.vectorStore = vectorStore;
         this.keywordSearch = keywordSearch;
+        this.accessFilter = accessFilter;
         this.candidates = candidates;
         this.topK = topK;
     }
 
     @Override
     public List&lt;Document&gt; retrieve(Query query) {
+        // The SAME access filter on both legs: a keyword index without it
+        // happily returns another tenant's passage for an exact-match term.
+        Filter.Expression access = accessFilter.get();
         List&lt;Document&gt; semantic = vectorStore.similaritySearch(
-                SearchRequest.builder().query(query.text()).topK(candidates).build());
-        List&lt;Document&gt; lexical = keywordSearch.search(query.text(), candidates);
+                SearchRequest.builder().query(query.text()).topK(candidates)
+                        .filterExpression(access).build());
+        List&lt;Document&gt; lexical = keywordSearch.search(query.text(), candidates, access);
 
         Map&lt;String, Double&gt; score = new HashMap&lt;&gt;();
         Map&lt;String, Document&gt; byId = new HashMap&lt;&gt;();

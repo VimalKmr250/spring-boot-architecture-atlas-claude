@@ -37,8 +37,10 @@ ResponseEntity&lt;OrderView&gt; place(
 
 // execute(): INSERT INTO idempotency_key(key, fingerprint, status) VALUES (?,?, 'IN_PROGRESS')
 //   unique violation + same fingerprint  → return the stored response (200/201, same body)
+//     ...but still IN_PROGRESS           → 409, the first request has not finished yet
 //   unique violation + diff. fingerprint → 422, the client reused a key for a different request
-//   success                              → store response body + status against the key, TTL 24h</code></pre>
+//   success                              → store response body + status against the key, TTL 24h
+//   failure                              → delete the key (or store the error) so a retry can run</code></pre>
     </div>
   </div>
 

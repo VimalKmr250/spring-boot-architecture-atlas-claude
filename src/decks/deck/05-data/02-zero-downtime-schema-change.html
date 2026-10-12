@@ -7,7 +7,7 @@
       <thead><tr><th>Release</th><th>Migration</th><th>Application code</th><th>Safe because</th></tr></thead>
       <tbody>
         <tr><td>R1 · expand</td><td><code>ALTER TABLE orders ADD COLUMN total_minor bigint NULL;</code></td><td>Writes both <code>total</code> and <code>total_minor</code>; reads <code>total</code></td><td>New column is nullable; old pods ignore it</td></tr>
-        <tr><td>R1.5 · backfill</td><td>Batched <code>UPDATE ... WHERE total_minor IS NULL LIMIT 10000</code></td><td>unchanged</td><td>Batched, so no long lock on a 40M-row table</td></tr>
+        <tr><td>R1.5 · backfill</td><td>Batched <code>UPDATE ... WHERE id IN (SELECT id ... WHERE total_minor IS NULL LIMIT 10000)</code> — PostgreSQL's <code>UPDATE</code> has no <code>LIMIT</code></td><td>unchanged</td><td>Batched, so no long lock on a 40M-row table</td></tr>
         <tr><td>R2 · switch</td><td>—</td><td>Reads <code>total_minor</code>, still writes both</td><td>Data is complete in both columns</td></tr>
         <tr><td>R3 · contract</td><td><code>ALTER TABLE orders DROP COLUMN total;</code></td><td>Writes and reads <code>total_minor</code> only</td><td>No running version references the old column</td></tr>
       </tbody>

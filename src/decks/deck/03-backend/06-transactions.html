@@ -31,6 +31,6 @@ class OrderService {
     </div>
   </div>
 
-  <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking and lets the driver route to a replica.</div>
+  <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking, and it is the flag a read replica is routed on. The PostgreSQL driver does not route by itself: you need a routing <code>DataSource</code>, such as <code>LazyConnectionDataSourceProxy</code> with a read-only target (Framework 6.1+).</div>
 </section>
 

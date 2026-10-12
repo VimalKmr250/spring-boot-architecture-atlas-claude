@@ -14,6 +14,7 @@ class ModuleBoundaryTest {
             .namingSlices("module $1")
             .should().notDependOnEachOther()
             .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.(*).api.."))
+            .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.(*).spi.."))  // adapters implement it
             .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.shared.."));
 
     /** 2. No module cycles — the rule that keeps extraction possible. */

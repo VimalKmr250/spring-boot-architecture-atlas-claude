@@ -1,0 +1,156 @@
+<section class="slide" data-sec="28 · Knapsack / subset DP" data-title="The six, in streams">
+  <h2>A fresh row per item makes 0/1 knapsack clean; reuse makes it state</h2>
+  <p class="dek">The loop version walks capacity backwards because it overwrites one row in place, and walking forwards would count an item twice. Build a new row from the old one for each item and that hazard disappears: every entry reads only the previous row, so <code>Stream.iterate(seed, step).skip(n)</code> folds the items cleanly, at the price of one array per item. That covers 416, 494, 1049, 474 and 879. 518 is the opposite case: an unbounded item may be reused, which means reading the row being built, so it is stateful by design.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">416</td><td><a href="https://leetcode.com/problems/partition-equal-subset-sum/" target="_blank" rel="noopener">Partition Equal Subset Sum</a></td><td>A reachability row folded over the items: new[s] = old[s] or old[s − x].</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">494</td><td><a href="https://leetcode.com/problems/target-sum/" target="_blank" rel="noopener">Target Sum</a></td><td>The same fold, counting the subsets that sum to (total + target) / 2.</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">1049</td><td><a href="https://leetcode.com/problems/last-stone-weight-ii/" target="_blank" rel="noopener">Last Stone Weight II</a></td><td>416's fold up to total / 2, then the largest reachable s; the answer is total − 2s.</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">518</td><td><a href="https://leetcode.com/problems/coin-change-ii/" target="_blank" rel="noopener">Coin Change II</a></td><td>Coins outer. <code>ways[a] += ways[a - c]</code> reads the entry this pass just wrote, which is the reuse.</td><td><span class="tag w">stateful</span></td><td class="num">O(n·amount) / O(amount)</td><td class="num">same</td></tr>
+        <tr><td class="num">474</td><td><a href="https://leetcode.com/problems/ones-and-zeroes/" target="_blank" rel="noopener">Ones and Zeroes</a></td><td>A 2D row (zeros × ones), rebuilt per string with nested <code>IntStream</code>s.</td><td><span class="tag g">clean</span></td><td class="num">O(len·m·n) / O(m·n)</td><td class="num">same</td></tr>
+        <tr><td class="num">879</td><td><a href="https://leetcode.com/problems/profitable-schemes/" target="_blank" rel="noopener">Profitable Schemes</a></td><td>f[g][p]: schemes with at most g members and profit at least p. A fresh 2D row per crime.</td><td><span class="tag g">clean</span></td><td class="num">O(len·n·minProfit) / O(n·minProfit)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 416 · Partition Equal Subset Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean canPartition(int[] nums) {
+        int total = Arrays.stream(nums).sum();
+        if (total % 2 == 1) return false;
+        int half = total / 2;
+        int[] start = new int[half + 1];
+        start[0] = 1;                       // the empty subset reaches 0
+        // can[s] is 1 if some subset of the items so far sums to s.
+        // Each item maps the old row to a NEW row: nothing is overwritten.
+        record Row(int i, int[] can) {}
+        Row last = Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, half)
+                                .map(s -&gt; r.can()[s] == 1
+                                        || s &gt;= nums[r.i()] &amp;&amp; r.can()[s - nums[r.i()]] == 1 ? 1 : 0)
+                                .toArray()))
+                .skip(nums.length).findFirst().get();
+        return last.can()[half] == 1;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 494 · Target Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int findTargetSumWays(int[] nums, int target) {
+        int total = Arrays.stream(nums).sum();
+        // The plus signs pick a subset P with sum(P) = (total + target) / 2.
+        if (Math.abs(target) &gt; total || (total + target) % 2 != 0) return 0;
+        int p = (total + target) / 2;
+        int[] start = new int[p + 1];
+        start[0] = 1;
+        // ways[s]: subsets of the items so far that sum to s. A zero
+        // doubles every count, which the formula handles on its own.
+        record Row(int i, int[] ways) {}
+        return Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, p)
+                                .map(s -&gt; r.ways()[s]
+                                        + (s &gt;= nums[r.i()] ? r.ways()[s - nums[r.i()]] : 0))
+                                .toArray()))
+                .skip(nums.length).findFirst().get().ways()[p];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1049 · Last Stone Weight II · clean</div>
+<pre><code class="language-java">class Solution {
+    public int lastStoneWeightII(int[] stones) {
+        // Smashing splits the stones into two piles; what is left is
+        // |P - N|. Get one pile as close to total / 2 as possible.
+        int total = Arrays.stream(stones).sum();
+        int half = total / 2;
+        int[] start = new int[half + 1];
+        start[0] = 1;
+        record Row(int i, int[] can) {}
+        int[] can = Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, half)
+                                .map(s -&gt; r.can()[s] == 1
+                                        || s &gt;= stones[r.i()] &amp;&amp; r.can()[s - stones[r.i()]] == 1 ? 1 : 0)
+                                .toArray()))
+                .skip(stones.length).findFirst().get().can();
+        int best = IntStream.rangeClosed(0, half).filter(s -&gt; can[s] == 1).max().getAsInt();
+        return total - 2 * best;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 518 · Coin Change II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int change(int amount, int[] coins) {
+        int[] ways = new int[amount + 1];
+        ways[0] = 1;
+        // Coins outer, so each combination is counted once, in coin
+        // order. Ascending a reads ways[a - c] AFTER this coin's pass
+        // updated it: that reuse is what "unbounded" means, and it is state.
+        Arrays.stream(coins).forEach(c -&gt;
+                IntStream.rangeClosed(c, amount).forEach(a -&gt; ways[a] += ways[a - c]));
+        return ways[amount];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 474 · Ones and Zeroes · clean</div>
+<pre><code class="language-java">class Solution {
+    public int findMaxForm(String[] strs, int m, int n) {
+        // best[i][j]: the largest subset of the strings so far that fits
+        // in i zeros and j ones. Each string builds a NEW table.
+        record Table(int k, int[][] best) {}
+        return Stream.iterate(new Table(0, new int[m + 1][n + 1]), t -&gt; {
+                    String s = strs[t.k()];
+                    int zeros = (int) s.chars().filter(ch -&gt; ch == '0').count();
+                    int ones = s.length() - zeros;
+                    int[][] b = t.best();
+                    return new Table(t.k() + 1, IntStream.rangeClosed(0, m)
+                            .mapToObj(i -&gt; IntStream.rangeClosed(0, n)
+                                    .map(j -&gt; i &gt;= zeros &amp;&amp; j &gt;= ones
+                                            ? Math.max(b[i][j], b[i - zeros][j - ones] + 1)
+                                            : b[i][j])
+                                    .toArray())
+                            .toArray(int[][]::new));
+                })
+                .skip(strs.length).findFirst().get().best()[m][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 879 · Profitable Schemes · clean</div>
+<pre><code class="language-java">class Solution {
+    public int profitableSchemes(int n, int minProfit, int[] group, int[] profit) {
+        int mod = 1_000_000_007;
+        // f[g][p]: schemes among the crimes so far using AT MOST g members
+        // with profit AT LEAST p. Taking crime k leaves p - profit[k] to
+        // find elsewhere, and anything at or below 0 is already met.
+        int[][] start = new int[n + 1][minProfit + 1];
+        Arrays.stream(start).forEach(row -&gt; row[0] = 1);   // the empty scheme
+        record Table(int k, int[][] f) {}
+        return Stream.iterate(new Table(0, start), t -&gt; {
+                    int g0 = group[t.k()], p0 = profit[t.k()];
+                    int[][] f = t.f();
+                    return new Table(t.k() + 1, IntStream.rangeClosed(0, n)
+                            .mapToObj(g -&gt; IntStream.rangeClosed(0, minProfit)
+                                    .map(p -&gt; (f[g][p]
+                                            + (g &gt;= g0 ? f[g - g0][Math.max(0, p - p0)] : 0)) % mod)
+                                    .toArray())
+                            .toArray(int[][]::new));
+                })
+                .skip(group.length).findFirst().get().f()[n][minProfit];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">A new row removes the backwards loop</span>The in-place loop walks s from the top down so that <code>dp[s]</code> reads <code>dp[s - x]</code> before this item overwrites it. Mapping the old row to a new one reads only old values, in any order, so the pipeline is clean and the direction no longer matters. The cost is an allocation per item: still O(sum) live memory, because each old row becomes garbage, but n arrays are created and dropped. 879's "at least p" definition is what lets each entry pull from exactly one old entry, <code>f[g - g0][max(0, p - p0)]</code>, instead of summing over several.</div>
+  <div class="note warn"><span class="lbl">518 cannot take a fresh row</span>An unbounded coin may be used again, so the recurrence is <code>new[a] = old[a] + new[a - c]</code>: it reads the row being built. Any stream that writes that row is stateful, and the ascending order is load-bearing. Swap the loops, amounts outer and coins inner, and you count ordered sequences instead of combinations: that is 377, Combination Sum IV.</div>
+</section>
+

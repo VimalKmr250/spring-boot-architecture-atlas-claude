@@ -24,12 +24,13 @@ class OrderService {
     @PostAuthorize("returnObject.customerId.value() == authentication.name")
     OrderView find(OrderId id) { ... }
 
-    // Filters the INPUT collection before the call
+    // Filters the INPUT collection before the call — the elements must carry
+    // the field the rule reads, so this takes approvals, not bare OrderIds
     @PreFilter("filterObject.region == authentication.principal.region")
-    void bulkApprove(List&lt;OrderId&gt; ids) { ... }
+    void bulkApprove(List&lt;ApprovalRequest&gt; requests) { ... }
 
-    // Filters the RETURNED collection after the call
-    @PostFilter("hasRole('OPS') or filterObject.customerId == authentication.name")
+    // Filters the RETURNED collection after the call — .value() again
+    @PostFilter("hasRole('OPS') or filterObject.customerId.value() == authentication.name")
     List&lt;OrderView&gt; search(OrderSearch f) { ... }
 
     @Secured("ROLE_OPS")            // older, no SpEL — string roles only

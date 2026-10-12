@@ -23,7 +23,8 @@ class OrderPlacedUpcaster {
     private OrderPlaced fromV1(JsonNode n) {
         return new OrderPlaced(
             n.get("orderId").asText(),
-            Money.ofMajor(n.get("total").asDouble(), "GBP"),    // the assumption, documented
+            Money.ofMajor(n.get("total").decimalValue(), "GBP"),  // GBP: the assumption, documented;
+                                                                   // BigDecimal, never a double, for money
             n.path("occurredAt").asText());
     }
 }</code></pre>

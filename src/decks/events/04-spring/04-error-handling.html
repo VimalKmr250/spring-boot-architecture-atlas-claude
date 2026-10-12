@@ -16,18 +16,18 @@ DefaultErrorHandler errorHandler(KafkaTemplate&lt;Object, Object&gt; template) {
         (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
     var handler = new DefaultErrorHandler(recoverer,
-        new ExponentialBackOffWithMaxRetries(3));      // 3 attempts, then DLT
+        new ExponentialBackOffWithMaxRetries(3));      // 3 RETRIES = 4 attempts, then DLT
 
-    // A poison pill never gets better — do not waste three attempts on it
+    // A poison pill never gets better — do not waste retries on it
     handler.addNotRetryableExceptions(
         DeserializationException.class,
         MethodArgumentNotValidException.class,
         IllegalArgumentException.class);
 
-    // Transient problems that deserve every retry
-    handler.addRetryableExceptions(
-        TransientDataAccessException.class,
-        ResourceAccessException.class);
+    // Transient problems (TransientDataAccessException, ResourceAccessException)
+    // need nothing: every exception is retryable by default.
+    // addRetryableExceptions(...) only matters after handler.defaultFalse(),
+    // which flips the default to "retry only what I list".
 
     handler.setRetryListeners((record, ex, attempt) -&gt;
         meters.counter("consumer.retry", "topic", record.topic(),
@@ -48,7 +48,7 @@ kafka_dlt-exception-fqcn       com.retailco…InsufficientStock
 kafka_dlt-exception-message    Only 2 left of SKU-8842</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="note bad"><span class="lbl">Blocking retries block the partition</span>The default handler retries <b>in place</b>, pausing the consumer. Three attempts with exponential backoff on a record that will never succeed stalls every record behind it on that partition — a head-of-line block that looks like a dead consumer. This is why bounded retries plus a DLT is non-negotiable, and why the next slide exists.</div>
+      <div class="note bad"><span class="lbl">Blocking retries block the partition</span>The default handler retries <b>in place</b>, pausing the consumer. Four attempts with exponential backoff on a record that will never succeed stalls every record behind it on that partition — a head-of-line block that looks like a dead consumer. This is why bounded retries plus a DLT is non-negotiable, and why the next slide exists.</div>
       <div class="note warn"><span class="lbl">A DLT with no owner is data loss with extra steps</span>Alert on DLT depth greater than zero. Route it to the team that owns the consumer, not to the platform team. And have a documented, tested replay path — a DLT nobody drains is a queue of business events quietly not happening.</div>
       <div class="note tip"><span class="lbl">Classify errors deliberately</span><b>Transient</b> (network, deadlock, 503) → retry. <b>Poison</b> (malformed, schema mismatch) → straight to DLT. <b>Business</b> (insufficient stock) → often not an error at all: emit a compensating event and acknowledge. Treating the third as a technical failure is how DLTs fill with perfectly normal outcomes.</div>
     </div>

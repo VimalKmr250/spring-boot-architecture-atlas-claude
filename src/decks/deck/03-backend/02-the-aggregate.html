@@ -11,6 +11,7 @@
     private final List&lt;OrderLine&gt; lines;
     private OrderStatus status;
     private Money total;
+    private PaymentReference paymentRef;     // null until the order is paid
     private long version;                    // optimistic lock, see the concurrency slide
 
     /** Factory carries the creation rules; no public constructor, no setters. */

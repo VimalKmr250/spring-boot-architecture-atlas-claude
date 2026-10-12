@@ -1,6 +1,6 @@
 <section class="slide" data-sec="Core annotations" data-title="Async, scheduling, caching, testing">
   <h2>The proxy-driven annotations, and the test set</h2>
-  <p class="dek">Everything in the left column works by the proxy from the bean-lifecycle slide — which means every one of them silently does nothing on a self-invocation, on a <code>private</code> method, or on a <code>final</code> class.</p>
+  <p class="dek"><code>@Async</code>, the cache annotations and <code>@Retryable</code> work through the proxy from the bean-lifecycle slide — so each silently does nothing on a self-invocation or a <code>private</code> method, and a <code>final</code> class cannot be given a class-based proxy at all, which fails at startup. <code>@Scheduled</code> and the event listeners are registered by post-processors instead, so self-invocation does not affect them.</p>
 
   <div class="split">
     <div class="codewrap">
@@ -22,8 +22,9 @@ ProductView byKey(String sku) { ... }
 @Caching(evict = { @CacheEvict("product"), @CacheEvict("catalog") })
 
 @EventListener                                    // fires immediately, same thread
-@TransactionalEventListener(phase = AFTER_COMMIT) // fires only if the tx committed
-void on(OrderPlaced event) { ... }
+@TransactionalEventListener(phase = AFTER_COMMIT) // fires only if the tx committed —
+void on(OrderPlaced event) { ... }                // and is DROPPED if no tx was active
+                                                  // (fallbackExecution = true runs it anyway)
 
 // Spring Retry (3.x). @EnableRetry on a @Configuration.
 @Retryable(retryFor = TransientException.class, maxAttempts = 3,
@@ -42,13 +43,14 @@ void on(OrderPlaced event) { ... }
 @MockitoSpyBean PricingService pricing;
 
 @TestConfiguration              // extra beans for tests, NOT picked up by component scan
-@DynamicPropertySource          // wire container ports into properties
+@ServiceConnection              // Boot 3.1+: a container @Bean wires its own connection
+@DynamicPropertySource          // anything @ServiceConnection does not cover
 @ActiveProfiles("test")
 @Sql("/seed-orders.sql")
 @Transactional                  // on a test = rollback after each method</code></pre>
       </div>
-      <div class="note warn"><span class="lbl">Three traps in one slide</span><b><code>@Async</code> without an executor</b> uses a <code>SimpleAsyncTaskExecutor</code> that creates an unbounded number of threads — define your own <code>ThreadPoolTaskExecutor</code> with a bounded queue and a rejection policy. <b><code>fixedRate</code></b> can overlap runs if one takes longer than the interval; <code>fixedDelay</code> cannot. <b><code>@Transactional</code> on a test</b> rolls back — which means it also hides the constraint violations that only fire at commit.</div>
-      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> the retry annotation you know is not the one you get</span>Framework 7 ships its own <code>@Retryable</code> in <code>org.springframework.core.retry</code>, and it is <b>not</b> a drop-in rename. <code>retryFor</code>/<code>noRetryFor</code> become <code>includes</code>/<code>excludes</code>; the nested <code>@Backoff</code> flattens into <code>delay</code>/<code>multiplier</code>/<code>jitter</code>/<code>maxDelay</code>; <code>maxAttempts = 3</code> becomes <code>maxRetries = 2</code> — it counts <em>retries</em>, not attempts, so a straight copy silently gives you one extra call; there is <b>no <code>@Recover</code></b>, so recovery moves to a <code>catch</code> in the caller; and nothing is advised at all without <code>@EnableResilientMethods</code>. <code>@ConcurrencyLimit</code> arrives alongside it for bulkheads. Keep Spring Retry on the classpath if you rely on <code>@Recover</code>.</div>
+      <div class="note warn"><span class="lbl">Three traps in one slide</span><b><code>@Async</code> without a named executor</b> runs on Boot's <code>applicationTaskExecutor</code>: 8 core threads and an <b>unbounded queue</b>, so a slow downstream builds a silent backlog rather than more threads (with <code>spring.threads.virtual.enabled</code> it is a virtual-thread executor instead). Name a bounded <code>ThreadPoolTaskExecutor</code> with a rejection policy — and know that declaring any <code>Executor</code> bean makes Boot's own back off, unless you register yours with <code>@Bean(defaultCandidate = false)</code>. <b><code>fixedRate</code></b> can overlap runs if one takes longer than the interval; <code>fixedDelay</code> cannot. <b><code>@Transactional</code> on a test</b> rolls back — which means it also hides the constraint violations that only fire at commit.</div>
+      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> the retry annotation you know is not the one you get</span>Framework 7 ships its own <code>@Retryable</code> in <code>org.springframework.resilience.annotation</code> (the programmatic <code>RetryTemplate</code> lives in <code>org.springframework.core.retry</code>), and it is <b>not</b> a drop-in rename. <code>retryFor</code>/<code>noRetryFor</code> become <code>includes</code>/<code>excludes</code>; the nested <code>@Backoff</code> flattens into <code>delay</code>/<code>multiplier</code>/<code>jitter</code>/<code>maxDelay</code>; <code>maxAttempts = 3</code> becomes <code>maxRetries = 2</code> — it counts <em>retries</em>, not attempts, so a straight copy silently gives you one extra call; there is <b>no <code>@Recover</code></b>, so recovery moves to a <code>catch</code> in the caller; and nothing is advised at all without <code>@EnableResilientMethods</code>. <code>@ConcurrencyLimit</code> arrives alongside it for bulkheads. Keep Spring Retry on the classpath if you rely on <code>@Recover</code>.</div>
     </div>
   </div>
 </section>

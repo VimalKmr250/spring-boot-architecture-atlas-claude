@@ -38,8 +38,11 @@ public @interface ValidDateRange {
     Class&lt;? extends Payload&gt;[] payload() default {};
 }
 
-class DateRangeValidator implements ConstraintValidator&lt;ValidDateRange, OrderPayload&gt; {
-    public boolean isValid(OrderPayload p, ConstraintValidatorContext ctx) {
+@ValidDateRange
+record DeliveryRequest(@NotNull Instant placedAt, @NotNull Instant deliverBy) { }
+
+class DateRangeValidator implements ConstraintValidator&lt;ValidDateRange, DeliveryRequest&gt; {
+    public boolean isValid(DeliveryRequest p, ConstraintValidatorContext ctx) {
         if (p.placedAt() == null || p.deliverBy() == null) return true;   // let @NotNull say it
         boolean ok = p.deliverBy().isAfter(p.placedAt());
         if (!ok) {

@@ -17,12 +17,12 @@
 class MdcFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
                                     FilterChain chain) throws IOException, ServletException {
-        MDC.put("tenantId", TenantContext.current());
-        MDC.put("channel", req.getHeader("X-Channel"));
-        try {
+        // putCloseable removes the key on close, so pooled threads cannot carry it
+        // to the next request — and removes ONLY these keys: MDC.clear() would
+        // also wipe the traceId/spanId the tracer put there.
+        try (var tenant = MDC.putCloseable("tenantId", TenantContext.current());
+             var channel = MDC.putCloseable("channel", req.getHeader("X-Channel"))) {
             chain.doFilter(req, res);
-        } finally {
-            MDC.clear();            // ALWAYS — pooled threads carry it to the next request
         }
     }
 }
@@ -36,7 +36,7 @@ log.atInfo()
    .log();</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="note bad"><span class="lbl">Forgetting <code>MDC.clear()</code></span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always clear in a <code>finally</code>.</div>
+      <div class="note bad"><span class="lbl">Leaving MDC keys behind</span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always remove your keys when the request ends — <code>MDC.putCloseable</code> or a <code>finally</code> — and only your keys: <code>MDC.clear()</code> also strips the trace ids from every later line in the request.</div>
       <div class="note warn"><span class="lbl">MDC does not cross threads</span><code>@Async</code>, <code>CompletableFuture</code>, Kafka listeners and scheduled jobs all start with an empty MDC. Propagate explicitly — a <code>TaskDecorator</code> on your executor that copies the map is the standard fix, and it is about ten lines.</div>
       <div class="note tip"><span class="lbl">Runtime log levels</span><code>POST /actuator/loggers/com.retailco.shop.payment {"configuredLevel":"DEBUG"}</code> turns on debug for one package on one pod, with no restart and no deploy. Then turn it off. This is the single most useful production debugging capability Boot gives you, and most teams never enable the endpoint.</div>
     </div>

@@ -1,0 +1,140 @@
+<section class="slide" data-sec="30 · String / sequence DP" data-title="The six, in streams">
+  <h2>Two strings, one table: the left cell is state unless the recurrence skips it</h2>
+  <p class="dek">Every problem here fills a table indexed by prefixes of two strings, one row at a time. 1143, 583, 1312, 72 and 97 read the cell to their left in the same row, so the row is filled by a stream that reads what it just wrote: stateful, and correct only sequentially. 115 is the exception worth noticing. Its cell reads only the row above, so it folds into a fresh row per character with <code>Stream.iterate</code>, and that pipeline is clean.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1143</td><td><a href="https://leetcode.com/problems/longest-common-subsequence/" target="_blank" rel="noopener">Longest Common Subsequence</a></td><td>Two alternating rows. A match takes up-left + 1; otherwise max(up, left).</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">583</td><td><a href="https://leetcode.com/problems/delete-operation-for-two-strings/" target="_blank" rel="noopener">Delete Operation for Two Strings</a></td><td>m + n − 2·lcs, with 1143's table.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1312</td><td><a href="https://leetcode.com/problems/minimum-insertion-steps-to-make-a-string-palindrome/" target="_blank" rel="noopener">Minimum Insertion Steps to Make a String Palindrome</a></td><td>n − lcs(s, reverse(s)), with the same table.</td><td><span class="tag w">stateful</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">72</td><td><a href="https://leetcode.com/problems/edit-distance/" target="_blank" rel="noopener">Edit Distance</a></td><td>A three-way min of up-left, up and left, after writing the row's base case.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">115</td><td><a href="https://leetcode.com/problems/distinct-subsequences/" target="_blank" rel="noopener">Distinct Subsequences</a></td><td>A fresh row per character of s: ways[j] + (match ? ways[j − 1] : 0), both from the row above.</td><td><span class="tag g">clean</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">97</td><td><a href="https://leetcode.com/problems/interleaving-string/" target="_blank" rel="noopener">Interleaving String</a></td><td>One boolean row: s3's next character comes from s1 (above) or s2 (left).</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 1143 · Longest Common Subsequence · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int longestCommonSubsequence(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];   // this row and the one above
+        // cur[j] = a match ? up-left + 1 : max(up, left). "left" is this
+        // row's previous entry, written a moment ago: sequential only.
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 583 · Delete Operation for Two Strings · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minDistance(String a, String b) {
+        // Keep the longest common subsequence; delete everything else.
+        return a.length() + b.length() - 2 * lcs(a, b);
+    }
+
+    // 1143's table: two alternating rows, reading "left".
+    private static int lcs(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1312 · Minimum Insertion Steps · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minInsertions(String s) {
+        // The longest palindromic subsequence stays; every other
+        // character needs a mirror inserted on the other side.
+        return s.length() - lcs(s, new StringBuilder(s).reverse().toString());
+    }
+
+    // 1143's table: two alternating rows, reading "left".
+    private static int lcs(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 72 · Edit Distance · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minDistance(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        Arrays.setAll(rows[0], j -&gt; j);     // row 0: insert j characters
+        // cur[j] = a match ? up-left : 1 + min(up-left, up, left), where
+        // "left" was written a moment ago in this row: sequential only.
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            cur[0] = i;                      // column 0: delete i characters
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] : 1 + Math.min(up[j - 1], Math.min(up[j], cur[j - 1])));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 115 · Distinct Subsequences · clean</div>
+<pre><code class="language-java">class Solution {
+    public int numDistinct(String s, String t) {
+        int n = t.length();
+        int[] start = new int[n + 1];
+        start[0] = 1;                       // the empty t occurs once in anything
+        // ways[j] after one more character of s reads only the PREVIOUS
+        // row: ways[j] + (match ? ways[j - 1] : 0). A fresh row: clean.
+        record Row(int i, int[] ways) {}
+        return Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, n).map(j -&gt; r.ways()[j]
+                                + (j &gt; 0 &amp;&amp; s.charAt(r.i()) == t.charAt(j - 1) ? r.ways()[j - 1] : 0))
+                                .toArray()))
+                .skip(s.length()).findFirst().get().ways()[n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 97 · Interleaving String · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean isInterleave(String s1, String s2, String s3) {
+        int m = s1.length(), n = s2.length();
+        if (m + n != s3.length()) return false;
+        boolean[] ok = new boolean[n + 1];
+        // ok[j] for row i: s3's next character came from s1 (the row above,
+        // ok[j]) or from s2 (the left cell, ok[j - 1], written a moment ago).
+        IntStream.rangeClosed(0, m).forEach(i -&gt;
+                IntStream.rangeClosed(0, n).forEach(j -&gt; ok[j] = i == 0 &amp;&amp; j == 0
+                        || i &gt; 0 &amp;&amp; ok[j] &amp;&amp; s1.charAt(i - 1) == s3.charAt(i + j - 1)
+                        || j &gt; 0 &amp;&amp; ok[j - 1] &amp;&amp; s2.charAt(j - 1) == s3.charAt(i + j - 1)));
+        return ok[n];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Two rows, alternating</span><code>rows[i % 2]</code> is the row being built and <code>rows[(i + 1) % 2]</code> the one above, so the table costs two rows of memory. The left cell sits in the row being built, written one step earlier by the same stream, so these are sequential only. 72 also writes its base case, <code>cur[0] = i</code>, before the inner stream starts, because the left cell of column 1 is that base case.</div>
+  <div class="note good"><span class="lbl">115 reads only the row above</span>Its next row depends on <code>ways[j]</code> and <code>ways[j - 1]</code> of the previous row and never on its own, so each step maps the old row to a new one. The in-place loop gets the same effect by walking j downwards; the fresh row makes the direction irrelevant, the same trade the knapsack slide makes. LeetCode guarantees the answer fits in an int, and because the table only adds, intermediate overflow wraps and cancels out by the end.</div>
+</section>
+

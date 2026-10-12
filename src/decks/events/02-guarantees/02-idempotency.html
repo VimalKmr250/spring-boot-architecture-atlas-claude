@@ -10,15 +10,18 @@ order.setStatus(SHIPPED);        // safe to apply twice
 counter.increment();             // NOT safe — this is the bug</code></pre>
       <div class="codelabel" style="margin-top:12px">2 · Business-key check — the everyday pattern</div>
 <pre><code class="language-java">@KafkaListener(topics = "orders.order.placed.v1", groupId = "inventory")
-@Transactional
-public void on(OrderPlaced event, Acknowledgment ack) {
-    if (reservations.existsByOrderId(event.orderId())) {   // already done
-        ack.acknowledge();
-        return;                                            // a duplicate is not an error
-    }
-    inventory.reserve(event.orderId(), event.lines());
-    ack.acknowledge();
-}</code></pre>
+public void on(OrderPlaced event, Acknowledgment ack) {      // NOT @Transactional — see below
+    tx.executeWithoutResult(status -&gt; {                      // the work commits first...
+        if (reservations.existsByOrderId(event.orderId())) {
+            return;                                          // a duplicate is not an error
+        }
+        inventory.reserve(event.orderId(), event.lines());
+    });
+    ack.acknowledge();                                       // ...then the offset moves
+}
+// tx is a TransactionTemplate. Under MANUAL_IMMEDIATE, acknowledge() commits the
+// offset at once — inside a @Transactional listener that is BEFORE the database
+// commit, and a crash between the two loses the record.</code></pre>
       <div class="codelabel" style="margin-top:12px">3 · Dedupe table on the event id — when there is no natural key</div>
 <pre><code class="language-sql">-- processed in the SAME transaction as the work
 INSERT INTO processed_events (event_id, consumer_group, processed_at)

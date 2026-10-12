@@ -46,7 +46,7 @@
         <text x="578" y="202" font-size="10" fill="currentColor" opacity="0.75">    nothing; you must add partitions first.</text>
       </svg>
     </div>
-    <figcaption>One partition is assigned to exactly one consumer in a group at a time — that is what preserves per-partition ordering, and what caps parallelism at the partition count.</figcaption>
+    <figcaption>One partition is assigned to exactly one consumer in a group at a time — that is what preserves per-partition ordering, and what caps parallelism at the partition count. The exception is a <b>share group</b> (Kafka 4.2+), which gives up that ordering so more consumers than partitions can work through a topic like a queue — see <a data-deck="ed" data-slide="Broker comparison">Broker comparison</a>.</figcaption>
   </figure>
 
   <div class="note tip"><span class="lbl">Group id naming</span>Name it for the <b>logical application</b>, not the instance or the environment: <code>inventory-order-reservation</code>. Putting a hostname or a version in it creates a brand-new group on every deploy, which starts from <code>auto.offset.reset</code> — either replaying everything or silently skipping the backlog.</div>

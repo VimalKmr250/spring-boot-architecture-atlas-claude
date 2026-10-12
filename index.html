@@ -413,6 +413,7 @@ figcaption{font-size:13px;color:var(--text-3);max-width:70ch}
         <li>The <b>Low-level design</b> tab prepares you for object-oriented design and machine-coding rounds: principles, the 23 patterns and seven classic problems, solved in Java 21 code that compiles and runs.</li>
         <li>The <b>Spring AI</b> tab covers LLM integration on Spring AI 2.0 and Boot 4.1: prompts, structured output, memory, tools and MCP, embeddings, RAG, fine-tuning and agents, nine use cases and 24 interview questions, with code compiled against the 2.0.1 jars.</li>
         <li>The <b>Core Java</b> tab covers what every Spring Boot service stands on: the language, collections, concurrency and the JVM, with every claim shown by a program and the output it printed on JDK 25.</li>
+        <li>The <b>DSA</b> tab prepares you for coding rounds: thirty problem-solving patterns, each taught as a reusable Java 17+ structure with a dry run, and drilled on six LeetCode problems.</li>
         <li>The <b>Interview prep</b> tab is a separate page: the same material rearranged as questions, scripts and numbers, with every answer linking back to the slides that go deeper.</li>
       </ul>
     </div>
@@ -807,6 +808,7 @@ class ModuleBoundaryTest {
             .namingSlices("module $1")
             .should().notDependOnEachOther()
             .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.(*).api.."))
+            .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.(*).spi.."))  // adapters implement it
             .ignoreDependency(alwaysTrue(), resideInAPackage("..shop.shared.."));
 
     /** 2. No module cycles — the rule that keeps extraction possible. */
@@ -853,7 +855,11 @@ package com.retailco.shop.order;
 
 // order/api/package-info.java
 @NamedInterface("api")
-package com.retailco.shop.order.api;</code></pre>
+package com.retailco.shop.order.api;
+
+// order/spi/package-info.java — exposed too, so pricing may implement it
+@NamedInterface("spi")
+package com.retailco.shop.order.spi;</code></pre>
     </div>
     <div class="codewrap">
       <div class="codelabel">ModularityTest.java — verification + docs in four lines</div>
@@ -999,7 +1005,7 @@ class OrderPlacedListener {
 
   <div class="grid3">
     <div class="card"><h4><code>@ApplicationModuleListener</code></h4><p>Is just <code>@Async</code> + <code>@Transactional(REQUIRES_NEW)</code> + <code>@TransactionalEventListener(AFTER_COMMIT)</code> in one annotation — the three you would otherwise forget one of.</p></div>
-    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.republish-outstanding-events-on-restart=true</code> replays anything stuck. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
+    <div class="card"><h4>Incomplete-publication job</h4><p><code>spring.modulith.events.republish-outstanding-events-on-restart=true</code> replays anything stuck (the key without <code>.events</code> is deprecated). On several instances a restarting pod can replay events another is still handling, so there prefer one scheduled job calling <code>IncompleteEventPublications.resubmitIncompletePublicationsOlderThan(…)</code>. Alert on the age of the oldest incomplete row — it is your best early-warning metric. Completed rows accumulate under the default <code>completion-mode: UPDATE</code>, so set <code>DELETE</code> or <code>ARCHIVE</code>, or schedule a purge.</p></div>
     <div class="card"><h4>Externalising later</h4><p>Add <code>@Externalized("order.placed::#{#this.orderId}")</code> and the same event goes to Kafka with the key you name. Nothing in the producing code changes.</p></div>
   </div>
 
@@ -1201,6 +1207,7 @@ class OrderPlacedListener {
     private final List&lt;OrderLine&gt; lines;
     private OrderStatus status;
     private Money total;
+    private PaymentReference paymentRef;     // null until the order is paid
     private long version;                    // optimistic lock, see the concurrency slide
 
     /** Factory carries the creation rules; no public constructor, no setters. */
@@ -1264,7 +1271,7 @@ class PlaceOrderUseCase implements OrderService {
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Do not do this here</span><code>if (customer.isVip() &amp;&amp; total.gt(500)) discount = ...</code> — that is a pricing rule sitting in an orchestration class, invisible to the domain model and impossible to unit-test without Spring.</div>
-      <div class="note warn"><span class="lbl">Keep the transaction short</span>Never call an external HTTP API inside <code>@Transactional</code>. A 3-second gateway timeout becomes a 3-second database connection held, and a pool of 20 becomes an outage at 7 concurrent checkouts.</div>
+      <div class="note warn"><span class="lbl">Keep the transaction short</span>Never call an external HTTP API inside <code>@Transactional</code>. A 3-second gateway timeout becomes a 3-second database connection held, and a pool of 20 becomes an outage at about 7 checkouts per second (Little's law: 20 connections ÷ 3 s held).</div>
       <div class="note good"><span class="lbl">Read paths skip all this</span>Queries do not need aggregates. <code>@Transactional(readOnly = true)</code> + a <code>JdbcClient</code> projection straight to a record is faster, simpler and perfectly legitimate. CQRS-lite, no framework required.</div>
     </div>
   </div>
@@ -1295,7 +1302,7 @@ class OrderRepositoryAdapter implements OrderRepository {
     }
 
     @Override public Optional&lt;Order&gt; findById(OrderId id) {
-        return jpa.findWithLinesById(id.value()).map(mapper.toDomain());
+        return jpa.findWithLinesById(id.value()).map(mapper::toDomain);
     }
 }
 
@@ -1399,7 +1406,7 @@ class OrderService {
     </div>
   </div>
 
-  <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking and lets the driver route to a replica.</div>
+  <div class="note good"><span class="lbl">Default posture</span>One transaction per use case, opened in the application service, never in the controller and never in the repository. Read paths get <code>readOnly = true</code> — it lets Hibernate skip dirty-checking, and it is the flag a read replica is routed on. The PostgreSQL driver does not route by itself: you need a routing <code>DataSource</code>, such as <code>LazyConnectionDataSourceProxy</code> with a read-only target (Framework 6.1+).</div>
 </section>
 
 <!-- decks/deck/03-backend/07-concurrency-and-idempotency.html -->
@@ -1442,8 +1449,10 @@ ResponseEntity&lt;OrderView&gt; place(
 
 // execute(): INSERT INTO idempotency_key(key, fingerprint, status) VALUES (?,?, 'IN_PROGRESS')
 //   unique violation + same fingerprint  → return the stored response (200/201, same body)
+//     ...but still IN_PROGRESS           → 409, the first request has not finished yet
 //   unique violation + diff. fingerprint → 422, the client reused a key for a different request
-//   success                              → store response body + status against the key, TTL 24h</code></pre>
+//   success                              → store response body + status against the key, TTL 24h
+//   failure                              → delete the key (or store the error) so a retry can run</code></pre>
     </div>
   </div>
 
@@ -1722,34 +1731,39 @@ class OrderController {
 <pre><code class="language-yaml">spring:
   cloud:
     gateway:
-      default-filters:
-        - RemoveRequestHeader=Cookie          # cookies terminate at the BFF, never reach services
-        - AddRequestHeader=X-Request-Source, gateway
-      routes:
-        - id: orders
-          uri: lb://order-platform
-          predicates:
-            - Path=/api/orders/**
-          filters:
-            - name: CircuitBreaker
-              args: { name: ordersCb, fallbackUri: forward:/fallback/orders }
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50      # per user, steady state
-                redis-rate-limiter.burstCapacity: 100
-                key-resolver: "#{@principalKeyResolver}"
-            - name: Retry
-              args:
-                retries: 2
-                methods: GET                              # NEVER retry POST here
-                series: SERVER_ERROR
-                backoff: { firstBackoff: 50ms, maxBackoff: 500ms, factor: 2 }
+      server:
+        webflux:                                  # the root since Spring Cloud 2025.0;
+                                                  # plain spring.cloud.gateway.* is the old one
+          default-filters:
+            - RemoveRequestHeader=Cookie          # cookies terminate at the BFF, never reach services
+            - AddRequestHeader=X-Request-Source, gateway
+          routes:
+            - id: orders
+              uri: lb://order-platform
+              predicates:
+                - Path=/api/orders/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: ordersCb, fallbackUri: forward:/fallback/orders }
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50      # per user, steady state
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@principalKeyResolver}"
+                - name: Retry
+                  args:
+                    retries: 2
+                    methods: GET                              # NEVER retry POST here
+                    series: SERVER_ERROR
+                    backoff: { firstBackoff: 50ms, maxBackoff: 500ms, factor: 2 }
 
   security.oauth2.resourceserver.jwt.issuer-uri: https://id.retailco.com/realms/shop
 
 management:
   endpoints.web.exposure.include: health,prometheus,gateway
-  tracing.sampling.probability: 0.1           # 100% for errors via a custom sampler</code></pre>
+  tracing.sampling.probability: 0.1           # head sampling: decided before any error
+                                              # exists. Keep every error with TAIL sampling
+                                              # in the OpenTelemetry collector instead.</code></pre>
   </div>
 
   <div class="grid3">
@@ -1971,7 +1985,7 @@ class PricingService {
         <text x="806" y="240" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.6">replay</text>
       </svg>
     </div>
-    <figcaption>Partition count caps consumer parallelism — twelve partitions means at most twelve useful consumers in a group. Keying on <code>orderId</code> guarantees that all events for one order land on one partition, and therefore arrive in order.</figcaption>
+    <figcaption>Partition count caps consumer parallelism — twelve partitions means at most twelve useful consumers in a group (a Kafka 4.2+ <b>share group</b> lifts that cap, at the price of per-key ordering — fine for work queues, wrong for these events). Keying on <code>orderId</code> guarantees that all events for one order land on one partition, and therefore arrive in order.</figcaption>
   </figure>
 
   <div class="grid3">
@@ -1991,9 +2005,11 @@ class PricingService {
 <pre><code class="language-java">@Component
 class OrderPlacedConsumer {
 
+    // Deliberately NOT @Transactional: under MANUAL_IMMEDIATE, ack.acknowledge()
+    // commits the offset at once — inside a listener transaction that would be
+    // BEFORE the database commit. reserve() has its own transaction instead.
     @KafkaListener(topics = "orders.placed.v1", groupId = "inventory",
                    concurrency = "6")
-    @Transactional
     public void handle(@Payload OrderPlaced event,
                        @Header(RECEIVED_KEY) String key,
                        Acknowledgment ack) {
@@ -2003,8 +2019,8 @@ class OrderPlacedConsumer {
             ack.acknowledge();                 // already done — a duplicate, not an error
             return;
         }
-        inventory.reserve(event.orderId(), event.lines());
-        ack.acknowledge();                     // commit offset only after the work committed
+        inventory.reserve(event.orderId(), event.lines());   // @Transactional: commits here
+        ack.acknowledge();                     // so the offset moves only after the work committed
     }
 }
 
@@ -2017,7 +2033,7 @@ class KafkaErrorConfig {
                 (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
         var handler = new DefaultErrorHandler(recoverer,
-                new ExponentialBackOffWithMaxRetries(3));   // 3 tries, then DLT — never infinite
+                new ExponentialBackOffWithMaxRetries(3));   // 3 retries = 4 deliveries, then DLT
         handler.addNotRetryableExceptions(
                 DeserializationException.class,             // a poison pill never gets better
                 IllegalArgumentException.class);
@@ -2079,7 +2095,7 @@ class KafkaErrorConfig {
   </figure>
 
   <div class="grid2">
-    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). <b>Spring Modulith's registry is exactly this.</b></p></div>
+    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). Spring Modulith's registry is the same <em>outbox</em> idea without the poller: it logs each publication in your transaction and dispatches it in-process after commit, republishing what is left incomplete — see <a data-deck="deck" data-slide="Events that cannot be lost" href="#deck/13">Events that cannot be lost</a>.</p></div>
     <div class="card"><h3>CDC (Debezium)</h3><p>Reads the write-ahead log, so no polling, no load on the table, ordering guaranteed by the log, latency in milliseconds. Costs a Kafka Connect cluster and replication-slot operations. Worth it above roughly a few thousand events/sec.</p></div>
   </div>
 </section>
@@ -2154,9 +2170,10 @@ class CatalogQueryService {
 
     // invalidation is an EVENT, not a scheduled job
     @ApplicationModuleListener
-    void on(ProductUpdated e) {
-        cache.evict("product", e.sku());                 // local
-        redis.convertAndSend("cache.evict", e.sku());    // tell the other 11 instances
+    void on(ProductUpdated e) {                         // the two CacheManagers behind "twoLevel"
+        redisCaches.getCache("product").evict(e.sku());     // shared L2 FIRST — or the next
+        caffeineCaches.getCache("product").evict(e.sku());  // L1 miss refills from stale L2
+        redis.convertAndSend("cache.evict", e.sku());       // then the other 11 drop their L1
     }
 }</code></pre>
 <pre style="margin-top:12px"><code class="language-yaml"># "twoLevel" is YOUR CacheManager bean (Caffeine in front of Redis).
@@ -2200,13 +2217,17 @@ shop.cache.l1.spec: maximumSize=10000,expireAfterWrite=60s
 CREATE ROLE app_order LOGIN;
 GRANT USAGE ON SCHEMA order_mgmt TO app_order;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA order_mgmt TO app_order;
+-- ...which covers only the tables that exist NOW. Tables a later migration
+-- creates need default privileges, set for the role that runs migrations:
+ALTER DEFAULT PRIVILEGES FOR ROLE order_migrator IN SCHEMA order_mgmt
+  GRANT SELECT, INSERT, UPDATE ON TABLES TO app_order;
 -- and is granted NOTHING on payment.* or inventory.*
 
 -- a cross-schema join is now a runtime permission error in CI, not a review comment
 SELECT o.id, p.status
   FROM order_mgmt.orders o JOIN payment.payments p ON p.order_id = o.id;
 -- ERROR: permission denied for schema payment</code></pre>
-      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px">One PostgreSQL cluster, one connection pool per module role. You keep operational simplicity — one backup, one failover, one upgrade — while the logical boundary is real.</p>
+      <p style="font-size:13.5px;color:var(--text-2);margin-top:12px">One PostgreSQL cluster, one connection pool per module role. You keep operational simplicity — one backup, one failover, one upgrade — while the logical boundary is real. The cost is connections: four module pools of 10 on 40 pods is 1,600, so keep each pool small and redo the <code>max_connections</code> sum from <a data-deck="deck" data-slide="Runtime and capacity" href="#deck/55">Runtime and capacity</a>.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">
@@ -2234,7 +2255,7 @@ SELECT o.id, p.status
       <thead><tr><th>Release</th><th>Migration</th><th>Application code</th><th>Safe because</th></tr></thead>
       <tbody>
         <tr><td>R1 · expand</td><td><code>ALTER TABLE orders ADD COLUMN total_minor bigint NULL;</code></td><td>Writes both <code>total</code> and <code>total_minor</code>; reads <code>total</code></td><td>New column is nullable; old pods ignore it</td></tr>
-        <tr><td>R1.5 · backfill</td><td>Batched <code>UPDATE ... WHERE total_minor IS NULL LIMIT 10000</code></td><td>unchanged</td><td>Batched, so no long lock on a 40M-row table</td></tr>
+        <tr><td>R1.5 · backfill</td><td>Batched <code>UPDATE ... WHERE id IN (SELECT id ... WHERE total_minor IS NULL LIMIT 10000)</code> — PostgreSQL's <code>UPDATE</code> has no <code>LIMIT</code></td><td>unchanged</td><td>Batched, so no long lock on a 40M-row table</td></tr>
         <tr><td>R2 · switch</td><td>—</td><td>Reads <code>total_minor</code>, still writes both</td><td>Data is complete in both columns</td></tr>
         <tr><td>R3 · contract</td><td><code>ALTER TABLE orders DROP COLUMN total;</code></td><td>Writes and reads <code>total_minor</code> only</td><td>No running version references the old column</td></tr>
       </tbody>
@@ -2276,9 +2297,9 @@ CREATE INDEX CONCURRENTLY idx_orders_customer_placed
 
   <div class="split">
     <div class="codewrap">
-      <div class="codelabel">The write path: aggregates, JPA, invariants</div>
+      <div class="codelabel">The write path: aggregates, JPA, invariants — as in <a data-deck="deck" data-slide="Use case and transaction" href="#deck/19">Use case and transaction</a></div>
 <pre><code class="language-java">@Transactional
-public OrderId place(PlaceOrderCommand cmd) { /* slide 15 */ }</code></pre>
+public OrderId place(PlaceOrderCommand cmd) { /* see "Use case and transaction" */ }</code></pre>
       <div class="codelabel" style="margin-top:14px">The read path: no entities, no mapping, one query</div>
 <pre><code class="language-java">@Transactional(readOnly = true)
 public List&lt;OrderSummary&gt; search(OrderSearch f, Pageable page) {
@@ -2561,9 +2582,10 @@ export class OrdersStore {
   readonly page    = signal(0);
 
   // declarative data fetching: refetches when filter or page changes
+  // (Angular 20 names: params + stream; 19's request + loader are gone)
   private readonly resource = rxResource({
-    request: () =&gt; ({ ...this.filter(), page: this.page() }),
-    loader: ({ request }) =&gt; this.api.listOrders(request),
+    params: () =&gt; ({ ...this.filter(), page: this.page() }),
+    stream: ({ params }) =&gt; this.api.listOrders(params),
   });
 
   readonly orders  = computed(() =&gt; this.resource.value()?.content ?? []);
@@ -2772,8 +2794,8 @@ SecurityFilterChain api(HttpSecurity http) throws Exception {
 }</code></pre>
       <div class="codelabel" style="margin-top:14px">Layer 2 · method security — may you do this to this thing</div>
 <pre><code class="language-java">// CustomerId is a value type, so unwrap it — comparing the record
-// itself to a String is always false, and fails OPEN-looking (denies
-// everyone but the OPS role, so nobody notices until a customer calls).
+// itself to a String is always false. It fails closed — every customer is
+// denied — but OPS still gets through, so nobody notices until a customer calls.
 @PreAuthorize("hasRole('OPS') or #command.customerId.value() == authentication.name")
 public void cancel(CancelOrderCommand command) { ... }
 
@@ -2788,23 +2810,18 @@ public void cancel(CancelOrderCommand command) { ... }</code></pre>
       <div class="card accent">
         <h3>Layer 3 · the row</h3>
         <p>The layer most teams skip. A bug in a repository method that forgets <code>WHERE customer_id = ?</code> returns other customers' orders with a perfectly valid token.</p>
-<pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query
+<pre style="margin-top:8px"><code class="language-java">// tenant/customer scoping applied centrally, not per query.
+// Hibernate 6+: the ORM adds the predicate to every query, every insert
+// and every find-by-id, using your CurrentTenantIdentifierResolver.
 @Entity
-@FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
-@Filter(name = "tenant", condition = "tenant_id = :tenantId")
-class OrderJpaEntity { ... }
-
-@Component
-class TenantFilterActivator {
-    @PersistenceContext EntityManager em;
-
-    void activate() {   // called once per request, from an interceptor
-        em.unwrap(Session.class)
-          .enableFilter("tenant")
-          .setParameter("tenantId", TenantContext.current());
-    }
-}</code></pre>
-        <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed.</p>
+class OrderJpaEntity {
+    @TenantId String tenantId;
+    ...
+}
+// A Hibernate @Filter is the older route, with two traps: it is not
+// applied to findById, and it is enabled per Session — so per
+// transaction, not once per request.</code></pre>
+        <p>Or, for real isolation, PostgreSQL row-level security — the database enforces it even when the ORM is bypassed. Use <code>FORCE ROW LEVEL SECURITY</code> (the owning role bypasses it otherwise) and set the tenant in every transaction on pooled connections; details in <a data-deck="sb" data-slide="Tenancy & testing" href="#springboot/31">Spring Boot · Tenancy</a>.</p>
       </div>
       <div class="note warn"><span class="lbl">Multi-tenancy: pick deliberately</span><b>Shared schema + tenant column</b> — cheapest, needs RLS discipline. <b>Schema per tenant</b> — good isolation, migrations across 500 schemas get slow. <b>Database per tenant</b> — strongest, viable only with tens of tenants. Enterprise default is shared schema with RLS; regulated customers buy the database.</div>
       <div class="note"><span class="lbl">Audit is a feature</span>Who changed what, when, from where — with the trace id. Append-only, its own schema, read-only role for auditors. Retrofitting it after an incident or an audit finding is far more expensive than adding it in week two.</div>
@@ -2894,7 +2911,7 @@ public record PaymentProperties(
   endpoint.health.probes.enabled: true      # /readiness and /liveness, separately
   metrics.tags.application: ${spring.application.name}
   tracing.sampling.probability: 0.1
-  otlp.tracing.endpoint: http://collector:4318/v1/traces
+  opentelemetry.tracing.export.otlp.endpoint: http://collector:4318/v1/traces   # Boot 4 key
 
 spring:
   kafka:
@@ -2925,9 +2942,9 @@ logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
   </div>
 
   <div class="grid3">
-    <div class="card"><h4>RED, for every endpoint</h4><p><b>R</b>ate, <b>E</b>rrors, <b>D</b>uration. Three dashboards panels per service that answer "is it working" without domain knowledge.</p></div>
+    <div class="card"><h4>RED, for every endpoint</h4><p><b>R</b>ate, <b>E</b>rrors, <b>D</b>uration. Three dashboard panels per service that answer "is it working" without domain knowledge.</p></div>
     <div class="card"><h4>USE, for every resource</h4><p><b>U</b>tilisation, <b>S</b>aturation, <b>E</b>rrors — connection pool, thread pool, disk, heap. This is where you look <em>after</em> RED says something is wrong.</p></div>
-    <div class="card"><h4>Burn-rate alerts</h4><p>Two windows: fast (1 h at 14× burn → page) and slow (6 h at 6× → ticket). It catches both the outage and the slow bleed, without paging on a single blip.</p></div>
+    <div class="card"><h4>Burn-rate alerts</h4><p>Fast (1 h at 14× burn → page) and slow (6 h at 6× → also a page), each confirmed by a short window so it stops once the burn does; only the gentle burn (3 days at 1×) is a ticket. It catches both the outage and the slow bleed, without paging on a single blip. The full pattern: <a data-deck="hld" data-slide="Alerting on SLO burn" href="#hld/68">System design · Alerting on SLO burn</a>.</p></div>
   </div>
 
   <div class="note warn"><span class="lbl">The four dashboards a team needs</span><b>Journey</b> (SLOs, customer-visible) · <b>Service</b> (RED per endpoint) · <b>Dependencies</b> (latency and error rate per downstream, circuit-breaker state) · <b>Resources</b> (USE). More than four and nobody opens any of them during an incident.</div>
@@ -2955,33 +2972,39 @@ logging.pattern.correlation: "[%X{traceId:-},%X{spanId:-}] "</code></pre>
 
   <div class="split">
     <div class="codewrap">
-      <div class="codelabel">Testcontainers, shared and fast — Boot 4 service connections</div>
-<pre><code class="language-java">import org.testcontainers.kafka.KafkaContainer;  // NOT ...containers.KafkaContainer
+      <div class="codelabel">Testcontainers 2, shared and fast — service connections (Boot 3.1+)</div>
+<pre><code class="language-java">// Testcontainers 2 (Boot 4's version): testcontainers-* artifacts, and each
+// module's classes in org.testcontainers.&lt;module&gt;, not ...containers.
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @TestConfiguration(proxyBeanMethods = false)
 class ContainersConfig {
     @Bean @ServiceConnection            // wires spring.datasource.* automatically
-    PostgreSQLContainer&lt;?&gt; postgres() {
-        return new PostgreSQLContainer&lt;&gt;("postgres:17-alpine").withReuse(true);
+    PostgreSQLContainer postgres() {
+        return new PostgreSQLContainer("postgres:17-alpine").withReuse(true);
     }
     @Bean @ServiceConnection
     KafkaContainer kafka() {
         return new KafkaContainer("apache/kafka:4.0.0").withReuse(true);
     }
 }
-// Two classes share the simple name KafkaContainer:
-//   org.testcontainers.kafka.KafkaContainer      → apache/kafka (KRaft)
-//   org.testcontainers.containers.KafkaContainer → confluentinc/cp-kafka
+// Two Kafka classes, two images:
+//   org.testcontainers.kafka.KafkaContainer          → apache/kafka (KRaft)
+//   org.testcontainers.kafka.ConfluentKafkaContainer → confluentinc/cp-kafka
 // Pair the wrong one with your image and startup hangs until it times out.
 
-// src/test: one container per build, reused across every test class
+// src/test: every test class with this same configuration shares ONE cached
+// Spring context, and so one set of containers, for the whole build.
+// withReuse(true) goes further — it keeps them alive across builds — but only
+// with testcontainers.reuse.enable=true in ~/.testcontainers.properties.
 @SpringBootTest
 @Import(ContainersConfig.class)
 class OrderFlowIT { ... }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note good"><span class="lbl">H2 is not your database</span>Testing against H2 while running PostgreSQL means your tests pass on SQL that production rejects — and silently skip the constraints, types and locking behaviour that matter. Testcontainers removed this excuse years ago.</div>
-      <div class="note tip"><span class="lbl">Architecture tests are tests</span>The ArchUnit rules from slide 8 and <code>modules.verify()</code> from slide 9 run in the same suite. That is what makes the boundary real rather than aspirational.</div>
+      <div class="note tip"><span class="lbl">Architecture tests are tests</span>The <a data-deck="deck" data-slide="Enforcing it with ArchUnit" href="#deck/10">ArchUnit rules</a> and <a data-deck="deck" data-slide="Spring Modulith" href="#deck/11"><code>modules.verify()</code></a> run in the same suite. That is what makes the boundary real rather than aspirational.</div>
       <div class="note warn"><span class="lbl">Flaky E2E destroys trust</span>Three reliable end-to-end journeys beat forty that fail randomly. A suite people re-run "because it's probably flaky" has already stopped being a gate.</div>
     </div>
   </div>
@@ -2996,15 +3019,22 @@ class OrderFlowIT { ... }</code></pre>
     <div class="codewrap">
       <div class="codelabel">settings.gradle.kts — modules as Gradle projects, when you want hard walls</div>
 <pre><code class="language-java">rootProject.name = "shop"
-include("modules:order", "modules:payment", "modules:inventory",
-        "modules:catalog", "modules:shared", "app")
+// Each module is TWO projects: a project dependency exposes every public
+// class, so "sees only the api" needs the api in a project of its own.
+include("modules:order-api", "modules:order-impl",
+        "modules:payment-api", "modules:payment-impl",
+        "modules:inventory-api", "modules:inventory-impl",
+        "modules:catalog-api", "modules:catalog-impl",
+        "modules:shared", "app")
 
-// modules/order/build.gradle.kts
+// modules/order-impl/build.gradle.kts
 dependencies {
     api(project(":modules:shared"))
-    implementation(project(":modules:payment"))   // sees payment's api only
+    implementation(project(":modules:order-api"))
+    implementation(project(":modules:payment-api"))   // payment's internals: not on the classpath
     // a compile error is now impossible to merge, not just discouraged
-}</code></pre>
+}
+// app/build.gradle.kts depends on every *-impl, to wire them together</code></pre>
       <p style="font-size:13.5px;color:var(--text-2);margin-top:12px"><b>Trade-off:</b> Gradle modules give compiler-enforced boundaries and faster incremental builds, at the cost of more build files and slower IDE indexing. One source set plus ArchUnit is lighter and usually enough; escalate to Gradle modules when the rules keep getting suppressed.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -3045,7 +3075,7 @@ dependencies {
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card accent">
-        <h3>Virtual threads (Java 21+, on by default in Boot 4 when enabled)</h3>
+        <h3>Virtual threads (Java 21+, opt-in with one property)</h3>
 <pre style="margin-top:6px"><code class="language-yaml">spring.threads.virtual.enabled: true</code></pre>
         <ul class="tight" style="margin-top:8px">
           <li><b>Helps:</b> IO-bound request handling — thousands of concurrent requests blocked on HTTP or JDBC, without a thread per request.</li>
@@ -3300,7 +3330,7 @@ SPRING_PROFILES_ACTIVE: prod,worker
         <text x="14" y="224" font-size="10.5" fill="currentColor" opacity="0.7">An unlabelled arrow means "related somehow", which is the same as no arrow at all.</text>
       </svg>
     </div>
-    <figcaption>The system-context diagram on slide 2 of this deck is level 1; the reference architecture near the end is level 2. That is the whole vocabulary you need to say which picture someone is asking for.</figcaption>
+    <figcaption>The <a data-deck="deck" data-slide="System context (C4 L1)" href="#deck/2">system-context diagram</a> at the start of this deck is level 1; the reference architecture near the end is level 2. That is the whole vocabulary you need to say which picture someone is asking for.</figcaption>
   </figure>
 
   <div class="note tip"><span class="lbl">The test for a good diagram</span>Hand it to someone who has never seen the system and ask them to explain it back. If they cannot say what each box does, which arrow carries the user's request, or where data is stored, the diagram is decoration. Adding a legend is usually a sign the encoding is doing too much work.</div>
@@ -3815,7 +3845,7 @@ debug: true
       <h3>1 · Set a property <span class="tag g">weakest, best</span></h3>
 <pre style="margin-top:6px"><code class="language-yaml">spring.jpa.open-in-view: false
 spring.datasource.hikari.maximum-pool-size: 20
-server.shutdown: graceful</code></pre>
+spring.lifecycle.timeout-per-shutdown-phase: 20s</code></pre>
       <p>Covers the large majority of real cases. Nothing to maintain, survives every upgrade.</p>
     </div>
     <div class="card">
@@ -3827,8 +3857,8 @@ ObjectMapper objectMapper() { ... }     // auto-config backs off</code></pre>
     <div class="card">
       <h3>3 · Customise instead of replace <span class="tag g">usually right</span></h3>
 <pre style="margin-top:6px"><code class="language-java">@Bean
-Jackson2ObjectMapperBuilderCustomizer dates() {
-    return b -&gt; b.simpleDateFormat("yyyy-MM-dd");
+Jackson2ObjectMapperBuilderCustomizer money() {
+    return b -&gt; b.serializerByType(Money.class, new MoneySerializer());
 }</code></pre>
       <p>Boot exposes a <code>*Customizer</code> for most things it builds. You change one setting and keep every default — almost always what you actually wanted in case 2.</p>
     </div>
@@ -3924,7 +3954,8 @@ class OrderMetrics {
     @PreDestroy   void close() { ... }   // on graceful shutdown
 }</code></pre>
       <div class="codelabel" style="margin-top:14px">Graceful shutdown — three settings that matter</div>
-<pre><code class="language-yaml">server.shutdown: graceful           # stop accepting, finish in-flight requests
+<pre><code class="language-yaml">server.shutdown: graceful           # stop accepting, finish in-flight requests —
+                                    # the DEFAULT since Boot 3.4; set it on 3.3 and older
 spring.lifecycle.timeout-per-shutdown-phase: 30s
 # Kubernetes: a preStop sleep of ~5s so the endpoint is removed from the
 # Service BEFORE the JVM stops accepting — otherwise the last few requests
@@ -4009,7 +4040,7 @@ spring.lifecycle.timeout-per-shutdown-phase: 30s
   <div class="grid3">
     <div class="card"><h4>Scopes</h4><p><code>singleton</code> (default, one per context) · <code>prototype</code> (new every injection; <b>no destroy callback ever runs</b>) · <code>request</code> / <code>session</code> (web, injected as a scoped proxy) · <code>application</code>. A prototype injected into a singleton is created once — use <code>ObjectProvider</code> if you need a fresh one per call.</p></div>
     <div class="card"><h4>Circular dependencies</h4><p>Constructor injection on both sides cannot be resolved and fails at startup — correctly, since it is a design smell. Boot 2.6+ disables the field-injection workaround by default. Fix the design, or use <code>@Lazy</code> on one side only as a stopgap.</p></div>
-    <div class="card"><h4>Proxy type</h4><p>JDK dynamic proxy when the bean implements an interface, CGLIB subclass otherwise (Boot forces CGLIB by default). CGLIB cannot proxy <code>final</code> classes or <code>final</code>/<code>private</code> methods — the annotation is silently ignored, which is the worst failure mode there is.</p></div>
+    <div class="card"><h4>Proxy type</h4><p>JDK dynamic proxy when the bean implements an interface, CGLIB subclass otherwise (Boot forces CGLIB by default). CGLIB cannot override <code>final</code> or <code>private</code> methods — the annotation on them is silently ignored, which is the worst failure mode there is. A <code>final</code> class is louder: the subclass cannot be generated, so startup fails.</p></div>
   </div>
 </section>
 
@@ -4203,7 +4234,7 @@ ext["kafka.version"] = "3.9.1"   // the ONLY safe way to move one library</code>
     <table class="tbl">
       <thead><tr><th>Starter</th><th>Pulls in</th><th>Gives you</th><th>First thing to set</th></tr></thead>
       <tbody>
-        <tr><td><code>-web</code></td><td>Spring MVC, embedded Tomcat, Jackson</td><td><code>DispatcherServlet</code>, JSON in/out, error page</td><td><code>server.shutdown: graceful</code></td></tr>
+        <tr><td><code>-web</code></td><td>Spring MVC, embedded Tomcat, Jackson</td><td><code>DispatcherServlet</code>, JSON in/out, error page</td><td><code>spring.lifecycle.timeout-per-shutdown-phase</code> — graceful shutdown itself is the default since 3.4</td></tr>
         <tr><td><code>-data-jpa</code></td><td>Hibernate, Spring Data, HikariCP, <code>spring-jdbc</code></td><td>Repositories, <code>EntityManager</code>, tx manager</td><td><code>spring.jpa.open-in-view: false</code></td></tr>
         <tr><td><code>-validation</code></td><td>Hibernate Validator (Jakarta Bean Validation)</td><td><code>@Valid</code> on request bodies, <code>@Validated</code> on beans</td><td>Nothing — but know it is <b>not</b> in <code>-web</code> since Boot 2.3</td></tr>
         <tr><td><code>-actuator</code></td><td>Micrometer, health contributors</td><td><code>/health</code>, <code>/metrics</code>, <code>/info</code>, <code>/conditions</code></td><td><code>endpoints.web.exposure.include</code> — and expose it on a separate port</td></tr>
@@ -4416,14 +4447,15 @@ public record OrderProperties(
     <div class="codelabel">OrderController.java — every common annotation in one place</div>
 <pre><code class="language-java">@RestController
 @RequestMapping("/api/orders")                    // class-level prefix
-@Validated                                        // enables @Min/@NotBlank on params
+// No class-level @Validated: since Framework 6.1 (Boot 3.2) MVC validates
+// @Size / @NotBlank on parameters itself → HandlerMethodValidationException.
 class OrderController {
 
     @GetMapping("/{id}")
     OrderView get(@PathVariable UUID id) { ... }
 
-    @GetMapping
-    Page&lt;OrderSummary&gt; list(
+    @GetMapping                                   // PagedModel, not Page: a raw Page's
+    PagedModel&lt;OrderSummary&gt; list(                // JSON shape is not stable (Data 3.3+)
             @RequestParam(defaultValue = "PLACED") OrderStatus status,
             @RequestParam(required = false) @Size(max = 64) String customerRef,
             @RequestHeader(value = "X-Channel", defaultValue = "web") String channel,
@@ -4479,7 +4511,8 @@ class OrderController {
 // @NotBlank — not null and contains non-whitespace. For strings, this is the one you want.</code></pre>
       <div class="codelabel" style="margin-top:14px">Two different annotations, two different jobs</div>
 <pre><code class="language-java">@Valid      // Jakarta: cascade validation into this object
-@Validated  // Spring: enables method-level validation on a bean,
+@Validated  // Spring: enables method-level validation on a bean (services —
+            //         controllers do it natively since Framework 6.1),
             //         and is the only one that supports groups</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -4500,7 +4533,7 @@ class SkuValidator implements ConstraintValidator&lt;ValidSku, String&gt; {
 }</code></pre>
       </div>
       <div class="note warn"><span class="lbl">Where the line is</span><b>Shape</b> — "currency is three letters", "at most 100 lines" — belongs here. <b>Rule</b> — "this customer may not ship to that country", "discount cannot exceed the order value" — belongs on the aggregate, where it can be unit-tested without HTTP and cannot be bypassed by a second entry point such as a Kafka consumer or a batch job.</div>
-      <div class="note tip"><span class="lbl">Turning violations into your error shape</span>Handle <code>MethodArgumentNotValidException</code> (body) and <code>ConstraintViolationException</code> (params) in your advice and emit a <code>ProblemDetail</code> with a <code>errors</code> property listing field and message. Without that, Boot's default body is a shape your frontend has to special-case.</div>
+      <div class="note tip"><span class="lbl">Turning violations into your error shape</span>Handle <code>MethodArgumentNotValidException</code> (a <code>@Valid</code> body on its own) and <code>HandlerMethodValidationException</code> (any handler with constraints directly on its parameters — it then covers the body too) in your advice — extending <code>ResponseEntityExceptionHandler</code> gives you both — and emit a <code>ProblemDetail</code> with an <code>errors</code> property listing field and message. <code>ConstraintViolationException</code> only appears if a class-level <code>@Validated</code> proxy does the validating. Without that, Boot's default body is a shape your frontend has to special-case.</div>
     </div>
   </div>
 </section>
@@ -4508,7 +4541,7 @@ class SkuValidator implements ConstraintValidator&lt;ValidSku, String&gt; {
 <!-- decks/springboot/04-core-annotations/05-async-scheduling-caching-testing.html -->
 <section class="slide" data-sec="Core annotations" data-title="Async, scheduling, caching, testing">
   <h2>The proxy-driven annotations, and the test set</h2>
-  <p class="dek">Everything in the left column works by the proxy from the bean-lifecycle slide — which means every one of them silently does nothing on a self-invocation, on a <code>private</code> method, or on a <code>final</code> class.</p>
+  <p class="dek"><code>@Async</code>, the cache annotations and <code>@Retryable</code> work through the proxy from the bean-lifecycle slide — so each silently does nothing on a self-invocation or a <code>private</code> method, and a <code>final</code> class cannot be given a class-based proxy at all, which fails at startup. <code>@Scheduled</code> and the event listeners are registered by post-processors instead, so self-invocation does not affect them.</p>
 
   <div class="split">
     <div class="codewrap">
@@ -4530,8 +4563,9 @@ ProductView byKey(String sku) { ... }
 @Caching(evict = { @CacheEvict("product"), @CacheEvict("catalog") })
 
 @EventListener                                    // fires immediately, same thread
-@TransactionalEventListener(phase = AFTER_COMMIT) // fires only if the tx committed
-void on(OrderPlaced event) { ... }
+@TransactionalEventListener(phase = AFTER_COMMIT) // fires only if the tx committed —
+void on(OrderPlaced event) { ... }                // and is DROPPED if no tx was active
+                                                  // (fallbackExecution = true runs it anyway)
 
 // Spring Retry (3.x). @EnableRetry on a @Configuration.
 @Retryable(retryFor = TransientException.class, maxAttempts = 3,
@@ -4550,13 +4584,14 @@ void on(OrderPlaced event) { ... }
 @MockitoSpyBean PricingService pricing;
 
 @TestConfiguration              // extra beans for tests, NOT picked up by component scan
-@DynamicPropertySource          // wire container ports into properties
+@ServiceConnection              // Boot 3.1+: a container @Bean wires its own connection
+@DynamicPropertySource          // anything @ServiceConnection does not cover
 @ActiveProfiles("test")
 @Sql("/seed-orders.sql")
 @Transactional                  // on a test = rollback after each method</code></pre>
       </div>
-      <div class="note warn"><span class="lbl">Three traps in one slide</span><b><code>@Async</code> without an executor</b> uses a <code>SimpleAsyncTaskExecutor</code> that creates an unbounded number of threads — define your own <code>ThreadPoolTaskExecutor</code> with a bounded queue and a rejection policy. <b><code>fixedRate</code></b> can overlap runs if one takes longer than the interval; <code>fixedDelay</code> cannot. <b><code>@Transactional</code> on a test</b> rolls back — which means it also hides the constraint violations that only fire at commit.</div>
-      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> the retry annotation you know is not the one you get</span>Framework 7 ships its own <code>@Retryable</code> in <code>org.springframework.core.retry</code>, and it is <b>not</b> a drop-in rename. <code>retryFor</code>/<code>noRetryFor</code> become <code>includes</code>/<code>excludes</code>; the nested <code>@Backoff</code> flattens into <code>delay</code>/<code>multiplier</code>/<code>jitter</code>/<code>maxDelay</code>; <code>maxAttempts = 3</code> becomes <code>maxRetries = 2</code> — it counts <em>retries</em>, not attempts, so a straight copy silently gives you one extra call; there is <b>no <code>@Recover</code></b>, so recovery moves to a <code>catch</code> in the caller; and nothing is advised at all without <code>@EnableResilientMethods</code>. <code>@ConcurrencyLimit</code> arrives alongside it for bulkheads. Keep Spring Retry on the classpath if you rely on <code>@Recover</code>.</div>
+      <div class="note warn"><span class="lbl">Three traps in one slide</span><b><code>@Async</code> without a named executor</b> runs on Boot's <code>applicationTaskExecutor</code>: 8 core threads and an <b>unbounded queue</b>, so a slow downstream builds a silent backlog rather than more threads (with <code>spring.threads.virtual.enabled</code> it is a virtual-thread executor instead). Name a bounded <code>ThreadPoolTaskExecutor</code> with a rejection policy — and know that declaring any <code>Executor</code> bean makes Boot's own back off, unless you register yours with <code>@Bean(defaultCandidate = false)</code>. <b><code>fixedRate</code></b> can overlap runs if one takes longer than the interval; <code>fixedDelay</code> cannot. <b><code>@Transactional</code> on a test</b> rolls back — which means it also hides the constraint violations that only fire at commit.</div>
+      <div class="note tip"><span class="lbl"><span class="tag a">Boot 4</span> the retry annotation you know is not the one you get</span>Framework 7 ships its own <code>@Retryable</code> in <code>org.springframework.resilience.annotation</code> (the programmatic <code>RetryTemplate</code> lives in <code>org.springframework.core.retry</code>), and it is <b>not</b> a drop-in rename. <code>retryFor</code>/<code>noRetryFor</code> become <code>includes</code>/<code>excludes</code>; the nested <code>@Backoff</code> flattens into <code>delay</code>/<code>multiplier</code>/<code>jitter</code>/<code>maxDelay</code>; <code>maxAttempts = 3</code> becomes <code>maxRetries = 2</code> — it counts <em>retries</em>, not attempts, so a straight copy silently gives you one extra call; there is <b>no <code>@Recover</code></b>, so recovery moves to a <code>catch</code> in the caller; and nothing is advised at all without <code>@EnableResilientMethods</code>. <code>@ConcurrencyLimit</code> arrives alongside it for bulkheads. Keep Spring Retry on the classpath if you rely on <code>@Recover</code>.</div>
     </div>
   </div>
 </section>
@@ -4612,7 +4647,7 @@ public class OrderJpaEntity {
 
   <div class="grid3">
     <div class="card"><h4><code>@Enumerated(ORDINAL)</code> is the default</h4><p>And it stores <code>0, 1, 2</code>. Insert a new enum constant in the middle a year later and every historical row silently changes meaning. Always <code>STRING</code>. This is the single most damaging JPA default.</p></div>
-    <div class="card"><h4><code>@Column</code> defaults you should set</h4><p><code>nullable</code> is <code>true</code> by default and only affects schema generation — the real constraint must be in your Flyway migration. <code>updatable = false</code> on immutable columns is genuinely enforced by Hibernate and catches bugs.</p></div>
+    <div class="card"><h4><code>@Column</code> defaults you should set</h4><p><code>nullable</code> is <code>true</code> by default and only affects schema generation — the real constraint must be in your Flyway migration. <code>updatable = false</code> on immutable columns protects them, but silently: Hibernate leaves the column out of the <code>UPDATE</code>, so a changed value is discarded with no error. Assert it in a test if it matters.</p></div>
     <div class="card"><h4><code>equals</code>/<code>hashCode</code></h4><p>Do not use Lombok's <code>@Data</code> on an entity — it generates them over all fields including lazy associations, which triggers loads and breaks <code>Set</code> semantics before the id is assigned. Use the business key, or the id with a stable hashCode.</p></div>
   </div>
 
@@ -4649,7 +4684,9 @@ private Long id;
 
 // DB: CREATE SEQUENCE order_mgmt.order_id_seq INCREMENT BY 50;
 // Hibernate now fetches one value and hands out 50 ids without another round trip.
-// Mismatch here = duplicate key errors that appear only under concurrency.</code></pre>
+// Mismatch: Hibernate checks the sequence at boot and, by default, refuses to
+// start (MappingException). Silence that check and the id blocks overlap —
+// duplicate keys, on a single instance as well as many.</code></pre>
       <div class="codelabel" style="margin-top:14px">Composite keys — prefer @EmbeddedId</div>
 <pre><code class="language-java">@Embeddable
 record OrderLineId(UUID orderId, int lineNo) implements Serializable { }
@@ -4716,8 +4753,12 @@ class OrderJpaEntity {
                inverseJoinColumns = @JoinColumn(name = "promotion_id"))
     private Set&lt;PromotionEntity&gt; promotions = new HashSet&lt;&gt;();
 
-    @OneToOne(mappedBy = "order", fetch = LAZY, optional = false)
-    private OrderPaymentEntity payment;
+    // NO inverse @OneToOne here. On the mappedBy side Hibernate cannot honour
+    // LAZY (it cannot tell null from a proxy without a query), so every order
+    // load would also load its payment. Map it one way, from the child
+    // (or turn on Hibernate bytecode enhancement):
+    //   @OneToOne(fetch = LAZY) @MapsId OrderJpaEntity order;   // in OrderPaymentEntity
+    // and read it by id: payments.findById(order.getId())
 }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -4742,8 +4783,9 @@ interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt; {
     @EntityGraph(attributePaths = { "lines", "customer" })
     Optional&lt;OrderJpaEntity&gt; findWithLinesById(UUID id);
 
-    @EntityGraph(attributePaths = "lines")
-    Page&lt;OrderJpaEntity&gt; findByCustomerId(UUID customerId, Pageable page);
+    @EntityGraph(attributePaths = "customer")    // to-one only: safe to page.
+    Page&lt;OrderJpaEntity&gt; findByStatus(OrderStatus s, Pageable page);
+    // Never a collection ("lines") on a Page — see "Pagination + join fetch".
 }
 
 // 2. JOIN FETCH — explicit, one collection at a time
@@ -4762,7 +4804,7 @@ List&lt;OrderSummary&gt; summariesFor(@Param("c") UUID customerId);</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Two <code>join fetch</code> on collections = cartesian product</span>An order with 10 lines and 10 promotions returns <b>100 rows</b>, and Hibernate 6 will refuse with <code>MultipleBagFetchException</code> if both are <code>List</code>. Fetch one collection per query and let <code>@BatchSize</code> handle the second, or run two queries.</div>
-      <div class="note bad"><span class="lbl">Pagination + <code>join fetch</code></span>Logs <em>"firstResult/maxResults specified with collection fetch; applying in memory"</em> — Hibernate loads <b>every matching row</b> then pages in the JVM. On 40,000 orders that is an OOM. Fix: page over ids first, then fetch the entities for that page. Set <code>hibernate.query.fail_on_pagination_over_collection_fetch: true</code> so it throws instead of quietly working until it doesn't.</div>
+      <div class="note bad"><span class="lbl">Pagination + <code>join fetch</code></span>Logs <em>"firstResult/maxResults specified with collection fetch; applying in memory"</em> — Hibernate loads <b>every matching row</b> then pages in the JVM. On 40,000 orders that is an OOM. Fix: page over ids first, then fetch the entities for that page — or page without the fetch and let <code>hibernate.default_batch_fetch_size</code> load the collections in batches. Set <code>hibernate.query.fail_on_pagination_over_collection_fetch: true</code> so it throws instead of quietly working until it doesn't.</div>
       <div class="note good"><span class="lbl">Make it a test</span>Count queries on your three hottest endpoints with datasource-proxy and assert an upper bound. An N+1 introduced six months later then fails the build rather than the Black Friday dashboard.</div>
     </div>
   </div>
@@ -5053,12 +5095,13 @@ class OrderService {
     @PostAuthorize("returnObject.customerId.value() == authentication.name")
     OrderView find(OrderId id) { ... }
 
-    // Filters the INPUT collection before the call
+    // Filters the INPUT collection before the call — the elements must carry
+    // the field the rule reads, so this takes approvals, not bare OrderIds
     @PreFilter("filterObject.region == authentication.principal.region")
-    void bulkApprove(List&lt;OrderId&gt; ids) { ... }
+    void bulkApprove(List&lt;ApprovalRequest&gt; requests) { ... }
 
-    // Filters the RETURNED collection after the call
-    @PostFilter("hasRole('OPS') or filterObject.customerId == authentication.name")
+    // Filters the RETURNED collection after the call — .value() again
+    @PostFilter("hasRole('OPS') or filterObject.customerId.value() == authentication.name")
     List&lt;OrderView&gt; search(OrderSearch f) { ... }
 
     @Secured("ROLE_OPS")            // older, no SpEL — string roles only
@@ -5202,25 +5245,32 @@ void audit(@CurrentSecurityContext(expression = "authentication.name") String us
   <div class="split">
     <div class="codewrap">
       <div class="codelabel">Scoping applied centrally, not per query</div>
-<pre><code class="language-java">// Hibernate filter enabled once per request — every query gets the predicate
+<pre><code class="language-java">// Hibernate 6+: a tenant discriminator the ORM adds to EVERY query,
+// insert and find-by-id. The value comes from your
+// CurrentTenantIdentifierResolver (hibernate.tenant_identifier_resolver).
 @Entity
+class OrderJpaEntity {
+    @TenantId String tenantId;
+    ...
+}
+
+// A Hibernate @Filter also works, with two traps:
 @FilterDef(name = "tenant", parameters = @ParamDef(name = "tenantId", type = String.class))
 @Filter(name = "tenant", condition = "tenant_id = :tenantId")
-class OrderJpaEntity { ... }
-
-@Component
-class TenantFilterActivator {
-    @PersistenceContext EntityManager em;
-    void activate(String tenantId) {
-        em.unwrap(Session.class).enableFilter("tenant").setParameter("tenantId", tenantId);
-    }
-}
+// 1. It is NOT applied to find() / findById or to @ManyToOne loads — a
+//    cross-tenant read by id — unless @FilterDef(applyToLoadByKey = true),
+//    which is still incubating.
+// 2. enableFilter() lives on ONE Session. With open-in-view off, enable it at
+//    the start of every transaction (an aspect), not once per request.
 
 // Stronger: let PostgreSQL enforce it, so even a native query or a rogue
 // psql session cannot see another tenant's rows.
 // ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+// ALTER TABLE orders FORCE ROW LEVEL SECURITY;  -- else the owner bypasses it
 // CREATE POLICY tenant_isolation ON orders
-//   USING (tenant_id = current_setting('app.tenant_id'));</code></pre>
+//   USING (tenant_id = current_setting('app.tenant_id'));
+// Pooled connections: select set_config('app.tenant_id', ?, true) at the
+// start of EVERY transaction (true = local to it, so it cannot leak).</code></pre>
       <div class="codelabel" style="margin-top:14px">Testing security</div>
 <pre><code class="language-java">@WebMvcTest(OrderController.class)
 class OrderControllerSecurityTest {
@@ -5331,7 +5381,7 @@ class AuditAspect {
 
   <div class="split">
     <div class="note bad"><span class="lbl">The ordering bug worth internalising</span>Retry <b>outside</b> transaction: each attempt gets a fresh transaction — correct. Retry <b>inside</b> transaction: the first failure already marked it rollback-only, so every retry runs in a transaction that can never commit, and you get <code>UnexpectedRollbackException</code> after wasting three attempts.
-    <p style="margin-top:8px">Put <code>@Retryable</code> on the <em>caller</em> of the transactional method, not on the transactional method itself.</p></div>
+    <p style="margin-top:8px"><code>@Retryable</code> and <code>@Transactional</code> on the <em>same</em> method is fine: Spring Retry orders its advice just before the transaction's, and Framework 7's retry advisor is added in front of existing ones, so the retry wraps the transaction. The trap is a <code>@Retryable</code> method that <b>joins a transaction its caller already opened</b> — the retry must wrap the <em>outermost</em> transaction.</p></div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="codewrap">
         <div class="codelabel">Proving a proxy exists, in two lines</div>
@@ -5427,7 +5477,7 @@ BalanceReport reconcile(AccountId id) { ... }
 // it bounds how long a transaction can hold its locks and its connection.</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="note good"><span class="lbl">Practical guidance</span>Stay on the database default — <code>READ_COMMITTED</code> on PostgreSQL and Oracle, <code>REPEATABLE_READ</code> on MySQL — and handle concurrency with <b>optimistic locking</b> instead. It is cheaper, it scales, and it fails loudly rather than blocking.</div>
+      <div class="note good"><span class="lbl">Practical guidance</span>Stay on the database default — <code>READ_COMMITTED</code> on PostgreSQL and Oracle, <code>REPEATABLE_READ</code> on MySQL — and handle concurrency with <b>optimistic locking</b> instead. It is cheaper, it scales, and it fails loudly rather than blocking. The anomalies that actually bite at <code>READ_COMMITTED</code> — <b>lost update</b> and <b>write skew</b> — are not in the ANSI table; they are covered in <a data-deck="hld" data-slide="ACID, isolation and anomalies" href="#hld/39">System design · isolation and anomalies</a>.</div>
         <div class="note warn"><span class="lbl">SERIALIZABLE is not free correctness</span>On PostgreSQL it uses predicate locking and will abort transactions with a serialization failure under contention — so your code must be prepared to retry the whole unit of work. Turning it on without a retry strategy converts a correctness problem into an availability problem.</div>
       <div class="note tip"><span class="lbl">The interview follow-up</span>"How would you prevent two customers buying the last item?" — the strong answer is not an isolation level. It is <code>@Version</code> optimistic locking with a bounded retry, plus a reservation with a TTL, as on the concurrency slide of the architecture deck.</div>
     </div>
@@ -5447,8 +5497,9 @@ record OrderView(
     @JsonProperty("order_id")                       // rename on the wire
     UUID id,
 
-    @JsonFormat(shape = STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
-    Instant placedAt,
+    @JsonFormat(shape = STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX",
+                timezone = "UTC")                   // an Instant has no zone: without one
+    Instant placedAt,                               // (or spring.jackson.time-zone) it throws
 
     @JsonFormat(shape = JsonFormat.Shape.STRING)    // BigDecimal as a string —
     BigDecimal total,                               // stops JS clients losing precision
@@ -5456,7 +5507,7 @@ record OrderView(
     @JsonAlias({ "customerId", "customer_id" })     // accept both on the way IN
     UUID customerId,
 
-    @JsonIgnore                                     // never serialised
+    @JsonIgnore                                     // ignored both ways: not written, not read
     String internalNote,
 
     @JsonProperty(access = READ_ONLY)               // serialised out, ignored on input
@@ -5479,7 +5530,7 @@ record OrderView(
   </div>
 
   <div class="grid3">
-    <div class="card"><h4><code>@JsonIgnore</code> is not security</h4><p>It stops a field being serialised — it does not stop it being <em>deserialised</em> unless you also block that. A client can still POST <code>{"role":"ADMIN"}</code> into a field you thought was hidden. Use <code>access = READ_ONLY</code>, or better, a separate request DTO that simply has no such field.</p></div>
+    <div class="card"><h4><code>@JsonIgnore</code> is not security</h4><p>It drops the property in <em>both</em> directions — until someone adds <code>@JsonProperty</code> to its setter, or writes <code>@JsonIgnoreProperties(value = "role", allowSetters = true)</code>, and a client can POST <code>{"role":"ADMIN"}</code> again. One annotation is easy to undo by accident; a separate request DTO that simply has no such field is not.</p></div>
     <div class="card"><h4>Money as a string</h4><p>JSON numbers become IEEE doubles in JavaScript. <code>99999999.99</code> survives; a long enough decimal does not. Serialise money as a string, or as minor units in a <code>long</code>. Financial clients will ask you for this eventually — ship it first.</p></div>
     <div class="card"><h4>Be a tolerant reader</h4><p><code>FAIL_ON_UNKNOWN_PROPERTIES=false</code> (Boot's default) is what lets a producer add a field without breaking you. Turning it on to "catch typos" makes every additive upstream change a production incident.</p></div>
   </div>
@@ -5681,8 +5732,11 @@ public @interface ValidDateRange {
     Class&lt;? extends Payload&gt;[] payload() default {};
 }
 
-class DateRangeValidator implements ConstraintValidator&lt;ValidDateRange, OrderPayload&gt; {
-    public boolean isValid(OrderPayload p, ConstraintValidatorContext ctx) {
+@ValidDateRange
+record DeliveryRequest(@NotNull Instant placedAt, @NotNull Instant deliverBy) { }
+
+class DateRangeValidator implements ConstraintValidator&lt;ValidDateRange, DeliveryRequest&gt; {
+    public boolean isValid(DeliveryRequest p, ConstraintValidatorContext ctx) {
         if (p.placedAt() == null || p.deliverBy() == null) return true;   // let @NotNull say it
         boolean ok = p.deliverBy().isAfter(p.placedAt());
         if (!ok) {
@@ -5743,7 +5797,7 @@ class WebConfig implements WebMvcConfigurer {
           <li><b>Set the JVM zone explicitly</b> (<code>-Duser.timezone=UTC</code>) so behaviour does not change between your laptop and the cluster.</li>
         </ul>
       </div>
-      <div class="note warn"><span class="lbl">The enum parameter trap</span>An unknown enum value in a request parameter produces a 400 whose message names your Java class and its constants — an internal detail leaking to the client. Register a converter that maps unknown values to a domain exception and returns a <code>ProblemDetail</code> listing the accepted values instead.</div>
+      <div class="note warn"><span class="lbl">The enum parameter trap</span>An unknown enum value in a request parameter fails conversion with a message that names your Java class — an internal detail. Boot keeps it out of its default error body (<code>server.error.include-message</code> is <code>never</code> by default), but any handler that echoes <code>ex.getMessage()</code> sends it straight to the client. Register a converter that maps unknown values to a domain exception and returns a <code>ProblemDetail</code> listing the accepted values instead.</div>
     </div>
   </div>
 </section>
@@ -5822,7 +5876,9 @@ List&lt;OrderView&gt; byCustomer(UUID customerId, OrderStatus status) { ... }
 @Value("#{'${shop.regions}'.split(',')}")
 
 // 5. Conditional bean registration
-@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active}'.contains('test')")</code></pre>
+@ConditionalOnExpression("${shop.kafka.enabled:true} and !'${spring.profiles.active:}'.contains('test')")
+// The trailing ':' is an empty default — without it, startup fails when no
+// profile is set. For a profile check alone, @Profile("!test") is simpler.</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">
@@ -5985,7 +6041,9 @@ class OrderMetrics {
 }
 
 @Timed(value = "tax.calculate", percentiles = { 0.95, 0.99 })   // annotation form
-Tax calculate(Basket b) { ... }</code></pre>
+Tax calculate(Basket b) { ... }
+// ...which records NOTHING on its own: it needs a TimedAspect bean, or
+// management.observations.annotations.enabled=true (Boot 3.2+), plus AOP.</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Cardinality is the way monitoring dies</span>Every distinct combination of tag values is a separate time series. A tag of <code>orderId</code> on a service doing 1.2M orders a month creates 1.2M series a month — Prometheus falls over, and the bill if you are on a hosted product is memorable. <b>Tags must be bounded and small</b>: status, endpoint, channel, outcome, module. Ten values, not ten thousand.</div>
@@ -6015,12 +6073,12 @@ Tax calculate(Basket b) { ... }</code></pre>
 class MdcFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
                                     FilterChain chain) throws IOException, ServletException {
-        MDC.put("tenantId", TenantContext.current());
-        MDC.put("channel", req.getHeader("X-Channel"));
-        try {
+        // putCloseable removes the key on close, so pooled threads cannot carry it
+        // to the next request — and removes ONLY these keys: MDC.clear() would
+        // also wipe the traceId/spanId the tracer put there.
+        try (var tenant = MDC.putCloseable("tenantId", TenantContext.current());
+             var channel = MDC.putCloseable("channel", req.getHeader("X-Channel"))) {
             chain.doFilter(req, res);
-        } finally {
-            MDC.clear();            // ALWAYS — pooled threads carry it to the next request
         }
     }
 }
@@ -6034,7 +6092,7 @@ log.atInfo()
    .log();</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="note bad"><span class="lbl">Forgetting <code>MDC.clear()</code></span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always clear in a <code>finally</code>.</div>
+      <div class="note bad"><span class="lbl">Leaving MDC keys behind</span>Thread pools reuse threads. A tenant id left in the MDC attaches to the <b>next customer's</b> log lines — which is both a debugging nightmare and, in a regulated environment, a reportable data-handling incident. Always remove your keys when the request ends — <code>MDC.putCloseable</code> or a <code>finally</code> — and only your keys: <code>MDC.clear()</code> also strips the trace ids from every later line in the request.</div>
       <div class="note warn"><span class="lbl">MDC does not cross threads</span><code>@Async</code>, <code>CompletableFuture</code>, Kafka listeners and scheduled jobs all start with an empty MDC. Propagate explicitly — a <code>TaskDecorator</code> on your executor that copies the map is the standard fix, and it is about ten lines.</div>
       <div class="note tip"><span class="lbl">Runtime log levels</span><code>POST /actuator/loggers/com.retailco.shop.payment {"configuredLevel":"DEBUG"}</code> turns on debug for one package on one pod, with no restart and no deploy. Then turn it off. This is the single most useful production debugging capability Boot gives you, and most teams never enable the endpoint.</div>
     </div>
@@ -6114,7 +6172,7 @@ log.debug("order {} priced at {}", orderId, total);   // no concatenation, no co
         <rect x="624" y="34" width="86" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
         <text x="667" y="52" text-anchor="middle" font-size="10" fill="currentColor">Thread</text>
         <text x="667" y="66" text-anchor="middle" font-size="10" fill="currentColor">stacks</text>
-        <text x="667" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">1 MB each!</text>
+        <text x="667" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">≤ 1 MB each</text>
 
         <rect x="714" y="34" width="70" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
         <text x="749" y="52" text-anchor="middle" font-size="10" fill="currentColor">Code</text>
@@ -6124,11 +6182,11 @@ log.debug("order {} priced at {}", orderId, total);   // no concatenation, no co
         <rect x="788" y="34" width="74" height="52" rx="5" fill="#A22636" fill-opacity="0.10" stroke="#A22636"></rect>
         <text x="825" y="52" text-anchor="middle" font-size="10" fill="currentColor">Direct</text>
         <text x="825" y="66" text-anchor="middle" font-size="10" fill="currentColor">buffers</text>
-        <text x="825" y="80" text-anchor="middle" font-size="8.5" fill="#A22636">unbounded</text>
+        <text x="825" y="80" text-anchor="middle" font-size="8.5" fill="#A22636">≤ heap size</text>
 
         <line x1="14" y1="112" x2="866" y2="112" stroke="currentColor" stroke-opacity="0.15"></line>
-        <text x="14" y="134" font-size="10.5" fill="currentColor" opacity="0.8">Direct ByteBuffers — used by Netty, Kafka clients and NIO — live OUTSIDE the heap and are not bounded by -Xmx. A Kafka</text>
-        <text x="14" y="151" font-size="10.5" fill="currentColor" opacity="0.8">consumer with large fetch buffers, or 400 threads at 1 MB of stack each, quietly eats the headroom you left.</text>
+        <text x="14" y="134" font-size="10.5" fill="currentColor" opacity="0.8">Direct ByteBuffers — Netty, Kafka clients, NIO — live OUTSIDE the heap, and by default may grow as large as the heap again. A Kafka</text>
+        <text x="14" y="151" font-size="10.5" fill="currentColor" opacity="0.8">consumer with large fetch buffers, or hundreds of threads with deep stacks, quietly eats the headroom you left.</text>
         <text x="14" y="174" font-size="10.5" fill="#D26A3F">Symptom: the pod is OOMKilled (exit 137) with NO OutOfMemoryError in the logs and a heap graph that looks healthy.</text>
         <text x="14" y="196" font-size="10.5" fill="currentColor" opacity="0.8">Diagnose with Native Memory Tracking: -XX:NativeMemoryTracking=summary, then jcmd &lt;pid&gt; VM.native_memory summary</text>
       </svg>
@@ -6138,8 +6196,8 @@ log.debug("order {} priced at {}", orderId, total);   // no concatenation, no co
 
   <div class="grid3">
     <div class="card"><h4>Set the percentage, not the megabytes</h4><p><code>-XX:MaxRAMPercentage=75</code> adapts when someone changes the container limit. A hardcoded <code>-Xmx1500m</code> in a container later resized to 1 GiB is an instant crash loop.</p></div>
-    <div class="card"><h4>Leave real headroom</h4><p>25% of the limit for non-heap is a reasonable starting point; services with heavy Netty or Kafka use need more. Set container <code>requests == limits</code> for predictable scheduling.</p></div>
-    <div class="card"><h4>Virtual threads change the maths</h4><p>Platform threads cost ~1 MB of stack each, so 400 of them is 400 MB. Virtual threads are heap-allocated and tiny — which removes this particular ceiling but moves the pressure onto the heap.</p></div>
+    <div class="card"><h4>Leave real headroom</h4><p>25% of the limit for non-heap is a reasonable starting point; services with heavy Netty or Kafka use need more — and cap direct memory with <code>-XX:MaxDirectMemorySize</code>, because by default it may grow as large as the heap. Set container <code>requests == limits</code> for predictable scheduling.</p></div>
+    <div class="card"><h4>Virtual threads change the maths</h4><p>A platform thread <em>reserves</em> up to 1 MB of stack (<code>-Xss</code>), but only the pages it actually touches are committed and counted against the container — usually far less, though deep framework stacks add up across hundreds of threads. NMT shows reserved and committed separately. Virtual threads are heap-allocated and tiny — which removes this particular ceiling but moves the pressure onto the heap.</p></div>
   </div>
 </section>
 
@@ -6276,7 +6334,7 @@ jcmd &lt;pid&gt; GC.heap_dump /dumps/heap.hprof
         <tr><td>Baseline large Boot app</td><td class="num">4–8 s</td><td>—</td><td>Where most services sit</td></tr>
         <tr><td>Trim the classpath</td><td class="num">−0.5–2 s</td><td>An afternoon of dependency review</td><td><b>Do this first.</b> Free, and it shrinks the CVE surface too</td></tr>
         <tr><td><code>spring.main.lazy-initialization</code></td><td class="num">−30–50%</td><td>Startup failures move to first request</td><td>Dev only. Never in production — you lose fail-fast</td></tr>
-        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>None; on by default</td><td>Free win on upgrade</td></tr>
+        <tr><td>Spring Data AOT <span class="tag a">Boot 4</span></td><td class="num">−20–40%</td><td>An AOT build step: on by default, but repositories are generated only by <code>process-aot</code>, and a JVM run needs <code>-Dspring.aot.enabled=true</code></td><td>Near-free on upgrade — a plain <code>java -jar</code> without the AOT step gains nothing</td></tr>
         <tr><td>AppCDS / AOT cache</td><td class="num">−20–40%</td><td>A training run in the build</td><td>Excellent value; no code change</td></tr>
         <tr><td>Checkpoint/restore (CRaC)</td><td class="num">to ~50 ms</td><td>Beans must handle checkpoint/restore; connections reopen</td><td>Niche but powerful where supported</td></tr>
         <tr><td>GraalVM native image</td><td class="num">to ~50 ms, low RSS</td><td>Long builds, reflection config, harder debugging, some libraries unsupported</td><td>Only for scale-to-zero or per-request billing</td></tr>
@@ -6394,16 +6452,20 @@ jcmd &lt;pid&gt; GC.heap_dump /dumps/heap.hprof
       <tbody>
         <tr><td>Baseline</td><td>Java 17, Jakarta EE 10</td><td>Java 17 still (25 recommended), Jakarta EE 11, Servlet 6.1</td></tr>
         <tr><td>Module layout</td><td>Few large jars</td><td>Finer-grained modules — <b>the most common upgrade surprise</b>; imports move</td></tr>
+        <tr><td>Starters</td><td><code>spring-boot-starter-web</code>; one <code>-test</code> starter</td><td><code>spring-boot-starter-webmvc</code> (the old name is deprecated); a test starter per technology, <code>spring-boot-starter-&lt;technology&gt;-test</code></td></tr>
+        <tr><td>Platform versions</td><td>Hibernate 6, Spring Security 6, JUnit 5, Testcontainers 1.x</td><td>Hibernate 7, Spring Security 7, JUnit 6, Testcontainers 2 (<code>testcontainers-*</code> artifacts, <code>org.testcontainers.&lt;module&gt;</code> packages)</td></tr>
         <tr><td>Auto-config registry</td><td><code>AutoConfiguration.imports</code> only — <code>spring.factories</code> registration was already removed in <b>Boot 3.0</b></td><td>Unchanged. Worth knowing the removal date: a starter that silently contributes nothing broke at 3.0, not at 4.0</td></tr>
         <tr><td>HTTP clients</td><td><code>RestClient</code>, <code>HttpServiceProxyFactory</code> by hand</td><td><code>@ImportHttpServices</code> — declarative groups with shared config</td></tr>
         <tr><td>API versioning</td><td>Roll your own, or a gateway</td><td>First class: <code>@GetMapping(version = "2")</code> + <code>ApiVersionConfigurer</code></td></tr>
-        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code></td></tr>
+        <tr><td>Resilience</td><td>Spring Retry: <code>@EnableRetry</code>, <code>retryFor</code>, <code>maxAttempts</code>, <code>@Backoff</code>, <code>@Recover</code></td><td>Core <code>@Retryable</code>: <code>@EnableResilientMethods</code>, <code>includes</code>/<code>excludes</code>, <b><code>maxRetries</code></b> (retries, not attempts), flat <code>delay</code>/<code>jitter</code>/<code>multiplier</code>, <b>no <code>@Recover</code></b> — plus <code>@ConcurrencyLimit</code>. Boot no longer manages a Spring Retry version, and Spring Kafka and Spring Batch now retry on the core API</td></tr>
         <tr><td>Null safety</td><td>Spring's own <code>@Nullable</code> (JSR-305 style)</td><td>JSpecify — <code>@NullMarked</code> at package level, real tooling support</td></tr>
-        <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — ISO-8601 dates by default, unchecked exceptions</td></tr>
-        <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — queries generated at build time, notably faster startup</td></tr>
+        <tr><td>JSON</td><td>Jackson 2</td><td>Jackson 3 — <code>tools.jackson</code> packages (annotations stay in <code>com.fasterxml.jackson.annotation</code>), ISO-8601 dates by default, unchecked exceptions; Jackson 2 support kept but deprecated</td></tr>
+        <tr><td>Data</td><td>Repositories built at runtime</td><td>Spring Data AOT — repository queries generated during AOT processing, notably faster startup</td></tr>
+        <tr><td>Batch</td><td>Spring Batch 5; <code>-batch</code> stores job metadata in your database</td><td>Spring Batch 6; <code>-batch</code> runs <b>in memory</b> — restartable jobs need <code>spring-boot-starter-batch-jdbc</code></td></tr>
+        <tr><td>Observability</td><td>Micrometer Tracing + an OTel bridge, assembled by hand</td><td>New <code>spring-boot-starter-opentelemetry</code>; OTLP tracing keys move to <code>management.opentelemetry.tracing.export.otlp.*</code></td></tr>
         <tr><td>Test mocks</td><td><code>@MockBean</code> (deprecated in 3.4)</td><td><code>@MockitoBean</code> / <code>@MockitoSpyBean</code></td></tr>
         <tr><td>Testing API</td><td>MockMvc, WebTestClient, TestRestTemplate</td><td>Unified <code>RestTestClient</code> across all three</td></tr>
-        <tr><td>Removals</td><td>—</td><td>Spring JCL, <code>javax.annotation</code>, Undertow WebSocket, legacy path matching</td></tr>
+        <tr><td>Removals</td><td>—</td><td>Spring JCL, <code>javax.annotation</code>, <b>Undertow entirely</b> (it does not support Servlet 6.1), legacy path matching</td></tr>
         <tr><td>4.1 additions</td><td>—</td><td>Spring gRPC, lazy JDBC connections, <code>InetAddressFilter</code> SSRF mitigation, <code>@RedisListener</code></td></tr>
       </tbody>
     </table>
@@ -6802,15 +6864,18 @@ order.setStatus(SHIPPED);        // safe to apply twice
 counter.increment();             // NOT safe — this is the bug</code></pre>
       <div class="codelabel" style="margin-top:12px">2 · Business-key check — the everyday pattern</div>
 <pre><code class="language-java">@KafkaListener(topics = "orders.order.placed.v1", groupId = "inventory")
-@Transactional
-public void on(OrderPlaced event, Acknowledgment ack) {
-    if (reservations.existsByOrderId(event.orderId())) {   // already done
-        ack.acknowledge();
-        return;                                            // a duplicate is not an error
-    }
-    inventory.reserve(event.orderId(), event.lines());
-    ack.acknowledge();
-}</code></pre>
+public void on(OrderPlaced event, Acknowledgment ack) {      // NOT @Transactional — see below
+    tx.executeWithoutResult(status -&gt; {                      // the work commits first...
+        if (reservations.existsByOrderId(event.orderId())) {
+            return;                                          // a duplicate is not an error
+        }
+        inventory.reserve(event.orderId(), event.lines());
+    });
+    ack.acknowledge();                                       // ...then the offset moves
+}
+// tx is a TransactionTemplate. Under MANUAL_IMMEDIATE, acknowledge() commits the
+// offset at once — inside a @Transactional listener that is BEFORE the database
+// commit, and a crash between the two loses the record.</code></pre>
       <div class="codelabel" style="margin-top:12px">3 · Dedupe table on the event id — when there is no natural key</div>
 <pre><code class="language-sql">-- processed in the SAME transaction as the work
 INSERT INTO processed_events (event_id, consumer_group, processed_at)
@@ -6939,7 +7004,8 @@ CREATE INDEX ON outbox (created_at) WHERE sent_at IS NULL;   -- partial: stays t
 @Transactional
 void relay() {
     // LIMIT comes BEFORE the locking clause — Postgres rejects the
-    // other order. FOR UPDATE SKIP LOCKED makes this safe on N pods.
+    // other order. SKIP LOCKED stops two pods sending the same row; it
+    // does NOT keep an aggregate's events in order across pods (see table).
     var batch = jdbc.sql("""
         SELECT * FROM outbox WHERE sent_at IS NULL
         ORDER BY id
@@ -6947,12 +7013,22 @@ void relay() {
         FOR UPDATE SKIP LOCKED
         """).query(OutboxRow.class).list();
 
-    for (var row : batch) {
-        kafka.send(topicFor(row), row.aggregateId(), row.payload());
+    var acks = batch.stream()
+        .map(row -&gt; kafka.send(topicFor(row), row.aggregateId(), row.payload()))
+        .toList();
+    // Confirm EACH send. flush() would not help: it waits, but a failed
+    // send only shows up in its own future, never as an exception.
+    var sent = new ArrayList&lt;Long&gt;();
+    for (int i = 0; i &lt; batch.size(); i++) {
+        try {
+            acks.get(i).join();
+            sent.add(batch.get(i).id());
+        } catch (CompletionException e) {
+            break;     // stop at the first failure: it and everything after it
+        }              // are re-sent next run, in order (consumers are idempotent)
     }
-    kafka.flush();                              // confirm before marking
     jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY(?)")
-        .param(batch.stream().map(OutboxRow::id).toArray(Long[]::new))
+        .param(sent.toArray(Long[]::new))
         .update();                              // ANY(?) needs an ARRAY, not a List
 }</code></pre>
       <div class="note warn" style="margin-top:10px"><span class="lbl">Yes, this holds a transaction across a network call</span>Everywhere else in this atlas the rule is "never call an external system inside <code>@Transactional</code>". The relay is the deliberate exception: the rows are locked with <code>SKIP LOCKED</code> so no other pod blocks on them, the batch is bounded, and the send has a <code>delivery.timeout.ms</code> that caps how long the transaction can live. Keep the batch small, keep the timeout short, and size the relay's pool separately from the request pool — then one slow broker delays events instead of exhausting the connections checkout needs.</div>
@@ -6982,7 +7058,7 @@ void relay() {
           <tbody>
             <tr><td>Latency</td><td class="num">200 ms–1 s</td><td class="num">~10 ms</td></tr>
             <tr><td>DB load</td><td>A query per interval</td><td>None — reads the WAL</td></tr>
-            <tr><td>Ordering</td><td>By id, per batch</td><td>Log order, exact</td></tr>
+            <tr><td>Ordering</td><td>By id with <b>one</b> active relay; parallel relays can reorder an aggregate's events</td><td>Log order, exact</td></tr>
             <tr><td>Infrastructure</td><td>None</td><td>Kafka Connect + replication slot</td></tr>
             <tr><td>Failure mode</td><td>Backlog grows; visible</td><td>A stalled slot fills the WAL and <b>can stop the database</b></td></tr>
           </tbody>
@@ -7059,29 +7135,29 @@ void relay() {
     <div class="codewrap">
       <div class="codelabel">A consumer that survives all three</div>
 <pre><code class="language-java">@KafkaListener(topics = "orders.order.statuschanged.v1", groupId = "projection")
-@Transactional
 public void on(OrderStatusChanged e, Acknowledgment ack) {
+    tx.executeWithoutResult(status -&gt; apply(e));   // commit the work first (TransactionTemplate)...
+    ack.acknowledge();                             // ...then move the offset
+}
 
+private void apply(OrderStatusChanged e) {
     var view = projections.findById(e.orderId()).orElseGet(() -&gt; OrderView.empty(e.orderId()));
 
     // out-of-order + duplicate in one guard
     if (e.aggregateVersion() &lt;= view.appliedVersion()) {
         meters.counter("events.stale", "type", e.type()).increment();
-        ack.acknowledge();
         return;
     }
 
     // late: a business decision, not a technical one
     if (Duration.between(e.occurredAt(), Instant.now()).toHours() &gt; 24) {
         lateEvents.quarantine(e);            // human review, do not silently apply
-        ack.acknowledge();
         return;
     }
 
     view.apply(e);
     view.setAppliedVersion(e.aggregateVersion());
     projections.save(view);
-    ack.acknowledge();
 }</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -7382,7 +7458,7 @@ public void on(OrderStatusChanged e, Acknowledgment ack) {
         <text x="578" y="202" font-size="10" fill="currentColor" opacity="0.75">    nothing; you must add partitions first.</text>
       </svg>
     </div>
-    <figcaption>One partition is assigned to exactly one consumer in a group at a time — that is what preserves per-partition ordering, and what caps parallelism at the partition count.</figcaption>
+    <figcaption>One partition is assigned to exactly one consumer in a group at a time — that is what preserves per-partition ordering, and what caps parallelism at the partition count. The exception is a <b>share group</b> (Kafka 4.2+), which gives up that ordering so more consumers than partitions can work through a topic like a queue — see <a data-deck="ed" data-slide="Broker comparison" href="#events/57">Broker comparison</a>.</figcaption>
   </figure>
 
   <div class="note tip"><span class="lbl">Group id naming</span>Name it for the <b>logical application</b>, not the instance or the environment: <code>inventory-order-reservation</code>. Putting a hostname or a version in it creates a brand-new group on every deploy, which starts from <code>auto.offset.reset</code> — either replaying everything or silently skipping the backlog.</div>
@@ -7821,18 +7897,18 @@ DefaultErrorHandler errorHandler(KafkaTemplate&lt;Object, Object&gt; template) {
         (record, ex) -&gt; new TopicPartition(record.topic() + ".DLT", -1));
 
     var handler = new DefaultErrorHandler(recoverer,
-        new ExponentialBackOffWithMaxRetries(3));      // 3 attempts, then DLT
+        new ExponentialBackOffWithMaxRetries(3));      // 3 RETRIES = 4 attempts, then DLT
 
-    // A poison pill never gets better — do not waste three attempts on it
+    // A poison pill never gets better — do not waste retries on it
     handler.addNotRetryableExceptions(
         DeserializationException.class,
         MethodArgumentNotValidException.class,
         IllegalArgumentException.class);
 
-    // Transient problems that deserve every retry
-    handler.addRetryableExceptions(
-        TransientDataAccessException.class,
-        ResourceAccessException.class);
+    // Transient problems (TransientDataAccessException, ResourceAccessException)
+    // need nothing: every exception is retryable by default.
+    // addRetryableExceptions(...) only matters after handler.defaultFalse(),
+    // which flips the default to "retry only what I list".
 
     handler.setRetryListeners((record, ex, attempt) -&gt;
         meters.counter("consumer.retry", "topic", record.topic(),
@@ -7853,7 +7929,7 @@ kafka_dlt-exception-fqcn       com.retailco…InsufficientStock
 kafka_dlt-exception-message    Only 2 left of SKU-8842</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="note bad"><span class="lbl">Blocking retries block the partition</span>The default handler retries <b>in place</b>, pausing the consumer. Three attempts with exponential backoff on a record that will never succeed stalls every record behind it on that partition — a head-of-line block that looks like a dead consumer. This is why bounded retries plus a DLT is non-negotiable, and why the next slide exists.</div>
+      <div class="note bad"><span class="lbl">Blocking retries block the partition</span>The default handler retries <b>in place</b>, pausing the consumer. Four attempts with exponential backoff on a record that will never succeed stalls every record behind it on that partition — a head-of-line block that looks like a dead consumer. This is why bounded retries plus a DLT is non-negotiable, and why the next slide exists.</div>
       <div class="note warn"><span class="lbl">A DLT with no owner is data loss with extra steps</span>Alert on DLT depth greater than zero. Route it to the team that owns the consumer, not to the platform team. And have a documented, tested replay path — a DLT nobody drains is a queue of business events quietly not happening.</div>
       <div class="note tip"><span class="lbl">Classify errors deliberately</span><b>Transient</b> (network, deadlock, 503) → retry. <b>Poison</b> (malformed, schema mismatch) → straight to DLT. <b>Business</b> (insufficient stock) → often not an error at all: emit a compensating event and acknowledge. Treating the third as a technical failure is how DLTs fill with perfectly normal outcomes.</div>
     </div>
@@ -8218,6 +8294,10 @@ payments.filter((k, p) -&gt; p.declined())
         .groupBy((k, p) -&gt; p.cardFingerprint())
         .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMinutes(10), Duration.ofMinutes(2)))
         .count()
+        // count() emits on EVERY decline, so "&gt;= 5" alone would alert again at
+        // 6, 7, 8... Emit one result per window instead — at the cost of
+        // waiting for the window and its grace to close (or dedupe downstream):
+        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
         .filter((windowedKey, count) -&gt; count &gt;= 5)
         .toStream()
         .to("risk.card.velocity.v1");</code></pre>
@@ -8334,21 +8414,25 @@ class OrderSaga {
 class OrderSagaHandler {
 
     @KafkaListener(topics = "inventory.stock.reserved.v1", groupId = "order-saga")
-    @Transactional
     void onStockReserved(StockReserved e, Acknowledgment ack) {
-        var saga = sagas.findById(e.orderId()).orElseThrow();
-        if (saga.state() != AWAITING_STOCK) { ack.acknowledge(); return; }  // idempotent
-        saga.transitionTo(AWAITING_PAYMENT, Duration.ofSeconds(60));
-        commands.send(new AuthorisePayment(e.orderId(), saga.totalMinor()));
-        ack.acknowledge();
+        tx.executeWithoutResult(status -&gt; {        // state + command commit together...
+            var saga = sagas.findById(e.orderId()).orElseThrow();
+            if (saga.state() != AWAITING_STOCK) return;                        // idempotent
+            saga.transitionTo(AWAITING_PAYMENT, Duration.ofSeconds(60));
+            outbox.add(new AuthorisePayment(e.orderId(), saga.totalMinor()));  // a ROW, not a send:
+        });                                        // a direct send here is a dual write
+        ack.acknowledge();                         // ...then the offset moves
     }
 
-    @Scheduled(fixedDelay = 5000)      // the timeout sweeper — the piece people omit
+    // The timeout sweeper — the piece people omit. It runs on EVERY pod, so
+    // lock the rows (SKIP LOCKED, or ShedLock) or each pod compensates the same
+    // saga; @Version stops a double state change, not a double command.
+    @Scheduled(fixedDelay = 5000)
     @Transactional
     void sweepTimeouts() {
-        sagas.findExpired(Instant.now()).forEach(saga -&gt; {
+        sagas.lockExpired(Instant.now()).forEach(saga -&gt; {   // ... FOR UPDATE SKIP LOCKED
             meters.counter("saga.timeout", "state", saga.state().name()).increment();
-            saga.compensate();          // or escalate to MANUAL_REVIEW
+            saga.compensate();          // its commands via the outbox too — or MANUAL_REVIEW
         });
     }
 }</code></pre>
@@ -8371,13 +8455,16 @@ class OrderHistoryProjection {
 
     @KafkaListener(topics = { "orders.order.placed.v1", "orders.order.statuschanged.v1" },
                    groupId = "projection-order-history")   // ← its OWN group: replayable
-    @Transactional
     void on(ConsumerRecord&lt;String, Object&gt; record, Acknowledgment ack) {
+        tx.executeWithoutResult(status -&gt; project(record));  // commit the view first...
+        ack.acknowledge();                                   // ...then move the offset
+    }
 
+    private void project(ConsumerRecord&lt;String, Object&gt; record) {
         var view = views.findById(key(record)).orElseGet(OrderHistoryView::empty);
 
         // 1. ORDERED + 2. IDEMPOTENT: one guard does both
-        if (version(record) &lt;= view.appliedVersion()) { ack.acknowledge(); return; }
+        if (version(record) &lt;= view.appliedVersion()) return;
 
         view.apply(record.value());
         view.setAppliedVersion(version(record));
@@ -8386,8 +8473,6 @@ class OrderHistoryProjection {
         // 3. OBSERVABLE: publish end-to-end staleness, not just lag
         meters.timer("projection.staleness", "name", "order-history")
               .record(Duration.between(occurredAt(record), Instant.now()));
-
-        ack.acknowledge();
     }
 }
 // 4. REBUILDABLE: truncate the table, reset the group to earliest, let it run.
@@ -8672,7 +8757,8 @@ class OrderPlacedUpcaster {
     private OrderPlaced fromV1(JsonNode n) {
         return new OrderPlaced(
             n.get("orderId").asText(),
-            Money.ofMajor(n.get("total").asDouble(), "GBP"),    // the assumption, documented
+            Money.ofMajor(n.get("total").decimalValue(), "GBP"),  // GBP: the assumption, documented;
+                                                                   // BigDecimal, never a double, for money
             n.path("occurredAt").asText());
     }
 }</code></pre>
@@ -13259,40 +13345,49 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 
 /** Vector + keyword search merged with reciprocal rank fusion. */
 class HybridDocumentRetriever implements DocumentRetriever {
 
-    /** Your full-text search: PostgreSQL tsvector, Elasticsearch, OpenSearch… */
+    /** Your full-text search: PostgreSQL tsvector, Elasticsearch, OpenSearch…
+     *  It must enforce the same tenant and ACL filter as the vector store. */
     interface KeywordSearch {
-        List&lt;Document&gt; search(String text, int limit);
+        List&lt;Document&gt; search(String text, int limit, Filter.Expression access);
     }
 
     private static final int K = 60;          // the usual RRF constant
 
     private final VectorStore vectorStore;
     private final KeywordSearch keywordSearch;
+    private final Supplier&lt;Filter.Expression&gt; accessFilter;   // the caller's tenant + ACL groups
     private final int candidates;
     private final int topK;
 
     HybridDocumentRetriever(VectorStore vectorStore, KeywordSearch keywordSearch,
-                            int candidates, int topK) {
+                            Supplier&lt;Filter.Expression&gt; accessFilter, int candidates, int topK) {
         this.vectorStore = vectorStore;
         this.keywordSearch = keywordSearch;
+        this.accessFilter = accessFilter;
         this.candidates = candidates;
         this.topK = topK;
     }
 
     @Override
     public List&lt;Document&gt; retrieve(Query query) {
+        // The SAME access filter on both legs: a keyword index without it
+        // happily returns another tenant's passage for an exact-match term.
+        Filter.Expression access = accessFilter.get();
         List&lt;Document&gt; semantic = vectorStore.similaritySearch(
-                SearchRequest.builder().query(query.text()).topK(candidates).build());
-        List&lt;Document&gt; lexical = keywordSearch.search(query.text(), candidates);
+                SearchRequest.builder().query(query.text()).topK(candidates)
+                        .filterExpression(access).build());
+        List&lt;Document&gt; lexical = keywordSearch.search(query.text(), candidates, access);
 
         Map&lt;String, Double&gt; score = new HashMap&lt;&gt;();
         Map&lt;String, Document&gt; byId = new HashMap&lt;&gt;();
@@ -13480,8 +13575,11 @@ class PolicyAssistantEvaluationTest {
                 if (answer.sources().isEmpty()) passed++;
                 continue;
             }
+            // Judge against the SAME context the assistant saw: same topK and the
+            // same 0.5 threshold (better still, have ask() return its documents).
             List&lt;Document&gt; context = vectorStore.similaritySearch(
-                    SearchRequest.builder().query(c.question()).topK(5).build());
+                    SearchRequest.builder().query(c.question()).topK(5)
+                            .similarityThreshold(0.5).build());
             var request = new EvaluationRequest(c.question(), context, answer.text());
             if (relevancy.evaluate(request).isPass() &amp;&amp; facts.evaluate(request).isPass()) passed++;
         }
@@ -14210,7 +14308,7 @@ class SupportTools {
             <tr><td>QA advisor + <code>audience</code> filter</td><td>Policy answers come from customer-facing articles only, never internal runbooks</td></tr>
             <tr><td>Tools with <code>ToolContext</code></td><td>Order questions answered from live data, scoped to the logged-in customer</td></tr>
             <tr><td>Escalation tool</td><td>The model can hand over; your code can also force it (keywords, repeated failures, VIP customers)</td></tr>
-            <tr><td>Streaming</td><td>First words in about a second, even when tools run</td></tr>
+            <tr><td>Streaming</td><td>First words in about a second on a plain answer. When a tool runs, the answer that uses its result cannot start until the tool round-trip finishes, so show a "checking your order…" status meanwhile</td></tr>
           </tbody>
         </table>
       </div>
@@ -15046,7 +15144,8 @@ import org.springframework.stereotype.Service;
 @Service
 class ContractComplianceService {
 
-    record Clause(String id, String heading, String text, Integer paymentDays, BigDecimal liabilityCap) {}
+    record Clause(String id, String heading, String category, String text,
+                  Integer paymentDays, BigDecimal liabilityCap) {}
 
     record ExtractedContract(String supplier, List&lt;Clause&gt; clauses) {}
 
@@ -15074,6 +15173,8 @@ class ContractComplianceService {
         this.extractor = builder.clone()
                 .defaultSystem("""
                         Split the contract into clauses. Copy each clause's text exactly.
+                        Set category to one of: payment, liability, termination,
+                        data-protection, other.
                         Fill paymentDays and liabilityCap only when the clause states them.""")
                 .build();
         this.judge = builder.clone()
@@ -15094,15 +15195,18 @@ class ContractComplianceService {
         var f = new FilterExpressionBuilder();
         for (Clause clause : contract.clauses()) {
             numericRules(clause).ifPresent(findings::add);                       // code, not model
+            // EVERY rule for the clause's category, not the few most similar: a
+            // clause that does not LOOK like its rule must still be judged by it.
             List&lt;Document&gt; rules = policies.similaritySearch(SearchRequest.builder()
                     .query(clause.heading() + "\n" + clause.text())
-                    .topK(3)
-                    .similarityThreshold(0.4)
-                    .filterExpression(f.and(f.eq("type", "policy-rule"),
-                            f.eq("version", POLICY_VERSION)).build())
+                    .topK(50)
+                    .similarityThresholdAll()
+                    .filterExpression(f.and(f.and(f.eq("type", "policy-rule"),
+                                    f.eq("version", POLICY_VERSION)),
+                            f.eq("category", clause.category())).build())
                     .build());
             if (rules.isEmpty()) {
-                continue;
+                continue;                                   // no rule governs this category
             }
             String ruleText = rules.stream()
                     .map(r -&gt; r.getMetadata().get("ruleId") + ": " + r.getText())
@@ -15510,7 +15614,7 @@ public class AiUsageMetrics {
           <tr><td>Trim input</td><td>Smaller memory window, summaries, lower top-K, higher threshold</td><td>Input is most of the bill</td></tr>
           <tr><td>Cap output</td><td><code>maxTokens</code> / <code>maxCompletionTokens</code>; ask for short formats</td><td>Bounds worst cases</td></tr>
           <tr><td>Provider prompt caching</td><td>Stable prefix first; Anthropic <code>cache-options</code>; OpenAI caches long prefixes automatically and accepts a <code>prompt-cache-key</code></td><td>Cached input billed at a fraction of the normal price</td></tr>
-          <tr><td>Semantic cache</td><td>Answer repeated questions from a cache of similar ones (<code>spring-ai-redis-semantic-cache</code>, or your own advisor)</td><td>FAQ-heavy traffic</td></tr>
+          <tr><td>Semantic cache</td><td>Answer repeated questions from a cache of similar ones (<code>spring-ai-redis-semantic-cache</code>, or your own advisor). <b>Key it by tenant and permission set</b>, and never cache answers built from tools or personal data — otherwise one user's answer, grounded in their documents, is served to another (OWASP LLM02 and LLM08)</td><td>FAQ-heavy traffic over shared, public content</td></tr>
           <tr><td>Batch APIs</td><td>Provider batch endpoints for offline jobs</td><td>About half price, hours of latency</td></tr>
           <tr><td>Budgets and limits</td><td>Tool-call limits; a budget advisor (right)</td><td>Stops runaway spend</td></tr>
         </tbody>
@@ -15898,7 +16002,7 @@ class VectorSearchIT {
 
     @Container
     @ServiceConnection
-    static OllamaContainer ollama = new OllamaContainer("ollama/ollama:latest");
+    static OllamaContainer ollama = new OllamaContainer("ollama/ollama:0.40.3");  // pinned: "latest" moves
 
     @Container
     @ServiceConnection
@@ -23514,7 +23618,7 @@ POST /v1/media/upload-url                      # presigned PUT for images</code>
 
   <figure>
     <div class="figbox">
-      <svg viewBox="0 0 900 260" role="img" aria-label="Estimate. Reads: 300 million daily users opening the feed 10 times a day is 3 billion feed loads, about 35 thousand a second, 100 thousand at peak. Writes: 30 million posts a day is about 350 a second; with 300 followers on average, pushing each post into followers' feeds is 9 billion feed inserts a day, about 100 thousand a second. A celebrity with 100 million followers turns one post into 100 million inserts. Feed cache: 300 million users times 500 post ids times 8 bytes is about 1.2 terabytes of Redis.">
+      <svg viewBox="0 0 900 260" role="img" aria-label="Estimate. Reads: 300 million daily users opening the feed 10 times a day is 3 billion feed loads, about 35 thousand a second, 100 thousand at peak. Writes: 30 million posts a day is about 350 a second; with 300 followers on average, pushing each post into followers' feeds is 9 billion feed inserts a day, about 100 thousand a second. A celebrity with 100 million followers turns one post into 100 million inserts. Feed cache: 300 million users times 800 post ids times 8 bytes is about 1.9 terabytes of raw ids, which is about 20 terabytes once stored as Redis sorted sets.">
         <g font-size="11" fill="currentColor" text-anchor="middle">
           <text x="140" y="20" font-weight="600">Reads</text><text x="450" y="20" font-weight="600">Writes and fan-out</text><text x="760" y="20" font-weight="600">Feed cache</text>
           <rect x="30" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="140" y="55">300 M DAU × 10 opens</text>
@@ -23523,9 +23627,9 @@ POST /v1/media/upload-url                      # presigned PUT for images</code>
           <rect x="340" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="55">30 M posts / day ≈ 350/s</text>
           <rect x="340" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="450" y="115">× 300 followers (average)</text>
           <rect x="340" y="152" width="220" height="46" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.3"></rect><text x="450" y="171">9 B feed inserts / day</text><text x="450" y="188" font-weight="600">≈ 100 k/s of fan-out</text>
-          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">500 post ids per user</text>
+          <rect x="650" y="32" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="55">800 post ids per user</text>
           <rect x="650" y="92" width="220" height="36" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.4"></rect><text x="760" y="115">× 8 B × 300 M users</text>
-          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.2 TB of ids</text><text x="760" y="188" font-weight="600">a Redis cluster (ids only)</text>
+          <rect x="650" y="152" width="220" height="46" rx="5" fill="#3AA79B" fill-opacity="0.12" stroke="#3AA79B" stroke-width="1.3"></rect><text x="760" y="171">≈ 1.9 TB of raw ids</text><text x="760" y="188" font-weight="600">≈ 20 TB as Redis sorted sets</text>
         </g>
         <g stroke="#8A94A3" stroke-width="1.3">
           <line x1="140" y1="68" x2="140" y2="89" marker-end="url(#arw)"></line><line x1="140" y1="128" x2="140" y2="149" marker-end="url(#arw)"></line>
@@ -23536,6 +23640,7 @@ POST /v1/media/upload-url                      # presigned PUT for images</code>
         <text x="450" y="235" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">celebrity: 1 post × 100 M followers = 100 M inserts</text>
       </svg>
     </div>
+    <figcaption>Raw ids are 8 bytes, but a Redis sorted set longer than <code>zset-max-listpack-entries</code> (128 by default) is stored as a skiplist plus a hash table, at roughly 80–100 bytes per entry: 240 billion entries is about 20–24 TB of RAM. Raising the listpack limit above the 800 cap packs each entry into about 20 bytes (about 5 TB), at the cost of O(n) inserts — still fast at 800.</figcaption>
   </figure>
 
   <div class="grid3">
@@ -26808,17 +26913,18 @@ replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
   <div class="grid3">
     <div class="card lift"><span class="bignum">30</span><p>patterns, each a self-contained topic. Nothing in one topic depends on having read another.</p></div>
     <div class="card lift"><span class="bignum">180</span><p>LeetCode problems, linked. Two per pattern are solved in full; the other four are shown as a delta against that pattern's own structure.</p></div>
-    <div class="card lift"><span class="bignum">4</span><p>slides per pattern — mechanics, a dry run, the reusable structure, the six problems. Every line of code is Java 17+.</p></div>
+    <div class="card lift"><span class="bignum">5</span><p>slides per pattern — mechanics, a dry run, the reusable structure, the six problems, and the six again as Java streams. Every line of code is Java 17+.</p></div>
   </div>
 
   <div class="split">
     <div class="panel">
-      <h3>The four slides, every time</h3>
+      <h3>The five slides, every time</h3>
       <dl class="kv" style="margin-top:10px">
         <dt>Mechanics</dt><dd>The invariant that holds on every iteration, and the argument for why the work is bounded. This is the part that transfers to problems not on the list.</dd>
         <dt>Dry run</dt><dd>One concrete input traced step by step, as a diagram and a table. If you cannot trace it by hand, you do not know it yet.</dd>
         <dt>Structure</dt><dd>The generic Java skeleton, its variants, and the exact knobs you turn per problem.</dd>
         <dt>Problems</dt><dd>The six, each with the path from brute force to optimal — not just the finished answer.</dd>
+        <dt>In streams</dt><dd>The same six written as Java streams, each tagged clean, stateful or forced, so you can see where a pipeline states the idea and where the loop is the honest form.</dd>
       </dl>
     </div>
     <div class="panel">
@@ -26841,7 +26947,7 @@ replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
 <!-- decks/dsa/01-orientation/02-the-thirty-patterns-and-their-problems.html -->
 <section class="slide" data-sec="Orientation" data-title="The thirty patterns and their problems">
   <h2>The full list, in order</h2>
-  <p class="dek">Each row is one self-contained topic with its own four slides. Work down the list, or jump straight to whichever pattern you are drilling — nothing below depends on anything above.</p>
+  <p class="dek">Each row is one self-contained topic with its own five slides. Work down the list, or jump straight to whichever pattern you are drilling — nothing below depends on anything above.</p>
 
   <div class="tblwrap">
     <table class="tbl">
@@ -26881,7 +26987,7 @@ replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
     </table>
   </div>
 
-  <div class="note"><span class="lbl">On order</span>The numbering is roughly easiest to hardest, so working straight down is a reasonable default. It is not a dependency chain: each pattern's four slides stand on their own, so you can drill number 22 without having read number 9. If a pattern assumes a data structure you have not used before, its mechanics slide says so explicitly rather than pointing you elsewhere.</div>
+  <div class="note"><span class="lbl">On order</span>The numbering is roughly easiest to hardest, so working straight down is a reasonable default. It is not a dependency chain: each pattern's five slides stand on their own, so you can drill number 22 without having read number 9. If a pattern assumes a data structure you have not used before, its mechanics slide says so explicitly rather than pointing you elsewhere.</div>
 </section>
 
 <!-- decks/dsa/01-orientation/03-choosing-the-pattern-from-the-statement.html -->
@@ -26977,7 +27083,7 @@ replicas = walk_clockwise(token, n=3, distinct_racks=True)</code></pre>
         <text x="14" y="426" font-size="10.5" fill="currentColor" opacity="0.62">The last row carries the decision that matters most: "list every solution" means backtracking; "how many" or "the maximum" means DP.</text>
       </svg>
     </div>
-    <figcaption>Two questions — what the input is, and what is being asked — point you at a pattern number. Open that pattern's four slides and confirm the choice against the constraint bounds on the next slide.</figcaption>
+    <figcaption>Two questions — what the input is, and what is being asked — point you at a pattern number. Open that pattern's five slides and confirm the choice against the constraint bounds on the next slide.</figcaption>
   </figure>
 
   <div class="note warn"><span class="lbl">The trap hiding in row two</span>A sliding window needs the window property to be <b>monotone</b>: growing the window must only ever help, or only ever hurt. With negative numbers, extending a subarray can lower <em>or</em> raise the sum, so there is no valid shrink rule — which is why "subarray sums to K" with negatives is not a window problem at all, and belongs to a different pattern in the list.</div>
@@ -44996,6 +45102,163 @@ int findTargetSumWays(int[] nums, int target) {
 </section>
 
 
+<!-- decks/dsa/30-28-knapsack-subset-dp/05-the-six-in-streams.html -->
+<section class="slide" data-sec="28 · Knapsack / subset DP" data-title="The six, in streams">
+  <h2>A fresh row per item makes 0/1 knapsack clean; reuse makes it state</h2>
+  <p class="dek">The loop version walks capacity backwards because it overwrites one row in place, and walking forwards would count an item twice. Build a new row from the old one for each item and that hazard disappears: every entry reads only the previous row, so <code>Stream.iterate(seed, step).skip(n)</code> folds the items cleanly, at the price of one array per item. That covers 416, 494, 1049, 474 and 879. 518 is the opposite case: an unbounded item may be reused, which means reading the row being built, so it is stateful by design.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">416</td><td><a href="https://leetcode.com/problems/partition-equal-subset-sum/" target="_blank" rel="noopener">Partition Equal Subset Sum</a></td><td>A reachability row folded over the items: new[s] = old[s] or old[s − x].</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">494</td><td><a href="https://leetcode.com/problems/target-sum/" target="_blank" rel="noopener">Target Sum</a></td><td>The same fold, counting the subsets that sum to (total + target) / 2.</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">1049</td><td><a href="https://leetcode.com/problems/last-stone-weight-ii/" target="_blank" rel="noopener">Last Stone Weight II</a></td><td>416's fold up to total / 2, then the largest reachable s; the answer is total − 2s.</td><td><span class="tag g">clean</span></td><td class="num">O(n·sum) / O(sum)</td><td class="num">same</td></tr>
+        <tr><td class="num">518</td><td><a href="https://leetcode.com/problems/coin-change-ii/" target="_blank" rel="noopener">Coin Change II</a></td><td>Coins outer. <code>ways[a] += ways[a - c]</code> reads the entry this pass just wrote, which is the reuse.</td><td><span class="tag w">stateful</span></td><td class="num">O(n·amount) / O(amount)</td><td class="num">same</td></tr>
+        <tr><td class="num">474</td><td><a href="https://leetcode.com/problems/ones-and-zeroes/" target="_blank" rel="noopener">Ones and Zeroes</a></td><td>A 2D row (zeros × ones), rebuilt per string with nested <code>IntStream</code>s.</td><td><span class="tag g">clean</span></td><td class="num">O(len·m·n) / O(m·n)</td><td class="num">same</td></tr>
+        <tr><td class="num">879</td><td><a href="https://leetcode.com/problems/profitable-schemes/" target="_blank" rel="noopener">Profitable Schemes</a></td><td>f[g][p]: schemes with at most g members and profit at least p. A fresh 2D row per crime.</td><td><span class="tag g">clean</span></td><td class="num">O(len·n·minProfit) / O(n·minProfit)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 416 · Partition Equal Subset Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public boolean canPartition(int[] nums) {
+        int total = Arrays.stream(nums).sum();
+        if (total % 2 == 1) return false;
+        int half = total / 2;
+        int[] start = new int[half + 1];
+        start[0] = 1;                       // the empty subset reaches 0
+        // can[s] is 1 if some subset of the items so far sums to s.
+        // Each item maps the old row to a NEW row: nothing is overwritten.
+        record Row(int i, int[] can) {}
+        Row last = Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, half)
+                                .map(s -&gt; r.can()[s] == 1
+                                        || s &gt;= nums[r.i()] &amp;&amp; r.can()[s - nums[r.i()]] == 1 ? 1 : 0)
+                                .toArray()))
+                .skip(nums.length).findFirst().get();
+        return last.can()[half] == 1;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 494 · Target Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int findTargetSumWays(int[] nums, int target) {
+        int total = Arrays.stream(nums).sum();
+        // The plus signs pick a subset P with sum(P) = (total + target) / 2.
+        if (Math.abs(target) &gt; total || (total + target) % 2 != 0) return 0;
+        int p = (total + target) / 2;
+        int[] start = new int[p + 1];
+        start[0] = 1;
+        // ways[s]: subsets of the items so far that sum to s. A zero
+        // doubles every count, which the formula handles on its own.
+        record Row(int i, int[] ways) {}
+        return Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, p)
+                                .map(s -&gt; r.ways()[s]
+                                        + (s &gt;= nums[r.i()] ? r.ways()[s - nums[r.i()]] : 0))
+                                .toArray()))
+                .skip(nums.length).findFirst().get().ways()[p];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1049 · Last Stone Weight II · clean</div>
+<pre><code class="language-java">class Solution {
+    public int lastStoneWeightII(int[] stones) {
+        // Smashing splits the stones into two piles; what is left is
+        // |P - N|. Get one pile as close to total / 2 as possible.
+        int total = Arrays.stream(stones).sum();
+        int half = total / 2;
+        int[] start = new int[half + 1];
+        start[0] = 1;
+        record Row(int i, int[] can) {}
+        int[] can = Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, half)
+                                .map(s -&gt; r.can()[s] == 1
+                                        || s &gt;= stones[r.i()] &amp;&amp; r.can()[s - stones[r.i()]] == 1 ? 1 : 0)
+                                .toArray()))
+                .skip(stones.length).findFirst().get().can();
+        int best = IntStream.rangeClosed(0, half).filter(s -&gt; can[s] == 1).max().getAsInt();
+        return total - 2 * best;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 518 · Coin Change II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int change(int amount, int[] coins) {
+        int[] ways = new int[amount + 1];
+        ways[0] = 1;
+        // Coins outer, so each combination is counted once, in coin
+        // order. Ascending a reads ways[a - c] AFTER this coin's pass
+        // updated it: that reuse is what "unbounded" means, and it is state.
+        Arrays.stream(coins).forEach(c -&gt;
+                IntStream.rangeClosed(c, amount).forEach(a -&gt; ways[a] += ways[a - c]));
+        return ways[amount];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 474 · Ones and Zeroes · clean</div>
+<pre><code class="language-java">class Solution {
+    public int findMaxForm(String[] strs, int m, int n) {
+        // best[i][j]: the largest subset of the strings so far that fits
+        // in i zeros and j ones. Each string builds a NEW table.
+        record Table(int k, int[][] best) {}
+        return Stream.iterate(new Table(0, new int[m + 1][n + 1]), t -&gt; {
+                    String s = strs[t.k()];
+                    int zeros = (int) s.chars().filter(ch -&gt; ch == '0').count();
+                    int ones = s.length() - zeros;
+                    int[][] b = t.best();
+                    return new Table(t.k() + 1, IntStream.rangeClosed(0, m)
+                            .mapToObj(i -&gt; IntStream.rangeClosed(0, n)
+                                    .map(j -&gt; i &gt;= zeros &amp;&amp; j &gt;= ones
+                                            ? Math.max(b[i][j], b[i - zeros][j - ones] + 1)
+                                            : b[i][j])
+                                    .toArray())
+                            .toArray(int[][]::new));
+                })
+                .skip(strs.length).findFirst().get().best()[m][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 879 · Profitable Schemes · clean</div>
+<pre><code class="language-java">class Solution {
+    public int profitableSchemes(int n, int minProfit, int[] group, int[] profit) {
+        int mod = 1_000_000_007;
+        // f[g][p]: schemes among the crimes so far using AT MOST g members
+        // with profit AT LEAST p. Taking crime k leaves p - profit[k] to
+        // find elsewhere, and anything at or below 0 is already met.
+        int[][] start = new int[n + 1][minProfit + 1];
+        Arrays.stream(start).forEach(row -&gt; row[0] = 1);   // the empty scheme
+        record Table(int k, int[][] f) {}
+        return Stream.iterate(new Table(0, start), t -&gt; {
+                    int g0 = group[t.k()], p0 = profit[t.k()];
+                    int[][] f = t.f();
+                    return new Table(t.k() + 1, IntStream.rangeClosed(0, n)
+                            .mapToObj(g -&gt; IntStream.rangeClosed(0, minProfit)
+                                    .map(p -&gt; (f[g][p]
+                                            + (g &gt;= g0 ? f[g - g0][Math.max(0, p - p0)] : 0)) % mod)
+                                    .toArray())
+                            .toArray(int[][]::new));
+                })
+                .skip(group.length).findFirst().get().f()[n][minProfit];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note good"><span class="lbl">A new row removes the backwards loop</span>The in-place loop walks s from the top down so that <code>dp[s]</code> reads <code>dp[s - x]</code> before this item overwrites it. Mapping the old row to a new one reads only old values, in any order, so the pipeline is clean and the direction no longer matters. The cost is an allocation per item: still O(sum) live memory, because each old row becomes garbage, but n arrays are created and dropped. 879's "at least p" definition is what lets each entry pull from exactly one old entry, <code>f[g - g0][max(0, p - p0)]</code>, instead of summing over several.</div>
+  <div class="note warn"><span class="lbl">518 cannot take a fresh row</span>An unbounded coin may be used again, so the recurrence is <code>new[a] = old[a] + new[a - c]</code>: it reads the row being built. Any stream that writes that row is stateful, and the ascending order is load-bearing. Swap the loops, amounts outer and coins inner, and you count ordered sequences instead of combinations: that is 377, Combination Sum IV.</div>
+</section>
+
 <!-- decks/dsa/31-29-grid-dp/01-mechanics.html -->
 <section class="slide" data-sec="29 · Grid DP" data-title="Mechanics">
   <h2>Each cell is answered by the cells that reach it</h2>
@@ -45393,6 +45656,132 @@ return dp[0];</code></pre>
   <div class="note good"><span class="lbl">If you only drill two</span>Do <b>64</b> and <b>221</b>. 64 fixes the two-predecessor transition and the rolling-row space collapse that 62, 63, 931 and 120 all reuse. 221 is the one that teaches state design in this family — realising that you must <em>anchor the square at a corner</em> to get a usable recurrence is the same move that makes several harder grid problems tractable.</div>
 </section>
 
+
+<!-- decks/dsa/31-29-grid-dp/05-the-six-in-streams.html -->
+<section class="slide" data-sec="29 · Grid DP" data-title="The six, in streams">
+  <h2>A row that reads only the row above is clean; a left neighbour is a running scan</h2>
+  <p class="dek">Grid DP sweeps rows, so the natural stream is <code>Stream.iterate</code> over rows with a fresh row per step. That is clean when a cell reads only the previous row, as in 931 and 120. 62, 63, 64 and 221 also read the cell to their left in the same row, which is a running scan. Java 17 streams have no scan operation (<code>Gatherers.scan</code> arrived in JDK 24), so the row is filled by a stream that reads what it just wrote. That is state, and it makes them correct only sequentially.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">62</td><td><a href="https://leetcode.com/problems/unique-paths/" target="_blank" rel="noopener">Unique Paths</a></td><td>One row of counts: <code>ways[j] += ways[j - 1]</code>, the left cell this pass just wrote.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">63</td><td><a href="https://leetcode.com/problems/unique-paths-ii/" target="_blank" rel="noopener">Unique Paths II</a></td><td>The same pass, with an obstacle forcing the cell to 0.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">64</td><td><a href="https://leetcode.com/problems/minimum-path-sum/" target="_blank" rel="noopener">Minimum Path Sum</a></td><td>grid + min(above, left), with left written a moment ago.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">221</td><td><a href="https://leetcode.com/problems/maximal-square/" target="_blank" rel="noopener">Maximal Square</a></td><td>1 + min(up, up-left, left) into two alternating rows; the max of each row, then of the rows.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">931</td><td><a href="https://leetcode.com/problems/minimum-falling-path-sum/" target="_blank" rel="noopener">Minimum Falling Path Sum</a></td><td>A fresh row per step: each cell plus the min of the up-to-three cells above it.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">120</td><td><a href="https://leetcode.com/problems/triangle/" target="_blank" rel="noopener">Triangle</a></td><td>Bottom-up, a fresh row per step: each cell plus the smaller of the two below.</td><td><span class="tag g">clean</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 62 · Unique Paths · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int uniquePaths(int m, int n) {
+        int[] ways = new int[n];
+        Arrays.fill(ways, 1);               // the top row: one way to each cell
+        // Each later row: ways[j] (from above) + ways[j - 1] (from the
+        // left, written a moment ago by this same stream). Sequential only.
+        IntStream.range(1, m).forEach(i -&gt;
+                IntStream.range(1, n).forEach(j -&gt; ways[j] += ways[j - 1]));
+        return ways[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 63 · Unique Paths II · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int uniquePathsWithObstacles(int[][] grid) {
+        int n = grid[0].length;
+        int[] ways = new int[n];
+        ways[0] = 1;                        // a virtual way in, above (0, 0)
+        // Every row, the first included: an obstacle zeroes the cell,
+        // otherwise add the left cell that this pass already updated.
+        Arrays.stream(grid).forEach(row -&gt;
+                IntStream.range(0, n).forEach(j -&gt;
+                        ways[j] = row[j] == 1 ? 0 : ways[j] + (j &gt; 0 ? ways[j - 1] : 0)));
+        return ways[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 64 · Minimum Path Sum · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minPathSum(int[][] grid) {
+        int n = grid[0].length;
+        int[] best = new int[n];
+        Arrays.fill(best, Integer.MAX_VALUE);
+        best[0] = 0;                        // a virtual 0 above the start
+        // best[j] = this cell + min(above = best[j], left = best[j - 1]),
+        // and the left entry was written a moment ago by this stream.
+        Arrays.stream(grid).forEach(row -&gt;
+                IntStream.range(0, n).forEach(j -&gt; best[j] = row[j]
+                        + (j == 0 ? best[0] : Math.min(best[j], best[j - 1]))));
+        return best[n - 1];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 221 · Maximal Square · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int maximalSquare(char[][] matrix) {
+        int n = matrix[0].length;
+        int[][] rows = new int[2][n + 1];   // this row and the one above, 0-padded
+        // side[j] = 1 + min(up, up-left, left) on a '1'. "left" was
+        // written a moment ago in this row, so it is sequential only.
+        int side = IntStream.range(0, matrix.length).map(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = matrix[i][j - 1] == '1'
+                    ? 1 + Math.min(Math.min(up[j], up[j - 1]), cur[j - 1]) : 0);
+            return Arrays.stream(cur).max().getAsInt();
+        }).max().getAsInt();
+        return side * side;
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 931 · Minimum Falling Path Sum · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minFallingPathSum(int[][] matrix) {
+        int n = matrix.length;
+        // Each row reads only the row above, at j - 1, j and j + 1 clamped
+        // to the edges. A fresh row per step, so the fold is clean.
+        record Row(int i, int[] sum) {}
+        Row last = Stream.iterate(new Row(0, matrix[0]), r -&gt; new Row(r.i() + 1,
+                        IntStream.range(0, n).map(j -&gt; matrix[r.i() + 1][j]
+                                + IntStream.rangeClosed(Math.max(0, j - 1), Math.min(n - 1, j + 1))
+                                        .map(k -&gt; r.sum()[k]).min().getAsInt())
+                                .toArray()))
+                .skip(n - 1).findFirst().get();
+        return Arrays.stream(last.sum()).min().getAsInt();
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 120 · Triangle · clean</div>
+<pre><code class="language-java">class Solution {
+    public int minimumTotal(List&lt;List&lt;Integer&gt;&gt; triangle) {
+        int rows = triangle.size();
+        // Bottom-up: row r holds the best sum from each cell down. Row
+        // r - 1 reads cells j and j + 1 of row r, which always exist.
+        record Row(int r, int[] best) {}
+        int[] bottom = triangle.get(rows - 1).stream().mapToInt(Integer::intValue).toArray();
+        return Stream.iterate(new Row(rows - 1, bottom), w -&gt; new Row(w.r() - 1,
+                        IntStream.range(0, w.r()).map(j -&gt; triangle.get(w.r() - 1).get(j)
+                                + Math.min(w.best()[j], w.best()[j + 1])).toArray()))
+                .skip(rows - 1).findFirst().get().best()[0];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">The left neighbour is the state</span><code>ways[j] += ways[j - 1]</code> is a prefix sum along the row: each cell needs the one the stream wrote just before it, so a parallel stream would read stale or zero values. Sweeping anti-diagonals instead would make 62–64 clean, because every cell on a diagonal reads only cells on the previous one, but the index arithmetic is rarely worth it in an interview. 221 keeps two alternating rows because it also needs the up-left value, which a single in-place row has already overwritten.</div>
+  <div class="note good"><span class="lbl">A fresh row is the clean shape</span>931 and 120 never read their own row, so each step is a pure map from the old row to a new one. Clamping <code>j - 1</code> and <code>j + 1</code> with <code>Math.max</code> and <code>Math.min</code> is the whole edge case in 931. Going bottom-up in 120 means the row being built is always one shorter than the row it reads, so no index can fall off the end.</div>
+</section>
 
 <!-- decks/dsa/32-30-string-sequence-dp/01-mechanics.html -->
 <section class="slide" data-sec="30 · String / sequence DP" data-title="Mechanics">
@@ -45804,6 +46193,147 @@ boolean isInterleave(String s1, String s2, String s3) {
   </div>
 
   <div class="note good"><span class="lbl">If you only drill two</span>Do <b>1143</b> and <b>72</b>. 1143 fixes the table shape, the index offset and the match-or-skip split that every problem here inherits. 72 adds the third option and the non-zero base cases — and being able to name each of its three source cells as delete, insert or replace is what turns this whole family from recalled formulas into a recurrence you can rebuild from scratch.</div>
+</section>
+
+<!-- decks/dsa/32-30-string-sequence-dp/05-the-six-in-streams.html -->
+<section class="slide" data-sec="30 · String / sequence DP" data-title="The six, in streams">
+  <h2>Two strings, one table: the left cell is state unless the recurrence skips it</h2>
+  <p class="dek">Every problem here fills a table indexed by prefixes of two strings, one row at a time. 1143, 583, 1312, 72 and 97 read the cell to their left in the same row, so the row is filled by a stream that reads what it just wrote: stateful, and correct only sequentially. 115 is the exception worth noticing. Its cell reads only the row above, so it folds into a fresh row per character with <code>Stream.iterate</code>, and that pipeline is clean.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th class="num">#</th><th>Problem</th><th>The stream move</th><th>Fit</th><th>Streams</th><th>Loop</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1143</td><td><a href="https://leetcode.com/problems/longest-common-subsequence/" target="_blank" rel="noopener">Longest Common Subsequence</a></td><td>Two alternating rows. A match takes up-left + 1; otherwise max(up, left).</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">583</td><td><a href="https://leetcode.com/problems/delete-operation-for-two-strings/" target="_blank" rel="noopener">Delete Operation for Two Strings</a></td><td>m + n − 2·lcs, with 1143's table.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">1312</td><td><a href="https://leetcode.com/problems/minimum-insertion-steps-to-make-a-string-palindrome/" target="_blank" rel="noopener">Minimum Insertion Steps to Make a String Palindrome</a></td><td>n − lcs(s, reverse(s)), with the same table.</td><td><span class="tag w">stateful</span></td><td class="num">O(n²) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">72</td><td><a href="https://leetcode.com/problems/edit-distance/" target="_blank" rel="noopener">Edit Distance</a></td><td>A three-way min of up-left, up and left, after writing the row's base case.</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">115</td><td><a href="https://leetcode.com/problems/distinct-subsequences/" target="_blank" rel="noopener">Distinct Subsequences</a></td><td>A fresh row per character of s: ways[j] + (match ? ways[j − 1] : 0), both from the row above.</td><td><span class="tag g">clean</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+        <tr><td class="num">97</td><td><a href="https://leetcode.com/problems/interleaving-string/" target="_blank" rel="noopener">Interleaving String</a></td><td>One boolean row: s3's next character comes from s1 (above) or s2 (left).</td><td><span class="tag w">stateful</span></td><td class="num">O(mn) / O(n)</td><td class="num">same</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--text-3);font-size:13px"><span class="tag g">clean</span> a pure pipeline, still correct if made parallel &nbsp;·&nbsp; <span class="tag w">stateful</span> a lambda carries state from one element to the next, so sequential only &nbsp;·&nbsp; <span class="tag b">forced</span> the stream only drives the loop, so write the loop &nbsp;·&nbsp; snippets assume <code>java.util.*</code>, <code>java.util.function.*</code> and <code>java.util.stream.*</code></p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">LC 1143 · Longest Common Subsequence · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int longestCommonSubsequence(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];   // this row and the one above
+        // cur[j] = a match ? up-left + 1 : max(up, left). "left" is this
+        // row's previous entry, written a moment ago: sequential only.
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 583 · Delete Operation for Two Strings · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minDistance(String a, String b) {
+        // Keep the longest common subsequence; delete everything else.
+        return a.length() + b.length() - 2 * lcs(a, b);
+    }
+
+    // 1143's table: two alternating rows, reading "left".
+    private static int lcs(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 1312 · Minimum Insertion Steps · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minInsertions(String s) {
+        // The longest palindromic subsequence stays; every other
+        // character needs a mirror inserted on the other side.
+        return s.length() - lcs(s, new StringBuilder(s).reverse().toString());
+    }
+
+    // 1143's table: two alternating rows, reading "left".
+    private static int lcs(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] + 1 : Math.max(up[j], cur[j - 1]));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 72 · Edit Distance · stateful</div>
+<pre><code class="language-java">class Solution {
+    public int minDistance(String a, String b) {
+        int n = b.length();
+        int[][] rows = new int[2][n + 1];
+        Arrays.setAll(rows[0], j -&gt; j);     // row 0: insert j characters
+        // cur[j] = a match ? up-left : 1 + min(up-left, up, left), where
+        // "left" was written a moment ago in this row: sequential only.
+        IntStream.rangeClosed(1, a.length()).forEach(i -&gt; {
+            int[] up = rows[(i + 1) % 2], cur = rows[i % 2];
+            cur[0] = i;                      // column 0: delete i characters
+            IntStream.rangeClosed(1, n).forEach(j -&gt; cur[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? up[j - 1] : 1 + Math.min(up[j - 1], Math.min(up[j], cur[j - 1])));
+        });
+        return rows[a.length() % 2][n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 115 · Distinct Subsequences · clean</div>
+<pre><code class="language-java">class Solution {
+    public int numDistinct(String s, String t) {
+        int n = t.length();
+        int[] start = new int[n + 1];
+        start[0] = 1;                       // the empty t occurs once in anything
+        // ways[j] after one more character of s reads only the PREVIOUS
+        // row: ways[j] + (match ? ways[j - 1] : 0). A fresh row: clean.
+        record Row(int i, int[] ways) {}
+        return Stream.iterate(new Row(0, start), r -&gt; new Row(r.i() + 1,
+                        IntStream.rangeClosed(0, n).map(j -&gt; r.ways()[j]
+                                + (j &gt; 0 &amp;&amp; s.charAt(r.i()) == t.charAt(j - 1) ? r.ways()[j - 1] : 0))
+                                .toArray()))
+                .skip(s.length()).findFirst().get().ways()[n];
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">LC 97 · Interleaving String · stateful</div>
+<pre><code class="language-java">class Solution {
+    public boolean isInterleave(String s1, String s2, String s3) {
+        int m = s1.length(), n = s2.length();
+        if (m + n != s3.length()) return false;
+        boolean[] ok = new boolean[n + 1];
+        // ok[j] for row i: s3's next character came from s1 (the row above,
+        // ok[j]) or from s2 (the left cell, ok[j - 1], written a moment ago).
+        IntStream.rangeClosed(0, m).forEach(i -&gt;
+                IntStream.rangeClosed(0, n).forEach(j -&gt; ok[j] = i == 0 &amp;&amp; j == 0
+                        || i &gt; 0 &amp;&amp; ok[j] &amp;&amp; s1.charAt(i - 1) == s3.charAt(i + j - 1)
+                        || j &gt; 0 &amp;&amp; ok[j - 1] &amp;&amp; s2.charAt(j - 1) == s3.charAt(i + j - 1)));
+        return ok[n];
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="note warn"><span class="lbl">Two rows, alternating</span><code>rows[i % 2]</code> is the row being built and <code>rows[(i + 1) % 2]</code> the one above, so the table costs two rows of memory. The left cell sits in the row being built, written one step earlier by the same stream, so these are sequential only. 72 also writes its base case, <code>cur[0] = i</code>, before the inner stream starts, because the left cell of column 1 is that base case.</div>
+  <div class="note good"><span class="lbl">115 reads only the row above</span>Its next row depends on <code>ways[j]</code> and <code>ways[j - 1]</code> of the previous row and never on its own, so each step maps the old row to a new one. The in-place loop gets the same effect by walking j downwards; the fresh row makes the direction irrelevant, the same trade the knapsack slide makes. LeetCode guarantees the answer fits in an int, and because the table only adds, intermediate overflow wraps and cancels out by the end.</div>
 </section>
 
 </main>
@@ -51652,7 +52182,7 @@ ConcurrentHashMap.merge: {fizz=3334, other=6666}</code></pre>
 <!-- decks/lld/15-concurrency/03-virtual-threads.html -->
 <section class="slide" data-sec="Concurrency" data-title="Virtual threads and structured concurrency">
   <h2>Virtual threads: a thread per task is cheap again, but the downstream is not</h2>
-  <p class="dek">Java 21 made virtual threads final <span class="tag a">since 21</span>. A virtual thread that blocks on I/O or <code>sleep</code> unmounts from its carrier thread, so a program can hold millions of them. In an LLD answer this means "one virtual thread per request" is a reasonable design, and a fixed thread pool is no longer the default. The limit moves to the service you call, so bound that explicitly.</p>
+  <p class="dek">Virtual threads are a final feature <span class="tag a">since 21</span> (JEP 444). A virtual thread that blocks on I/O or <code>sleep</code> unmounts from its carrier thread, so a program can hold millions of them. In an LLD answer this means "one virtual thread per request" is a reasonable design, and a fixed thread pool is no longer the default. The limit moves to the service you call, so bound that explicitly.</p>
 
   <div class="split">
     <div class="codewrap">
@@ -52816,7 +53346,7 @@ void onlyOneOfManyUsersHoldsTheLastSeat() throws Exception {
     <div class="card"><h4>Everyday library and modern Java</h4><ul class="tight">
       <li><a data-deck="cj" data-slide="java.time" href="#java/63">java.time</a>: a 23-hour day</li>
       <li><a data-deck="cj" data-slide="Numbers that bite" href="#java/64">Numbers</a>: <code>2.0</code> is not <code>equals</code> to <code>2.00</code></li>
-      <li><a data-deck="cj" data-slide="I/O and NIO.2" href="#java/65">Files</a>: ZoÃ« from the wrong charset</li>
+      <li><a data-deck="cj" data-slide="I/O and NIO.2" href="#java/65">Files</a>: "Zoë" read back as <code>ZoÃ«</code> through the wrong charset</li>
       <li><a data-deck="cj" data-slide="Serialization" href="#java/66">Serialization</a>: no constructor runs</li>
       <li><a data-deck="cj" data-slide="What each LTS changed" href="#java/67">Each LTS</a>, <a data-deck="cj" data-slide="The new syntax on one slide" href="#java/68">new syntax</a>, <a data-deck="cj" data-slide="Java 25 features and their status" href="#java/69">Java 25</a></li>
     </ul></div>
@@ -60868,7 +61398,7 @@ String label = grade + 1 + " band";                         // Bug 5: "A1 band"<
   <p class="lede">A reference for <code>java.util.stream</code> as it stands in JDK 25. It covers every method on <code>Stream</code> and the primitive streams, all 44 <code>Collectors</code>, the Gatherers that became final in Java 24, and the <code>Optional</code> that the search and reduce operations return. It ends with the stream questions interviewers ask most often, and the coding problems they set, solved.</p>
 
   <div class="grid3">
-    <div class="card lift"><span class="bignum">57</span><p>methods on <code>Stream</code>: 40 instance, 9 static and 8 inherited from <code>BaseStream</code>. Every one is in the index on slide 3, linked to the slide that covers it.</p></div>
+    <div class="card lift"><span class="bignum">57</span><p>methods on <code>Stream</code>: 40 instance, 9 static and 8 inherited from <code>BaseStream</code>. Every one is in the <a data-deck="st" data-slide="Stream API index" href="#streams/3">Stream API index</a>, linked to the slide that covers it.</p></div>
     <div class="card lift"><span class="bignum">44</span><p>factory methods on <code>Collectors</code>, from <code>toList</code> to <code>teeing</code>. Slide 4 lists them all, along with the five Gatherers and every <code>Optional</code> method.</p></div>
     <div class="card lift"><span class="bignum">25</span><p>JDK 25, the current LTS, is the target. JDK 26 ships the identical stream API. Anything added after Java 8 carries a <span class="tag a">since</span> tag.</p></div>
   </div>
@@ -61321,7 +61851,7 @@ List&lt;String&gt; bigIds = orders.parallelStream()
 <!-- decks/streams/02-how-a-stream-runs/06-under-the-hood-stages-sinks-and-spliterators.html -->
 <section class="slide" data-sec="How a stream runs" data-title="Under the hood: stages, sinks and spliterators">
   <h2>How a pipeline is built, and how it runs</h2>
-  <p class="dek">Each intermediate call wraps the previous stage in a new pipeline object and records its flags. The terminal call walks back to the source, builds a chain of <code>Sink</code>s ending in the terminal's own sink, and pushes every element into that chain from a <code>Spliterator</code>. There is no queue between stages and no intermediate collection. This is the machinery the stepper on slide 5 animates.</p>
+  <p class="dek">Each intermediate call wraps the previous stage in a new pipeline object and records its flags. The terminal call walks back to the source, builds a chain of <code>Sink</code>s ending in the terminal's own sink, and pushes every element into that chain from a <code>Spliterator</code>. There is no queue between stages and no intermediate collection. This is the machinery the stepper on <a data-deck="st" data-slide="Laziness: one element at a time" href="#streams/5">Laziness: one element at a time</a> animates.</p>
 
   <figure>
     <div class="figbox">
@@ -63070,7 +63600,7 @@ for (Path p : paths) contents3.add(Files.readString(p));</code></pre>
 <!-- decks/streams/14-interview-questions/02-q4-6-laziness-and-order.html -->
 <section class="slide" data-sec="Interview questions" data-title="Q4–6 · Laziness and order">
   <h2>Laziness and order: the questions behind the obvious ones</h2>
-  <p class="dek">These three separate people who use streams from people who understand them. Each answer is easier to give after pressing through the stepper on slide 5 once.</p>
+  <p class="dek">These three separate people who use streams from people who understand them. Each answer is easier to give after pressing through <a data-deck="st" data-slide="Laziness: one element at a time" href="#streams/5">the stepper</a> once.</p>
 
   <article class="q"><header><i>Q4</i><h3>What does it mean that streams are lazy? Why didn't my <code>peek</code> print anything?</h3></header><div class="qb">
     <div class="snap"><span class="lbl">30-second answer</span>Intermediate operations do not run when you call them. They run when a terminal operation pulls elements, and then one element at a time: each element goes through every stage before the next is read. So unneeded work is never done — <code>findFirst</code> after <code>filter</code> stops at the first match — and a pipeline with no terminal operation does nothing at all, which is why a lone <code>peek</code> prints nothing.</div>
@@ -64000,7 +64530,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
             <tr><td>Java &amp; Spring deep-dive</td><td>The mechanism behind the annotation: proxies, the persistence context, transaction boundaries, the JVM inside a container.</td><td>Definitions without failure modes. "It just works."</td><td><div class="xrefs"><a href="#q-spring">Spring &amp; Java</a><a href="#q-security">Security</a><a data-deck="sb" data-slide="What this tab covers" href="#springboot/1">Spring Boot tab</a><a data-deck="cj" data-slide="Q1–3 · Fundamentals" href="#java/73">Core Java questions</a><a data-deck="st" data-slide="Q1–3 · Fundamentals" href="#streams/45">Java streams questions</a></div></td></tr>
             <tr><td>AI / LLM integration</td><td>Grounding answers in your own data, typed outputs, tools that run with the user's permissions, and how you would measure, secure and pay for it.</td><td>Prompt tricks instead of architecture. "Temperature 0 stops hallucinations." No evaluation set, no cost estimate.</td><td><div class="xrefs"><a data-deck="ai" data-slide="What this tab covers" href="#ai/1">Spring AI tab</a><a data-deck="ai" data-slide="Q1–3 · LLM fundamentals" href="#ai/93">Spring AI questions</a><a data-deck="ai" data-slide="Two pipelines: ingestion and retrieval" href="#ai/53">RAG</a></div></td></tr>
             <tr><td>Low-level design / machine coding</td><td>Turning a prompt into classes with clear responsibilities, interfaces where the requirements vary, running code, and a design that absorbs a change request.</td><td>A god class. Patterns with no requirement behind them. No working code at the end. A change that touches every class.</td><td><div class="xrefs"><a data-deck="lld" data-slide="What this tab covers" href="#lld/1">Low-level design</a><a data-deck="lld" data-slide="The 45-minute plan" href="#lld/91">The 45-minute plan</a></div></td></tr>
-            <tr><td>System design</td><td>Trade-offs under constraints, real numbers, and a failure story for every box you draw.</td><td>Microservices in the first minute. No numbers. No time left for failure handling.</td><td><div class="xrefs"><a href="#framework">Framework</a><a href="#whiteboard">Scripts</a><a data-deck="deck" data-slide="What this atlas is" href="#deck/1">Reference deck</a></div></td></tr>
+            <tr><td>System design</td><td>Trade-offs under constraints, real numbers, and a failure story for every box you draw.</td><td>Microservices in the first minute. No numbers. No time left for failure handling.</td><td><div class="xrefs"><a href="#framework">Framework</a><a href="#whiteboard">Scripts</a><a data-deck="hld" data-slide="What this deck is" href="#hld/1">System design tab</a><a data-deck="deck" data-slide="What this atlas is" href="#deck/1">Reference deck</a></div></td></tr>
             <tr><td>Production &amp; debugging</td><td>Whether you have operated a system: an ordered diagnosis, and mitigation before root cause.</td><td>Guessing. Scaling before measuring. Investigating while customers wait.</td><td><div class="xrefs"><a href="#q-ops">Production &amp; ops</a><a data-deck="sb" data-sec="Production" href="#springboot/44">Boot · Production</a></div></td></tr>
             <tr><td>Behavioural</td><td>Judgement, ownership, and how you handle disagreement and your own mistakes.</td><td>Stories with no cost, no numbers and no "I".</td><td><div class="xrefs"><a href="#stories">Stories</a></div></td></tr>
           </tbody>
@@ -64187,7 +64717,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
 
       <article class="q"><header><i>Q13</i><h3>How do you write to the database and publish to Kafka atomically?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>You don't — you use the transactional outbox. Write the event into an outbox table in the same local transaction as the data, and let a separate relay publish it and mark it sent. Crash anywhere and the row is still there, so it gets published again. That gives at-least-once, which is why every consumer is idempotent.</div>
-        <p class="deeper"><b>Go deeper:</b> Name both failure modes of the naive approach: send-then-commit publishes an event for an order that rolls back; commit-then-send loses the event on a crash. Then the two relay options — a polling relay (<code>FOR UPDATE SKIP LOCKED</code>, simple, ~200 ms–1 s latency) versus Debezium CDC reading the WAL (millisecond latency, ordering from the log, costs a Connect cluster). Bonus: Spring Modulith's event publication registry is exactly this pattern, built in.</p>
+        <p class="deeper"><b>Go deeper:</b> Name both failure modes of the naive approach: send-then-commit publishes an event for an order that rolls back; commit-then-send loses the event on a crash. Then the two relay options — a polling relay (<code>FOR UPDATE SKIP LOCKED</code>, simple, ~200 ms–1 s latency) versus Debezium CDC reading the WAL (millisecond latency, ordering from the log, costs a Connect cluster). Bonus: Spring Modulith's event publication registry is the same outbox idea built in, though not a polling relay: it records each publication in your transaction and dispatches it in-process after commit, republishing incomplete ones.</p>
         <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="ed" data-slide="The dual-write problem" href="#events/12">Events · The dual-write problem</a><a data-deck="deck" data-slide="Outbox and CDC" href="#deck/34">Deck · Outbox and CDC</a><a data-deck="deck" data-slide="Events that cannot be lost" href="#deck/13">Deck · Events that cannot be lost</a></p>
       </div></article>
 
@@ -64247,7 +64777,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
 
       <article class="q"><header><i>Q23</i><h3>UUID or database sequence for primary keys?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>A sequence on PostgreSQL or Oracle, with Hibernate's <code>allocationSize</code> matching the sequence's <code>INCREMENT BY</code>, so ids arrive in blocks and inserts can batch. If ids must exist before persisting, or be generated across services, use a time-ordered UUIDv7, not a random v4. Avoid <code>IDENTITY</code> if you need batch inserts, because Hibernate cannot batch them.</div>
-        <p class="deeper"><b>Go deeper:</b> Give the reason for each. With <code>IDENTITY</code> the id is known only after the <code>INSERT</code>, so Hibernate round-trips per row and silently turns off JDBC batching. A mismatched <code>allocationSize</code> produces duplicate-key errors that only appear under concurrency. A random v4 key sends every insert to a random leaf page of the B-tree, which costs write throughput and bloats the index on a large table. A v7 key starts with a timestamp, so inserts land almost in order. Hibernate 7.0 added <code>UuidGenerator.Style.VERSION_7</code>; its older <code>TIME</code> style is a different, version-1-like layout. And always use a surrogate key: "the order number will never change" describes today's process, not the data.</p>
+        <p class="deeper"><b>Go deeper:</b> Give the reason for each. With <code>IDENTITY</code> the id is known only after the <code>INSERT</code>, so Hibernate round-trips per row and silently turns off JDBC batching. A mismatched <code>allocationSize</code> stops the application at boot, because Hibernate checks the sequence's increment and by default throws; if someone silences that check, the id blocks overlap and duplicate keys follow, even on a single instance. A random v4 key sends every insert to a random leaf page of the B-tree, which costs write throughput and bloats the index on a large table. A v7 key starts with a timestamp, so inserts land almost in order. Hibernate 7.0 added <code>UuidGenerator.Style.VERSION_7</code>; its older <code>TIME</code> style is a different, version-1-like layout. And always use a surrogate key: "the order number will never change" describes today's process, not the data.</p>
         <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="sb" data-slide="Keys" href="#springboot/21">Boot · Keys</a><a data-deck="sb" data-slide="Entity basics" href="#springboot/20">Boot · Entity basics</a></p>
       </div></article>
     </section>
@@ -64288,7 +64818,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
 
       <article class="q"><header><i>Q29</i><h3>How do you debug a request that crossed four components and a queue?</h3></header><div class="qb">
         <div class="snap"><span class="lbl">30-second answer</span>One trace id, propagated end to end — including through the Kafka message headers, which is the hop teams forget. Every log line carries it, every span carries it, and the customer's error page shows it. Support quotes the id, you get the whole journey in one query.</div>
-        <p class="deeper"><b>Go deeper:</b> In Spring terms: Micrometer Tracing with W3C <code>traceparent</code>, OTLP export, and <code>observation-enabled: true</code> on both the Kafka template and the listener container. Mention structured JSON logs with the correlation pattern, sampling at 10% with errors always sampled, and the cardinality rule — never tag a metric with an order id, that belongs in logs and traces.</p>
+        <p class="deeper"><b>Go deeper:</b> In Spring terms: Micrometer Tracing with W3C <code>traceparent</code>, OTLP export, and <code>observation-enabled: true</code> on both the Kafka template and the listener container. Mention structured JSON logs with the correlation pattern, head sampling at 10% plus tail sampling in the OpenTelemetry collector so every error trace is kept (a head sampler decides before any error exists), and the cardinality rule — never tag a metric with an order id, that belongs in logs and traces.</p>
         <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="Observability" href="#deck/51">Deck · Observability</a><a data-deck="ed" data-slide="Observability" href="#events/34">Events · Observability</a><a data-deck="sb" data-slide="Structured logging" href="#springboot/47">Boot · Structured logging</a></p>
       </div></article>
 
@@ -64532,7 +65062,7 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
       </div></article>
 
       <article class="q"><header><i>Q66</i><h3>How do you decide what to alert on?</h3></header><div class="qb">
-        <div class="snap"><span class="lbl">30-second answer</span>On symptoms the customer feels, derived from SLOs, not on CPU. Pick an SLI for each journey, such as the share of <code>POST /orders</code> that succeed within 1.5 s. Set an objective, such as 99.9% over 28 days. Then alert on how fast the error budget is burning: a fast window that pages (about 14× the sustainable rate over an hour) and a slow window that opens a ticket (about 6× over six hours). That catches both the outage and the slow bleed without paging on a blip.</div>
+        <div class="snap"><span class="lbl">30-second answer</span>On symptoms the customer feels, derived from SLOs, not on CPU. Pick an SLI for each journey, such as the share of <code>POST /orders</code> that succeed within 1.5 s. Set an objective, such as 99.9% over 28 days. Then alert on how fast the error budget is burning: a fast window that pages (about 14× the sustainable rate over an hour), a slow window that also pages (about 6× over six hours), and a ticket for the gentle, multi-day burn (about 1× over three days). That catches both the outage and the slow bleed without paging on a blip.</div>
         <p class="deeper"><b>Go deeper:</b> Explain the budget. 99.9% allows about 43 minutes a month, and that figure turns "can we ship this risky change?" into arithmetic. Every paging alert has a runbook. Below the SLOs, dashboards follow RED for endpoints (rate, errors, duration) and USE for resources (utilisation, saturation, errors) such as pools, heap and disk. On the asynchronous side, consumer lag and dead-letter depth are the SLIs. And keep metric tags low-cardinality: an order id belongs in logs and traces, never on a metric.</p>
         <p class="xrefs"><span class="lbl">In the atlas</span><a data-deck="deck" data-slide="SLOs and alerting" href="#deck/52">Deck · SLOs and alerting</a><a data-deck="sb" data-slide="Metrics" href="#springboot/46">Boot · Metrics</a><a data-deck="ed" data-slide="SLIs & alerting" href="#events/51">Events · SLIs &amp; alerting</a></p>
       </div></article>
@@ -64725,36 +65255,40 @@ IntStream.range(0, nums.size()).filter(i -&gt; nums.get(i) &gt; 7).findFirst(); 
 <!-- interview/017-plan.html -->
     <section class="ivsec" id="plan">
       <h2>A three-week plan</h2>
-      <p class="dek">If the interview is booked, this order gets the most out of the atlas per hour. It assumes about ninety minutes on weekdays and a longer session at the weekend. With less time, shorten each week but keep the order: mechanisms first, then systems, then rehearsal.</p>
+      <p class="dek">If the interview is booked, this order gets the most out of the atlas per hour. It assumes about ninety minutes on weekdays and a longer session at the weekend. Start from <a href="#rounds">the rounds in your loop</a> and drop the lines for rounds you will not face: an AI line for a role with no LLM work, the low-level design lines for a loop without machine coding. With less time, shorten each week but keep the order: mechanisms first, then systems, then rehearsal.</p>
       <div class="grid3">
         <div class="card">
           <h3>Week 1 · Mechanisms</h3>
           <ul class="checks tight">
+            <li>Core Java tab: Collections, Concurrency foundations and The JVM. Every Spring answer eventually lands on one of them.</li>
             <li>Spring Boot tab: Lifecycle, JPA and Internals. The proxy, the persistence context and transaction boundaries answer a third of any Spring deep-dive.</li>
+            <li>Java streams tab: How a stream runs, then Collectors. Laziness and ordering come up in both the deep-dive and the coding round.</li>
             <li>This page: Spring &amp; Java and Security, answered out loud before you read the answers.</li>
             <li>DSA: the orientation and complexity slides, then patterns 01–10, about two a day. Code the two "if you only drill two" problems for each.</li>
           </ul>
-          <p class="xrefs"><a data-deck="sb" data-sec="Lifecycle" href="#springboot/6">Boot · Lifecycle</a><a data-deck="sb" data-sec="JPA" href="#springboot/20">Boot · JPA</a><a data-deck="sb" data-sec="Internals" href="#springboot/32">Boot · Internals</a><a data-deck="dsa" data-slide="What this deck is" href="#dsa/1">DSA · Start</a></p>
+          <p class="xrefs"><a data-deck="cj" data-sec="Collections" href="#java/24">Java · Collections</a><a data-deck="cj" data-sec="Concurrency foundations" href="#java/34">Java · Concurrency</a><a data-deck="cj" data-sec="The JVM" href="#java/56">Java · JVM</a><a data-deck="sb" data-sec="Lifecycle" href="#springboot/6">Boot · Lifecycle</a><a data-deck="sb" data-sec="JPA" href="#springboot/20">Boot · JPA</a><a data-deck="sb" data-sec="Internals" href="#springboot/32">Boot · Internals</a><a data-deck="st" data-sec="How a stream runs" href="#streams/5">Streams · How it runs</a><a data-deck="dsa" data-slide="What this deck is" href="#dsa/1">DSA · Start</a></p>
         </div>
         <div class="card">
-          <h3>Week 2 · Systems</h3>
+          <h3>Week 2 · Systems and design</h3>
           <ul class="checks tight">
-            <li>Reference deck: Modular monolith, Backend, Middleware and Data.</li>
-            <li>Event-driven tab: Guarantees and Kafka internals.</li>
+            <li>System design tab: Fundamentals, Estimation, Data and Caching, then two worked designs (URL shortener and news feed) drawn from memory before you read them.</li>
+            <li>Reference deck: Modular monolith, Backend, Middleware and Data. Event-driven tab: Guarantees and Kafka internals.</li>
+            <li>Low-level design tab: SOLID, then the parking lot and the elevator coded against a 45-minute timer.</li>
             <li>This page: Architecture, Data and Integration. Rehearse W1 and W2 out loud against a 45-minute timer.</li>
             <li>DSA patterns 11–20.</li>
           </ul>
-          <p class="xrefs"><a data-deck="deck" data-sec="Modular monolith" href="#deck/6">Deck · Modular monolith</a><a data-deck="deck" data-sec="Middleware" href="#deck/27">Deck · Middleware</a><a data-deck="ed" data-sec="Guarantees" href="#events/9">Events · Guarantees</a><a data-deck="ed" data-sec="Kafka internals" href="#events/17">Events · Kafka internals</a><a data-deck="dsa" data-sec="11 · Heap / top K" href="#dsa/65">DSA · 11</a></p>
+          <p class="xrefs"><a data-deck="hld" data-sec="Fundamentals" href="#hld/5">HLD · Fundamentals</a><a data-deck="hld" data-sec="Estimation" href="#hld/16">HLD · Estimation</a><a data-deck="hld" data-sec="Design · News feed" href="#hld/108">HLD · News feed</a><a data-deck="deck" data-sec="Modular monolith" href="#deck/6">Deck · Modular monolith</a><a data-deck="deck" data-sec="Middleware" href="#deck/27">Deck · Middleware</a><a data-deck="ed" data-sec="Guarantees" href="#events/9">Events · Guarantees</a><a data-deck="ed" data-sec="Kafka internals" href="#events/17">Events · Kafka internals</a><a data-deck="lld" data-sec="SOLID and friends" href="#lld/12">LLD · SOLID</a><a data-deck="lld" data-sec="Parking lot" href="#lld/43">LLD · Parking lot</a><a data-deck="dsa" data-sec="11 · Heap / top K" href="#dsa/65">DSA · 11</a></p>
         </div>
         <div class="card">
           <h3>Week 3 · Operating it, then rehearsal</h3>
           <ul class="checks tight">
-            <li>Spring Boot tab: Production. Reference deck: Cross-cutting.</li>
+            <li>Spring Boot tab: Production. Reference deck: Cross-cutting. System design tab: Reliability and Operate &amp; secure.</li>
+            <li>Spring AI tab, if the role touches LLMs: LLM fundamentals, RAG and Production, then its interview questions.</li>
             <li>This page: Production &amp; ops, scripts W3–W5, and the numbers.</li>
             <li>Two mock interviews, one design and one coding, with someone who will interrupt you. Write your five stories and time each at ninety seconds.</li>
             <li>DSA patterns 21–30.</li>
           </ul>
-          <p class="xrefs"><a data-deck="sb" data-sec="Production" href="#springboot/44">Boot · Production</a><a data-deck="deck" data-sec="Cross-cutting" href="#deck/49">Deck · Cross-cutting</a><a data-deck="dsa" data-sec="21 · Topological sort" href="#dsa/115">DSA · 21</a></p>
+          <p class="xrefs"><a data-deck="sb" data-sec="Production" href="#springboot/44">Boot · Production</a><a data-deck="deck" data-sec="Cross-cutting" href="#deck/49">Deck · Cross-cutting</a><a data-deck="hld" data-sec="Reliability" href="#hld/57">HLD · Reliability</a><a data-deck="hld" data-sec="Operate & secure" href="#hld/66">HLD · Operate</a><a data-deck="ai" data-sec="LLM fundamentals" href="#ai/4">AI · Fundamentals</a><a data-deck="ai" data-sec="RAG" href="#ai/53">AI · RAG</a><a data-deck="ai" data-sec="Production" href="#ai/85">AI · Production</a><a data-deck="dsa" data-sec="21 · Topological sort" href="#dsa/115">DSA · 21</a></p>
         </div>
       </div>
       <div class="note good"><span class="lbl">The day before</span>Re-read the numbers, the red flags and your five stories. Learn nothing new: new material the night before crowds out what you already know, and the interview rewards fluent recall of the basics far more than one extra pattern.</div>

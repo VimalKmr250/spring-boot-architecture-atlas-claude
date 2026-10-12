@@ -19,7 +19,7 @@
         <rect x="624" y="34" width="86" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
         <text x="667" y="52" text-anchor="middle" font-size="10" fill="currentColor">Thread</text>
         <text x="667" y="66" text-anchor="middle" font-size="10" fill="currentColor">stacks</text>
-        <text x="667" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">1 MB each!</text>
+        <text x="667" y="80" text-anchor="middle" font-size="8.5" fill="currentColor" opacity="0.65">≤ 1 MB each</text>
 
         <rect x="714" y="34" width="70" height="52" rx="5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-opacity="0.32"></rect>
         <text x="749" y="52" text-anchor="middle" font-size="10" fill="currentColor">Code</text>
@@ -29,11 +29,11 @@
         <rect x="788" y="34" width="74" height="52" rx="5" fill="#A22636" fill-opacity="0.10" stroke="#A22636"></rect>
         <text x="825" y="52" text-anchor="middle" font-size="10" fill="currentColor">Direct</text>
         <text x="825" y="66" text-anchor="middle" font-size="10" fill="currentColor">buffers</text>
-        <text x="825" y="80" text-anchor="middle" font-size="8.5" fill="#A22636">unbounded</text>
+        <text x="825" y="80" text-anchor="middle" font-size="8.5" fill="#A22636">≤ heap size</text>
 
         <line x1="14" y1="112" x2="866" y2="112" stroke="currentColor" stroke-opacity="0.15"></line>
-        <text x="14" y="134" font-size="10.5" fill="currentColor" opacity="0.8">Direct ByteBuffers — used by Netty, Kafka clients and NIO — live OUTSIDE the heap and are not bounded by -Xmx. A Kafka</text>
-        <text x="14" y="151" font-size="10.5" fill="currentColor" opacity="0.8">consumer with large fetch buffers, or 400 threads at 1 MB of stack each, quietly eats the headroom you left.</text>
+        <text x="14" y="134" font-size="10.5" fill="currentColor" opacity="0.8">Direct ByteBuffers — Netty, Kafka clients, NIO — live OUTSIDE the heap, and by default may grow as large as the heap again. A Kafka</text>
+        <text x="14" y="151" font-size="10.5" fill="currentColor" opacity="0.8">consumer with large fetch buffers, or hundreds of threads with deep stacks, quietly eats the headroom you left.</text>
         <text x="14" y="174" font-size="10.5" fill="#D26A3F">Symptom: the pod is OOMKilled (exit 137) with NO OutOfMemoryError in the logs and a heap graph that looks healthy.</text>
         <text x="14" y="196" font-size="10.5" fill="currentColor" opacity="0.8">Diagnose with Native Memory Tracking: -XX:NativeMemoryTracking=summary, then jcmd &lt;pid&gt; VM.native_memory summary</text>
       </svg>
@@ -43,8 +43,8 @@
 
   <div class="grid3">
     <div class="card"><h4>Set the percentage, not the megabytes</h4><p><code>-XX:MaxRAMPercentage=75</code> adapts when someone changes the container limit. A hardcoded <code>-Xmx1500m</code> in a container later resized to 1 GiB is an instant crash loop.</p></div>
-    <div class="card"><h4>Leave real headroom</h4><p>25% of the limit for non-heap is a reasonable starting point; services with heavy Netty or Kafka use need more. Set container <code>requests == limits</code> for predictable scheduling.</p></div>
-    <div class="card"><h4>Virtual threads change the maths</h4><p>Platform threads cost ~1 MB of stack each, so 400 of them is 400 MB. Virtual threads are heap-allocated and tiny — which removes this particular ceiling but moves the pressure onto the heap.</p></div>
+    <div class="card"><h4>Leave real headroom</h4><p>25% of the limit for non-heap is a reasonable starting point; services with heavy Netty or Kafka use need more — and cap direct memory with <code>-XX:MaxDirectMemorySize</code>, because by default it may grow as large as the heap. Set container <code>requests == limits</code> for predictable scheduling.</p></div>
+    <div class="card"><h4>Virtual threads change the maths</h4><p>A platform thread <em>reserves</em> up to 1 MB of stack (<code>-Xss</code>), but only the pages it actually touches are committed and counted against the container — usually far less, though deep framework stacks add up across hundreds of threads. NMT shows reserved and committed separately. Virtual threads are heap-allocated and tiny — which removes this particular ceiling but moves the pressure onto the heap.</p></div>
   </div>
 </section>
 

@@ -7,34 +7,39 @@
 <pre><code class="language-yaml">spring:
   cloud:
     gateway:
-      default-filters:
-        - RemoveRequestHeader=Cookie          # cookies terminate at the BFF, never reach services
-        - AddRequestHeader=X-Request-Source, gateway
-      routes:
-        - id: orders
-          uri: lb://order-platform
-          predicates:
-            - Path=/api/orders/**
-          filters:
-            - name: CircuitBreaker
-              args: { name: ordersCb, fallbackUri: forward:/fallback/orders }
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 50      # per user, steady state
-                redis-rate-limiter.burstCapacity: 100
-                key-resolver: "#{@principalKeyResolver}"
-            - name: Retry
-              args:
-                retries: 2
-                methods: GET                              # NEVER retry POST here
-                series: SERVER_ERROR
-                backoff: { firstBackoff: 50ms, maxBackoff: 500ms, factor: 2 }
+      server:
+        webflux:                                  # the root since Spring Cloud 2025.0;
+                                                  # plain spring.cloud.gateway.* is the old one
+          default-filters:
+            - RemoveRequestHeader=Cookie          # cookies terminate at the BFF, never reach services
+            - AddRequestHeader=X-Request-Source, gateway
+          routes:
+            - id: orders
+              uri: lb://order-platform
+              predicates:
+                - Path=/api/orders/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: ordersCb, fallbackUri: forward:/fallback/orders }
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 50      # per user, steady state
+                    redis-rate-limiter.burstCapacity: 100
+                    key-resolver: "#{@principalKeyResolver}"
+                - name: Retry
+                  args:
+                    retries: 2
+                    methods: GET                              # NEVER retry POST here
+                    series: SERVER_ERROR
+                    backoff: { firstBackoff: 50ms, maxBackoff: 500ms, factor: 2 }
 
   security.oauth2.resourceserver.jwt.issuer-uri: https://id.retailco.com/realms/shop
 
 management:
   endpoints.web.exposure.include: health,prometheus,gateway
-  tracing.sampling.probability: 0.1           # 100% for errors via a custom sampler</code></pre>
+  tracing.sampling.probability: 0.1           # head sampling: decided before any error
+                                              # exists. Keep every error with TAIL sampling
+                                              # in the OpenTelemetry collector instead.</code></pre>
   </div>
 
   <div class="grid3">

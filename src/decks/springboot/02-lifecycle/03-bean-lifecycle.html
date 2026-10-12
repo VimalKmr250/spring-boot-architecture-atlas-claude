@@ -59,7 +59,7 @@
   <div class="grid3">
     <div class="card"><h4>Scopes</h4><p><code>singleton</code> (default, one per context) · <code>prototype</code> (new every injection; <b>no destroy callback ever runs</b>) · <code>request</code> / <code>session</code> (web, injected as a scoped proxy) · <code>application</code>. A prototype injected into a singleton is created once — use <code>ObjectProvider</code> if you need a fresh one per call.</p></div>
     <div class="card"><h4>Circular dependencies</h4><p>Constructor injection on both sides cannot be resolved and fails at startup — correctly, since it is a design smell. Boot 2.6+ disables the field-injection workaround by default. Fix the design, or use <code>@Lazy</code> on one side only as a stopgap.</p></div>
-    <div class="card"><h4>Proxy type</h4><p>JDK dynamic proxy when the bean implements an interface, CGLIB subclass otherwise (Boot forces CGLIB by default). CGLIB cannot proxy <code>final</code> classes or <code>final</code>/<code>private</code> methods — the annotation is silently ignored, which is the worst failure mode there is.</p></div>
+    <div class="card"><h4>Proxy type</h4><p>JDK dynamic proxy when the bean implements an interface, CGLIB subclass otherwise (Boot forces CGLIB by default). CGLIB cannot override <code>final</code> or <code>private</code> methods — the annotation on them is silently ignored, which is the worst failure mode there is. A <code>final</code> class is louder: the subclass cannot be generated, so startup fails.</p></div>
   </div>
 </section>
 

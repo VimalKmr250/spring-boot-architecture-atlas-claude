@@ -42,7 +42,7 @@
   </figure>
 
   <div class="grid2">
-    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). <b>Spring Modulith's registry is exactly this.</b></p></div>
+    <div class="card"><h3>Polling relay</h3><p><code>SELECT ... WHERE sent_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED</code>, publish, mark. Simple, no extra infrastructure, adds polling latency (typically 200 ms–1 s). Spring Modulith's registry is the same <em>outbox</em> idea without the poller: it logs each publication in your transaction and dispatches it in-process after commit, republishing what is left incomplete — see <a data-deck="deck" data-slide="Events that cannot be lost">Events that cannot be lost</a>.</p></div>
     <div class="card"><h3>CDC (Debezium)</h3><p>Reads the write-ahead log, so no polling, no load on the table, ordering guaranteed by the log, latency in milliseconds. Costs a Kafka Connect cluster and replication-slot operations. Worth it above roughly a few thousand events/sec.</p></div>
   </div>
 </section>

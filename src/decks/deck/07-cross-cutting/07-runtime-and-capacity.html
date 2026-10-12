@@ -17,7 +17,7 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card accent">
-        <h3>Virtual threads (Java 21+, on by default in Boot 4 when enabled)</h3>
+        <h3>Virtual threads (Java 21+, opt-in with one property)</h3>
 <pre style="margin-top:6px"><code class="language-yaml">spring.threads.virtual.enabled: true</code></pre>
         <ul class="tight" style="margin-top:8px">
           <li><b>Helps:</b> IO-bound request handling — thousands of concurrent requests blocked on HTTP or JDBC, without a thread per request.</li>

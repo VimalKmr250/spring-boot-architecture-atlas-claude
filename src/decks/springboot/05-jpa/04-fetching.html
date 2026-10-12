@@ -11,8 +11,9 @@ interface OrderJpaRepository extends JpaRepository&lt;OrderJpaEntity, UUID&gt; {
     @EntityGraph(attributePaths = { "lines", "customer" })
     Optional&lt;OrderJpaEntity&gt; findWithLinesById(UUID id);
 
-    @EntityGraph(attributePaths = "lines")
-    Page&lt;OrderJpaEntity&gt; findByCustomerId(UUID customerId, Pageable page);
+    @EntityGraph(attributePaths = "customer")    // to-one only: safe to page.
+    Page&lt;OrderJpaEntity&gt; findByStatus(OrderStatus s, Pageable page);
+    // Never a collection ("lines") on a Page — see "Pagination + join fetch".
 }
 
 // 2. JOIN FETCH — explicit, one collection at a time
@@ -31,7 +32,7 @@ List&lt;OrderSummary&gt; summariesFor(@Param("c") UUID customerId);</code></pre>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="note bad"><span class="lbl">Two <code>join fetch</code> on collections = cartesian product</span>An order with 10 lines and 10 promotions returns <b>100 rows</b>, and Hibernate 6 will refuse with <code>MultipleBagFetchException</code> if both are <code>List</code>. Fetch one collection per query and let <code>@BatchSize</code> handle the second, or run two queries.</div>
-      <div class="note bad"><span class="lbl">Pagination + <code>join fetch</code></span>Logs <em>"firstResult/maxResults specified with collection fetch; applying in memory"</em> — Hibernate loads <b>every matching row</b> then pages in the JVM. On 40,000 orders that is an OOM. Fix: page over ids first, then fetch the entities for that page. Set <code>hibernate.query.fail_on_pagination_over_collection_fetch: true</code> so it throws instead of quietly working until it doesn't.</div>
+      <div class="note bad"><span class="lbl">Pagination + <code>join fetch</code></span>Logs <em>"firstResult/maxResults specified with collection fetch; applying in memory"</em> — Hibernate loads <b>every matching row</b> then pages in the JVM. On 40,000 orders that is an OOM. Fix: page over ids first, then fetch the entities for that page — or page without the fetch and let <code>hibernate.default_batch_fetch_size</code> load the collections in batches. Set <code>hibernate.query.fail_on_pagination_over_collection_fetch: true</code> so it throws instead of quietly working until it doesn't.</div>
       <div class="note good"><span class="lbl">Make it a test</span>Count queries on your three hottest endpoints with datasource-proxy and assert an upper bound. An N+1 introduced six months later then fails the build rather than the Black Friday dashboard.</div>
     </div>
   </div>
