@@ -1,0 +1,187 @@
+<section class="slide" data-sec="Indexes and plans" data-title="Covering and filtered indexes">
+  <h2>An index that holds every column a query needs makes the table unnecessary, and one that holds only the rows you query stays tiny</h2>
+  <p class="dek">The lookups on the previous slides exist because the index lacks a column the query needs, here <code>total</code>. A <b>covering</b> index includes it, so the query is answered from the index alone. SQL Server adds non-key columns to the leaf with <code>INCLUDE</code>; Oracle has no <code>INCLUDE</code>, so the column joins the key. A <b>filtered</b> or partial index holds only the rows that matter, such as the 0.5% of orders that FAILED. SQL Server writes it as <code>WHERE status = 'FAILED'</code>. Oracle gets the same effect from a function-based index that is NULL for every other row, because entirely-NULL keys are not indexed.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">covering.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- total revenue of the 2,500 FAILED orders, with three different indexes on status
+CREATE INDEX ix_status          ON big_orders (status);
+CREATE INDEX ix_status_covering ON big_orders (status) INCLUDE (total);
+CREATE INDEX ix_failed_only     ON big_orders (order_id) INCLUDE (total) WHERE status = 'FAILED';
+GO
+SET STATISTICS IO ON;
+-- 1  key only: SQL Server prefers to scan the table rather than do 2,500 lookups
+SELECT SUM(total) AS failed_total FROM big_orders WITH (INDEX (ix_status)) WHERE status = 'FAILED';
+-- 2  INCLUDE (total) puts the summed column in the index leaf: no lookups at all
+SELECT SUM(total) AS failed_total FROM big_orders WITH (INDEX (ix_status_covering)) WHERE status = 'FAILED';
+-- 3  a filtered index holds only the FAILED rows
+SELECT SUM(total) AS failed_total FROM big_orders WITH (INDEX (ix_failed_only)) WHERE status = 'FAILED';
+SET STATISTICS IO OFF;
+
+-- how big each index is
+SELECT i.name AS index_name, SUM(s.used_page_count) AS pages, SUM(s.row_count) AS index_rows
+FROM   sys.dm_db_partition_stats s JOIN sys.indexes i ON i.object_id = s.object_id AND i.index_id = s.index_id
+WHERE  s.object_id = OBJECT_ID('big_orders')
+GROUP  BY i.name ORDER BY pages DESC;
+DROP INDEX ix_status ON big_orders;
+DROP INDEX ix_status_covering ON big_orders;
+DROP INDEX ix_failed_only ON big_orders;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · covering.mss.sql</div>
+<pre><code class="language-plaintext">failed_total
+------------
+   635000.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 7678, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+failed_total
+------------
+   635000.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 15, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+failed_total
+------------
+   635000.00
+
+(1 rows affected)
+Table 'big_orders'. Scan count 1, logical reads 19, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+index_name         pages index_rows
+------------------ ----- ----------
+big_orders_pk       2639     500000
+ix_status_covering  1848     500000
+ix_status           1289     500000
+ix_failed_only        39       2500
+
+(4 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">covering.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">SET SERVEROUTPUT OFF
+-- Oracle has no INCLUDE: add the column to the key. NULL keys are not indexed, which gives a partial index.
+CREATE INDEX ix_status_total ON big_orders (status, total);
+CREATE INDEX ix_failed_only  ON big_orders (CASE WHEN status = 'FAILED' THEN total END);
+
+-- 1  everything the query needs is in the index, so the table is never visited
+SELECT /*+ gather_plan_statistics INDEX(o ix_status_total) */ SUM(total) AS failed_total
+FROM   big_orders o WHERE status = 'FAILED';
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST'));
+
+-- 2  the partial index: only the 2,500 FAILED rows have a non-NULL key; the query repeats the expression
+SELECT /*+ gather_plan_statistics */ SUM(CASE WHEN status = 'FAILED' THEN total END) AS failed_total
+FROM   big_orders o WHERE CASE WHEN status = 'FAILED' THEN total END IS NOT NULL;
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(format =&gt; 'BASIC ROWS IOSTATS LAST'));
+
+SELECT index_name, leaf_blocks, num_rows FROM user_indexes
+WHERE  table_name = 'BIG_ORDERS' ORDER BY leaf_blocks DESC;
+DROP INDEX ix_status_total;
+DROP INDEX ix_failed_only;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · covering.ora.sql · A-Time and Reads vary by run</div>
+<pre><code class="language-plaintext">Index created.
+
+Index created.
+
+FAILED_TOTAL
+------------
+      635000
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics INDEX(o ix_status_total) */
+SUM(total) AS failed_total FROM   big_orders o WHERE status = 'FAILED'
+
+Plan hash value: 902759886
+
+--------------------------------------------------------------------------------------------------------
+| Id  | Operation         | Name            | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |
+--------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |                 |      1 |        |      1 |00:00:00.01 |      11 |     10 |
+|   1 |  SORT AGGREGATE   |                 |      1 |      1 |      1 |00:00:00.01 |      11 |     10 |
+|*  2 |   INDEX RANGE SCAN| IX_STATUS_TOTAL |      1 |    100K|   2500 |00:00:00.01 |      11 |     10 |
+--------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("STATUS"='FAILED')
+
+20 rows selected.
+
+FAILED_TOTAL
+------------
+      635000
+
+1 row selected.
+
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------------------------
+EXPLAINED SQL STATEMENT:
+------------------------
+SELECT /*+ gather_plan_statistics */ SUM(CASE WHEN status = 'FAILED'
+THEN total END) AS failed_total FROM   big_orders o WHERE CASE WHEN
+status = 'FAILED' THEN total END IS NOT NULL
+
+Plan hash value: 3613108983
+
+--------------------------------------------------------------------------------------------------
+| Id  | Operation             | Name           | Starts | E-Rows | A-Rows |   A-Time   | Buffers |
+--------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT      |                |      1 |        |      1 |00:00:00.01 |      11 |
+|   1 |  SORT AGGREGATE       |                |      1 |      1 |      1 |00:00:00.01 |      11 |
+|*  2 |   INDEX FAST FULL SCAN| IX_FAILED_ONLY |      1 |   2495 |   2500 |00:00:00.01 |      11 |
+--------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter("O"."SYS_NC00006$" IS NOT NULL)
+
+Note
+-----
+   - dynamic statistics used: dynamic sampling (level=AUTO (SYSTEM))
+
+25 rows selected.
+
+INDEX_NAME      LEAF_BLOCKS NUM_ROWS
+--------------- ----------- --------
+IX_STATUS_TOTAL        1631   500000
+BIG_ORDERS_PK           937   500000
+IX_FAILED_ONLY            6     2500
+
+3 rows selected.
+
+Index dropped.
+
+Index dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>SQL Server, FAILED revenue</th><th class="num">Pages read</th><th class="num">Index size, pages</th></tr></thead>
+      <tbody>
+        <tr><td>Forced through <code>(status)</code>: 2,500 lookups</td><td class="num">7,678</td><td class="num">1,289</td></tr>
+        <tr><td>Table scan, the optimiser's own choice</td><td class="num">2,639</td><td class="num">—</td></tr>
+        <tr><td><code>(status) INCLUDE (total)</code></td><td class="num">15</td><td class="num">1,848</td></tr>
+        <tr><td>Filtered: <code>WHERE status = 'FAILED'</code></td><td class="num">19</td><td class="num">39</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Forcing the index made it worse</span>Hinting the plain status index cost 7,678 pages, three times the scan the optimiser had chosen. That is why the optimiser refused it. Fix a slow query by changing the index or the query, not by forcing a plan.</div>
+    <div class="note warn"><span class="lbl">The estimate behind it</span>Oracle estimated <b>100K</b> FAILED rows (E-Rows) against 2,500 actual: without a histogram it assumes the five statuses are equally common. Skewed columns need histograms, which Oracle's statistics job gathers for columns that appear in predicates. With such a bad estimate, plan choices go wrong.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For a hot query I build a covering index: filter columns as keys, returned columns in <code>INCLUDE</code>. For queries that only ever look at a small subset, such as unprocessed jobs or failed payments, a filtered index is small and cheap to maintain. Then I confirm in the plan that the key lookup is gone."</div>
+  </div>
+</section>

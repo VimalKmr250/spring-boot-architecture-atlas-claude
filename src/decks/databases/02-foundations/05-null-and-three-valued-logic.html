@@ -1,0 +1,159 @@
+<section class="slide" data-sec="Foundations" data-title="NULL and three-valued logic">
+  <h2>NULL means "unknown", so every comparison with it is unknown, and WHERE keeps only rows that are true</h2>
+  <p class="dek">SQL logic has three values: TRUE, FALSE and UNKNOWN. Any comparison with NULL, even <code>NULL = NULL</code>, yields UNKNOWN, and <code>WHERE</code>, <code>ON</code> and <code>CHECK</code> treat UNKNOWN differently: the first two drop the row, a <code>CHECK</code> lets it through. That is why <code>referred_by &lt;&gt; 1</code> counted 3 customers rather than 8: the five with no referrer are neither equal nor unequal to 1. Aggregates skip NULLs, <code>COUNT(*)</code> counts rows, and the engines disagree about where NULLs sort and how many may share a unique column.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">nulls.sql · runs on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  "not referred by customer 1" quietly drops everyone with no referrer
+SELECT COUNT(*)                                  AS all_customers,
+       COUNT(referred_by)                        AS with_referrer,
+       SUM(CASE WHEN referred_by &lt;&gt; 1 THEN 1 ELSE 0 END)                       AS not_equal_1,
+       SUM(CASE WHEN referred_by &lt;&gt; 1 OR referred_by IS NULL THEN 1 ELSE 0 END) AS not_1_or_null
+FROM   customers;
+
+-- 2  NULL is not equal to NULL, and not unequal either
+SELECT CASE WHEN NULL = NULL      THEN 'true' ELSE 'not true' END AS null_equals_null,
+       CASE WHEN NULL IS NULL     THEN 'true' ELSE 'not true' END AS null_is_null;
+
+-- 3  aggregates skip NULLs, so AVG is over 5 rows, not 10
+SELECT AVG(referred_by)           AS avg_ignoring_nulls,
+       AVG(COALESCE(referred_by, 0)) AS avg_nulls_as_zero
+FROM   customers;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · nulls.sql</div>
+<pre><code class="language-plaintext">ALL_CUSTOMERS WITH_REFERRER NOT_EQUAL_1 NOT_1_OR_NULL
+------------- ------------- ----------- -------------
+           10             5           3             8
+
+1 row selected.
+
+NULL_EQUALS_NULL NULL_IS_NULL
+---------------- ------------
+not true         true
+
+1 row selected.
+
+AVG_IGNORING_NULLS AVG_NULLS_AS_ZERO
+------------------ -----------------
+               2.4               1.2
+
+1 row selected.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · nulls.sql (excerpt: the last result)</div>
+<pre><code class="language-plaintext">avg_ignoring_nulls avg_nulls_as_zero
+------------------ -----------------
+                 2                 1</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="codewrap">
+      <div class="codelabel">null-order.sql · ORDER BY referred_by, customers 1 to 5</div>
+<pre><code class="language-sql">-- where do NULLs sort?
+SELECT customer_id, referred_by
+FROM   customers
+WHERE  customer_id &lt;= 5
+ORDER  BY referred_by;</code></pre>
+    </div>
+    <div class="grid2" style="gap:12px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai</div>
+<pre><code class="language-plaintext">CUSTOMER_ID REFERRED_BY
+----------- -----------
+          2           1
+          5           1
+          4           3
+          1      (null)
+          3      (null)
+
+5 rows selected.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025</div>
+<pre><code class="language-plaintext">customer_id referred_by
+----------- -----------
+          1        NULL
+          3        NULL
+          2           1
+          5           1
+          4           3
+
+(5 rows affected)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">unique-null.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">CREATE TABLE vouchers (voucher_id INT PRIMARY KEY, code VARCHAR(20) CONSTRAINT vouchers_code_uk UNIQUE);
+INSERT INTO vouchers VALUES (1, NULL);
+INSERT INTO vouchers VALUES (2, NULL);
+GO
+-- the fix: a filtered unique index ignores the NULLs
+ALTER TABLE vouchers DROP CONSTRAINT vouchers_code_uk;
+CREATE UNIQUE INDEX vouchers_code_ux ON vouchers (code) WHERE code IS NOT NULL;
+INSERT INTO vouchers VALUES (2, NULL);
+SELECT COUNT(*) AS rows_with_null_code FROM vouchers WHERE code IS NULL;
+DROP TABLE vouchers;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · unique-null.mss.sql</div>
+<pre><code class="language-plaintext">(1 rows affected)
+Msg 2627, Level 14, State 1, Server mssql, Line 3
+Violation of UNIQUE KEY constraint 'vouchers_code_uk'. Cannot insert duplicate key in object 'dbo.vouchers'. The duplicate key value is (&lt;NULL&gt;).
+The statement has been terminated.
+
+(1 rows affected)
+rows_with_null_code
+-------------------
+                  2
+
+(1 rows affected)</code></pre>
+      </div>
+      <div class="note"><span class="lbl">Oracle 26ai, same two inserts</span>Both NULL rows are accepted under the plain <code>UNIQUE</code> constraint, and the count is 2 (<code>unique-null.ora.sql</code>). Oracle does not index an entry whose key columns are all NULL, so NULLs never collide.</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">nulls.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// null in a filter matches a field that is null and a field that is missing
+db.n.drop();
+db.n.insertMany([{ _id: 1, referredBy: 7 }, { _id: 2, referredBy: null }, { _id: 3 }]);
+show(db.n.find({ referredBy: null }));
+print('--');
+show(db.n.find({ referredBy: { $exists: false } }));
+print('--');
+show(db.n.find({ referredBy: { $type: 'null' } }));
+print('--');
+// $ne: 7 includes the null and the missing ones, unlike SQL's &lt;&gt;
+show(db.n.find({ referredBy: { $ne: 7 } }));
+db.n.drop();</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · nulls.js</div>
+<pre><code class="language-plaintext">{ _id: 2, referredBy: null }
+{ _id: 3 }
+--
+{ _id: 3 }
+--
+{ _id: 2, referredBy: null }
+--
+{ _id: 2, referredBy: null }
+{ _id: 3 }</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Integer AVG</span>The same <code>AVG(referred_by)</code> gave <b>2.4</b> on Oracle and <b>2</b> on SQL Server, because SQL Server averages an <code>INT</code> column in integer arithmetic. Write <code>AVG(CAST(x AS DECIMAL(10,2)))</code> or <code>AVG(x * 1.0)</code> when the column is an integer.</div>
+    <div class="note warn"><span class="lbl">Sort order and uniqueness differ</span>Ascending order puts NULLs last on Oracle and first on SQL Server. Oracle accepts <code>NULLS FIRST</code> and <code>NULLS LAST</code>; SQL Server does not, so sort by <code>CASE WHEN x IS NULL THEN 1 ELSE 0 END, x</code>. A SQL Server <code>UNIQUE</code> allows one NULL; a filtered unique index allows any number.</div>
+    <div class="note tip"><span class="lbl">In MongoDB, null also means missing</span><code>{ referredBy: null }</code> matched the explicit null and the absent field. Use <code>$exists</code> or <code>$type: 'null'</code> to tell them apart. Unlike SQL's <code>&lt;&gt;</code>, <code>$ne: 7</code> returns both of those documents.</div>
+  </div>
+</section>

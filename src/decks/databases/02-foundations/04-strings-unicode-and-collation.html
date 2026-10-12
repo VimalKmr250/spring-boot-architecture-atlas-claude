@@ -1,0 +1,152 @@
+<section class="slide" data-sec="Foundations" data-title="Strings, Unicode and collation">
+  <h2>Is 'abc' equal to 'ABC'? Is '' NULL? Oracle and SQL Server give opposite answers to both</h2>
+  <p class="dek">String behaviour is set by the column type and the <b>collation</b>, the rules for comparing and sorting text. Oracle compares bytes by default, so <code>'abc'</code> and <code>'ABC'</code> differ. A SQL Server database created with the default collation, <code>SQL_Latin1_General_CP1_CI_AS</code>, is case-insensitive (<b>CI</b>) and accent-sensitive (<b>AS</b>). Unicode adds two more traps. In Oracle, column sizes count bytes unless you say <code>CHAR</code>. In SQL Server, a literal without the <code>N</code> prefix is squeezed into a single-byte code page before it reaches an <code>NVARCHAR</code> column.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">strings.ora.sql · Oracle 26ai, AL32UTF8</div>
+<pre><code class="language-sql">-- 1  the empty string is NULL in Oracle
+SELECT CASE WHEN '' IS NULL THEN 'NULL' ELSE 'not NULL' END AS empty_string,
+       LENGTH('')                                         AS its_length
+FROM   dual;
+
+-- 2  comparisons are case-sensitive, and VARCHAR2 does not pad
+SELECT CASE WHEN 'abc' = 'ABC'    THEN 'equal' ELSE 'different' END AS case_test,
+       CASE WHEN 'abc' = 'abc   ' THEN 'equal' ELSE 'different' END AS trailing_spaces
+FROM   dual;
+
+-- 3  VARCHAR2(10) means 10 bytes by default, and AL32UTF8 needs 2 bytes for ë and ü
+CREATE TABLE name_test (name VARCHAR2(10), name_chars VARCHAR2(10 CHAR));
+INSERT INTO name_test (name_chars) VALUES ('Zoë Müller');
+INSERT INTO name_test (name) VALUES ('Zoë Müller');
+SELECT name_chars, LENGTH(name_chars) AS chars, LENGTHB(name_chars) AS bytes FROM name_test;
+DROP TABLE name_test PURGE;
+
+-- 4  the unique index on email compares bytes, so a different case is a different email
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (11, 'Asha Rao', 'ASHA@example.com', 'IN', 'GOLD', TIMESTAMP '2026-04-01 10:00:00');
+ROLLBACK;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · strings.ora.sql</div>
+<pre><code class="language-plaintext">EMPTY_STRING ITS_LENGTH
+------------ ----------
+NULL         (null)
+
+1 row selected.
+
+CASE_TEST TRAILING_SPACES
+--------- ---------------
+different different
+
+1 row selected.
+
+Table created.
+
+1 row created.
+
+INSERT INTO name_test (name) VALUES ('Zoë Müller')
+                                     *
+ERROR at line 1:
+ORA-12899: value too large for column "SHOP"."NAME_TEST"."NAME" (actual: 12, maximum: 10)
+Help: https://docs.oracle.com/error-help/db/ora-12899/
+
+NAME_CHARS CHARS BYTES
+---------- ----- -----
+Zoë Müller    10    12
+
+1 row selected.
+
+Table dropped.
+
+1 row created.
+
+Rollback complete.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">strings.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  the empty string is an empty string
+SELECT CASE WHEN '' IS NULL THEN 'NULL' ELSE 'not NULL' END AS empty_string,
+       LEN('')                                            AS its_length;
+
+-- 2  the default collation ignores case, and = ignores trailing spaces
+SELECT CASE WHEN 'abc' = 'ABC'    THEN 'equal' ELSE 'different' END AS case_test,
+       CASE WHEN 'abc' = 'abc   ' THEN 'equal' ELSE 'different' END AS trailing_spaces,
+       DATABASEPROPERTYEX('shop', 'Collation')                     AS collation;
+
+-- 3  without the N prefix a literal is VARCHAR in the database's code page
+SELECT 'Łódź 東京'  AS without_n,
+       N'Łódź 東京' AS with_n,
+       DATALENGTH(N'Łódź 東京') AS nvarchar_bytes;
+
+-- 4  the unique index on email uses the collation, so a different case is a duplicate
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (11, N'Asha Rao', 'ASHA@example.com', 'IN', 'GOLD', '2026-04-01 10:00:00');</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · strings.mss.sql</div>
+<pre><code class="language-plaintext">empty_string its_length
+------------ ----------
+not NULL              0
+
+(1 rows affected)
+case_test trailing_spaces collation
+--------- --------------- ----------------------------
+equal     equal           SQL_Latin1_General_CP1_CI_AS
+
+(1 rows affected)
+without_n with_n  nvarchar_bytes
+--------- ------- --------------
+Lódz ??   Łódź 東京             14
+
+(1 rows affected)
+Msg 2627, Level 14, State 1, Server mssql, Line 16
+Violation of UNIQUE KEY constraint 'customers_email_uk'. Cannot insert duplicate key in object 'dbo.customers'. The duplicate key value is (ASHA@example.com).
+The statement has been terminated.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">strings.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// string comparison is binary unless the query asks for a collation
+print('binary:', db.customers.countDocuments({ name: 'asha rao' }));
+print('strength 2, case-insensitive:',
+      db.customers.countDocuments({ name: 'asha rao' }, { collation: { locale: 'en', strength: 2 } }));
+
+// an empty string is a string, and differs from a missing field
+db.str.drop();
+db.str.insertMany([{ _id: 1, note: '' }, { _id: 2 }]);
+show(db.str.find({ note: '' }));
+show(db.str.find({ note: null }));
+db.str.drop();</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · strings.js</div>
+<pre><code class="language-plaintext">binary: 0
+strength 2, case-insensitive: 1
+{ _id: 1, note: '' }
+{ _id: 2 }</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Behaviour</th><th>Oracle 26ai</th><th>SQL Server 2025, default collation</th><th>MongoDB 8.3</th></tr></thead>
+      <tbody>
+        <tr><td><code>''</code></td><td>Is NULL; <code>LENGTH('')</code> is NULL</td><td>An empty string; <code>LEN('')</code> is 0</td><td>An empty string, distinct from a missing field</td></tr>
+        <tr><td>Case</td><td>Sensitive</td><td>Insensitive (<code>CI</code>)</td><td>Sensitive, unless the query or index has a collation</td></tr>
+        <tr><td>Trailing spaces in <code>=</code></td><td>Significant for <code>VARCHAR2</code></td><td>Ignored</td><td>Significant</td></tr>
+        <tr><td>Column size</td><td>Bytes, unless declared <code>VARCHAR2(n CHAR)</code></td><td><code>NVARCHAR(n)</code> counts byte pairs; <code>VARCHAR(n)</code> counts bytes</td><td>No sizes; a whole document is limited to 16 MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The N prefix</span><code>'Łódź 東京'</code> without <code>N</code> came back as <code>Lódz ??</code>. SQL Server converted the literal to code page 1252 first: Ł and ź got their nearest Latin-1 letters, and the kanji became question marks. Microsoft's JDBC driver sends string parameters as Unicode by default, so this bites mostly in hand-written SQL and stored procedures. The opposite setting is a performance trap, shown on <a data-deck="db" data-slide="Why the optimiser ignores your index">Why the optimiser ignores your index</a>.</div>
+    <div class="note warn"><span class="lbl">Bytes are not characters</span><code>Zoë Müller</code> is 10 characters but 12 bytes in UTF-8, so it fails in <code>VARCHAR2(10)</code> with ORA-12899 and fits in <code>VARCHAR2(10 CHAR)</code>. The client must also declare UTF-8 (<code>NLS_LANG</code> for SQL*Plus), or the bytes are miscounted before they arrive. Size Oracle text columns in <code>CHAR</code>. Never let an application validate "max 10" in characters against a column that counts bytes.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"In Oracle, the empty string is NULL, so a NOT NULL column rejects <code>''</code>. SQL Server's default collation is case-insensitive, so the unique email index rejected <code>ASHA@example.com</code> as a duplicate; Oracle accepted it. To get that in Oracle I add a unique function-based index on <code>LOWER(email)</code>."</div>
+  </div>
+</section>

@@ -1,0 +1,180 @@
+<section class="slide" data-sec="Foundations" data-title="Constraints as the last line of defence">
+  <h2>Validation in the application can be bypassed by a bug or a second service; a constraint cannot</h2>
+  <p class="dek">Primary keys, unique keys, foreign keys, <code>CHECK</code> and <code>NOT NULL</code> are rules the database enforces on every write, whichever program makes it. They also make good error reports. Each statement below breaks one rule of the running example's schema, and each engine names the constraint it hit. With named constraints, an application can map the error to a precise message, for example "that email is already registered", instead of a generic 500. MongoDB has two equivalents: unique indexes, and <code>$jsonSchema</code> validation on a collection.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">constraints.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- each statement breaks one rule of the running example's schema
+
+-- duplicate email
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (11, 'Asha R.', 'asha@example.com', 'IN', 'GOLD', SYSTIMESTAMP);
+
+-- no such customer
+INSERT INTO orders (customer_id, status, placed_at, total)
+VALUES (999, 'PENDING', SYSTIMESTAMP, 10);
+
+-- qty must be &gt; 0
+INSERT INTO order_items (order_id, line_no, product_id, qty, unit_price)
+VALUES (1001, 3, 103, 0, 29.90);
+
+-- not an allowed status
+UPDATE orders SET status = 'LOST' WHERE order_id = 1001;
+
+-- name is required
+INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+VALUES (12, NULL, 'x@example.com', 'IN', 'GOLD', SYSTIMESTAMP);
+
+-- orders still point at it
+DELETE FROM customers WHERE customer_id = 1;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · constraints.ora.sql</div>
+<pre><code class="language-plaintext">INSERT INTO customers (customer_id, name, email, country, tier, created_at)
+*
+ERROR at line 1:
+ORA-00001: unique constraint (SHOP.CUSTOMERS_EMAIL_UK) violated on table SHOP.CUSTOMERS columns (EMAIL)
+ORA-03301: (ORA-00001 details) row with column values (EMAIL:'asha@example.com') already exists
+Help: https://docs.oracle.com/error-help/db/ora-00001/
+
+INSERT INTO orders (customer_id, status, placed_at, total)
+*
+ERROR at line 1:
+ORA-02291: integrity constraint (SHOP.ORDERS_CUSTOMER_FK) violated - parent key not found
+Help: https://docs.oracle.com/error-help/db/ora-02291/
+
+INSERT INTO order_items (order_id, line_no, product_id, qty, unit_price)
+*
+ERROR at line 1:
+ORA-02290: check constraint (SHOP.ORDER_ITEMS_QTY_CK) violated
+Help: https://docs.oracle.com/error-help/db/ora-02290/
+
+UPDATE orders SET status = 'LOST' WHERE order_id = 1001
+*
+ERROR at line 1:
+ORA-02290: check constraint (SHOP.ORDERS_STATUS_CK) violated
+Help: https://docs.oracle.com/error-help/db/ora-02290/
+
+VALUES (12, NULL, 'x@example.com', 'IN', 'GOLD', SYSTIMESTAMP)
+            *
+ERROR at line 2:
+ORA-01400: cannot insert NULL into ("SHOP"."CUSTOMERS"."NAME")
+Help: https://docs.oracle.com/error-help/db/ora-01400/
+
+DELETE FROM customers WHERE customer_id = 1
+*
+ERROR at line 1:
+ORA-02292: integrity constraint (SHOP.ORDERS_CUSTOMER_FK) violated - child record found
+Help: https://docs.oracle.com/error-help/db/ora-02292/</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Output on SQL Server 2025 · constraints.mss.sql: the same six statements, with SYSDATETIME() and N'' literals</div>
+<pre><code class="language-plaintext">Msg 2627, Level 14, State 1, Server mssql, Line 4
+Violation of UNIQUE KEY constraint 'customers_email_uk'. Cannot insert duplicate key in object 'dbo.customers'. The duplicate key value is (asha@example.com).
+The statement has been terminated.
+Msg 547, Level 16, State 1, Server mssql, Line 8
+The INSERT statement conflicted with the FOREIGN KEY constraint "orders_customer_fk". The conflict occurred in database "shop", table "dbo.customers", column 'customer_id'.
+The statement has been terminated.
+Msg 547, Level 16, State 1, Server mssql, Line 12
+The INSERT statement conflicted with the CHECK constraint "order_items_qty_ck". The conflict occurred in database "shop", table "dbo.order_items", column 'qty'.
+The statement has been terminated.
+Msg 547, Level 16, State 1, Server mssql, Line 16
+The UPDATE statement conflicted with the CHECK constraint "orders_status_ck". The conflict occurred in database "shop", table "dbo.orders", column 'status'.
+The statement has been terminated.
+Msg 515, Level 16, State 2, Server mssql, Line 19
+Cannot insert the value NULL into column 'name', table 'shop.dbo.customers'; column does not allow nulls. INSERT fails.
+The statement has been terminated.
+Msg 547, Level 16, State 1, Server mssql, Line 23
+The DELETE statement conflicted with the REFERENCE constraint "orders_customer_fk". The conflict occurred in database "shop", table "dbo.orders", column 'customer_id'.
+The statement has been terminated.</code></pre>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">constraints.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// a unique index is MongoDB's unique constraint
+try { db.customers.insertOne({ _id: 11, name: 'Asha R.', email: 'asha@example.com' }); }
+catch (e) { print(e.message); }
+
+// $jsonSchema validation, added to an existing collection
+db.runCommand({ collMod: 'payments', validationLevel: 'strict', validator: { $jsonSchema: {
+  bsonType: 'object',
+  required: ['orderId', 'idempotencyKey', 'status', 'amount'],
+  properties: {
+    status: { enum: ['AUTHORIZED', 'CAPTURED', 'FAILED', 'REFUNDED'] },
+    amount: { bsonType: 'decimal', minimum: Decimal128('0') }
+  } } } });
+try { db.payments.insertOne({ _id: 99, orderId: 1001, idempotencyKey: 'pay-1001-9', status: 'LOST', amount: 10 }); }
+catch (e) { print(e.message); printjson(e.errInfo.details.schemaRulesNotSatisfied); }
+
+// put the collection back the way the other slides expect it
+db.runCommand({ collMod: 'payments', validator: {}, validationLevel: 'off' });</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · constraints.js</div>
+<pre><code class="language-plaintext">E11000 duplicate key error collection: shop.customers index: email_1 dup key: { email: "asha@example.com" }
+Document failed validation
+[
+  {
+    operatorName: 'properties',
+    propertiesNotSatisfied: [
+      {
+        propertyName: 'status',
+        details: [
+          {
+            operatorName: 'enum',
+            specifiedAs: {
+              enum: [
+                'AUTHORIZED',
+                'CAPTURED',
+                'FAILED',
+                'REFUNDED'
+              ]
+            },
+            reason: 'value was not found in enum',
+            consideredValue: 'LOST'
+          }
+        ]
+      },
+      {
+        propertyName: 'amount',
+        details: [
+          {
+            operatorName: 'bsonType',
+            specifiedAs: {
+              bsonType: 'decimal'
+            },
+            reason: 'type did not match',
+            consideredValue: 10,
+            consideredType: 'int'
+          }
+        ]
+      }
+    ]
+  }
+]</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Rule broken</th><th>Oracle</th><th>SQL Server</th><th>MongoDB</th><th>Spring translates it to</th></tr></thead>
+      <tbody>
+        <tr><td>Primary or unique key</td><td>ORA-00001</td><td>2627 (constraint), 2601 (unique index)</td><td>E11000</td><td><code>DuplicateKeyException</code></td></tr>
+        <tr><td>Foreign key, missing parent</td><td>ORA-02291</td><td>547</td><td>Not enforced</td><td><code>DataIntegrityViolationException</code></td></tr>
+        <tr><td>Foreign key, child rows exist</td><td>ORA-02292</td><td>547</td><td>Not enforced</td><td><code>DataIntegrityViolationException</code></td></tr>
+        <tr><td><code>CHECK</code> or schema</td><td>ORA-02290</td><td>547</td><td>121, "Document failed validation"</td><td><code>DataIntegrityViolationException</code></td></tr>
+        <tr><td><code>NOT NULL</code></td><td>ORA-01400</td><td>515</td><td>Schema <code>required</code></td><td><code>DataIntegrityViolationException</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Index your foreign keys</span>A foreign key does not create an index on the child column. Without one, deleting a customer scans <code>orders</code> to look for children. On Oracle it is worse: deleting a parent row, or changing its key, briefly takes a table-level lock on the child table, which blocks other sessions writing orders. The running example indexes <code>orders.customer_id</code> for both reasons.</div>
+    <div class="note warn"><span class="lbl">MongoDB enforces less</span>Nothing checks that <code>orderId</code> in a payment matches a real order. References are the application's job, or a reason to embed. Schema validation is opt-in per collection, and <code>validationAction: 'warn'</code> only logs, which is useful while migrating old documents.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I validate in the application for good messages, and I keep constraints in the database for correctness, because the application is not the only writer. I name constraints so the error can be mapped, and I treat a unique-key violation as a normal outcome: it is how idempotent inserts work."</div>
+  </div>
+</section>

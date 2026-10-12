@@ -1,0 +1,33 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Question shape to pipeline stage">
+  <h2>Read the question for its shape, and the pipeline stage follows</h2>
+  <p class="dek">The MongoDB version of the SQL revision table. Each row maps the wording of a question to the stage or operator that answers it, and to the mistake that returns a wrong result without any error. Revise from it alongside <a data-deck="db" data-slide="Question shape to SQL">Question shape to SQL</a>: most rows have a twin there.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>If the question says</th><th>Reach for</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr><td>"…find documents where"</td><td><code>find</code> or <code>$match</code> first in the pipeline</td><td><code>{ f: null }</code> also matches a missing <code>f</code>; use <code>$exists</code> to tell them apart</td></tr>
+        <tr><td>"…an array element that has both A and B"</td><td><code>$elemMatch</code></td><td>Two separate conditions may match two different elements</td></tr>
+        <tr><td>"…total / count / average per X"</td><td><code>$group</code> with <code>$sum</code>, <code>$avg</code>, <code>$count</code></td><td><code>$sum</code> of a missing field is 0; doubles for money</td></tr>
+        <tr><td>"…per line item / per tag"</td><td><code>$unwind</code>, then <code>$group</code></td><td>Empty or missing arrays vanish unless <code>preserveNullAndEmptyArrays</code></td></tr>
+        <tr><td>"…the top N in each group"</td><td><code>$topN</code> in <code>$group</code>; <code>$denseRank</code> for ties</td><td><code>$push</code> then <code>$slice</code> holds whole groups in memory</td></tr>
+        <tr><td>"…with the customer / product details"</td><td><code>$lookup</code>, late in the pipeline, after <code>$limit</code></td><td>No index on <code>foreignField</code>: a scan per input document</td></tr>
+        <tr><td>"…that have no / never"</td><td><code>$lookup</code> with <code>$limit: 1</code>, then <code>$size: 0</code>; or <code>distinct</code> and <code>$nin</code></td><td>Large <code>distinct</code> results hit the 16 MB limit</td></tr>
+        <tr><td>"…per 5 minutes / per day"</td><td><code>$dateTrunc</code> with <code>binSize</code> and <code>timezone</code></td><td>Days in UTC when the business means local days</td></tr>
+        <tr><td>"…including the periods with no data"</td><td><code>$densify</code>, then <code>$fill</code></td><td>A plain <code>$group</code> skips the gaps silently</td></tr>
+        <tr><td>"…running total / previous value"</td><td><code>$setWindowFields</code> with <code>$sum</code> or <code>$shift</code></td><td>Missing <code>partitionBy</code> mixes series</td></tr>
+        <tr><td>"…several summaries in one query"</td><td><code>$facet</code></td><td>All facets come back in one document, so together they must fit in 16 MB</td></tr>
+        <tr><td>"…duplicates"</td><td><code>$group</code> on the normalised key, <code>$push</code> the ids, <code>$match</code> count &gt; 1</td><td>A unique index needs a collation to be case-insensitive</td></tr>
+        <tr><td>"…save the result for later"</td><td><code>$merge</code> into a summary collection</td><td><code>$out</code> replaces the whole target collection</td></tr>
+        <tr><td>"…page through / next 20"</td><td>Range on the sort key: <code>{ ts: { $lt: lastTs } }</code> plus a tie-breaker</td><td><code>skip</code> reads and discards every skipped document</td></tr>
+        <tr><td>"…update if present, insert if not"</td><td><code>updateOne</code> with <code>upsert: true</code> on a unique key</td><td>Without a unique index, two upserts can both insert</td></tr>
+        <tr><td>"…the whole subtree / all reports"</td><td><code>$graphLookup</code></td><td>The 100 MB memory limit on the stage</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="note tip"><span class="lbl">Where each one is explained</span>The stages come from <a data-deck="db" data-slide="The aggregation pipeline, with the SQL beside it">The aggregation pipeline</a>, <a data-deck="db" data-slide="$lookup, $unwind, $facet and $merge">$lookup, $unwind, $facet and $merge</a>, <a data-deck="db" data-slide="Arrays: $elemMatch, positional updates, arrayFilters">Arrays</a>, <a data-deck="db" data-slide="Update operators and upserts">Update operators and upserts</a> and <a data-deck="db" data-slide="Covered queries and range pagination">range pagination</a>.</div>
+    <div class="note"><span class="lbl">Next</span>Rehearse the spoken answers with <a data-deck="db" data-slide="Q25–27 · MongoDB queries and indexes">the MongoDB interview questions</a>, then use <a data-deck="db" data-slide="Oracle, SQL Server and MongoDB syntax side by side">the syntax table</a> to switch between the three engines quickly.</div>
+  </div>
+</section>

@@ -1,0 +1,40 @@
+<section class="slide" data-sec="Wrap-up" data-title="Study plan and further reading">
+  <h2>A three-week plan from first query to interview-ready, on real engines</h2>
+  <p class="dek">Reading about isolation levels is not the same as watching a session block. Run the three engines locally, all free for development, load a small shop schema, and repeat the experiments in this tab yourself. By the end you will have numbers you measured, queries you wrote from the question alone, and an answer to every question in this tab.</p>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Days</th><th>Practise</th><th>Read in this tab</th></tr></thead>
+      <tbody>
+        <tr><td>1–2</td><td>Start the three engines in Docker; create customers, products, orders and order lines; write ten queries against them</td><td><a data-deck="db" data-sec="Foundations">Foundations</a>, <a data-deck="db" data-sec="SQL essentials">SQL essentials</a></td></tr>
+        <tr><td>3–4</td><td>Every join type; each anti-join written three ways; a NULL in a <code>NOT IN</code> list; one fan-out bug, found and fixed</td><td><a data-deck="db" data-sec="SQL essentials">SQL essentials</a></td></tr>
+        <tr><td>5–6</td><td>Ranking, running totals and <code>LAG</code>; then drills 2 to 9 from the question alone</td><td><a data-deck="db" data-sec="Advanced SQL">Advanced SQL</a>, <a data-deck="db" data-sec="SQL drills">SQL drills</a></td></tr>
+        <tr><td>7–8</td><td>Model a payment ledger with constraints; try to insert a duplicate capture and an unbalanced journal</td><td><a data-deck="db" data-sec="Relational modelling">Relational modelling</a></td></tr>
+        <tr><td>9–10</td><td>Load 500,000 rows; read plans before and after each index; reproduce an implicit conversion and a sniffing problem</td><td><a data-deck="db" data-sec="Indexes and plans">Indexes and plans</a></td></tr>
+        <tr><td>11–12</td><td>Two sessions side by side: a lost update, a deadlock, a blocked reader, a <code>SKIP LOCKED</code> queue</td><td><a data-deck="db" data-sec="Transactions and locking">Transactions and locking</a>, <a data-deck="db" data-sec="Database code">Database code</a></td></tr>
+        <tr><td>13–14</td><td>The shop in MongoDB: CRUD, array updates, pipelines; rewrite five SQL drills as pipelines</td><td><a data-deck="db" data-sec="MongoDB basics">MongoDB basics</a>, <a data-deck="db" data-sec="MongoDB drills">MongoDB drills</a></td></tr>
+        <tr><td>15–16</td><td>Embed against reference for one query; ESR indexes checked with <code>explain</code>; a time-series collection</td><td><a data-deck="db" data-sec="MongoDB modelling">MongoDB modelling</a>, <a data-deck="db" data-sec="MongoDB indexing">MongoDB indexing</a></td></tr>
+        <tr><td>17–18</td><td>A conditional update against read-check-write; a transaction with retries; JDBC batching and a Testcontainers test</td><td><a data-deck="db" data-sec="MongoDB consistency">MongoDB consistency</a>, <a data-deck="db" data-sec="Java and Spring">Java and Spring</a></td></tr>
+        <tr><td>19–21</td><td>Answer all 30 questions aloud; redo every drill without looking; present one case study on a whiteboard</td><td><a data-deck="db" data-sec="Interview questions">Interview questions</a>, <a data-deck="db" data-sec="Choosing and case studies">Case studies</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <h3>Further reading</h3>
+      <ul class="checks tight" style="margin-top:8px;color:var(--text-2);font-size:14px">
+        <li><a href="https://use-the-index-luke.com/" target="_blank" rel="noopener">Use The Index, Luke</a>: indexing and plans for developers, with Oracle and SQL Server examples</li>
+        <li><a href="https://docs.oracle.com/en/database/oracle/oracle-database/" target="_blank" rel="noopener">Oracle Database documentation</a>: the SQL Language Reference and the Concepts guide's chapter on data concurrency</li>
+        <li><a href="https://learn.microsoft.com/en-us/sql/t-sql/language-reference" target="_blank" rel="noopener">Transact-SQL reference</a>, and the guide to transaction locking and row versioning</li>
+        <li><a href="https://www.mongodb.com/docs/manual/data-modeling/" target="_blank" rel="noopener">MongoDB data modelling</a> and the <a href="https://www.mongodb.com/docs/manual/aggregation/" target="_blank" rel="noopener">aggregation</a> chapters of the manual</li>
+        <li><a href="https://docs.spring.io/spring-data/mongodb/reference/" target="_blank" rel="noopener">Spring Data MongoDB reference</a> and <a href="https://testcontainers.com/" target="_blank" rel="noopener">Testcontainers</a></li>
+        <li>Martin Kleppmann, <i>Designing Data-Intensive Applications</i>: chapters on storage, replication, partitioning and transactions</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="note"><span class="lbl">The engines used here</span>Oracle AI Database 26ai Free (<code>container-registry.oracle.com/database/free</code>), SQL Server 2025 Developer (<code>mcr.microsoft.com/mssql/server:2025-latest</code>, which requires accepting the licence with <code>ACCEPT_EULA=Y</code>) and MongoDB (<code>mongo:8</code>, started as a one-node replica set so transactions and change streams work). With the example data loaded, the three together used about 4 GB of memory here.</div>
+      <div class="note tip"><span class="lbl">Elsewhere in the atlas</span>The <a data-deck="sb" data-slide="Isolation levels">Spring Boot tab</a> covers JPA, transactions and isolation from the framework side, and the <a data-deck="hld" data-slide="Choosing a data store">system design tab</a> covers replication, partitioning and choosing a store at system scale.</div>
+    </div>
+  </div>
+</section>

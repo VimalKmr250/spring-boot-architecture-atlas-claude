@@ -43,6 +43,7 @@
     <button role="tab" id="tab-lld" aria-selected="false" onclick="setView('lld')"><span class="t-full">Low-level design</span><span class="t-abbr">LLD</span></button>
     <button role="tab" id="tab-cj" aria-selected="false" onclick="setView('cj')"><span class="t-full">Core Java</span><span class="t-abbr">Java</span></button>
     <button role="tab" id="tab-st" aria-selected="false" onclick="setView('st')"><span class="t-full">Java streams</span><span class="t-abbr">Streams</span></button>
+    <button role="tab" id="tab-db" aria-selected="false" onclick="setView('db')"><span class="t-full">SQL &amp; NoSQL</span><span class="t-abbr">DB</span></button>
   </div>
   <span class="counter" id="counter">1 / 1</span>
   <button class="iconbtn" id="tocbtn" onclick="toggleToc()">Contents</button>
@@ -100,6 +101,12 @@
 <main class="stage" id="stage-st" data-deck="st" data-slug="streams" hidden>
 
 <!-- @include decks/streams/**/*.html -->
+</main>
+
+
+<main class="stage" id="stage-db" data-deck="db" data-slug="databases" hidden>
+
+<!-- @include decks/databases/**/*.html -->
 </main>
 
 <div class="iv" id="ivroot" hidden>

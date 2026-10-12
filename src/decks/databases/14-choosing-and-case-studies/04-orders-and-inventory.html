@@ -1,0 +1,86 @@
+<section class="slide" data-sec="Choosing and case studies" data-title="Case study: e-commerce orders and inventory">
+  <h2>Checkout must never sell stock it does not have: reserve with a conditional update inside the transaction that creates the order</h2>
+  <p class="dek">Placing an order touches three things: the order, its lines and the stock. They must succeed or fail together, and under concurrency the stock check must not be separate from the stock change. In a relational database that is one transaction: insert the order and its lines, then reserve each product with <code>UPDATE … SET reserved = reserved + :qty WHERE on_hand - reserved &gt;= :qty</code>. Zero rows updated means out of stock, so roll back. Below, two checkouts against the running example's inventory: two grinders are available, the last phone is already reserved.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">checkout.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- checkout: create the order, its lines and the stock reservations in one transaction
+CREATE OR REPLACE PROCEDURE checkout(p_customer NUMBER, p_product NUMBER, p_qty NUMBER, p_order OUT NUMBER) AS
+  v_price products.price%TYPE;
+BEGIN
+  SELECT price INTO v_price FROM products WHERE product_id = p_product;
+  INSERT INTO orders (customer_id, status, placed_at, total)
+  VALUES (p_customer, 'PENDING', SYSTIMESTAMP, v_price * p_qty)
+  RETURNING order_id INTO p_order;
+  INSERT INTO order_items VALUES (p_order, 1, p_product, p_qty, v_price);
+  UPDATE inventory SET reserved = reserved + p_qty
+  WHERE  product_id = p_product AND on_hand - reserved &gt;= p_qty;
+  IF SQL%ROWCOUNT = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'out of stock: product ' || p_product);
+  END IF;
+END;
+/
+VARIABLE order_id NUMBER
+-- two grinders: in stock
+EXEC checkout(2, 109, 2, :order_id)
+-- one Clam C2 phone: on_hand 1, already reserved 1
+EXEC checkout(2, 107, 1, :order_id)
+
+SELECT product_id, on_hand, reserved FROM inventory WHERE product_id IN (107, 109) ORDER BY product_id;
+SELECT COUNT(*) AS pending_orders_for_customer_2 FROM orders WHERE customer_id = 2 AND status = 'PENDING';
+ROLLBACK;
+DROP PROCEDURE checkout;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · checkout.ora.sql</div>
+<pre><code class="language-plaintext">Procedure created.
+
+PL/SQL procedure successfully completed.
+
+BEGIN checkout(2, 107, 1, :order_id); END;
+
+*
+ERROR at line 1:
+ORA-20001: out of stock: product 107
+ORA-06512: at "SHOP.CHECKOUT", line 12
+ORA-06512: at line 1
+
+PRODUCT_ID ON_HAND RESERVED
+---------- ------- --------
+       107       1        1
+       109       4        3
+
+2 rows selected.
+
+PENDING_ORDERS_FOR_CUSTOMER_2
+-----------------------------
+                            1
+
+1 row selected.
+
+Rollback complete.
+
+Procedure dropped.</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Design</th><th>Relational</th><th>MongoDB</th></tr></thead>
+          <tbody>
+            <tr><td>Order and lines</td><td>Two tables, one transaction</td><td>One document: atomic by nature</td></tr>
+            <tr><td>Stock</td><td>One row per SKU, conditional update</td><td>One document per SKU, conditional <code>$inc</code></td></tr>
+            <tr><td>Order + stock together</td><td>The same transaction</td><td>A multi-document transaction, or a reservation saga with compensation</td></tr>
+            <tr><td>Order history</td><td>Index on <code>(customer_id, placed_at)</code></td><td>Index on <code>{ 'customer.id': 1, placedAt: -1 }</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note good"><span class="lbl">What the run showed</span>The grinder checkout committed its order, line and reservation (reserved went from 1 to 3). The phone checkout raised ORA-20001. Because the call failed, Oracle undid everything it had done, including the order row it had already inserted: customer 2 has exactly one pending order.</div>
+    <div class="note warn"><span class="lbl">Hot rows</span>A flash sale on one product makes its inventory row the most contended row in the system, and every checkout queues on its lock. Keep the transaction short, reserve last, or split stock into several rows ("buckets") and reserve from any one that has enough.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Check and decrement in one conditional statement, inside the same transaction as the order, with a CHECK constraint as the backstop. Reservations expire if payment does not follow. Across services, it becomes a saga." The system-design view is <a data-deck="hld" data-slide="E-commerce: inventory without overselling">HLD · inventory without overselling</a>.</div>
+  </div>
+</section>

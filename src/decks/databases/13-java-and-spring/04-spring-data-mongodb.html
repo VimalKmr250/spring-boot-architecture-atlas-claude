@@ -1,0 +1,145 @@
+<section class="slide" data-sec="Java and Spring" data-title="Spring Data MongoDB repositories">
+  <h2>A repository method name becomes a MongoDB filter; turn on the query log once and check it says what you meant</h2>
+  <p class="dek">Spring Data MongoDB maps records to documents and derives queries from method names, the same way Spring Data JPA does. The things that go wrong are mapping details. A field named <code>id</code> is the document's <code>_id</code>, even inside an embedded object. A <code>Page</code> costs a second, counting query. A <code>@Version</code> field turns <code>save</code> into a conditional update. The program below runs against the running example's <code>orders</code> collection, with <code>MongoTemplate</code>'s debug log switched on so each query is visible.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">ShopMongoApp.java · Spring Boot 4.1.1, Spring Data MongoDB 5.1.1</div>
+<pre><code class="language-java">package shop;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+
+@SpringBootApplication
+@EnableMongoRepositories(considerNestedRepositories = true)
+public class ShopMongoApp {
+
+    @Document("orders")
+    record Order(@Id int id, Customer customer, String status, Instant placedAt, List&lt;Line&gt; items, BigDecimal total) {}
+    record Customer(@Field("id") int id, String name) {}     // without @Field, "id" maps to "_id"
+    record Line(int productId, String sku, int qty, BigDecimal unitPrice) {}
+
+    interface OrderRepository extends MongoRepository&lt;Order, Integer&gt; {
+        List&lt;Order&gt; findByCustomerIdAndStatusOrderByPlacedAtDesc(int customerId, String status);
+
+        @Query("{ 'items': { $elemMatch: { 'productId': ?0, 'qty': { $gte: ?1 } } } }")
+        List&lt;Order&gt; withLine(int productId, int minQty);
+
+        Page&lt;Order&gt; findByStatus(String status, Pageable page);
+    }
+
+    @Document("wallets")
+    record Wallet(@Id String id, BigDecimal balance, @Version Long version) {
+        Wallet withBalance(BigDecimal newBalance) { return new Wallet(id, newBalance, version); }
+    }
+    interface WalletRepository extends MongoRepository&lt;Wallet, String&gt; {}
+
+    public static void main(String[] args) {
+        new SpringApplicationBuilder(ShopMongoApp.class)
+            .web(WebApplicationType.NONE)
+            .properties(
+                "spring.mongodb.uri=mongodb://localhost:27017/shop?directConnection=true",
+                "spring.main.banner-mode=off",
+                "logging.pattern.console=%-5level %logger{0} - %msg%n",
+                "logging.level.root=warn",
+                "logging.level.org.springframework.data.mongodb.core.MongoTemplate=debug")
+            .run(args)
+            .close();
+    }
+
+    @Bean
+    CommandLineRunner demo(OrderRepository orders, WalletRepository wallets, MongoTemplate mongo) {
+        return args -&gt; {
+            // 1  a derived query: the method name becomes the filter and the sort
+            orders.findByCustomerIdAndStatusOrderByPlacedAtDesc(1, "PAID")
+                  .forEach(o -&gt; System.out.println("  paid by customer 1: " + o.id() + " " + o.total()));
+
+            // 2  a hand-written query for what a method name cannot say
+            orders.withLine(110, 2).forEach(o -&gt; System.out.println("  2+ bags of beans: " + o.id()));
+
+            // 3  paging: one query for the slice, and a count query for the total
+            Page&lt;Order&gt; shipped = orders.findByStatus("SHIPPED", PageRequest.of(0, 3, Sort.by("placedAt")));
+            System.out.println("  shipped page 1 of " + shipped.getTotalPages() + ": "
+                    + shipped.map(Order::id).getContent() + " of " + shipped.getTotalElements());
+
+            // 4  @Version: saving a stale copy fails instead of overwriting
+            wallets.deleteAll();
+            Wallet saved = wallets.save(new Wallet("asha", new BigDecimal("500.00"), null));
+            Wallet copyA = wallets.findById("asha").orElseThrow(), copyB = wallets.findById("asha").orElseThrow();
+            wallets.save(copyA.withBalance(copyA.balance().subtract(new BigDecimal("100"))));
+            try {
+                wallets.save(copyB.withBalance(copyB.balance().subtract(new BigDecimal("100"))));
+            } catch (OptimisticLockingFailureException e) {
+                System.out.println("  stale save rejected: " + e.getClass().getSimpleName());
+            }
+            System.out.println("  saved version " + saved.version() + ", now " + wallets.findById("asha").orElseThrow());
+
+            // 5  how the BigDecimal balance was stored
+            System.out.println("  stored as: " + mongo.getCollection("wallets").find().first().toJson());
+        };
+    }
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on JDK 25 · ShopMongoApp.java against MongoDB 8.3</div>
+<pre><code class="language-plaintext">DEBUG MongoTemplate - find using query: { "customer.id" : 1, "status" : "PAID"} fields: Document{{}} sort: { "placedAt" : -1} for class: class shop.ShopMongoApp$Order in collection: orders
+  paid by customer 1: 1011 748.50
+  paid by customer 1: 1001 1328.90
+DEBUG MongoTemplate - find using query: { "items" : { "$elemMatch" : { "productId" : 110, "qty" : { "$gte" : 2}}}} fields: Document{{}} sort: null for class: class shop.ShopMongoApp$Order in collection: orders
+  2+ bags of beans: 1003
+  2+ bags of beans: 1012
+  2+ bags of beans: 1016
+DEBUG MongoTemplate - find using query: { "status" : "SHIPPED"} fields: Document{{}} sort: { "placedAt" : 1} for class: class shop.ShopMongoApp$Order in collection: orders
+DEBUG MongoTemplate - Executing count: { "status" : "SHIPPED"} in collection: orders
+  shipped page 1 of 3: [1002, 1003, 1004] of 8
+DEBUG MongoTemplate - Remove using query: {} in collection: wallets.
+DEBUG MongoTemplate - Inserting Document containing fields: [_id, balance, version, _class] in collection: wallets
+DEBUG MongoTemplate - findOne using query: { "id" : "asha"} fields: Document{{}} for class: class shop.ShopMongoApp$Wallet in collection: wallets
+DEBUG MongoTemplate - findOne using query: { "id" : "asha"} fields: Document{{}} for class: class shop.ShopMongoApp$Wallet in collection: wallets
+DEBUG MongoTemplate - Calling update using query: { "_id" : "asha", "version" : 0} and update: { "balance" : { "$numberDecimal" : "400.00"}, "version" : 1, "_class" : "shop.ShopMongoApp$Wallet"} in collection: wallets
+DEBUG MongoTemplate - Calling update using query: { "_id" : "asha", "version" : 0} and update: { "balance" : { "$numberDecimal" : "400.00"}, "version" : 1, "_class" : "shop.ShopMongoApp$Wallet"} in collection: wallets
+  stale save rejected: OptimisticLockingFailureException
+DEBUG MongoTemplate - findOne using query: { "id" : "asha"} fields: Document{{}} for class: class shop.ShopMongoApp$Wallet in collection: wallets
+  saved version 0, now Wallet[id=asha, balance=400.00, version=1]
+  stored as: {"_id": "asha", "balance": {"$numberDecimal": "400.00"}, "version": 1, "_class": "shop.ShopMongoApp$Wallet"}</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>In the log</th><th>What it tells you</th></tr></thead>
+      <tbody>
+        <tr><td><code>"customer.id" : 1</code></td><td><code>findByCustomerId</code> was resolved to the nested path, and the sort came from <code>OrderByPlacedAtDesc</code>.</td></tr>
+        <tr><td><code>Executing count</code></td><td><code>Page</code> runs a count on every request. Return <code>Slice</code> or <code>List</code> when the total is not shown.</td></tr>
+        <tr><td><code>"_id" : "asha", "version" : 0</code></td><td><code>save</code> on a versioned entity is an update conditioned on the version. Matching nothing raises <code>OptimisticLockingFailureException</code>.</td></tr>
+        <tr><td><code>"_class"</code></td><td>Spring writes the Java type name into every document, for polymorphic reads. Other services reading the collection will see it.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The trap this program hit first</span>Without <code>@Field("id")</code> on <code>Customer.id</code>, the first query was logged as <code>{ "customer._id" : 1, … }</code> and found nothing. Reading the next result then failed with <code>Parameter id must not be null</code>. Spring Data treats any property named <code>id</code> as the identifier, embedded or not. Name it <code>customerId</code>, or map it explicitly as here.</div>
+    <div class="note good"><span class="lbl">Money survives the round trip</span>The last line shows the <code>BigDecimal</code> stored as <code>$numberDecimal</code>, which is BSON Decimal128, exact and sortable. A <code>double</code> field would have stored binary floating point; see <a data-deck="db" data-slide="Schema validation, Decimal128 and dates">Decimal128 and dates</a>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Derived queries are fine for simple filters; for <code>$elemMatch</code>, projections or aggregations I use <code>@Query</code> or <code>MongoTemplate</code>. I check the generated filter in the debug log or with <code>explain</code>, and I put <code>@Version</code> on documents that are edited concurrently."</div>
+  </div>
+</section>

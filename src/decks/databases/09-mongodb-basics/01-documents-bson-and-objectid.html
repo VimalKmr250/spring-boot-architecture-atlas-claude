@@ -1,0 +1,55 @@
+<section class="slide" data-sec="MongoDB basics" data-title="Documents, BSON and ObjectId">
+  <h2>A MongoDB document looks like JSON but is stored as BSON: typed values, ordered fields, and a mandatory _id</h2>
+  <p class="dek">MongoDB stores <b>documents</b> in <b>collections</b>. A document is a set of fields whose values can be scalars, arrays or nested documents, encoded as <b>BSON</b>, a binary format with richer types than JSON: 32- and 64-bit integers, doubles, <code>Decimal128</code>, dates, binary data and <code>ObjectId</code>. Every document has an <code>_id</code> that is unique in its collection and indexed automatically. If the application does not supply one, the driver generates an <code>ObjectId</code>. A document may be at most 16 MB, and the fields in it keep the order in which they were written.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">bson.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  every value has a BSON type; the shell shows the non-JSON ones with constructors
+const order = db.orders.findOne({ _id: 1001 });
+show(db.orders.aggregate([{ $match: { _id: 1001 } }, { $project: {
+  _id: { $type: '$_id' }, customer: { $type: '$customer' }, placedAt: { $type: '$placedAt' },
+  items: { $type: '$items' }, total: { $type: '$total' } } }]));
+print('document size in bytes:', bsonsize(order));
+
+// 2  an ObjectId is 12 bytes: a 4-byte timestamp, 5 random bytes, a 3-byte counter
+const id = new ObjectId();
+print(id.getTimestamp() instanceof Date, id.toHexString().length, 'hex digits');
+
+// 3  matching a whole embedded document compares field order too
+print('{ name, id }:', db.orders.countDocuments({ customer: { name: 'Asha Rao', id: 1 } }));
+print('{ id, name }:', db.orders.countDocuments({ customer: { id: 1, name: 'Asha Rao' } }));
+print('dot notation:', db.orders.countDocuments({ 'customer.id': 1 }));</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · bson.js</div>
+<pre><code class="language-plaintext">{ _id: 'int', customer: 'object', placedAt: 'date', items: 'array', total: 'decimal' }
+document size in bytes: 342
+true 24 hex digits
+{ name, id }: 0
+{ id, name }: 4
+dot notation: 4</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>BSON type</th><th>Use it for</th></tr></thead>
+          <tbody>
+            <tr><td><code>int</code>, <code>long</code></td><td>Counts, quantities, ids</td></tr>
+            <tr><td><code>double</code></td><td>Measurements; never money</td></tr>
+            <tr><td><code>decimal</code> (Decimal128)</td><td>Money and anything that must add up exactly</td></tr>
+            <tr><td><code>date</code></td><td>Instants: milliseconds since 1970, UTC</td></tr>
+            <tr><td><code>objectId</code></td><td>Default <code>_id</code>: 12 bytes, roughly time-ordered</td></tr>
+            <tr><td><code>object</code>, <code>array</code></td><td>Embedded documents and lists</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Matching a whole sub-document</span><code>{ customer: { name: …, id: … } }</code> matched nothing, because an embedded document is compared as a whole, field order included, and the stored order is <code>id</code>, then <code>name</code>. Query embedded fields with dot notation, <code>'customer.id': 1</code>, which matched all 4 orders.</div>
+    <div class="note warn"><span class="lbl">JavaScript numbers</span>In mongosh a literal such as <code>19.99</code> is stored as a <code>double</code>, and an integer literal as an <code>int</code>. Drivers map types from the language: a Java <code>BigDecimal</code> becomes <code>Decimal128</code>, a <code>long</code> becomes <code>long</code>. Mixed types in one field, an <code>int</code> here and a <code>double</code> there, are legal and easily created by accident.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Documents are BSON: typed, ordered, up to 16 MB, with a unique <code>_id</code>. An <code>ObjectId</code> embeds its creation second, so it sorts roughly by insert time, and the driver generates it, so the client knows the id before the write reaches the server."</div>
+  </div>
+</section>

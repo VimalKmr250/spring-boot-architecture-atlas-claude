@@ -1,0 +1,56 @@
+<section class="slide" data-sec="MongoDB modelling" data-title="Modelling anti-patterns and the 16 MB limit">
+  <h2>An array that only grows will hit the 16 MB document limit, and long before that it makes every read and write slower</h2>
+  <p class="dek">A document is read, written and replicated as a unit. An unbounded array, such as every event for a customer, every message in a chat or every sample from a sensor, makes each <code>$push</code> rewrite a bigger document. It makes every read of the parent load the history too, and it ends in a hard error at 16 MB. The script pushes 1,000 page-view events at a time into one customer's document until the server refuses, then stores the same events as one small document each, which has no limit and indexes naturally by time.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">limits.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// 1  the 16 MB document limit, hit by an array that only ever grows
+db.activity.drop();
+db.activity.insertOne({ _id: 'customer-1', events: [] });
+const chunk = Array.from({ length: 1000 }, (_, i) =&gt; ({ type: 'PAGE_VIEW', at: new Date(Date.UTC(2026, 0, 1) + i * 1000), path: '/p/' + 'x'.repeat(1000) }));
+let pushes = 0;
+try {
+  while (true) { db.activity.updateOne({ _id: 'customer-1' }, { $push: { events: { $each: chunk } } }); pushes++; }
+} catch (e) {
+  print('after', pushes * 1000, 'events: error', e.code, '-', e.message.split(' :: ').pop());
+}
+print('document size now:', (bsonsize(db.activity.findOne()) / 1024 / 1024).toFixed(1), 'MB');
+
+// 2  the same events as one document each: no limit, and indexable by time
+db.activity.drop();
+db.activity_events.drop();
+db.activity_events.insertMany(chunk.map(e =&gt; ({ customerId: 1, ...e })));
+db.activity_events.createIndex({ customerId: 1, at: -1 });
+print('latest 3 for customer 1:', db.activity_events.find({ customerId: 1 }, { at: 1, _id: 0 }).sort({ at: -1 }).limit(3).toArray().length);
+db.activity_events.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · limits.js</div>
+<pre><code class="language-plaintext">after 15000 events: error 10334 - Resulting document after update is larger than 16777216
+document size now: 15.1 MB
+latest 3 for customer 1: 3</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Anti-pattern</th><th>Instead</th></tr></thead>
+          <tbody>
+            <tr><td>Unbounded arrays</td><td>A child collection; or a capped array (<code>$slice</code>) plus a child collection</td></tr>
+            <tr><td>Bloated documents read for one field</td><td>Projections; split cold fields into a second collection</td></tr>
+            <tr><td><code>$lookup</code> on every request</td><td>Embed or copy the fields that page needs</td></tr>
+            <tr><td>One collection per tenant or per day</td><td>One collection with a tenant or date field, indexed; thousands of collections strain the server</td></tr>
+            <tr><td>Indexes for every field</td><td>Index the queries you run; each index slows every write</td></tr>
+            <tr><td>Case-sensitive duplicates, mixed types</td><td>A validator, and a collation on the unique index</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Error 10334</span>The fifteenth batch succeeded and the sixteenth did not: "Resulting document after update is larger than 16777216" bytes. The document stopped at 15.1 MB. In production this surfaces as a write that fails for one heavy customer only, usually the most valuable one.</div>
+    <div class="note warn"><span class="lbl">Slow long before the limit</span>A 15 MB document is sent in full to every query that reads it without a projection, and every update rewrites it in the storage engine and in the replication log. Keep documents to what the main read needs; a few kilobytes is typical for an order.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"16 MB is the hard limit, but the real rule is that an array must have a known upper bound. Events, logs and messages go in their own collection, indexed by owner and time; the parent can keep a summary or the latest few."</div>
+  </div>
+</section>

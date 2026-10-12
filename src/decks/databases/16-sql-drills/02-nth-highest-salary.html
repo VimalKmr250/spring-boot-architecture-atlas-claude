@@ -1,0 +1,89 @@
+<section class="slide" data-sec="SQL drills" data-title="Nth highest salary, three ways">
+  <h2>Drill: "find the third highest salary", and the follow-ups about ties, missing values and departments</h2>
+  <p class="dek">The most asked SQL question of all. Clarify first. "Third highest" usually means the third distinct salary: two people on 150,000 are one value. And the answer for a company with only two salaries should be NULL, not an error. Three standard answers follow, all returning 180,000. Window functions are the modern answer, <code>OFFSET</code> is the shortest, and the correlated subquery works on any SQL engine ever made.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">nth-salary.sql · runs unchanged on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- the 3rd highest distinct salary, three ways (salaries can tie: 150,000 and 140,000 appear twice)
+
+-- 1  DENSE_RANK: ties share a rank and leave no gaps, so rank 3 is the 3rd distinct value
+SELECT DISTINCT salary AS third_highest
+FROM  (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk FROM employees) ranked
+WHERE  rnk = 3;
+
+-- 2  skip the two highest distinct values, take the next
+SELECT DISTINCT salary AS third_highest
+FROM   employees
+ORDER  BY salary DESC
+OFFSET 2 ROWS FETCH NEXT 1 ROW ONLY;
+
+-- 3  correlated subquery: exactly two distinct salaries are higher (works on any SQL engine)
+SELECT DISTINCT e.salary AS third_highest
+FROM   employees e
+WHERE  2 = (SELECT COUNT(DISTINCT x.salary) FROM employees x WHERE x.salary &gt; e.salary);
+
+-- follow-up: return NULL rather than no row when there is no Nth value (N = 20)
+SELECT (SELECT DISTINCT salary FROM (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk FROM employees) r
+        WHERE rnk = 20) AS twentieth_highest;
+
+-- follow-up: the 2nd highest salary in each department
+SELECT dept, salary AS second_highest
+FROM  (SELECT dept, salary, DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk FROM employees) r
+WHERE  rnk = 2
+GROUP  BY dept, salary
+ORDER  BY dept;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · nth-salary.sql</div>
+<pre><code class="language-plaintext">third_highest
+-------------
+       180000
+
+(1 rows affected)
+third_highest
+-------------
+       180000
+
+(1 rows affected)
+third_highest
+-------------
+       180000
+
+(1 rows affected)
+twentieth_highest
+-----------------
+NULL
+
+(1 rows affected)
+dept        second_highest
+----------- --------------
+Engineering         155000
+Payments            175000
+Support              72000
+
+(3 rows affected)</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Oracle 26ai agrees</span>Same values in every query, with <code>(null)</code> for the missing 20th salary.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Approach</th><th>Ties</th><th>Cost</th><th>Say</th></tr></thead>
+      <tbody>
+        <tr><td><code>DENSE_RANK() = N</code></td><td>Correct: ranks distinct values</td><td>One sort, or an index scan on salary</td><td>The default answer; extends to "per department" with <code>PARTITION BY</code></td></tr>
+        <tr><td><code>DISTINCT … OFFSET N-1 FETCH 1</code></td><td>Correct, because of <code>DISTINCT</code></td><td>Sort of the distinct values</td><td>Shortest; <code>TOP</code> / <code>ROWNUM</code> variants on old versions</td></tr>
+        <tr><td>Correlated <code>COUNT(DISTINCT)</code></td><td>Correct</td><td>Quadratic without an index</td><td>Portable everywhere; mention the cost</td></tr>
+        <tr><td><code>ROW_NUMBER() = N</code></td><td><b>Wrong</b>: for N = 7 it returns 150,000, the second copy of the 6th value, instead of 140,000</td><td>—</td><td>The trap answer</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>O(n log n) for the sort, or a walk down an index on <code>salary</code> that stops after N distinct values. The correlated version is O(n²) without an index.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"What if N is larger than the number of salaries?" Wrap it in a scalar subquery so it returns NULL, as the 20th does above. "Per department?" Add <code>PARTITION BY dept</code>. "And the people earning it?" Select the rows instead of <code>DISTINCT salary</code>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I'd use <code>DENSE_RANK</code> so tied salaries count once, filter it in an outer query, and wrap the result to return NULL when there is no Nth value." Java's version of the same question is <a data-deck="st" data-slide="Employees: ranking">Streams · Employees: ranking</a>.</div>
+  </div>
+</section>

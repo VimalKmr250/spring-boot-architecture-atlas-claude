@@ -1,0 +1,121 @@
+<section class="slide" data-sec="SQL essentials" data-title="Grouping and aggregation">
+  <h2>One GROUP BY, many answers: conditional aggregation turns a status column into a column per status</h2>
+  <p class="dek"><code>GROUP BY</code> collapses rows into one row per group, and every selected column must either be grouped or aggregated. Four techniques cover most reporting questions. The <code>COUNT</code> variants count different things. Wrapping a <code>CASE</code> in <code>SUM</code> or <code>AVG</code> (<b>conditional aggregation</b>) computes several filtered totals in a single pass. <code>LISTAGG</code> (Oracle) and <code>STRING_AGG</code> (SQL Server) build a list per group. <code>ROLLUP</code> adds subtotal and grand-total rows. Here they report on payment failures per method, which is the first query anyone runs on a payment system.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">grouping.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  three different counts
+SELECT COUNT(*) AS payments, COUNT(DISTINCT order_id) AS orders_paid_for, COUNT(DISTINCT method) AS methods
+FROM   payments;
+
+-- 2  conditional aggregation: one pass, one row per method, a column per outcome
+SELECT method,
+       COUNT(*)                                             AS attempts,
+       SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END)   AS failed,
+       ROUND(100 * AVG(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END), 1) AS failed_pct
+FROM   payments
+GROUP  BY method
+ORDER  BY method;
+
+-- 3  a list per group
+SELECT o.order_id,
+       LISTAGG(p.sku, ', ') WITHIN GROUP (ORDER BY i.line_no) AS skus
+FROM   orders o
+JOIN   order_items i ON i.order_id = o.order_id
+JOIN   products p    ON p.product_id = i.product_id
+WHERE  o.customer_id = 1
+GROUP  BY o.order_id
+ORDER  BY o.order_id;
+
+-- 4  subtotals and a grand total in one query
+SELECT CASE WHEN GROUPING(c.tier) = 1 THEN '(all)' ELSE c.tier END       AS tier,
+       CASE WHEN GROUPING(o.status) = 1 THEN '(all)' ELSE o.status END   AS status,
+       COUNT(*) AS orders, SUM(o.total) AS total
+FROM   orders o
+JOIN   customers c ON c.customer_id = o.customer_id
+WHERE  o.status IN ('PAID', 'SHIPPED')
+GROUP  BY ROLLUP (c.tier, o.status)
+ORDER  BY GROUPING(c.tier), c.tier, GROUPING(o.status), o.status;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · grouping.ora.sql</div>
+<pre><code class="language-plaintext">PAYMENTS ORDERS_PAID_FOR METHODS
+-------- --------------- -------
+      21              16       3
+
+1 row selected.
+
+METHOD ATTEMPTS FAILED FAILED_PCT
+------ -------- ------ ----------
+CARD         14      5       35.7
+UPI           4      0          0
+WALLET        3      0          0
+
+3 rows selected.
+
+ORDER_ID SKUS
+-------- ----------------
+    1001 LAP-14, ACC-MSE
+    1004 ACC-KBD, ACC-HUB
+    1011 PHN-A1, ACC-HUB
+    1018 KIT-KTL
+
+4 rows selected.
+
+TIER   STATUS  ORDERS   TOTAL
+------ ------- ------ -------
+BRONZE PAID         1   89.00
+BRONZE SHIPPED      1   48.00
+BRONZE (all)        2  137.00
+GOLD   PAID         4 4814.40
+GOLD   SHIPPED      3  409.50
+GOLD   (all)        7 5223.90
+SILVER SHIPPED      4 2829.80
+SILVER (all)        4 2829.80
+(all)  (all)       13 8190.70
+
+9 rows selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="note good"><span class="lbl">SQL Server 2025 agrees</span><code>grouping.mss.sql</code> is the same file with two changes: <code>STRING_AGG</code> instead of <code>LISTAGG</code>, and <code>100.0 * AVG(… THEN 1.0 …)</code>. Without the decimals, SQL Server would average the 0s and 1s as integers and report 0% failed. It prints the same rows.</div>
+    <div class="codewrap">
+      <div class="codelabel">grouping.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// conditional aggregation in a pipeline: $group with $cond
+show(db.payments.aggregate([
+  { $group: { _id: '$method',
+              attempts: { $sum: 1 },
+              failed:   { $sum: { $cond: [{ $eq: ['$status', 'FAILED'] }, 1, 0] } } } },
+  { $sort: { _id: 1 } }
+]));</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Output on MongoDB 8.3 · grouping.js</div>
+<pre><code class="language-plaintext">{ _id: 'CARD', attempts: 14, failed: 5 }
+{ _id: 'UPI', attempts: 4, failed: 0 }
+{ _id: 'WALLET', attempts: 3, failed: 0 }</code></pre>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Expression</th><th>Counts</th><th>Here</th></tr></thead>
+      <tbody>
+        <tr><td><code>COUNT(*)</code></td><td>Rows</td><td>21 payment attempts</td></tr>
+        <tr><td><code>COUNT(col)</code></td><td>Rows where <code>col</code> is not NULL</td><td>After a LEFT JOIN, the matched rows only</td></tr>
+        <tr><td><code>COUNT(DISTINCT col)</code></td><td>Distinct non-NULL values</td><td>16 orders had at least one attempt</td></tr>
+        <tr><td><code>SUM(CASE WHEN … THEN 1 ELSE 0 END)</code></td><td>Rows meeting a condition</td><td>5 failed card payments</td></tr>
+        <tr><td><code>AVG(CASE WHEN … THEN 1 ELSE 0 END)</code></td><td>The fraction meeting it</td><td>35.7% of card attempts failed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The non-grouped column</span><code>SELECT customer_id, name, COUNT(*) … GROUP BY customer_id</code> fails in both engines: ORA-00979 and SQL Server error 8120. Group by the name as well, or aggregate it with <code>MAX(name)</code>. Some engines, such as MySQL in its old mode, return an arbitrary value instead, which is worse.</div>
+    <div class="note warn"><span class="lbl">Reading ROLLUP rows</span>A subtotal row has NULL in the rolled-up columns. <code>GROUPING(col) = 1</code> tells it apart from a real NULL, which is how the query labelled them <code>(all)</code>. Use <code>CUBE</code> for every combination of subtotals, and <code>GROUPING SETS</code> to list exactly the ones you want.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"For counts by status as columns I use conditional aggregation: one scan, one row per group, and it works in every engine. <code>PIVOT</code> is shorthand for the same thing; the <a data-deck="db" data-slide="Pivot monthly revenue by category">pivot drill</a> shows both."</div>
+  </div>
+</section>

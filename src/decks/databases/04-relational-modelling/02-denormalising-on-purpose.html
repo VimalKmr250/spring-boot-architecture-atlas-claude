@@ -1,0 +1,63 @@
+<section class="slide" data-sec="Relational modelling" data-title="Denormalising on purpose">
+  <h2>Copy a fact on purpose when it records history or saves a hot join, and know what keeps the copy correct</h2>
+  <p class="dek">Not every repeated value is a normalisation failure. The running example stores two copies deliberately. <code>order_items.unit_price</code> repeats <code>products.price</code>, but it means something else: the price the customer actually paid, which must not change when the catalogue does. <code>orders.total</code> could be computed from the lines every time, but it is read on every order list, so it is stored. The first copy is a <b>snapshot</b> and should never be synchronised. The second is a <b>derived value</b>, and something must keep it equal to its source.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">denormalised.mss.sql · SQL Server 2025 (the Oracle file is the same without BEGIN TRANSACTION)</div>
+<pre><code class="language-sql">-- 1  the stored order total must equal the sum of its lines: check it
+SELECT o.order_id, o.total, SUM(i.qty * i.unit_price) AS from_lines
+FROM   orders o
+JOIN   order_items i ON i.order_id = o.order_id
+GROUP  BY o.order_id, o.total
+HAVING o.total &lt;&gt; SUM(i.qty * i.unit_price);
+
+-- 2  the price snapshot: products.price changes, past order lines do not
+BEGIN TRANSACTION;
+UPDATE products SET price = 1199.00 WHERE product_id = 101;
+SELECT i.order_id, i.unit_price AS paid, p.price AS price_today
+FROM   order_items i
+JOIN   products p ON p.product_id = i.product_id
+WHERE  i.product_id = 101
+ORDER  BY i.order_id;
+ROLLBACK;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · denormalised.mss.sql</div>
+<pre><code class="language-plaintext">order_id total from_lines
+-------- ----- ----------
+
+(0 rows affected)
+
+(1 rows affected)
+order_id    paid price_today
+-------- ------- -----------
+    1001 1299.00     1199.00
+    1007 1299.00     1199.00
+
+(2 rows affected)</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">Oracle 26ai agrees</span>No order total differs from its lines (<code>no rows selected</code>), and the two laptop lines still show 1299.00 against today's 1199.00.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Denormalisation</th><th>Example</th><th>Kept correct by</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td>Snapshot</td><td>Price, address or tax rate copied into an order</td><td>Nothing: it must not change</td><td>None, if it is understood as history</td></tr>
+        <tr><td>Stored derived value</td><td><code>orders.total</code>, <code>customers.order_count</code></td><td>The same transaction that changes the source, plus a periodic check query like query 1</td><td>Drift when a code path forgets; a hot counter row becomes a lock bottleneck</td></tr>
+        <tr><td>Duplicated attribute for reads</td><td>Customer name on the order, to avoid a join</td><td>An update or an event when the source changes</td><td>Stale reads; is the order's name a snapshot or a cache?</td></tr>
+        <tr><td>Precomputed aggregate</td><td>Daily revenue per category</td><td>A materialised or indexed view, or a scheduled job</td><td>Staleness and refresh cost; see <a data-deck="db" data-slide="Views, materialised views and indexed views">materialised views</a></td></tr>
+        <tr><td>A whole read model</td><td>A search index or a document per order page</td><td>Change events from the source of truth</td><td>Eventual consistency; see <a data-deck="deck" data-slide="Read models">Read models</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The snapshot that is not one</span>Joining order lines to <code>products.price</code> to print an old invoice would show 1199.00 for an item sold at 1299.00. Anything with legal or financial meaning (prices, tax, addresses, names on an invoice) is copied at the moment of the transaction.</div>
+    <div class="note warn"><span class="lbl">Counters cost concurrency</span><code>customers.order_count = order_count + 1</code> on every order makes every concurrent order for that customer queue on one row lock. For hot counters, insert rows and aggregate, or update the count asynchronously.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Every copy I add is either a snapshot, which never changes, or derived data with a named owner that updates it, in the same transaction or through events. And I keep a reconciliation query that proves the copy still matches."</div>
+  </div>
+</section>

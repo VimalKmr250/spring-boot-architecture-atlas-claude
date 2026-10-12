@@ -1,0 +1,99 @@
+<section class="slide" data-sec="Database code" data-title="Temporary tables, table variables and CTEs">
+  <h2>A CTE is a named query, a temporary table is real storage, and a table variable ignores ROLLBACK</h2>
+  <p class="dek">All three hold an intermediate result, and they behave very differently. A <b>CTE</b> is part of one statement: it is not stored, and the optimiser may evaluate it once or several times. A <b>temporary table</b> is a real table with statistics and indexes, private to the session. In SQL Server it is <code>#name</code>, created on the fly. In Oracle a <b>global</b> temporary table is created once, like any table, and each session sees only its own rows; since 18c there is also a session-only <b>private</b> temporary table. SQL Server's <b>table variable</b>, <code>@name</code>, lives for one batch and is not part of the transaction.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">temp-tables.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- a #temp table and a @table variable, filled inside a transaction that is rolled back
+CREATE TABLE #recent (order_id INT PRIMARY KEY);
+DECLARE @recent TABLE (order_id INT PRIMARY KEY);
+BEGIN TRANSACTION;
+INSERT INTO #recent  SELECT order_id FROM orders WHERE placed_at &gt;= '2026-03-01';
+INSERT INTO @recent  SELECT order_id FROM orders WHERE placed_at &gt;= '2026-03-01';
+ROLLBACK;
+SELECT (SELECT COUNT(*) FROM #recent) AS temp_table_rows,
+       (SELECT COUNT(*) FROM @recent) AS table_variable_rows;
+DROP TABLE #recent;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · temp-tables.mss.sql</div>
+<pre><code class="language-plaintext">(7 rows affected)
+
+(7 rows affected)
+temp_table_rows table_variable_rows
+--------------- -------------------
+              0                   7
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">temp-tables.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  a global temporary table: the definition is permanent, the rows are private to the session
+CREATE GLOBAL TEMPORARY TABLE recent_orders_gtt (order_id NUMBER PRIMARY KEY) ON COMMIT DELETE ROWS;
+INSERT INTO recent_orders_gtt SELECT order_id FROM orders WHERE placed_at &gt;= DATE '2026-03-01';
+SELECT COUNT(*) AS before_commit FROM recent_orders_gtt;
+COMMIT;
+SELECT COUNT(*) AS after_commit FROM recent_orders_gtt;
+DROP TABLE recent_orders_gtt PURGE;
+
+-- 2  a private temporary table (18c): created and gone with the session, name must start ORA$PTT_
+CREATE PRIVATE TEMPORARY TABLE ora$ptt_recent (order_id NUMBER) ON COMMIT PRESERVE DEFINITION;
+INSERT INTO ora$ptt_recent SELECT order_id FROM orders WHERE placed_at &gt;= DATE '2026-03-01';
+SELECT COUNT(*) AS private_rows FROM ora$ptt_recent;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · temp-tables.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+7 rows created.
+
+BEFORE_COMMIT
+-------------
+            7
+
+1 row selected.
+
+Commit complete.
+
+AFTER_COMMIT
+------------
+           0
+
+1 row selected.
+
+Table dropped.
+
+Table created.
+
+7 rows created.
+
+PRIVATE_ROWS
+------------
+           7
+
+1 row selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th></th><th>CTE</th><th>SQL Server <code>#temp</code></th><th>SQL Server <code>@table</code></th><th>Oracle global temporary table</th></tr></thead>
+      <tbody>
+        <tr><td>Lives for</td><td>One statement</td><td>The session, or until dropped</td><td>The batch</td><td>Definition: permanent. Rows: the transaction or the session</td></tr>
+        <tr><td>Statistics, indexes</td><td>Not stored</td><td>Yes, both</td><td>Key constraints only; row estimates were poor before 2019</td><td>Yes; session-private statistics since 12c</td></tr>
+        <tr><td>Undone by ROLLBACK</td><td>—</td><td>Yes</td><td><b>No</b>: 7 rows survived the ROLLBACK</td><td>Yes</td></tr>
+        <tr><td>Good for</td><td>Readability, recursion</td><td>Large intermediate results reused several times</td><td>Small sets; keeping rows past a rollback, such as an error log</td><td>Staging data per session, without DDL at run time</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">DDL at run time in Oracle</span>Creating and dropping tables inside application code, as a SQL Server developer does with <code>#temp</code>, is wrong in Oracle. DDL commits, invalidates dependent code and takes locks. Create the global temporary table once in a migration, and let each session use its own rows.</div>
+    <div class="note warn"><span class="lbl">A CTE is not a cache</span>Referencing a CTE three times in a query can run it three times. If an expensive intermediate result is reused, materialise it in a temporary table. Oracle's <code>/*+ MATERIALIZE */</code> hint does it inside one query.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"CTE for readability within one statement; temporary table when a large intermediate result needs indexes, statistics or reuse; table variable for small sets. And the trick question: a table variable keeps its rows after <code>ROLLBACK</code>."</div>
+  </div>
+</section>

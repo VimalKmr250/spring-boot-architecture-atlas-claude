@@ -1,0 +1,174 @@
+<section class="slide" data-sec="Transactions and locking" data-title="Deadlocks in Oracle and SQL Server">
+  <h2>Two transactions that lock the same rows in opposite orders will eventually wait for each other forever, until the database breaks the cycle</h2>
+  <p class="dek">Transfer A debits wallet 1 then wallet 2; transfer B debits wallet 2 then wallet 1. Each takes its first row lock, then waits for the row the other holds. Neither can proceed, which is a <b>deadlock</b>. Both engines detect the cycle within seconds and break it by failing one participant, and they differ in what they roll back. Oracle rolls back only the <i>statement</i> that detected the deadlock and raises ORA-00060; that session still holds its earlier locks until it commits or rolls back. SQL Server picks a <b>victim</b> and rolls back its whole transaction with error 1205. The fix is the same everywhere: take locks in one consistent order.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 170" role="img" aria-label="Deadlock cycle: transaction A holds the lock on wallet 1 and waits for wallet 2; transaction B holds the lock on wallet 2 and waits for wallet 1. With a consistent order, both lock wallet 1 first, so B simply waits behind A and then runs.">
+        <g font-size="11" fill="currentColor">
+          <rect x="40" y="30" width="140" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="110" y="57" text-anchor="middle" font-weight="600">transfer A</text>
+          <rect x="40" y="110" width="140" height="44" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="110" y="137" text-anchor="middle" font-weight="600">transfer B</text>
+          <rect x="300" y="30" width="120" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect><text x="360" y="57" text-anchor="middle" font-family="IBM Plex Mono, monospace">wallet 1</text>
+          <rect x="300" y="110" width="120" height="44" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect><text x="360" y="137" text-anchor="middle" font-family="IBM Plex Mono, monospace">wallet 2</text>
+        </g>
+        <line x1="180" y1="46" x2="298" y2="46" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line><text x="240" y="40" text-anchor="middle" font-size="9.5" fill="currentColor">holds</text>
+        <line x1="180" y1="138" x2="298" y2="138" stroke="#3AA79B" stroke-width="1.6" marker-end="url(#arwB)"></line><text x="240" y="132" text-anchor="middle" font-size="9.5" fill="currentColor">holds</text>
+        <line x1="180" y1="66" x2="298" y2="120" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#arwA)"></line><text x="268" y="84" font-size="9.5" fill="currentColor">waits for</text>
+        <line x1="180" y1="118" x2="298" y2="64" stroke="#D26A3F" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#arwA)"></line><text x="200" y="108" font-size="9.5" fill="currentColor">waits for</text>
+        <g font-size="10.5" fill="currentColor">
+          <text x="500" y="44" font-weight="600">Opposite order: a cycle</text>
+          <text x="500" y="62">Oracle: ORA-00060 for the session that detected it;</text>
+          <text x="500" y="78">only its last statement is rolled back</text>
+          <text x="500" y="96">SQL Server: error 1205 for the victim; its whole</text>
+          <text x="500" y="112">transaction is rolled back</text>
+          <text x="500" y="138" font-weight="600">Same order (1, then 2): no cycle</text>
+          <text x="500" y="156">B waits behind A, then runs: both commit</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">Deadlock.java · ojdbc17 23.26.3, mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+/** Two transfers between the same two wallets, locking them in opposite orders, on Oracle and SQL Server. */
+public class Deadlock {
+    record Db(String name, String url, String user, String password, String blocked, String setup) {}
+
+    static final List&lt;Db&gt; DBS = List.of(
+        new Db("Oracle 26ai", "jdbc:oracle:thin:@//localhost:1521/FREEPDB1", "shop", "Atlas_pw1",
+               "SELECT COUNT(*) FROM v$session WHERE username = 'SHOP' AND blocking_session IS NOT NULL", null),
+        new Db("SQL Server 2025", "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false", "sa", "Atlas_pw1!",
+               "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id &lt;&gt; 0",
+               "SET DEADLOCK_PRIORITY LOW"));                       // make B the victim, so the run is repeatable
+
+    static final String DEBIT = "UPDATE accounts SET balance = balance - 10 WHERE account_id = ?";
+
+    public static void main(String[] args) throws Exception {
+        for (Db db : DBS) {
+            System.out.println("== " + db.name());
+            transfer(db, new int[] {1, 2}, new int[] {2, 1});        // opposite orders
+            transfer(db, new int[] {1, 2}, new int[] {1, 2});        // the same order
+        }
+    }
+
+    static void transfer(Db db, int[] orderA, int[] orderB) throws Exception {
+        try (Connection a = open(db, null); Connection b = open(db, db.setup()); Connection monitor = open(db, null);
+             var threads = Executors.newVirtualThreadPerTaskExecutor()) {
+            reset(a);
+            System.out.printf("  A locks %d then %d, B locks %d then %d%n", orderA[0], orderA[1], orderB[0], orderB[1]);
+            debit(a, orderA[0]);
+            Future&lt;String&gt; resultB;
+            if (orderA[0] == orderB[0]) {                             // same order: B queues behind A at once
+                resultB = threads.submit(() -&gt; finish(b, db, orderB[0], orderB[1]));
+                waitUntilBlocked(monitor, db);
+                debit(a, orderA[1]);
+                a.commit();
+                System.out.println("  A committed; B: " + resultB.get());
+                return;
+            }
+            debit(b, orderB[0]);
+            Future&lt;String&gt; resultA = threads.submit(() -&gt; finish(a, db, orderA[1]));
+            waitUntilBlocked(monitor, db);                            // A now waits for B
+            resultB = threads.submit(() -&gt; finish(b, db, orderB[1])); // and B for A: a cycle
+            System.out.println("  A: " + resultA.get());
+            System.out.println("  B: " + resultB.get());
+        }
+    }
+
+    // run the remaining debits and commit; on an error, report it, look at the other session, then roll back
+    static String finish(Connection c, Db db, int... ids) throws SQLException {
+        try {
+            for (int id : ids) debit(c, id);
+            c.commit();
+            return "committed";
+        } catch (SQLException e) {
+            String other = blockedNow(db) ? "the other session is still blocked" : "the other session is running";
+            c.rollback();
+            return "error " + e.getErrorCode() + ": " + e.getMessage().lines().findFirst().orElse("")
+                    + "\n     before this side rolled back, " + other;
+        }
+    }
+
+    static boolean blockedNow(Db db) throws SQLException {
+        try (Connection c = open(db, null); Statement s = c.createStatement(); ResultSet rs = s.executeQuery(db.blocked())) {
+            return rs.next() &amp;&amp; rs.getInt(1) &gt; 0;
+        }
+    }
+
+    static void debit(Connection c, int id) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(DEBIT)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        }
+    }
+
+    static Connection open(Db db, String setup) throws SQLException {
+        Connection c = DriverManager.getConnection(db.url(), db.user(), db.password());
+        c.setAutoCommit(false);
+        if (setup != null) try (Statement s = c.createStatement()) { s.execute(setup); }
+        return c;
+    }
+
+    static void reset(Connection c) throws SQLException {
+        try (Statement s = c.createStatement()) {
+            s.executeUpdate("UPDATE accounts SET balance = CASE account_id WHEN 1 THEN 500 ELSE 300 END WHERE account_id IN (1, 2)");
+        }
+        c.commit();
+    }
+
+    static void waitUntilBlocked(Connection monitor, Db db) throws Exception {
+        for (int i = 0; i &lt; 400; i++) {
+            try (Statement s = monitor.createStatement(); ResultSet rs = s.executeQuery(db.blocked())) {
+                if (rs.next() &amp;&amp; rs.getInt(1) &gt; 0) return;
+            }
+            monitor.commit();
+            Thread.sleep(25);
+        }
+        throw new IllegalStateException("nobody blocked");
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · Deadlock.java · SQL Server's process id varies by run</div>
+<pre><code class="language-plaintext">== Oracle 26ai
+  A locks 1 then 2, B locks 2 then 1
+  A: error 60: ORA-00060: deadlock detected while waiting for resource
+     before this side rolled back, the other session is still blocked
+  B: committed
+  A locks 1 then 2, B locks 1 then 2
+  A committed; B: committed
+== SQL Server 2025
+  A locks 1 then 2, B locks 2 then 1
+  A: committed
+  B: error 1205: Transaction (Process ID 65) was deadlocked on lock resources with another process and has been chosen as the deadlock victim. Rerun the transaction.
+     before this side rolled back, the other session is running
+  A locks 1 then 2, B locks 1 then 2
+  A committed; B: committed</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th></th><th>Oracle</th><th>SQL Server</th></tr></thead>
+          <tbody>
+            <tr><td>Error</td><td>ORA-00060</td><td>1205</td></tr>
+            <tr><td>Rolled back</td><td>The detecting statement only</td><td>The victim's whole transaction</td></tr>
+            <tr><td>Who fails</td><td>The first waiter, after about 3 s</td><td>The cheaper transaction to roll back, unless <code>DEADLOCK_PRIORITY</code> says otherwise</td></tr>
+            <tr><td>Diagnose with</td><td>The trace file and alert log entry</td><td>The <code>system_health</code> event session's deadlock graph</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Oracle: the half-failed transaction</span>After ORA-00060, session A still held its lock on wallet 1, and B stayed blocked until A's code rolled back. An application that catches the error and carries on, or does nothing, leaves B waiting. Treat ORA-00060 as "roll back the transaction and retry", exactly like SQL Server's 1205.</div>
+    <div class="note warn"><span class="lbl">Where deadlocks hide</span>Updating rows in the order a request lists them, foreign key checks against unindexed child tables, <code>MERGE … HOLDLOCK</code> key ranges, and lock escalation to a whole table on SQL Server. Sorting the keys before updating, as the second run did, removes the most common case.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Deadlocks come from inconsistent lock order. I lock rows in a fixed order, such as ascending id, keep transactions short, and retry the whole transaction on ORA-00060 or 1205; in Spring both arrive as a <code>PessimisticLockingFailureException</code> subtype, which a retry policy can catch."</div>
+  </div>
+</section>

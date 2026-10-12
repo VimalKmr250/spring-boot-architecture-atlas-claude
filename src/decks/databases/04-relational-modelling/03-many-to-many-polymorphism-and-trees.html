@@ -1,0 +1,131 @@
+<section class="slide" data-sec="Relational modelling" data-title="Many-to-many, polymorphism and trees">
+  <h2>Three shapes that do not fit one foreign key: many-to-many, "belongs to one of several", and hierarchies</h2>
+  <p class="dek">A foreign key expresses "each row belongs to one parent row in one table". Three common relationships need more than that. <b>Many-to-many</b>, such as products and tags, needs a junction table keyed by the pair. A row that belongs to <b>one of several</b> parent types, such as a note on an order or on a product, is tempting to model as <code>(target_type, target_id)</code>, but that cannot have a foreign key. Separate nullable keys with a check, an <b>exclusive arc</b>, keep referential integrity. <b>Trees</b> can be stored four ways; the right one depends on whether you mostly read subtrees or change the tree.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">relationships.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  many-to-many: a junction table whose primary key is the pair
+CREATE TABLE product_tags (
+  product_id INT         NOT NULL REFERENCES products,
+  tag        VARCHAR(20) NOT NULL,
+  CONSTRAINT product_tags_pk PRIMARY KEY (product_id, tag)
+);
+INSERT INTO product_tags VALUES (101, 'gift'), (101, 'sale'), (103, 'gift'), (106, 'sale'),
+                                (109, 'gift'), (109, 'sale'), (110, 'gift');
+
+--    products carrying BOTH tags: group, then count the distinct matches
+SELECT product_id
+FROM   product_tags
+WHERE  tag IN ('gift', 'sale')
+GROUP  BY product_id
+HAVING COUNT(DISTINCT tag) = 2
+ORDER  BY product_id;
+
+-- 2  a closure table: one row per ancestor-descendant pair, built once from parent_id
+CREATE TABLE category_closure (
+  ancestor_id   INT NOT NULL,
+  descendant_id INT NOT NULL,
+  depth         INT NOT NULL,
+  CONSTRAINT category_closure_pk PRIMARY KEY (ancestor_id, descendant_id)
+);
+INSERT INTO category_closure (ancestor_id, descendant_id, depth)
+WITH walk (ancestor_id, descendant_id, depth) AS (
+  SELECT category_id, category_id, 0 FROM categories
+  UNION ALL
+  SELECT w.ancestor_id, c.category_id, w.depth + 1
+  FROM   walk w JOIN categories c ON c.parent_id = w.descendant_id
+)
+SELECT ancestor_id, descendant_id, depth FROM walk;
+
+--    every product anywhere under Electronics: a plain join, no recursion at read time
+SELECT p.sku, cc.depth
+FROM   category_closure cc
+JOIN   products p ON p.category_id = cc.descendant_id
+WHERE  cc.ancestor_id = 1
+ORDER  BY cc.depth, p.sku;
+
+-- 3  an exclusive arc: a note belongs to an order or to a product, never both
+CREATE TABLE notes (
+  note_id    INT PRIMARY KEY,
+  order_id   INT REFERENCES orders,
+  product_id INT REFERENCES products,
+  body       VARCHAR(200) NOT NULL,
+  CONSTRAINT notes_one_parent_ck CHECK (
+    (CASE WHEN order_id IS NULL THEN 0 ELSE 1 END) + (CASE WHEN product_id IS NULL THEN 0 ELSE 1 END) = 1)
+);
+INSERT INTO notes VALUES (1, 1001, NULL, 'gift wrap requested');
+INSERT INTO notes VALUES (2, 1001, 101, 'attached to both');
+
+DROP TABLE notes;
+DROP TABLE category_closure;
+DROP TABLE product_tags;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · relationships.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+7 rows created.
+
+PRODUCT_ID
+----------
+       101
+       109
+
+2 rows selected.
+
+Table created.
+
+18 rows created.
+
+SKU     DEPTH
+------- -----
+PHN-A1      1
+PHN-C2      1
+ACC-HUB     2
+ACC-KBD     2
+ACC-MSE     2
+LAP-14      2
+LAP-16      2
+
+7 rows selected.
+
+Table created.
+
+1 row created.
+
+INSERT INTO notes VALUES (2, 1001, 101, 'attached to both')
+*
+ERROR at line 1:
+ORA-02290: check constraint (SHOP.NOTES_ONE_PARENT_CK) violated
+Help: https://docs.oracle.com/error-help/db/ora-02290/
+
+Table dropped.
+
+Table dropped.
+
+Table dropped.</code></pre>
+      </div>
+      <div class="note good"><span class="lbl">SQL Server 2025 agrees</span><code>relationships.mss.sql</code> prints the same rows and rejects the same note with error 547. The one change: SQL Server puts the <code>WITH</code> before <code>INSERT</code>, Oracle after it.</div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Tree model</th><th>Stores</th><th>Read a subtree</th><th>Move a branch</th></tr></thead>
+      <tbody>
+        <tr><td>Adjacency list</td><td><code>parent_id</code></td><td>Recursive CTE, one level per iteration</td><td>Update one row</td></tr>
+        <tr><td>Materialised path</td><td><code>path = '/1/2/3/'</code></td><td><code>path LIKE '/1/2/%'</code>, an index range scan</td><td>Rewrite the path of every descendant</td></tr>
+        <tr><td>Closure table</td><td>Every (ancestor, descendant, depth) pair</td><td>One join, as in query 2</td><td>Delete and insert the pairs of the moved subtree</td></tr>
+        <tr><td>Nested sets</td><td><code>lft</code>, <code>rgt</code> numbers</td><td><code>BETWEEN lft AND rgt</code></td><td>Renumber much of the table <span class="tag w">avoid</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The polymorphic key</span><code>target_type = 'ORDER', target_id = 1001</code> is the pattern ORMs make easy, and the database cannot check it. Nothing stops a note pointing at an order that was deleted. The exclusive arc above has a real foreign key per parent, and a <code>CHECK</code> that rejected the note attached to both.</div>
+    <div class="note warn"><span class="lbl">Entity-attribute-value</span>A table of <code>(entity_id, attribute, value)</code> rows looks flexible: products with arbitrary properties. Every query then needs a self-join per attribute, values lose their types, and constraints are impossible. For variable attributes, prefer a JSON column (<a data-deck="db" data-slide="JSON inside Oracle and SQL Server">JSON inside Oracle and SQL Server</a>) or a document store.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Products with both tags is relational division: filter to the tags, group by product, and keep groups whose distinct count equals the number of tags. For trees I start with <code>parent_id</code> and a recursive CTE, and add a closure table when subtree reads dominate."</div>
+  </div>
+</section>

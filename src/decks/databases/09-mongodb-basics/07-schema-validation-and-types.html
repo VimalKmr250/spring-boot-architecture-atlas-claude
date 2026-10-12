@@ -1,0 +1,68 @@
+<section class="slide" data-sec="MongoDB basics" data-title="Schema validation, Decimal128 and dates">
+  <h2>"Schemaless" means the database will store the wrong type without complaint, unless you ask it to check</h2>
+  <p class="dek">MongoDB accepts any document in any collection by default, so type mistakes surface later, as queries that quietly miss data. A date stored as a string compares as text: <code>'2026-3-9'</code> sorts after <code>'2026-10-01'</code>, and no date range will ever match it. A price stored as a double carries binary rounding into every total. A <code>$jsonSchema</code> validator on the collection makes the server check types, required fields and allowed values on every insert and update. It can reject a bad document (<code>validationAction: 'error'</code>) or only log it (<code>'warn'</code>).</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">types.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">db.events.drop();
+// 1  dates stored as strings compare as text, not as time
+db.events.insertMany([
+  { _id: 1, kind: 'string', at: '2026-3-9 10:00' },
+  { _id: 2, kind: 'string', at: '2026-10-01 10:00' },
+  { _id: 3, kind: 'date',   at: ISODate('2026-03-09T10:00:00Z') },
+  { _id: 4, kind: 'date',   at: ISODate('2026-10-01T10:00:00Z') }
+]);
+print('strings after "2026-06":', db.events.countDocuments({ at: { $gt: '2026-06' } }));
+print('dates after 2026-06-01:', db.events.countDocuments({ at: { $gt: ISODate('2026-06-01') } }));
+show(db.events.find({}, { _id: 1, kind: 1 }).sort({ at: 1 }));   // mixed types sort by type first
+
+// 2  money: a line total, price x quantity, as double and as Decimal128
+show(db.aggregate([
+  { $documents: [{ price: 1.10, priceDec: Decimal128('1.10'), qty: 3 }] },
+  { $project: { double: { $multiply: ['$price', '$qty'] }, decimal: { $multiply: ['$priceDec', '$qty'] } } }
+]));
+
+// 3  a validator in warn mode accepts a bad document and only logs it; error mode rejects it
+db.events.drop();
+db.createCollection('events', { validationAction: 'warn', validator: { $jsonSchema: {
+  required: ['kind', 'at'], properties: { at: { bsonType: 'date' } } } } });
+db.events.insertOne({ kind: 'login', at: '2026-04-01' });
+print('stored in warn mode:', db.events.countDocuments());
+db.runCommand({ collMod: 'events', validationAction: 'error' });
+try { db.events.insertOne({ kind: 'login', at: '2026-04-02' }); } catch (e) { print(e.message); }
+db.events.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · types.js</div>
+<pre><code class="language-plaintext">strings after "2026-06": 2
+dates after 2026-06-01: 1
+{ _id: 2, kind: 'string' }
+{ _id: 1, kind: 'string' }
+{ _id: 3, kind: 'date' }
+{ _id: 4, kind: 'date' }
+{ double: 3.3000000000000003, decimal: Decimal128('3.30') }
+stored in warn mode: 1
+Document failed validation</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Setting</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>validationAction: 'error'</code></td><td>Invalid writes fail, with a detailed reason</td></tr>
+            <tr><td><code>validationAction: 'warn'</code></td><td>Invalid writes succeed and are logged</td></tr>
+            <tr><td><code>validationLevel: 'strict'</code></td><td>Every insert and update is checked</td></tr>
+            <tr><td><code>validationLevel: 'moderate'</code></td><td>Existing invalid documents can still be updated; new and valid ones are checked</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Mixed types sort by type</span>The sort put both strings before both dates, regardless of value, because BSON compares values of different types by type first. A field that is sometimes a string and sometimes a date breaks sorting, ranges and indexes at once. That is usually the trace of an old application version or a careless import.</div>
+    <div class="note warn"><span class="lbl">1.10 × 3</span>As doubles the line total came out as <code>3.3000000000000003</code>; as <code>Decimal128</code> it is exactly <code>3.30</code>. Store money as <code>Decimal128</code>, or as whole cents in a <code>long</code>, and map it to <code>BigDecimal</code> in Java. MongoDB's <code>$sum</code> compensates for rounding when it adds doubles, but multiplication, division and application code do not.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I add a <code>$jsonSchema</code> validator to every collection that matters: required fields, BSON types, enums. During a migration I run it in warn mode, then switch it to error. Flexible schema is for evolving shapes, not for unchecked types." Constraint violations side by side are on <a data-deck="db" data-slide="Constraints as the last line of defence">Constraints</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,50 @@
+<section class="slide" data-sec="MongoDB drills" data-title="Find duplicate documents">
+  <h2>Drill: "sign-ups contain the same email in different cases: find them, keep the earliest, and stop it happening again"</h2>
+  <p class="dek">The same three parts as the <a data-deck="db" data-slide="Find and delete duplicate rows">SQL drill</a>, written as a pipeline. <b>Find</b>: <code>$group</code> on <code>$toLower</code> of the email, collect the ids with <code>$push</code>, keep groups with more than one. Sorting by sign-up time first means the first id in each list is the one to keep. <b>Delete</b>: every id after the first. <b>Prevent</b>: a unique index with a case-insensitive <b>collation</b> (strength 2), so <code>CHEN@…</code> and <code>chen@…</code> count as the same key.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">duplicates.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">db.signups.drop();
+db.signups.insertMany([
+  { _id: 1, email: 'asha@example.com', at: ISODate('2026-01-05') }, { _id: 2, email: 'ben@example.com', at: ISODate('2026-01-06') },
+  { _id: 3, email: 'ASHA@example.com', at: ISODate('2026-02-01') }, { _id: 4, email: 'chen@example.com', at: ISODate('2026-02-03') },
+  { _id: 5, email: 'asha@example.com', at: ISODate('2026-03-09') }, { _id: 6, email: 'Ben@Example.com', at: ISODate('2026-03-10') }
+]);
+// 1  group on the normalised email; keep groups with more than one document
+const dups = db.signups.aggregate([
+  { $sort: { at: 1 } },
+  { $group: { _id: { $toLower: '$email' }, ids: { $push: '$_id' }, copies: { $sum: 1 } } },
+  { $match: { copies: { $gt: 1 } } },
+  { $sort: { _id: 1 } }
+]).toArray();
+show(dups);
+
+// 2  delete every copy but the earliest
+const extra = dups.flatMap(d =&gt; d.ids.slice(1));
+show(db.signups.deleteMany({ _id: { $in: extra } }));
+
+// 3  a unique index with a case-insensitive collation keeps them out
+db.signups.createIndex({ email: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
+try { db.signups.insertOne({ _id: 7, email: 'CHEN@example.com', at: ISODate('2026-04-01') }); }
+catch (e) { print(e.message.split(' collation')[0]); }
+db.signups.drop();</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · duplicates.js</div>
+<pre><code class="language-plaintext">{ _id: 'asha@example.com', ids: [ 1, 3, 5 ], copies: 3 }
+{ _id: 'ben@example.com', ids: [ 2, 6 ], copies: 2 }
+{ acknowledged: true, deletedCount: 3 }
+E11000 duplicate key error collection: shop.signups index: email_1</code></pre>
+      </div>
+      <div class="note warn"><span class="lbl">The index only helps queries with the same collation</span>A query uses a collated index only when it asks for the same collation, for example <code>find({ email: 'ASHA@example.com' }).collation({ locale: 'en', strength: 2 })</code>. Checked on 8.3: without it, that query ran a <code>COLLSCAN</code> and found nothing; with it, an index scan found Asha. Setting the collation as the collection's default avoids repeating it on every query.</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>One pass to group, and memory for one entry per distinct email. On a large collection, the list of ids to delete may not fit in the client: write the duplicate groups to a collection with <code>$merge</code> or <code>$out</code>, then delete in batches with <code>bulkWrite</code>. Creating the unique index fails while any duplicates remain, so cleanup comes first.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Keep the latest?" Sort by <code>at: -1</code>. "Merge their data instead?" Use <code>$group</code> accumulators such as <code>$max</code> and <code>$addToSet</code> per field, then replace the survivor. "Unique on two fields?" A compound unique index. "Unique only for active users?" A partial index with <code>partialFilterExpression</code>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>$group</code> on the normalised key with <code>$push</code> of the ids and a count, <code>$match</code> count above 1, delete all but the first id, then a unique index with a strength-2 collation so the database rejects the next one with E11000."</div>
+  </div>
+</section>

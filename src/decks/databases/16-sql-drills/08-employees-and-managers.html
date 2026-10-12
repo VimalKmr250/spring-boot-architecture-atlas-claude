@@ -1,0 +1,89 @@
+<section class="slide" data-sec="SQL drills" data-title="Employees, managers and the org chart">
+  <h2>Drill: "employees who earn more than their manager", then "print the org chart", then "how many people report to each manager"</h2>
+  <p class="dek">One table, <code>employees(emp_id, name, salary, manager_id)</code>, and three questions of rising difficulty. The first needs a <b>self-join</b>: the same table twice under two aliases, one row for the employee and one for the manager. The second and third need the hierarchy, so a <b>recursive CTE</b> walks it from the root, one level per iteration. The third has a twist: it starts every walk at a manager–employee pair and carries the manager down, so each person is counted once under every manager above them.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">org-chart.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  self-join: employees who earn more than their manager
+SELECT e.name AS employee, e.salary, m.name AS manager, m.salary AS manager_salary
+FROM   employees e
+JOIN   employees m ON m.emp_id = e.manager_id
+WHERE  e.salary &gt; m.salary
+ORDER  BY e.name;
+
+-- 2  recursive CTE: the whole chart, with each person's level and chain of command
+WITH chart (emp_id, name, lvl, chain) AS (
+  SELECT emp_id, name, 1, CAST(name AS VARCHAR2(200)) FROM employees WHERE manager_id IS NULL
+  UNION ALL
+  SELECT e.emp_id, e.name, c.lvl + 1, c.chain || ' &gt; ' || e.name
+  FROM   employees e JOIN chart c ON e.manager_id = c.emp_id
+)
+SELECT LPAD(' ', 2 * (lvl - 1)) || name AS org_chart, lvl FROM chart ORDER BY chain;
+
+-- 3  head count under each manager, direct and indirect
+WITH reports (manager_id, emp_id) AS (
+  SELECT manager_id, emp_id FROM employees WHERE manager_id IS NOT NULL
+  UNION ALL
+  SELECT r.manager_id, e.emp_id FROM reports r JOIN employees e ON e.manager_id = r.emp_id
+)
+SELECT m.name AS manager, COUNT(*) AS total_reports
+FROM   reports r JOIN employees m ON m.emp_id = r.manager_id
+GROUP  BY m.name ORDER BY total_reports DESC, m.name;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · org-chart.ora.sql</div>
+<pre><code class="language-plaintext">EMPLOYEE   SALARY MANAGER      MANAGER_SALARY
+---------- ------ ------------ --------------
+Tom Becker 155000 Ravi Menon           150000
+Wen Li     185000 Lena Fischer         175000
+
+2 rows selected.
+
+ORG_CHART        LVL
+---------------- ---
+Maya Iyer          1
+  Lena Fischer     2
+    Uma Nair       3
+    Victor Chan    3
+    Wen Li         3
+  Omar Haddad      2
+    Ravi Menon     3
+      Tom Becker   4
+    Sara Lopez     3
+  Yara Saleh       2
+    Kai Tanaka     3
+    Zoe Martin     3
+
+12 rows selected.
+
+MANAGER      TOTAL_REPORTS
+------------ -------------
+Maya Iyer               11
+Lena Fischer             3
+Omar Haddad              3
+Yara Saleh               2
+Ravi Menon               1
+
+5 rows selected.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Line</th><th>Oracle 26ai</th><th>SQL Server 2025 (<code>org-chart.mss.sql</code>, same rows)</th></tr></thead>
+      <tbody>
+        <tr><td>Anchor type</td><td><code>CAST(name AS VARCHAR2(200))</code></td><td><code>CAST(name AS NVARCHAR(200))</code>, repeated in the recursive member or error 240</td></tr>
+        <tr><td>Building the path</td><td><code>c.chain || ' &gt; ' || e.name</code></td><td><code>c.chain + N' &gt; ' + e.name</code></td></tr>
+        <tr><td>Indenting</td><td><code>LPAD(' ', 2 * (lvl - 1)) || name</code></td><td><code>REPLICATE(' ', 2 * (lvl - 1)) + name</code></td></tr>
+        <tr><td>Older syntax</td><td><code>CONNECT BY PRIOR emp_id = manager_id</code> with <code>LEVEL</code> <span class="tag w">legacy</span></td><td>None: recursive CTEs only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Complexity</h4><p>The self-join is one lookup per employee by primary key. Each recursive iteration joins one level to <code>employees</code>, so an index on <code>manager_id</code> matters. Query 3 produces one row per manager–descendant pair: 20 here, and up to n² for a deep, narrow tree.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Who has no manager?" <code>manager_id IS NULL</code>. "Managers with no reports?" An anti-join. "Sort siblings by salary?" Ordering by the name path only works while names sort the way you want; build the path from zero-padded sort keys instead. "A bad row makes a cycle?" See <a data-deck="db" data-slide="CTEs and recursive queries">CTEs and recursive queries</a>.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Self-join for one level up. A recursive CTE for anything deeper: the anchor is the root, the recursive member joins children to the previous level, and I carry a level and a path. To count everyone under a manager, I anchor on every manager–report pair and carry the manager down."</div>
+  </div>
+</section>

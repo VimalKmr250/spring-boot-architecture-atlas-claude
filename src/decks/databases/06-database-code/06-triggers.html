@@ -1,0 +1,142 @@
+<section class="slide" data-sec="Database code" data-title="Triggers, and why teams avoid them">
+  <h2>A trigger is code that runs on someone else's statement: invisible to the caller, and easy to write for one row only</h2>
+  <p class="dek">A trigger fires on <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code> and runs inside the same transaction. That makes it a reliable place for audit rows and for derived values: nothing can bypass it. It is also code the application developer never sees. It adds work and locks to every write, and the two engines punish two different mistakes. Oracle row-level triggers may not query the table being changed (ORA-04091, the "mutating table"). SQL Server triggers fire once per statement, so a trigger that assumes one row silently mishandles a multi-row insert.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">triggers.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- keep orders.total in step with order_items, from a row-level trigger
+CREATE OR REPLACE TRIGGER order_items_total_trg
+AFTER INSERT OR UPDATE OR DELETE ON order_items
+FOR EACH ROW
+BEGIN
+  UPDATE orders
+  SET    total = (SELECT SUM(qty * unit_price) FROM order_items WHERE order_id = :NEW.order_id)
+  WHERE  order_id = :NEW.order_id;
+END;
+/
+-- a row trigger may not read the table whose change fired it
+INSERT INTO order_items VALUES (1018, 2, 110, 1, 24.00);
+
+-- a compound trigger collects the ids per row and recalculates once, after the statement
+CREATE OR REPLACE TRIGGER order_items_total_trg
+FOR INSERT OR UPDATE OR DELETE ON order_items
+COMPOUND TRIGGER
+  TYPE id_set IS TABLE OF BOOLEAN INDEX BY PLS_INTEGER;
+  touched id_set;
+  AFTER EACH ROW IS
+  BEGIN
+    touched(NVL(:NEW.order_id, :OLD.order_id)) := TRUE;
+  END AFTER EACH ROW;
+  AFTER STATEMENT IS
+    id PLS_INTEGER := touched.FIRST;
+  BEGIN
+    WHILE id IS NOT NULL LOOP
+      UPDATE orders SET total = (SELECT SUM(qty * unit_price) FROM order_items WHERE order_id = id)
+      WHERE  order_id = id;
+      id := touched.NEXT(id);
+    END LOOP;
+  END AFTER STATEMENT;
+END order_items_total_trg;
+/
+INSERT INTO order_items VALUES (1018, 2, 110, 1, 24.00);
+SELECT order_id, total FROM orders WHERE order_id = 1018;
+ROLLBACK;
+DROP TRIGGER order_items_total_trg;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · triggers.ora.sql</div>
+<pre><code class="language-plaintext">Trigger created.
+
+INSERT INTO order_items VALUES (1018, 2, 110, 1, 24.00)
+            *
+ERROR at line 1:
+ORA-04091: table SHOP.ORDER_ITEMS is mutating, trigger/function may not see it
+ORA-06512: at "SHOP.ORDER_ITEMS_TOTAL_TRG", line 2
+ORA-04088: error during execution of trigger 'SHOP.ORDER_ITEMS_TOTAL_TRG'
+Help: https://docs.oracle.com/error-help/db/ora-04091/
+
+Trigger created.
+
+1 row created.
+
+ORDER_ID TOTAL
+-------- -----
+    1018 83.00
+
+1 row selected.
+
+Rollback complete.
+
+Trigger dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">triggers.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- keep orders.total in step with order_items, written as if one row changes at a time
+CREATE OR ALTER TRIGGER order_items_total_tr ON order_items AFTER INSERT AS
+BEGIN
+  DECLARE @order_id INT = (SELECT TOP (1) order_id FROM inserted);
+  UPDATE orders
+  SET    total = (SELECT SUM(qty * unit_price) FROM order_items WHERE order_id = @order_id)
+  WHERE  order_id = @order_id;
+END;
+GO
+-- one INSERT statement adds lines to two orders: only one total is updated
+BEGIN TRANSACTION;
+INSERT INTO order_items VALUES (1018, 2, 110, 1, 24.00), (1017, 2, 110, 1, 24.00);
+SELECT o.order_id, o.total, SUM(i.qty * i.unit_price) AS from_lines
+FROM   orders o JOIN order_items i ON i.order_id = o.order_id
+WHERE  o.order_id IN (1017, 1018) GROUP BY o.order_id, o.total;
+ROLLBACK;
+GO
+-- set-based: join to the inserted pseudo-table, so every affected order is recalculated
+CREATE OR ALTER TRIGGER order_items_total_tr ON order_items AFTER INSERT AS
+BEGIN
+  UPDATE o
+  SET    total = (SELECT SUM(qty * unit_price) FROM order_items WHERE order_id = o.order_id)
+  FROM   orders o
+  WHERE  o.order_id IN (SELECT order_id FROM inserted);
+END;
+GO
+BEGIN TRANSACTION;
+INSERT INTO order_items VALUES (1018, 2, 110, 1, 24.00), (1017, 2, 110, 1, 24.00);
+SELECT o.order_id, o.total, SUM(i.qty * i.unit_price) AS from_lines
+FROM   orders o JOIN order_items i ON i.order_id = o.order_id
+WHERE  o.order_id IN (1017, 1018) GROUP BY o.order_id, o.total;
+ROLLBACK;
+GO
+DROP TRIGGER order_items_total_tr;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · triggers.mss.sql</div>
+<pre><code class="language-plaintext">(1 rows affected)
+
+(2 rows affected)
+order_id  total from_lines
+-------- ------ ----------
+    1017 113.00     113.00
+    1018  59.00      83.00
+
+(2 rows affected)
+
+(2 rows affected)
+
+(2 rows affected)
+order_id  total from_lines
+-------- ------ ----------
+    1017 113.00     113.00
+    1018  83.00      83.00
+
+(2 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The one-row trigger</span>One <code>INSERT</code> added a line to order 1017 and a line to 1018. The first trigger picked one order id from <code>inserted</code>, so order 1018's total stayed at 59.00 against 83.00 in its lines, with no error. The set-based version joins to <code>inserted</code> and fixes both. In Oracle, the compound trigger collects ids per row and recalculates once per statement.</div>
+    <div class="note warn"><span class="lbl">Hidden cost</span>Triggers run for every write, including bulk loads and migrations. They hold the writer's locks longer, can cascade into other triggers, and disappear from the code the team reads. Avoid business logic in triggers; keep them for audit and simple derived columns, and document them where the application code lives.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"The mutating-table error, ORA-04091, means a row-level trigger read the table it fires on. The fix is a compound trigger, or moving the logic out of the trigger. On SQL Server I always write triggers against the whole <code>inserted</code> and <code>deleted</code> sets, never a single variable."</div>
+  </div>
+</section>

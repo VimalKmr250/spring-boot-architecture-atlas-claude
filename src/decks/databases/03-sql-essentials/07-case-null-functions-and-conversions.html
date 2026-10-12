@@ -1,0 +1,146 @@
+<section class="slide" data-sec="SQL essentials" data-title="CASE, NULL functions and conversions">
+  <h2>COALESCE, NVL and ISNULL all replace a NULL, but they disagree on evaluation and on the result's type</h2>
+  <p class="dek"><code>CASE</code> is SQL's if-then-else, and it works anywhere an expression is allowed: in <code>SELECT</code>, <code>WHERE</code>, <code>ORDER BY</code> and inside aggregates. The NULL functions look interchangeable but are not. <code>COALESCE</code> is standard: it takes any number of arguments, evaluates them only until one is not NULL, and returns the widest of their types. Oracle's <code>NVL</code> evaluates both arguments. SQL Server's <code>ISNULL</code> returns the type of its first argument. Conversions have their own trap: <code>CAST</code> of bad text is an error in both engines, unless you ask for NULL instead.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">functions.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  CASE: the searched form tests any condition; the first true branch wins
+SELECT order_id, total,
+       CASE WHEN total &gt;= 1000 THEN 'large'
+            WHEN total &gt;= 100  THEN 'medium'
+            ELSE 'small' END AS size_band
+FROM   orders
+WHERE  customer_id = 1
+ORDER  BY order_id;
+
+-- 2  NVL evaluates both arguments; COALESCE stops at the first non-NULL
+SELECT COALESCE(1, 1 / 0) AS coalesce_short_circuits FROM dual;
+SELECT NVL(1, 1 / 0) AS nvl_does_not FROM dual;
+
+-- 3  NULLIF turns a zero divisor into NULL instead of an error
+SELECT 100 / NULLIF(0, 0) AS safe_division FROM dual;
+
+-- 4  converting text that may not be a number
+SELECT CAST('42' AS NUMBER)                                  AS good,
+       CAST('4x2' AS NUMBER DEFAULT NULL ON CONVERSION ERROR) AS bad_becomes_null,
+       VALIDATE_CONVERSION('4x2' AS NUMBER)                  AS is_valid
+FROM   dual;
+SELECT CAST('4x2' AS NUMBER) AS fails FROM dual;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · functions.ora.sql</div>
+<pre><code class="language-plaintext">ORDER_ID   TOTAL SIZE_BAND
+-------- ------- ---------
+    1001 1328.90 large
+    1004  138.50 medium
+    1011  748.50 medium
+    1018   59.00 small
+
+4 rows selected.
+
+COALESCE_SHORT_CIRCUITS
+-----------------------
+                      1
+
+1 row selected.
+
+SELECT NVL(1, 1 / 0) AS nvl_does_not FROM dual
+                *
+ERROR at line 1:
+ORA-01476: divisor is equal to zero
+Help: https://docs.oracle.com/error-help/db/ora-01476/
+
+SAFE_DIVISION
+-------------
+(null)
+
+1 row selected.
+
+GOOD BAD_BECOMES_NULL IS_VALID
+---- ---------------- --------
+  42 (null)                  0
+
+1 row selected.
+
+SELECT CAST('4x2' AS NUMBER) AS fails FROM dual
+            *
+ERROR at line 1:
+ORA-01722: unable to convert string value containing 'x' to a number:
+ORA-03302: (ORA-01722 details) invalid string value: 4x2
+Help: https://docs.oracle.com/error-help/db/ora-01722/</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">functions.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- 1  CASE: the searched form tests any condition; the first true branch wins
+SELECT order_id, total,
+       CASE WHEN total &gt;= 1000 THEN 'large'
+            WHEN total &gt;= 100  THEN 'medium'
+            ELSE 'small' END AS size_band
+FROM   orders
+WHERE  customer_id = 1
+ORDER  BY order_id;
+
+-- 2  ISNULL takes the type of its first argument; COALESCE takes the widest
+DECLARE @code VARCHAR(3) = NULL;
+SELECT ISNULL(@code, 'unknown') AS isnull_result, COALESCE(@code, 'unknown') AS coalesce_result;
+
+-- 3  NULLIF turns a zero divisor into NULL instead of an error
+SELECT 100 / NULLIF(0, 0) AS safe_division;
+
+-- 4  converting text that may not be a number
+SELECT CAST('42' AS INT) AS good, TRY_CAST('4x2' AS INT) AS bad_becomes_null;
+SELECT CAST('4x2' AS INT) AS fails;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · functions.mss.sql</div>
+<pre><code class="language-plaintext">order_id   total size_band
+-------- ------- ---------
+    1001 1328.90 large
+    1004  138.50 medium
+    1011  748.50 medium
+    1018   59.00 small
+
+(4 rows affected)
+isnull_result coalesce_result
+------------- ---------------
+unk           unknown
+
+(1 rows affected)
+safe_division
+-------------
+NULL
+
+(1 rows affected)
+good bad_becomes_null
+---- ----------------
+  42 NULL
+
+(1 rows affected)
+Msg 245, Level 16, State 1, Server mssql, Line 19
+Conversion failed when converting the varchar value '4x2' to data type int.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Need</th><th>Oracle</th><th>SQL Server</th><th>Portable</th></tr></thead>
+      <tbody>
+        <tr><td>First non-NULL</td><td><code>NVL(a, b)</code>: evaluates both</td><td><code>ISNULL(a, b)</code>: the type of <code>a</code></td><td><code>COALESCE(a, b, …)</code></td></tr>
+        <tr><td>NULL when equal</td><td colspan="2"><code>NULLIF(a, b)</code>, mostly to avoid division by zero</td><td>Same</td></tr>
+        <tr><td>Text to number, or NULL</td><td><code>CAST(x AS NUMBER DEFAULT NULL ON CONVERSION ERROR)</code> <span class="tag a">12.2</span></td><td><code>TRY_CAST(x AS INT)</code>, <code>TRY_CONVERT</code></td><td>None; validate first</td></tr>
+        <tr><td>Is it convertible?</td><td><code>VALIDATE_CONVERSION(x AS NUMBER)</code></td><td><code>TRY_CAST(…) IS NOT NULL</code></td><td>None</td></tr>
+        <tr><td>Simple value mapping</td><td><code>DECODE(x, 1, 'a', 'b')</code> <span class="tag w">legacy</span></td><td><code>IIF(cond, a, b)</code>, <code>CHOOSE</code></td><td><code>CASE</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">ISNULL truncates</span><code>ISNULL(@code, 'unknown')</code> returned <code>unk</code>: the result took <code>@code</code>'s type, <code>VARCHAR(3)</code>, and the default was cut to fit, with no error. <code>COALESCE</code> returned <code>unknown</code>. Any NULL default of a different length or type should use <code>COALESCE</code>.</div>
+    <div class="note warn"><span class="lbl">NVL is not lazy</span><code>NVL(1, 1 / 0)</code> raised ORA-01476 although the first argument was not NULL, because <code>NVL</code> evaluates both. <code>COALESCE</code> stopped at the 1. It matters when the second argument is expensive, a function call or a scalar subquery, or can fail.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I default to <code>CASE</code> and <code>COALESCE</code> because they are standard and behave the same everywhere. A <code>CASE</code> without <code>ELSE</code> returns NULL for unmatched rows, which matters inside <code>SUM</code> or <code>COUNT</code>. And <code>NULLIF(divisor, 0)</code> is the one-line fix for division by zero."</div>
+  </div>
+</section>

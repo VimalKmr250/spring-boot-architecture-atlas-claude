@@ -1,0 +1,129 @@
+<section class="slide" data-sec="Database code" data-title="Cursors, BULK COLLECT and FORALL">
+  <h2>Row-by-row processing is the slow path in every engine; think in sets, and batch when you cannot</h2>
+  <p class="dek">A <b>cursor</b> walks a result set one row at a time, so procedural code can act on each row. Inside the database that costs a context switch per row, between the PL/SQL or T-SQL engine and the SQL engine; from an application it costs a network round trip per row. Oracle's PL/SQL has a middle way: <code>BULK COLLECT</code> fetches thousands of rows into a collection in one call, and <code>FORALL</code> sends one statement with an array of values. Below, each approach expires the same 50,000 pending orders in a 500,000-row copy, and each run is rolled back.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">bulk.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- expire the 50,000 PENDING orders in a copy of big_orders, three ways
+CREATE TABLE orders_copy AS SELECT * FROM big_orders;
+ALTER TABLE orders_copy ADD CONSTRAINT orders_copy_pk PRIMARY KEY (order_id);
+
+DECLARE
+  t0 PLS_INTEGER;
+  n  PLS_INTEGER;
+  TYPE id_list IS TABLE OF orders_copy.order_id%TYPE;
+  ids id_list;
+  CURSOR pending IS SELECT order_id FROM orders_copy WHERE status = 'PENDING';
+BEGIN
+  -- read the new table once, so the first method timed does not also pay for loading it into the cache
+  SELECT COUNT(*) INTO n FROM orders_copy WHERE status = 'PENDING';
+
+  -- 1  one set-based statement
+  t0 := DBMS_UTILITY.GET_TIME;
+  UPDATE orders_copy SET status = 'EXPIRED' WHERE status = 'PENDING';
+  DBMS_OUTPUT.PUT_LINE('single UPDATE       ' || SQL%ROWCOUNT || ' rows ' || (DBMS_UTILITY.GET_TIME - t0) * 10 || ' ms');
+  ROLLBACK;
+
+  -- 2  BULK COLLECT 10,000 ids at a time, then one FORALL per batch
+  t0 := DBMS_UTILITY.GET_TIME;
+  n := 0;
+  OPEN pending;
+  LOOP
+    FETCH pending BULK COLLECT INTO ids LIMIT 10000;
+    EXIT WHEN ids.COUNT = 0;
+    FORALL i IN 1 .. ids.COUNT
+      UPDATE orders_copy SET status = 'EXPIRED' WHERE order_id = ids(i);
+    n := n + SQL%ROWCOUNT;
+  END LOOP;
+  CLOSE pending;
+  DBMS_OUTPUT.PUT_LINE('BULK COLLECT+FORALL ' || n || ' rows ' || (DBMS_UTILITY.GET_TIME - t0) * 10 || ' ms');
+  ROLLBACK;
+
+  -- 3  row by row: one UPDATE, and one switch from PL/SQL to SQL, per order
+  t0 := DBMS_UTILITY.GET_TIME;
+  n := 0;
+  FOR r IN pending LOOP
+    UPDATE orders_copy SET status = 'EXPIRED' WHERE order_id = r.order_id;
+    n := n + SQL%ROWCOUNT;
+  END LOOP;
+  DBMS_OUTPUT.PUT_LINE('row by row          ' || n || ' rows ' || (DBMS_UTILITY.GET_TIME - t0) * 10 || ' ms');
+  ROLLBACK;
+END;
+/
+DROP TABLE orders_copy PURGE;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · bulk.ora.sql · timings vary by run</div>
+<pre><code class="language-plaintext">Table created.
+
+Table altered.
+
+single UPDATE       50000 rows 200 ms
+BULK COLLECT+FORALL 50000 rows 420 ms
+row by row          50000 rows 760 ms
+
+PL/SQL procedure successfully completed.
+
+Table dropped.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">bulk.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- expire the 50,000 PENDING orders in a copy of big_orders, two ways
+SELECT * INTO orders_copy FROM big_orders;
+ALTER TABLE orders_copy ADD CONSTRAINT orders_copy_pk PRIMARY KEY (order_id);
+SET NOCOUNT ON;
+DECLARE @t0 DATETIME2 = SYSDATETIME(), @id INT, @n INT = 0;
+
+-- 1  one set-based statement
+BEGIN TRANSACTION;
+UPDATE orders_copy SET status = 'EXPIRED' WHERE status = 'PENDING';
+PRINT CONCAT('single UPDATE ', @@ROWCOUNT, ' rows ', DATEDIFF(MILLISECOND, @t0, SYSDATETIME()), ' ms');
+ROLLBACK;
+
+-- 2  a cursor: one UPDATE per row
+SET @t0 = SYSDATETIME();
+BEGIN TRANSACTION;
+DECLARE pending CURSOR LOCAL FAST_FORWARD FOR SELECT order_id FROM orders_copy WHERE status = 'PENDING';
+OPEN pending;
+FETCH NEXT FROM pending INTO @id;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  UPDATE orders_copy SET status = 'EXPIRED' WHERE order_id = @id;
+  SET @n += 1;
+  FETCH NEXT FROM pending INTO @id;
+END;
+CLOSE pending; DEALLOCATE pending;
+PRINT CONCAT('cursor        ', @n, ' rows ', DATEDIFF(MILLISECOND, @t0, SYSDATETIME()), ' ms');
+ROLLBACK;
+
+SET NOCOUNT OFF;
+DROP TABLE orders_copy;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · bulk.mss.sql · timings vary by run</div>
+<pre><code class="language-plaintext">(500000 rows affected)
+single UPDATE 50000 rows 196 ms
+cursor        50000 rows 805 ms</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Approach</th><th>Seven runs on this laptop, the last shown above</th><th>When to use it</th></tr></thead>
+      <tbody>
+        <tr><td>One set-based statement</td><td>Oracle 200–350 ms; SQL Server 180–257 ms</td><td>Always, when the change can be expressed in SQL</td></tr>
+        <tr><td><code>BULK COLLECT</code> + <code>FORALL</code></td><td>Oracle 280–460 ms</td><td>Per-row logic in PL/SQL that cannot be one statement: batch it</td></tr>
+        <tr><td>Cursor, one statement per row</td><td>Oracle 630–1670 ms; SQL Server 767–907 ms</td><td>Rarely: an operation that really is per row, such as calling a procedure for each</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The application version is worse</span>The same loop written in Java, one <code>UPDATE</code> per row through JDBC, adds a network round trip for each of the 50,000 rows. That is the most common performance bug in data access code. Use one statement, or a JDBC batch: see <a data-deck="db" data-slide="JDBC done right">JDBC done right</a>.</div>
+    <div class="note warn"><span class="lbl">Reading the timings</span>The single statement and <code>FORALL</code> were close and traded places once in seven runs; the Oracle script reads the new table once before timing, so the first method does not also pay for loading it. The order of magnitude is the reliable part: per-row loops cost two to five times more in most runs here, once seven times, and the gap grows with network latency.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I avoid cursors: set-based SQL lets the optimiser choose how to process all the rows. In PL/SQL, when I must loop, I use <code>BULK COLLECT … LIMIT</code> with <code>FORALL</code> to cut context switches; in Java, JDBC batching to cut round trips."</div>
+  </div>
+</section>

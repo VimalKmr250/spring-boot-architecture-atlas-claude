@@ -1,0 +1,107 @@
+<section class="slide" data-sec="Orientation" data-title="SQL and NoSQL on one page">
+  <h2>Every slide in the tab, grouped by topic, with the one fact each shows</h2>
+  <p class="dek">Use this as the tab's index. Each link opens the slide; the note beside it is the fact the slide's queries demonstrate, so you can revise from this page alone and open a slide when a fact surprises you.</p>
+
+  <div class="grid3">
+    <div class="card"><h4>Foundations</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Rows and documents: two shapes for one order">Rows and documents</a>: joined on read, or stored as one</li>
+      <li><a data-deck="db" data-slide="The running example">The running example</a>: one shop, its payments, its servers</li>
+      <li><a data-deck="db" data-slide="Numbers, money and time types">Money and time</a>: <code>MONEY</code> made 100 into 99.9999</li>
+      <li><a data-deck="db" data-slide="Strings, Unicode and collation">Strings</a>: <code>''</code> is NULL in Oracle</li>
+      <li><a data-deck="db" data-slide="NULL and three-valued logic">NULL</a>: <code>&lt;&gt; 1</code> counted 3 customers, not 8</li>
+      <li><a data-deck="db" data-slide="Keys and generated ids">Keys</a>: random GUIDs, 99% fragmentation</li>
+      <li><a data-deck="db" data-slide="Constraints as the last line of defence">Constraints</a>: the one check a bug cannot skip</li>
+      <li><a data-deck="db" data-slide="Oracle, SQL Server and MongoDB at a glance">The engines at a glance</a>: where the dialects differ</li>
+    </ul></div>
+    <div class="card"><h4>SQL essentials</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="How a SELECT is evaluated">Evaluation order</a>: <code>FROM</code> first, <code>SELECT</code> late</li>
+      <li><a data-deck="db" data-slide="Filtering, sorting and limiting rows">Limiting</a>: <code>ROWNUM</code> limits before it sorts</li>
+      <li><a data-deck="db" data-slide="Joins, and the outer-join filter trap">Joins</a>: fan-out turned 8,190.70 into 12,748.60</li>
+      <li><a data-deck="db" data-slide="EXISTS, IN, anti-joins and set operators">Anti-joins</a>: one NULL empties <code>NOT IN</code></li>
+      <li><a data-deck="db" data-slide="Grouping and aggregation">Grouping</a>: a column per status in one scan</li>
+      <li><a data-deck="db" data-slide="CTEs and recursive queries">Recursive CTEs</a>: a cycle stops at 100 levels, or ORA-32044</li>
+      <li><a data-deck="db" data-slide="CASE, NULL functions and conversions">NULL functions</a>: <code>ISNULL</code> cut 'unknown' to 'unk'</li>
+      <li><a data-deck="db" data-slide="Dates and times in queries">Dates</a>: a missing month needs a calendar</li>
+    </ul></div>
+    <div class="card"><h4>Relational modelling</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Normalisation, worked on one order">Normalisation</a>: each fact stored once</li>
+      <li><a data-deck="db" data-slide="Denormalising on purpose">Denormalising</a>: 1,299.00 paid, 1,199.00 today</li>
+      <li><a data-deck="db" data-slide="Many-to-many, polymorphism and trees">Trees and many-to-many</a>: relational division for "has both tags"</li>
+      <li><a data-deck="db" data-slide="Modelling money: a double-entry ledger">The ledger</a>: a duplicate capture becomes ORA-00001</li>
+      <li><a data-deck="db" data-slide="History, audit and soft delete">History</a>: temporal tables, Flashback, soft delete</li>
+    </ul></div>
+    <div class="card"><h4>Advanced SQL</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="ROW_NUMBER, RANK and DENSE_RANK">Ranking</a>: the three differ only on ties</li>
+      <li><a data-deck="db" data-slide="Running totals and window frames">Window frames</a>: the default <code>RANGE</code> shares a total</li>
+      <li><a data-deck="db" data-slide="LAG, LEAD, gaps and islands">Gaps and islands</a>: web-2 silent for 5 minutes</li>
+      <li><a data-deck="db" data-slide="MERGE and upserts under concurrency">MERGE</a>: two sessions both insert</li>
+      <li><a data-deck="db" data-slide="Getting generated values back">Generated keys</a>: <code>@@IDENTITY</code> returns a trigger's id</li>
+      <li><a data-deck="db" data-slide="JSON inside Oracle and SQL Server">JSON in SQL</a>: filter, explode and index it</li>
+    </ul></div>
+    <div class="card"><h4>Database code</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="DELETE, TRUNCATE, DROP and chunked deletes">DELETE and TRUNCATE</a>: only SQL Server rolls back a TRUNCATE</li>
+      <li><a data-deck="db" data-slide="Temporary tables, table variables and CTEs">Temporary tables</a>: a table variable ignores ROLLBACK</li>
+      <li><a data-deck="db" data-slide="Procedures, functions and packages">Procedures</a>: which logic belongs there</li>
+      <li><a data-deck="db" data-slide="Cursors, BULK COLLECT and FORALL">Cursors</a>: per-row loops cost two to five times more</li>
+      <li><a data-deck="db" data-slide="Errors and transactions in database code">Errors</a>: without <code>XACT_ABORT</code>, half a transfer commits</li>
+      <li><a data-deck="db" data-slide="Triggers, and why teams avoid them">Triggers</a>: one row handled, the other silently wrong</li>
+      <li><a data-deck="db" data-slide="Views, materialised views and indexed views">Views</a>: staleness or slower writes</li>
+    </ul></div>
+    <div class="card"><h4>Indexes and plans</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Seek, scan and lookup: clustered tables and heaps">Seek and scan</a>: 2,500 lookups lose to 2,639 pages</li>
+      <li><a data-deck="db" data-slide="Composite indexes and column order">Column order</a>: equality first, range last</li>
+      <li><a data-deck="db" data-slide="Covering and filtered indexes">Covering indexes</a>: a forced index cost 7,678 pages</li>
+      <li><a data-deck="db" data-slide="Why the optimiser ignores your index">Sargability</a>: 1,012 pages against 9</li>
+      <li><a data-deck="db" data-slide="Reading an Oracle execution plan">Oracle plans</a>: 2,425 buffers down to 11</li>
+      <li><a data-deck="db" data-slide="Reading a SQL Server execution plan">SQL Server plans</a>: estimate against actual at each step</li>
+      <li><a data-deck="db" data-slide="Bind variables, plan reuse and parameter sniffing">Sniffing</a>: 1,532,419 pages for one call</li>
+      <li><a data-deck="db" data-slide="Pagination: OFFSET against keyset">Paging</a>: page 20,000 in 6 pages, not 1,789</li>
+    </ul></div>
+    <div class="card"><h4>Transactions and locking</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Transaction boundaries: autocommit, DDL and savepoints">Boundaries</a>: Oracle DDL commits your insert</li>
+      <li><a data-deck="db" data-slide="Oracle: readers never block writers">Oracle MVCC</a>: write skew leaves −400</li>
+      <li><a data-deck="db" data-slide="SQL Server: locking, RCSI and SNAPSHOT">SQL Server</a>: <code>NOLOCK</code> read a rolled-back 400</li>
+      <li><a data-deck="db" data-slide="Preventing lost updates in SQL">Lost updates</a>: two withdrawals leave 400, not 300</li>
+      <li><a data-deck="db" data-slide="Deadlocks in Oracle and SQL Server">Deadlocks</a>: ORA-00060 keeps the earlier locks</li>
+      <li><a data-deck="db" data-slide="Work queues with SKIP LOCKED and READPAST">Job queues</a>: no job claimed twice</li>
+    </ul></div>
+    <div class="card"><h4>MongoDB basics and modelling</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Documents, BSON and ObjectId">BSON</a>: typed, ordered, a mandatory <code>_id</code></li>
+      <li><a data-deck="db" data-slide="Finding documents: filters, projections, sorting">Queries</a>: an object where a string belongs is injection</li>
+      <li><a data-deck="db" data-slide="Update operators and upserts">Update operators</a>: a replacement overwrites the rest</li>
+      <li><a data-deck="db" data-slide="Arrays: $elemMatch, positional updates, arrayFilters">Arrays</a>: two conditions, two elements</li>
+      <li><a data-deck="db" data-slide="The aggregation pipeline, with the SQL beside it">The pipeline</a>, <a data-deck="db" data-slide="$lookup, $unwind, $facet and $merge">$lookup and friends</a>, <a data-deck="db" data-slide="Schema validation, Decimal128 and dates">validation</a></li>
+      <li><a data-deck="db" data-slide="Embed or reference">Embed or reference</a>: one document read instead of three</li>
+      <li><a data-deck="db" data-slide="Modelling orders, customers and the catalogue">The shop as documents</a>: one read per page</li>
+      <li><a data-deck="db" data-slide="Schema design patterns">Patterns</a>: write work for cheaper reads</li>
+      <li><a data-deck="db" data-slide="Modelling anti-patterns and the 16 MB limit">16 MB</a>: error 10334 at 15.1 MB</li>
+      <li><a data-deck="db" data-slide="Time-series collections and TTL indexes">Time series</a>: 0.8 MB against 20.1 MB</li>
+    </ul></div>
+    <div class="card"><h4>MongoDB indexing and consistency</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="MongoDB index types">Index types</a>: a partial index of 32 KB</li>
+      <li><a data-deck="db" data-slide="Reading explain and finding slow queries">Explain</a>: 500,000 examined for 25</li>
+      <li><a data-deck="db" data-slide="Compound indexes and the ESR rule">ESR</a>: 20 keys instead of 62,470</li>
+      <li><a data-deck="db" data-slide="Covered queries and range pagination">Covered queries</a>: zero documents examined</li>
+      <li><a data-deck="db" data-slide="Single-document atomicity and conditional updates">Atomic updates</a>: exactly 100 of 400 granted</li>
+      <li><a data-deck="db" data-slide="Multi-document transactions and retries">Transactions</a>: WriteConflict at once, not a wait</li>
+      <li><a data-deck="db" data-slide="Write concern, read concern, read preference">Write concern</a>: a timeout is not a rollback</li>
+      <li><a data-deck="db" data-slide="Sharding and choosing a shard key">Shard keys</a>: 99.5% in one status value</li>
+      <li><a data-deck="db" data-slide="Change streams">Change streams</a>: resume after the last token</li>
+    </ul></div>
+    <div class="card"><h4>Java, Spring and case studies</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="JDBC done right">JDBC</a>: 2,002 round trips at fetch size 10, 22 at 1,000</li>
+      <li><a data-deck="db" data-slide="Dialect traps under JPA and JDBC">Dialect traps</a>: 88 pages per lookup instead of 2</li>
+      <li><a data-deck="db" data-slide="Procedures, ref cursors and exception translation">Exception translation</a>: ORA-00001 and 2627 alike</li>
+      <li><a data-deck="db" data-slide="Spring Data MongoDB repositories">Spring Data MongoDB</a>, <a data-deck="db" data-slide="MongoTemplate: updates, aggregations, transactions">MongoTemplate</a>, <a data-deck="db" data-slide="Testing against real engines with Testcontainers">Testcontainers</a></li>
+      <li><a data-deck="db" data-slide="Oracle, SQL Server or MongoDB for this workload">Choosing</a>: data model first, product second</li>
+      <li><a data-deck="db" data-slide="Evolving a schema in SQL and in MongoDB">Schema evolution</a>: code that tolerates two shapes</li>
+      <li><a data-deck="db" data-slide="Case study: a payment system">Payments</a>, <a data-deck="db" data-slide="Case study: e-commerce orders and inventory">inventory</a>, <a data-deck="db" data-slide="Case study: a metrics and monitoring store">monitoring</a>: dropping a partition wrote 8,120 bytes of redo, not 2.3 MB</li>
+    </ul></div>
+    <div class="card"><h4>Interview prep</h4><ul class="tight">
+      <li><a data-deck="db" data-slide="Q1–3 · SQL fundamentals">Questions 1–30</a>, three per slide</li>
+      <li><a data-deck="db" data-slide="How to answer a SQL coding question">SQL drills</a> and <a data-deck="db" data-slide="How to answer a MongoDB query question">MongoDB drills</a>: how to answer</li>
+      <li><a data-deck="db" data-slide="Question shape to SQL">Question shape to SQL</a> and <a data-deck="db" data-slide="Question shape to pipeline stage">to pipeline stage</a></li>
+      <li><a data-deck="db" data-slide="Oracle, SQL Server and MongoDB syntax side by side">Syntax side by side</a>, <a data-deck="db" data-slide="Red flags in database answers">red flags</a>, <a data-deck="db" data-slide="Study plan and further reading">study plan</a></li>
+    </ul></div>
+  </div>
+</section>

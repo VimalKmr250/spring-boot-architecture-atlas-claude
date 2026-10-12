@@ -1,0 +1,79 @@
+<section class="slide" data-sec="Advanced SQL" data-title="Running totals and window frames">
+  <h2>A running total with ORDER BY alone uses a RANGE frame, so rows with the same timestamp share one total</h2>
+  <p class="dek">Aggregate functions become window functions with <code>OVER</code>. Add <code>ORDER BY</code> and each row aggregates a <b>frame</b>: the rows from the start of the partition up to this one. The trap is the default frame, which the standard defines as <code>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code>. RANGE means "up to this row's <i>value</i>", so it includes every peer with the same sort value. In a wallet where two movements share a second, both rows show the balance after both. An explicit <code>ROWS</code> frame, with a unique tie-breaker in the sort, gives each row its own total.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 175" role="img" aria-label="Five wallet movements in time order: 09:00 plus 500, 09:05 minus 120, 09:05 minus 30, 09:20 minus 45.50 and 10:00 plus 200. For move 2, the default RANGE frame reaches up to every row with timestamp 09:05, so it includes move 3 and shows 350. A ROWS frame stops at move 2 itself and shows 380. A ROWS frame of 2 preceding rows and the current row covers moves 2 to 4 when computing the moving average at move 4.">
+        <g font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor">
+          <rect x="20" y="40" width="150" height="44" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="32" y="58">1  09:00</text><text x="32" y="75">+500.00</text>
+          <rect x="195" y="40" width="150" height="44" rx="6" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect><text x="207" y="58">2  09:05</text><text x="207" y="75">−120.00</text>
+          <rect x="370" y="40" width="150" height="44" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="382" y="58">3  09:05</text><text x="382" y="75">−30.00</text>
+          <rect x="545" y="40" width="150" height="44" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="557" y="58">4  09:20</text><text x="557" y="75">−45.50</text>
+          <rect x="720" y="40" width="150" height="44" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect><text x="732" y="58">5  10:00</text><text x="732" y="75">+200.00</text>
+        </g>
+        <line x1="20" y1="104" x2="520" y2="104" stroke="#D26A3F" stroke-width="2"></line>
+        <text x="20" y="120" font-size="10.5" fill="currentColor">default RANGE frame for row 2: up to every row stamped 09:05, so it reads 350.00</text>
+        <line x1="20" y1="136" x2="345" y2="136" stroke="#3AA79B" stroke-width="2"></line>
+        <text x="20" y="152" font-size="10.5" fill="currentColor">ROWS frame for row 2: stops at row 2 itself, so 380.00</text>
+        <line x1="195" y1="28" x2="695" y2="28" stroke="currentColor" stroke-opacity="0.5" stroke-width="2"></line>
+        <text x="445" y="20" text-anchor="middle" font-size="10.5" fill="currentColor">ROWS BETWEEN 2 PRECEDING AND CURRENT ROW, at row 4: average of rows 2 to 4 = −65.17</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">frames.mss.sql · SQL Server 2025 (frames.ora.sql differs only in its DDL and timestamp literals)</div>
+<pre><code class="language-sql">-- a wallet's movements; two arrive in the same second
+CREATE TABLE wallet_moves (move_id INT PRIMARY KEY, moved_at DATETIME2(0) NOT NULL, amount DECIMAL(10,2) NOT NULL);
+INSERT INTO wallet_moves VALUES (1, '2026-03-01 09:00:00',  500.00),
+                                (2, '2026-03-01 09:05:00', -120.00),
+                                (3, '2026-03-01 09:05:00',  -30.00),
+                                (4, '2026-03-01 09:20:00',  -45.50),
+                                (5, '2026-03-01 10:00:00',  200.00);
+
+SELECT move_id, moved_at, amount,
+       SUM(amount) OVER (ORDER BY moved_at)                         AS default_frame,
+       SUM(amount) OVER (ORDER BY moved_at, move_id
+                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total,
+       AVG(amount) OVER (ORDER BY moved_at, move_id
+                         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)  AS moving_avg_3,
+       SUM(amount) OVER ()                                           AS grand_total
+FROM   wallet_moves
+ORDER  BY moved_at, move_id;
+DROP TABLE wallet_moves;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on SQL Server 2025 · frames.mss.sql</div>
+<pre><code class="language-plaintext">(5 rows affected)
+move_id moved_at             amount default_frame running_total moving_avg_3 grand_total
+------- ------------------- ------- ------------- ------------- ------------ -----------
+      1 2026-03-01 09:00:00  500.00        500.00        500.00   500.000000      504.50
+      2 2026-03-01 09:05:00 -120.00        350.00        380.00   190.000000      504.50
+      3 2026-03-01 09:05:00  -30.00        350.00        350.00   116.666666      504.50
+      4 2026-03-01 09:20:00  -45.50        304.50        304.50   -65.166666      504.50
+      5 2026-03-01 10:00:00  200.00        504.50        504.50    41.500000      504.50
+
+(5 rows affected)</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · frames.ora.sql (excerpt: the result)</div>
+<pre><code class="language-plaintext">MOVE_ID MOVED_AT             AMOUNT DEFAULT_FRAME RUNNING_TOTAL MOVING_AVG_3 GRAND_TOTAL
+------- ------------------- ------- ------------- ------------- ------------ -----------
+      1 2026-03-01 09:00:00  500.00        500.00        500.00       500.00      504.50
+      2 2026-03-01 09:05:00 -120.00        350.00        380.00       190.00      504.50
+      3 2026-03-01 09:05:00  -30.00        350.00        350.00       116.67      504.50
+      4 2026-03-01 09:20:00  -45.50        304.50        304.50       -65.17      504.50
+      5 2026-03-01 10:00:00  200.00        504.50        504.50        41.50      504.50</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The default frame</span>Rows 2 and 3 both show 350.00 under <code>default_frame</code>. A statement printed from it would never show the 380.00 balance that existed between the two movements, and a "balance went negative" check could miss a real dip. Write the frame explicitly whenever you write <code>ORDER BY</code> inside <code>OVER</code>.</div>
+    <div class="note warn"><span class="lbl">Same maths, different scale</span>SQL Server averaged <code>DECIMAL(10,2)</code> values to six decimal places, truncating: 116.666666. Oracle's <code>NUMBER</code> kept full precision, and the column format rounded it to 116.67 for display. Round explicitly when the result is shown to a person or compared.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"<code>SUM(amount) OVER (PARTITION BY account ORDER BY moved_at, move_id ROWS UNBOUNDED PRECEDING)</code> is a running balance in one pass, with no self-join. <code>ROWS</code> counts rows; <code>RANGE</code> compares values." Oracle accepts <code>RANGE BETWEEN INTERVAL '7' DAY PRECEDING AND CURRENT ROW</code> for a true 7-day window; SQL Server allows <code>RANGE</code> only with <code>UNBOUNDED</code> and <code>CURRENT ROW</code>.</div>
+  </div>
+</section>

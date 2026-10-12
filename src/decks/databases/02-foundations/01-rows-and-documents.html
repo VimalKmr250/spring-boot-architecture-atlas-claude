@@ -1,0 +1,150 @@
+<section class="slide" data-sec="Foundations" data-title="Rows and documents: two shapes for one order">
+  <h2>A relational database splits an order into rows and joins them on read; a document database stores the order as one document</h2>
+  <p class="dek">Both models hold the same facts; they differ in where the work happens. A relational schema is <b>normalised</b>: each fact lives in one row of one table, and a query joins the tables back together. Any question can be asked later, and updating a product's name touches one row. A document schema is shaped by the <b>access pattern</b>. The order and its lines are read and written together, so they are stored together, and the common read is a single lookup. Questions that cut across documents need more work or another shape.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Order 1001 in two shapes. On the left, four relational tables: orders holds order 1001 for customer 1, status PAID, total 1328.90; customers holds customer 1, Asha Rao; order_items holds two lines for order 1001, products 101 and 103; products holds 101, the Aero 14 Laptop at 1299.00, and 103, the Quiet Mouse at 29.90. Foreign keys link order_items to orders and products, and orders to customers. On the right, one MongoDB document with _id 1001, an embedded customer snapshot with id and name, the status, the placed time, an items array holding both lines with sku, quantity and unit price copied in, and the total.">
+        <text x="20" y="20" font-size="12" font-weight="600" fill="currentColor">Relational: four tables, joined when read</text>
+        <text x="510" y="20" font-size="12" font-weight="600" fill="currentColor">Document: one document, read in one lookup</text>
+
+        <rect x="20" y="40" width="210" height="72" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <line x1="20" y1="60" x2="230" y2="60" stroke="#D26A3F" stroke-opacity="0.7"></line>
+        <text x="125" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">orders</text>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="28" y="78">1001  cust 1  PAID</text><text x="28" y="96">total 1328.90</text></g>
+
+        <rect x="265" y="40" width="200" height="72" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <line x1="265" y1="60" x2="465" y2="60" stroke="currentColor" stroke-opacity="0.45"></line>
+        <text x="365" y="54" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">customers</text>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="273" y="78">1  Asha Rao  IN</text><text x="273" y="96" opacity="0.6">… 9 more rows</text></g>
+
+        <rect x="20" y="150" width="210" height="90" rx="5" fill="#D26A3F" fill-opacity="0.10" stroke="#D26A3F" stroke-width="1.4"></rect>
+        <line x1="20" y1="170" x2="230" y2="170" stroke="#D26A3F" stroke-opacity="0.7"></line>
+        <text x="125" y="164" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">order_items</text>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="28" y="188">1001  line 1  prod 101  x1</text><text x="28" y="206">1001  line 2  prod 103  x1</text><text x="28" y="226" opacity="0.6">unit_price copied in</text></g>
+
+        <rect x="265" y="150" width="200" height="90" rx="5" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+        <line x1="265" y1="170" x2="465" y2="170" stroke="currentColor" stroke-opacity="0.45"></line>
+        <text x="365" y="164" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor">products</text>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace"><text x="273" y="188">101  Aero 14 Laptop</text><text x="273" y="206">103  Quiet Mouse</text><text x="273" y="226" opacity="0.6">… 10 more rows</text></g>
+
+        <line x1="230" y1="76" x2="263" y2="76" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="125" y1="150" x2="125" y2="114" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <line x1="230" y1="196" x2="263" y2="196" stroke="#8A94A3" stroke-width="1.3" marker-end="url(#arw)"></line>
+        <text x="20" y="268" font-size="10" fill="currentColor" opacity="0.75">Arrows are foreign keys. Reading order 1001 joins three tables;</text>
+        <text x="20" y="282" font-size="10" fill="currentColor" opacity="0.75">renaming a product changes one row, and every order sees it.</text>
+
+        <rect x="510" y="32" width="372" height="226" rx="6" fill="#3AA79B" fill-opacity="0.07" stroke="#3AA79B" stroke-width="1.4"></rect>
+        <g font-size="10.5" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <text x="524" y="54">{ _id: 1001,</text>
+          <text x="536.6" y="72">customer: { id: 1, name: 'Asha Rao' },</text>
+          <text x="536.6" y="90">status: 'PAID',</text>
+          <text x="536.6" y="108">placedAt: ISODate('2026-01-05T09:12Z'),</text>
+          <text x="536.6" y="126">items: [</text>
+          <text x="549.2" y="144">{ productId: 101, sku: 'LAP-14',</text>
+          <text x="561.8" y="160">qty: 1, unitPrice: 1299.00 },</text>
+          <text x="549.2" y="178">{ productId: 103, sku: 'ACC-MSE',</text>
+          <text x="561.8" y="194">qty: 1, unitPrice: 29.90 } ],</text>
+          <text x="536.6" y="212">total: 1328.90 }</text>
+        </g>
+        <rect x="544" y="132" width="290" height="68" rx="4" fill="none" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3"></rect>
+        <text x="524" y="244" font-size="10" fill="currentColor" opacity="0.75">Lines live inside the order. The customer's name is a snapshot.</text>
+        <text x="524" y="276" font-size="10" fill="currentColor" opacity="0.75">Read: one lookup by _id. Write: one atomic document update.</text>
+      </svg>
+    </div>
+    <figcaption>Copper marks where the order's lines live: a separate table on the left, an embedded array on the right. The document copies what the order needs (the customer's name, each line's sku and price) and keeps ids for the rest.</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">one-order.sql · runs on Oracle 26ai and SQL Server 2025</div>
+<pre><code class="language-sql">-- order 1001 is spread over three tables; a join puts it back together
+SELECT o.order_id, o.status, i.line_no, p.sku, i.qty, i.unit_price
+FROM   orders o
+JOIN   order_items i ON i.order_id = o.order_id
+JOIN   products p    ON p.product_id = i.product_id
+WHERE  o.order_id = 1001
+ORDER  BY i.line_no;</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · one-order.sql</div>
+<pre><code class="language-plaintext">ORDER_ID STATUS LINE_NO SKU     QTY UNIT_PRICE
+-------- ------ ------- ------- --- ----------
+    1001 PAID         1 LAP-14    1    1299.00
+    1001 PAID         2 ACC-MSE   1      29.90
+
+2 rows selected.</code></pre>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">one-order.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// order 1001 is one document: the lines are inside it
+printjson(db.orders.findOne({ _id: 1001 }));</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · one-order.js</div>
+<pre><code class="language-plaintext">{
+  _id: 1001,
+  customer: {
+    id: 1,
+    name: 'Asha Rao'
+  },
+  status: 'PAID',
+  placedAt: ISODate('2026-01-05T09:12:00.000Z'),
+  items: [
+    {
+      productId: 101,
+      sku: 'LAP-14',
+      name: 'Aero 14 Laptop',
+      qty: 1,
+      unitPrice: Decimal128('1299.00')
+    },
+    {
+      productId: 103,
+      sku: 'ACC-MSE',
+      name: 'Quiet Mouse',
+      qty: 1,
+      unitPrice: Decimal128('29.90')
+    }
+  ],
+  total: Decimal128('1328.90'),
+  currency: 'USD'
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="tblwrap">
+      <table class="tbl" style="min-width:0">
+        <thead><tr><th>Relational</th><th>MongoDB</th></tr></thead>
+        <tbody>
+          <tr><td>Database, schema</td><td>Database</td></tr>
+          <tr><td>Table</td><td>Collection</td></tr>
+          <tr><td>Row</td><td>Document (BSON, up to 16 MB)</td></tr>
+          <tr><td>Column</td><td>Field, which may hold an object or an array</td></tr>
+          <tr><td>Primary key</td><td><code>_id</code>, always present and unique</td></tr>
+          <tr><td>Foreign key and join</td><td>Embedding, or a stored id plus <code>$lookup</code>; nothing enforces the reference</td></tr>
+          <tr><td>Index, view, transaction</td><td>Index, view, transaction (since 4.0)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>The four families of SQL statements</h3>
+      <dl class="kv" style="margin-top:10px">
+        <dt>DDL</dt><dd>Definition: <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>TRUNCATE</code>. In Oracle each DDL statement commits first; in SQL Server DDL can be rolled back.</dd>
+        <dt>DML</dt><dd>Manipulation: <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>MERGE</code>.</dd>
+        <dt>DCL</dt><dd>Control: <code>GRANT</code>, <code>REVOKE</code>. A DBA's tool, but know the word.</dd>
+        <dt>TCL</dt><dd>Transaction control: <code>COMMIT</code>, <code>ROLLBACK</code>, <code>SAVEPOINT</code>.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The wrong reason to pick documents</span>"No schema" is not a feature. The schema still exists in the code that reads the data, and every old document shape must still be handled years later. Choose documents because the data is read and written as a unit. Flexibility is a side effect.</div>
+    <div class="note good"><span class="lbl">When rows win</span>Many-to-many relationships, ad-hoc reporting across entities, and facts shared by many parents, such as a product's current price. Normalised tables answer questions nobody planned for.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Relational modelling starts from the data and normalises it; document modelling starts from the queries and embeds what is read together. Both can be right for one system: orders in documents, the ledger in tables." Choosing between them is in <a data-deck="db" data-slide="Oracle, SQL Server or MongoDB for this workload">the case-studies section</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,122 @@
+<section class="slide" data-sec="Transactions and locking" data-title="SQL Server: locking, RCSI and SNAPSHOT">
+  <h2>By default SQL Server's readers wait for writers; one database setting gives it Oracle-style versioned reads</h2>
+  <p class="dek">SQL Server's default READ COMMITTED is implemented with <b>locks</b>: a reader takes a shared lock on each row it reads, and must wait while a writer holds an exclusive lock on that row. That is why a long update can stall every report touching the same rows, and why <code>WITH (NOLOCK)</code> is sprinkled through so many codebases. Row versioning is the real fix. <code>READ_COMMITTED_SNAPSHOT</code> (RCSI) makes READ COMMITTED read the last committed version, kept in the version store, instead of waiting. <code>ALLOW_SNAPSHOT_ISOLATION</code> adds a SNAPSHOT level that reads one snapshot for the whole transaction.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">SqlServerReads.java · mssql-jdbc 13.4.0</div>
+<pre><code class="language-java">import java.sql.*;
+
+/** SQL Server's default locking reads, NOLOCK, and the two row-versioning alternatives. */
+public class SqlServerReads {
+    static final String URL = "jdbc:sqlserver://localhost:1433;databaseName=shop;encrypt=false";
+
+    public static void main(String[] args) throws Exception {
+        try (Connection a = open(); Connection b = open()) {
+            reset(a);
+            update(b, "SET LOCK_TIMEOUT 1000");                       // B gives up on a lock after 1 second
+
+            // 1  default READ COMMITTED takes shared locks: B's read waits for A's uncommitted write
+            update(a, "UPDATE accounts SET balance = 400 WHERE account_id = 1");
+            try {
+                balance(b, "");
+            } catch (SQLException e) {
+                System.out.println("1 locking READ COMMITTED: B's read failed: " + e.getMessage());
+            }
+
+            // 2  NOLOCK reads uncommitted data, which A then rolls back
+            long dirty = balance(b, " WITH (NOLOCK)");
+            a.rollback();
+            System.out.printf("2 NOLOCK: B read %d; A rolled back, so the balance is %d%n", dirty, balance(b, ""));
+            b.commit();
+        }
+
+        // switch on row versioning (needs a moment with no other open transactions)
+        admin("ALTER DATABASE shop SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE");
+        admin("ALTER DATABASE shop SET ALLOW_SNAPSHOT_ISOLATION ON");
+        try (Connection a = open(); Connection b = open()) {
+            // 3  READ_COMMITTED_SNAPSHOT: the same read returns the last committed version, without waiting
+            update(a, "UPDATE accounts SET balance = 400 WHERE account_id = 1");
+            System.out.printf("3 RCSI: A wrote 400, not committed; B reads %d without waiting%n", balance(b, ""));
+            a.commit();
+            b.commit();
+
+            // 4  SNAPSHOT: a transaction-wide snapshot, and an error if B updates a row A changed meanwhile
+            b.setTransactionIsolation(SQLServerSnapshot.LEVEL);
+            long first = balance(b, "");
+            update(a, "UPDATE accounts SET balance = 300 WHERE account_id = 1"); a.commit();
+            System.out.printf("4 SNAPSHOT: B reads %d, A commits 300, B reads %d%n", first, balance(b, ""));
+            try {
+                update(b, "UPDATE accounts SET balance = balance - 50 WHERE account_id = 1");
+            } catch (SQLException e) {
+                System.out.println("  B updates the row A changed: " + e.getErrorCode() + " " + e.getMessage().lines().findFirst().orElse(""));
+            }
+            b.rollback();
+            reset(a);
+        }
+        admin("ALTER DATABASE shop SET ALLOW_SNAPSHOT_ISOLATION OFF");
+        admin("ALTER DATABASE shop SET READ_COMMITTED_SNAPSHOT OFF WITH ROLLBACK IMMEDIATE");
+    }
+
+    /** The JDBC constant for SQL Server's SNAPSHOT level is driver-specific. */
+    static final class SQLServerSnapshot { static final int LEVEL = 4096; }
+
+    static Connection open() throws SQLException {
+        Connection c = DriverManager.getConnection(URL, "sa", "Atlas_pw1!");
+        c.setAutoCommit(false);
+        return c;
+    }
+
+    static void admin(String sql) throws SQLException {
+        try (Connection c = DriverManager.getConnection(URL, "sa", "Atlas_pw1!"); Statement s = c.createStatement()) {
+            s.execute(sql);
+        }
+    }
+
+    static void reset(Connection c) throws SQLException {
+        update(c, "UPDATE accounts SET balance = CASE account_id WHEN 1 THEN 500 ELSE 300 END WHERE account_id IN (1, 2)");
+        c.commit();
+    }
+
+    static long balance(Connection c, String hint) throws SQLException {
+        try (Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT balance FROM accounts" + hint + " WHERE account_id = 1")) {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    static void update(Connection c, String sql) throws SQLException {
+        try (Statement s = c.createStatement()) { s.executeUpdate(sql); }
+    }
+}</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on JDK 25 · SqlServerReads.java</div>
+<pre><code class="language-plaintext">1 locking READ COMMITTED: B's read failed: An error occurred during the current command (Done status 0). Lock request time out period exceeded.
+2 NOLOCK: B read 400; A rolled back, so the balance is 500
+3 RCSI: A wrote 400, not committed; B reads 500 without waiting
+4 SNAPSHOT: B reads 400, A commits 300, B reads 400
+  B updates the row A changed: 3960 Snapshot isolation transaction aborted due to update conflict. You cannot use snapshot isolation to access table 'dbo.accounts' directly or indirectly in database 'shop' to update, delete, or insert the row that has been modified or deleted by another transaction. Retry the transaction or change the isolation level for the update/delete statement.</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Level</th><th>Reader meets an uncommitted write</th></tr></thead>
+          <tbody>
+            <tr><td>READ COMMITTED, locking (default)</td><td>Waits; step 1 gave up after 1 s with error 1222</td></tr>
+            <tr><td><code>NOLOCK</code> / READ UNCOMMITTED</td><td>Reads it: 400, a value that was then rolled back</td></tr>
+            <tr><td>READ COMMITTED with RCSI</td><td>Reads the last committed version: 500, at once</td></tr>
+            <tr><td>SNAPSHOT</td><td>Reads as of its transaction's start; error 3960 if it then updates a row changed since</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">NOLOCK is not a performance hint</span>It reads uncommitted data: step 2 saw a balance that never existed. During page splits it can also skip rows or read them twice. Reports built on <code>NOLOCK</code> are occasionally wrong in ways nobody can reproduce. If readers wait on writers, enable RCSI.</div>
+    <div class="note warn"><span class="lbl">What RCSI costs</span>Versions live in <code>tempdb</code>, or in the database itself with accelerated database recovery, and each changed row carries 14 bytes of versioning information. Code that relied on blocking to serialise work, such as reading a value and then updating it, loses that protection. Use <code>UPDLOCK</code>, as on <a data-deck="db" data-slide="Preventing lost updates in SQL">Preventing lost updates</a>. SQL Server 2025's optimized locking, which holds fewer row locks per transaction, builds on the same versioning.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Default SQL Server READ COMMITTED blocks readers behind writers. I would enable READ_COMMITTED_SNAPSHOT, as Azure SQL Database does by default, and use SNAPSHOT for long consistent reports, handling error 3960 as a retry. I would not use NOLOCK for anything that must be correct."</div>
+  </div>
+</section>

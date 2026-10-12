@@ -1,0 +1,61 @@
+<section class="slide" data-sec="MongoDB consistency" data-title="Change streams">
+  <h2>A change stream delivers every committed change as an event, and a resume token lets a consumer continue exactly where it stopped</h2>
+  <p class="dek">A <b>change stream</b> is a cursor on the replica set's operation log, filtered and shaped with an aggregation pipeline. An application can react to inserts, updates and deletes: publish an event when an order's status changes, refresh a cache, feed a search index. Each event carries a <b>resume token</b>. A consumer that stores the token of the last event it handled can restart with <code>resumeAfter</code> and receive everything since, as long as the oplog still holds it. It is change data capture without a separate tool.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">change-streams.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// open a change stream on orders, for status changes only, then make some changes
+const stream = db.orders.watch(
+  [{ $match: { operationType: 'update', 'updateDescription.updatedFields.status': { $exists: true } } }],
+  { fullDocument: 'updateLookup' });
+
+db.orders.updateOne({ _id: 1015 }, { $set: { status: 'PAID' } });
+db.orders.updateOne({ _id: 1015 }, { $set: { note: 'gift wrap' } });          // not a status change: filtered out
+db.orders.updateOne({ _id: 1018 }, { $set: { status: 'CANCELLED' } });
+
+let event, resumeToken;
+while ((event = stream.tryNext()) !== null) {
+  print(event.operationType, event.documentKey._id, '-&gt;', event.updateDescription.updatedFields.status,
+        '| customer', event.fullDocument.customer.name);
+  resumeToken = event._id;
+}
+stream.close();
+
+// a consumer that restarts resumes after the last event it processed: nothing is lost in between
+db.orders.updateOne({ _id: 1015 }, { $set: { status: 'SHIPPED' } });
+const resumed = db.orders.watch([{ $match: { operationType: 'update' } }], { resumeAfter: resumeToken });
+print('after resume:', resumed.tryNext().updateDescription.updatedFields.status);
+resumed.close();
+
+// put the orders back for the other slides
+db.orders.updateOne({ _id: 1015 }, { $set: { status: 'PENDING' }, $unset: { note: '' } });
+db.orders.updateOne({ _id: 1018 }, { $set: { status: 'PENDING' } });</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · change-streams.js</div>
+<pre><code class="language-plaintext">update 1015 -&gt; PAID | customer Chen Wei
+update 1018 -&gt; CANCELLED | customer Asha Rao
+after resume: SHIPPED</code></pre>
+      </div>
+      <div class="tblwrap">
+        <table class="tbl" style="min-width:0">
+          <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td>A <code>$match</code> stage</td><td>Only the events you want: the note-only update was filtered out</td></tr>
+            <tr><td><code>fullDocument: 'updateLookup'</code></td><td>Adds the current document, here for the customer's name</td></tr>
+            <tr><td><code>resumeAfter</code> / <code>startAfter</code></td><td>Continue after a stored token</td></tr>
+            <tr><td><code>fullDocumentBeforeChange</code> <span class="tag a">6.0</span></td><td>The document as it was before the change, if the collection keeps pre-images</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Store the token after the work</span>A consumer that saves the resume token before processing the event loses that event if it crashes in between. One that saves it after may process the event twice. So make the handler idempotent, and save the token after each event or each batch.</div>
+    <div class="note warn"><span class="lbl">The oplog is a window</span>The oplog is capped by size or retention time. A consumer that is down for longer than that window cannot resume and must rebuild from a full read. Size the oplog for your longest expected outage, and monitor the consumer's lag.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Change streams give ordered, resumable change events from the oplog, filtered with a pipeline. I use them as an outbox: write the order, and a consumer publishes the event, with the resume token stored after each event so a restart neither loses nor skips anything." Compare <a data-deck="ed" data-slide="Outbox and CDC">Outbox and CDC</a>.</div>
+  </div>
+</section>

@@ -1,0 +1,56 @@
+<section class="slide" data-sec="MongoDB indexing" data-title="Compound indexes and the ESR rule">
+  <h2>Order compound index fields as Equality, Sort, Range, and the newest 20 orders cost 20 index keys instead of 62,470</h2>
+  <p class="dek">MongoDB's guideline for compound indexes has a name: <b>ESR</b>. Fields tested for <b>equality</b> come first, because each value is one contiguous slice of the index. The <b>sort</b> field comes next, so that within the slice the index is already in the requested order. <b>Range</b> conditions come last, filtering entries as they are read. With that order, <code>limit(20)</code> stops after 20 matching entries. Put the range before the sort, and every entry in the range must be read and sorted in memory before the first 20 are known. It is the same reasoning as <a data-deck="db" data-slide="Composite indexes and column order">SQL's column order</a>, extended to sorting.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 150" role="img" aria-label="Index status, placedAt descending, total. The SHIPPED slice is sorted newest first. Reading from its start, each entry is checked for total above 400, and the scan stops after 20 matches: 20 keys. Index status, total, placedAt. The SHIPPED slice is sorted by total; every entry with total above 400 must be read, 62,470 keys, then sorted by date in memory to find the newest 20.">
+        <g font-size="10.5" fill="currentColor">
+          <text x="20" y="22" font-weight="600">E, S, R: status, placedAt desc, total</text>
+          <rect x="20" y="32" width="90" height="28" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="65" y="50" text-anchor="middle" font-family="IBM Plex Mono, monospace">other statuses</text>
+          <rect x="110" y="32" width="60" height="28" fill="#3AA79B" fill-opacity="0.25" stroke="#3AA79B" stroke-width="1.4"></rect><text x="140" y="50" text-anchor="middle" font-family="IBM Plex Mono, monospace">first 20</text>
+          <rect x="170" y="32" width="300" height="28" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="320" y="50" text-anchor="middle" font-family="IBM Plex Mono, monospace">rest of SHIPPED, newest first: never read</text>
+          <text x="490" y="50">read 20 keys, stop: already in date order</text>
+          <text x="20" y="92" font-weight="600">E, R, S: status, total, placedAt desc</text>
+          <rect x="20" y="102" width="90" height="28" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="65" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace">other statuses</text>
+          <rect x="110" y="102" width="160" height="28" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.35"></rect><text x="190" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace">SHIPPED, total ≤ 400</text>
+          <rect x="270" y="102" width="200" height="28" fill="#D26A3F" fill-opacity="0.18" stroke="#D26A3F" stroke-width="1.4"></rect><text x="370" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace">total &gt; 400: 62,470 keys</text>
+          <text x="490" y="120">read them all, SORT in memory, keep 20</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">esr.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// newest 20 SHIPPED orders over 400: an Equality, a Sort and a Range in one query
+const query = () =&gt; db.big_orders.find({ status: 'SHIPPED', total: { $gt: Decimal128('400') } })
+                                 .sort({ placedAt: -1 }).limit(20);
+const report = (label, ex) =&gt; print(label.padEnd(26), stages(ex).padEnd(56),
+  'keys', String(ex.executionStats.totalKeysExamined).padStart(6), '| docs', String(ex.executionStats.totalDocsExamined).padStart(6));
+const indexes = [
+  ['E, S, R  status, placedAt, total', { status: 1, placedAt: -1, total: 1 }],
+  ['E, R, S  status, total, placedAt', { status: 1, total: 1, placedAt: -1 }],
+  ['R, E, S  total, status, placedAt', { total: 1, status: 1, placedAt: -1 }]
+];
+for (const [label, keys] of indexes) {
+  db.big_orders.createIndex(keys, { name: 'esr_test' });
+  report(label.slice(0, 8), query().hint('esr_test').explain('executionStats'));
+  db.big_orders.dropIndex('esr_test');
+}</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on MongoDB 8.3 · esr.js</div>
+<pre><code class="language-plaintext">E, S, R                    LIMIT &gt; FETCH &gt; IXSCAN esr_test                          keys     20 | docs     20
+E, R, S                    FETCH &gt; SORT &gt; IXSCAN esr_test                           keys  62470 | docs     20
+R, E, S                    FETCH &gt; SORT &gt; IXSCAN esr_test                           keys  66722 | docs     20</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">The in-memory SORT</span>Both other orders produced a <code>SORT</code> stage: every matching key was read, 62,470 or 66,722, and sorted, all to return 20 documents. A blocking sort is limited to 100 MB of memory before it spills to disk, and it grows with the data, so a page that is fast at launch slows down every month.</div>
+    <div class="note warn"><span class="lbl">Equality on arrays and $in</span><code>$in</code> with a few values behaves like several equalities: the planner can merge the sorted slices. With many values it acts more like a range. Check with <code>explain</code> whether a <code>SORT</code> stage appears.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"ESR: equality fields first, then the sort field, then ranges. It lets a limited, sorted query stop after N index keys with no in-memory sort. I verify with explain: no <code>SORT</code> stage, and keys examined close to the limit."</div>
+  </div>
+</section>

@@ -1,0 +1,135 @@
+<section class="slide" data-sec="SQL drills" data-title="Find and delete duplicate rows">
+  <h2>Drill: "the table has duplicate emails: find them, delete all but one, and make sure it never happens again"</h2>
+  <p class="dek">Three parts, and each one has a trap. <b>Find</b>: duplicates are defined by a normalised key, here the lower-cased email, not the raw column. <b>Delete</b>: number the copies with <code>ROW_NUMBER</code> partitioned by that key, ordered by which one to keep, here the earliest sign-up, and delete those numbered above 1. <b>Prevent</b>: a unique index on the same normalised key. Without that third step the cleanup has to be repeated forever.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">duplicates.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- newsletter sign-ups imported twice from two systems, emails in mixed case
+CREATE TABLE signups (signup_id NUMBER PRIMARY KEY, email VARCHAR2(100) NOT NULL, signed_up DATE NOT NULL);
+INSERT INTO signups VALUES (1, 'asha@example.com', DATE '2026-01-05');
+INSERT INTO signups VALUES (2, 'ben@example.com',  DATE '2026-01-06');
+INSERT INTO signups VALUES (3, 'ASHA@example.com', DATE '2026-02-01');
+INSERT INTO signups VALUES (4, 'chen@example.com', DATE '2026-02-03');
+INSERT INTO signups VALUES (5, 'asha@example.com', DATE '2026-03-09');
+INSERT INTO signups VALUES (6, 'Ben@Example.com',  DATE '2026-03-10');
+
+-- 1  find them: group on the normalised key, keep groups with more than one row
+SELECT LOWER(email) AS email, COUNT(*) AS copies, MIN(signup_id) AS keep_id
+FROM   signups GROUP BY LOWER(email) HAVING COUNT(*) &gt; 1 ORDER BY email;
+
+-- 2  delete all but the earliest copy of each
+DELETE FROM signups
+WHERE  signup_id IN (SELECT signup_id
+                     FROM  (SELECT signup_id,
+                                   ROW_NUMBER() OVER (PARTITION BY LOWER(email) ORDER BY signed_up, signup_id) AS rn
+                            FROM   signups)
+                     WHERE  rn &gt; 1);
+SELECT signup_id, email FROM signups ORDER BY signup_id;
+
+-- 3  and stop them coming back
+CREATE UNIQUE INDEX signups_email_ux ON signups (LOWER(email));
+INSERT INTO signups VALUES (7, 'CHEN@example.com', DATE '2026-04-01');
+DROP TABLE signups PURGE;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · duplicates.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+1 row created.
+
+EMAIL            COPIES KEEP_ID
+---------------- ------ -------
+asha@example.com      3       1
+ben@example.com       2       2
+
+2 rows selected.
+
+3 rows deleted.
+
+SIGNUP_ID EMAIL
+--------- ----------------
+        1 asha@example.com
+        2 ben@example.com
+        4 chen@example.com
+
+3 rows selected.
+
+Index created.
+
+INSERT INTO signups VALUES (7, 'CHEN@example.com', DATE '2026-04-01')
+*
+ERROR at line 1:
+ORA-00001: unique constraint (SHOP.SIGNUPS_EMAIL_UX) violated on table SHOP.SIGNUPS columns (SYS_NC00004$)
+ORA-03301: (ORA-00001 details) row with column values (SYS_NC00004$:'chen@example.com') already exists
+Help: https://docs.oracle.com/error-help/db/ora-00001/
+
+Table dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">duplicates.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">-- newsletter sign-ups imported twice from two systems, emails in mixed case
+CREATE TABLE signups (signup_id INT PRIMARY KEY, email VARCHAR(100) NOT NULL, signed_up DATE NOT NULL);
+INSERT INTO signups VALUES (1, 'asha@example.com', '2026-01-05'), (2, 'ben@example.com', '2026-01-06'),
+                           (3, 'ASHA@example.com', '2026-02-01'), (4, 'chen@example.com', '2026-02-03'),
+                           (5, 'asha@example.com', '2026-03-09'), (6, 'Ben@Example.com', '2026-03-10');
+
+-- 1  find them; the case-insensitive collation already treats 'ASHA@…' and 'asha@…' as equal
+SELECT email, COUNT(*) AS copies, MIN(signup_id) AS keep_id
+FROM   signups GROUP BY email HAVING COUNT(*) &gt; 1 ORDER BY email;
+
+-- 2  delete all but the earliest copy of each: SQL Server can delete through a CTE
+WITH ranked AS (
+  SELECT signup_id, ROW_NUMBER() OVER (PARTITION BY email ORDER BY signed_up, signup_id) AS rn FROM signups
+)
+DELETE FROM ranked WHERE rn &gt; 1;
+SELECT signup_id, email FROM signups ORDER BY signup_id;
+
+-- 3  and stop them coming back
+ALTER TABLE signups ADD CONSTRAINT signups_email_uk UNIQUE (email);
+INSERT INTO signups VALUES (7, 'CHEN@example.com', '2026-04-01');
+DROP TABLE signups;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · duplicates.mss.sql</div>
+<pre><code class="language-plaintext">(6 rows affected)
+email            copies keep_id
+---------------- ------ -------
+asha@example.com      3       1
+Ben@Example.com       2       2
+
+(2 rows affected)
+
+(3 rows affected)
+signup_id email
+--------- ----------------
+        1 asha@example.com
+        2 ben@example.com
+        4 chen@example.com
+
+(3 rows affected)
+Msg 2627, Level 14, State 1, Server mssql, Line 20
+Violation of UNIQUE KEY constraint 'signups_email_uk'. Cannot insert duplicate key in object 'dbo.signups'. The duplicate key value is (CHEN@example.com).
+The statement has been terminated.</code></pre>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><h4>Engine differences</h4><p>Oracle needed <code>LOWER(email)</code> in the grouping and a function-based unique index. SQL Server's case-insensitive collation grouped the variants by itself, and a plain unique constraint rejected <code>CHEN@…</code>. The group's displayed value, <code>Ben@Example.com</code>, is an arbitrary member of the group. SQL Server can also delete straight through a CTE; Oracle deletes by key with <code>IN</code>, or by <code>ROWID</code>.</p></div>
+    <div class="card"><h4>Follow-ups</h4><p>"Keep the latest instead?" Order the window by <code>signed_up DESC</code>. "Millions of rows?" Delete in batches. "The duplicates have different data, so which wins?" That is a merge, not a delete: decide per column. "No unique id at all?" Oracle has <code>ROWID</code>; in SQL Server, the CTE delete works anyway.</p></div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Group by the normalised key with <code>HAVING COUNT(*) &gt; 1</code> to find them; <code>ROW_NUMBER</code> partitioned by that key, delete <code>rn &gt; 1</code>; then a unique index on the same expression so the database prevents it next time."</div>
+  </div>
+</section>

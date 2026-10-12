@@ -1,0 +1,120 @@
+<section class="slide" data-sec="Relational modelling" data-title="Normalisation, worked on one order">
+  <h2>Normalising means storing each fact once, so that changing it is one update and deleting one thing deletes nothing else</h2>
+  <p class="dek">A first draft of an order system often looks like a spreadsheet: one wide row per order line, with the customer's email, the product's name and the category repeated on every row. It works until data changes. Each normal form removes one kind of repetition by moving a fact to the table whose key it depends on. <b>1NF</b>: one value per cell, no lists. <b>2NF</b>: no column depends on only part of a composite key. <b>3NF</b>: no column depends on another non-key column. The script below builds the spreadsheet version from the running example and shows the three anomalies normalisation prevents.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Normalising the order sheet in three steps. Unnormalised: one row per order with a list of items in one cell. First normal form: one row per order line, keyed by order_id and line_no, but product name and category repeat for every line and customer email repeats for every order. Second normal form: product columns depend only on the sku, part of the line, so they move to a products table. Third normal form: email depends on customer_id, not on the order, so it moves to customers, and category name depends on category_id, so it moves to categories. Result: customers, orders, order_items, products and categories, each fact stored once.">
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace">
+          <rect x="10" y="40" width="190" height="150" rx="6" fill="#D26A3F" fill-opacity="0.08" stroke="#D26A3F" stroke-width="1.3"></rect>
+          <text x="18" y="60" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Unnormalised</text>
+          <text x="18" y="82">order_id 1001</text><text x="18" y="98">customer, email</text><text x="18" y="114">items: "LAP-14 x1,</text><text x="66" y="130">ACC-MSE x1"</text>
+          <text x="18" y="160" opacity="0.7">a list in one cell</text>
+
+          <rect x="235" y="40" width="190" height="150" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="243" y="60" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">1NF: one value per cell</text>
+          <text x="243" y="82">(order_id, line_no) PK</text><text x="243" y="98">email</text><text x="243" y="114">sku, product, category</text><text x="243" y="130">qty, unit_price</text>
+          <text x="243" y="160" opacity="0.7">email repeats per line</text><text x="243" y="176" opacity="0.7">product repeats per order</text>
+
+          <rect x="460" y="40" width="190" height="150" rx="6" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="468" y="60" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">2NF: whole key</text>
+          <text x="468" y="82">orders(order_id, email)</text><text x="468" y="98">order_items(order_id,</text><text x="480" y="114">line_no, sku, qty)</text><text x="468" y="130">products(sku, name,</text><text x="480" y="146">category)</text>
+          <text x="468" y="176" opacity="0.7">email still per order</text>
+
+          <rect x="685" y="40" width="205" height="150" rx="6" fill="#3AA79B" fill-opacity="0.08" stroke="#3AA79B" stroke-width="1.3"></rect>
+          <text x="693" y="60" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">3NF: nothing but the key</text>
+          <text x="693" y="82">customers(id, email)</text><text x="693" y="98">orders(id, customer_id)</text><text x="693" y="114">order_items(order, line,</text><text x="705" y="130">product_id, qty, price)</text><text x="693" y="146">products(id, category_id)</text><text x="693" y="162">categories(id, name)</text>
+          <text x="693" y="180" opacity="0.7">each fact once</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3"><line x1="200" y1="115" x2="233" y2="115" marker-end="url(#arw)"></line><line x1="425" y1="115" x2="458" y2="115" marker-end="url(#arw)"></line><line x1="650" y1="115" x2="683" y2="115" marker-end="url(#arw)"></line></g>
+        <g font-size="10" fill="currentColor" opacity="0.8">
+          <text x="10" y="222">split the list into rows</text>
+          <text x="235" y="222">product facts depend on the sku only:</text><text x="235" y="236">move them out</text>
+          <text x="460" y="222">email depends on the customer,</text><text x="460" y="236">not the order: move it out</text>
+          <text x="685" y="222">every non-key column depends on the key,</text><text x="685" y="236">the whole key, and nothing but the key</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">flat-orders.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- one row per order line, everything repeated: the spreadsheet a first draft often looks like
+CREATE TABLE order_sheet AS
+SELECT o.order_id, o.placed_at, c.customer_id, c.name AS customer, c.email,
+       p.sku, p.name AS product, cat.name AS category, i.qty, i.unit_price
+FROM   orders o
+JOIN   customers c    ON c.customer_id = o.customer_id
+JOIN   order_items i  ON i.order_id = o.order_id
+JOIN   products p     ON p.product_id = i.product_id
+JOIN   categories cat ON cat.category_id = p.category_id;
+
+-- update anomaly: Asha changes her email, and the fix reaches one order
+UPDATE order_sheet SET email = 'asha.rao@example.com' WHERE order_id = 1001;
+SELECT DISTINCT customer_id, email FROM order_sheet WHERE customer_id = 1 ORDER BY email;
+
+-- delete anomaly: deleting Gita's orders also deletes the only record of her email
+SELECT COUNT(*) AS rows_about_gita FROM order_sheet WHERE customer_id = 7;
+DELETE FROM order_sheet WHERE customer_id = 7;
+SELECT COUNT(*) AS gita_left FROM order_sheet WHERE email = 'gita@example.com';
+
+-- insert anomaly: a new product cannot be recorded until somebody orders it
+INSERT INTO order_sheet (sku, product, category) VALUES ('KIT-PRS', 'French Press', 'Kitchen');
+
+DROP TABLE order_sheet PURGE;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · flat-orders.ora.sql</div>
+<pre><code class="language-plaintext">Table created.
+
+2 rows updated.
+
+CUSTOMER_ID EMAIL
+----------- --------------------
+          1 asha.rao@example.com
+          1 asha@example.com
+
+2 rows selected.
+
+ROWS_ABOUT_GITA
+---------------
+              3
+
+1 row selected.
+
+3 rows deleted.
+
+GITA_LEFT
+---------
+        0
+
+1 row selected.
+
+INSERT INTO order_sheet (sku, product, category) VALUES ('KIT-PRS', 'French Press', 'Kitchen')
+*
+ERROR at line 1:
+ORA-01400: cannot insert NULL into ("SHOP"."ORDER_SHEET"."ORDER_ID")
+Help: https://docs.oracle.com/error-help/db/ora-01400/
+
+Table dropped.</code></pre>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>Anomaly</th><th>In the sheet above</th><th>In the normalised schema</th></tr></thead>
+      <tbody>
+        <tr><td>Update</td><td>Changing Asha's email on one order left two emails for one customer</td><td>One row in <code>customers</code> to update</td></tr>
+        <tr><td>Delete</td><td>Deleting Gita's orders deleted the only record of her email</td><td>Her <code>customers</code> row is unaffected; the foreign key even stops orphaned orders</td></tr>
+        <tr><td>Insert</td><td>A new product could not be stored without an order: ORA-01400 on <code>order_id</code></td><td>Insert into <code>products</code>; it needs no order</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note warn"><span class="lbl">BCNF and beyond</span>Boyce-Codd normal form tightens 3NF for tables with overlapping candidate keys. 4NF and 5NF deal with independent multi-valued facts. They come up rarely in application schemas. If every determinant in a table is a candidate key, you are in BCNF, and that answer is enough in an interview.</div>
+    <div class="note bad"><span class="lbl">Where the repetition hides</span>Comma-separated lists in a column (<code>'gift,sale'</code>) break 1NF: they cannot be indexed, joined or constrained. Columns like <code>phone1</code>, <code>phone2</code>, <code>phone3</code> are the same repeating group in disguise. Both want a child table.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I normalise to 3NF by default, so each fact has one home and constraints can protect it. Then I denormalise specific columns on purpose, for history or for read speed, and I write down how each copy is kept correct." That is the <a data-deck="db" data-slide="Denormalising on purpose">next slide</a>.</div>
+  </div>
+</section>

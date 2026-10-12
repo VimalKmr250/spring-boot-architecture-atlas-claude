@@ -1,0 +1,155 @@
+<section class="slide" data-sec="Advanced SQL" data-title="Getting generated values back">
+  <h2>Ask the INSERT itself for the id it generated; a trigger can make @@IDENTITY return somebody else's</h2>
+  <p class="dek">After inserting an order, the application needs its new id, to insert the lines and to return it to the caller. Reading it with a second query, "the highest id", is wrong as soon as two sessions insert at once. Both engines can return values from the insert itself: Oracle with <code>RETURNING … INTO</code>, SQL Server with the <code>OUTPUT</code> clause. JDBC's <code>getGeneratedKeys()</code> uses those underneath. SQL Server also keeps three "last identity" functions, and only one of them is safe.</p>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">returning.mss.sql · SQL Server 2025</div>
+<pre><code class="language-sql">BEGIN TRANSACTION;
+-- 1  OUTPUT returns the generated values from the statement itself
+INSERT INTO orders (customer_id, status, placed_at, total)
+OUTPUT inserted.order_id, inserted.status
+VALUES (2, 'PENDING', '2026-04-01 10:00:00', 89.00);
+ROLLBACK;
+GO
+
+-- 2  add an audit table with its own identity, filled by a trigger on orders
+CREATE TABLE order_audit (audit_id INT IDENTITY(500, 1) PRIMARY KEY, order_id INT, action VARCHAR(10));
+GO
+CREATE TRIGGER orders_audit_tr ON orders AFTER INSERT AS
+  INSERT INTO order_audit (order_id, action) SELECT order_id, 'INSERT' FROM inserted;
+GO
+
+--    now the same INSERT ... OUTPUT is refused
+BEGIN TRANSACTION;
+INSERT INTO orders (customer_id, status, placed_at, total)
+OUTPUT inserted.order_id, inserted.status
+VALUES (2, 'PENDING', '2026-04-01 10:00:00', 89.00);
+ROLLBACK;
+GO
+
+-- 3  OUTPUT INTO a table variable still works with the trigger in place
+BEGIN TRANSACTION;
+DECLARE @new TABLE (order_id INT);
+INSERT INTO orders (customer_id, status, placed_at, total)
+OUTPUT inserted.order_id INTO @new
+VALUES (2, 'PENDING', '2026-04-01 10:00:00', 89.00);
+SELECT order_id AS via_output_into FROM @new;
+
+-- 4  SCOPE_IDENTITY is this scope's last identity; @@IDENTITY is the session's, trigger included
+INSERT INTO orders (customer_id, status, placed_at, total)
+VALUES (3, 'PENDING', '2026-04-01 10:05:00', 24.00);
+SELECT SCOPE_IDENTITY() AS scope_identity, @@IDENTITY AS at_at_identity;
+ROLLBACK;
+GO
+
+DROP TRIGGER orders_audit_tr;
+DROP TABLE order_audit;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on SQL Server 2025 · returning.mss.sql</div>
+<pre><code class="language-plaintext">order_id status
+-------- -------
+    1020 PENDING
+
+(1 rows affected)
+Msg 334, Level 16, State 1, Server mssql, Line 4
+The target table 'orders' of the DML statement cannot have any enabled triggers if the statement contains an OUTPUT clause without INTO clause.
+
+(1 rows affected)
+
+(1 rows affected)
+via_output_into
+---------------
+           1021
+
+(1 rows affected)
+
+(1 rows affected)
+
+(1 rows affected)
+scope_identity at_at_identity
+-------------- --------------
+          1022            501
+
+(1 rows affected)</code></pre>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">returning.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  RETURNING hands back generated values; SQL*Plus receives them into a bind variable
+VARIABLE new_id NUMBER
+INSERT INTO orders (customer_id, status, placed_at, total)
+VALUES (2, 'PENDING', TIMESTAMP '2026-04-01 10:00:00', 89.00)
+RETURNING order_id INTO :new_id;
+PRINT new_id
+
+-- 2  the same in PL/SQL, where application code usually does it
+SET SERVEROUTPUT ON
+DECLARE
+  v_id    orders.order_id%TYPE;
+  v_total orders.total%TYPE;
+BEGIN
+  INSERT INTO orders (customer_id, status, placed_at, total)
+  VALUES (3, 'PENDING', TIMESTAMP '2026-04-01 10:05:00', 24.00)
+  RETURNING order_id, total INTO v_id, v_total;
+  DBMS_OUTPUT.PUT_LINE('new order ' || v_id || ' for ' || v_total);
+END;
+/
+ROLLBACK;</code></pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="codewrap">
+        <div class="codelabel">Output on Oracle 26ai · returning.ora.sql</div>
+<pre><code class="language-plaintext">1 row created.
+
+NEW_ID
+------
+  1020
+
+new order 1021 for 24
+
+PL/SQL procedure successfully completed.
+
+Rollback complete.</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">returning.js · MongoDB 8.3, mongosh</div>
+<pre><code class="language-javascript">// the driver creates the ObjectId, so the id is known before the server answers
+const res = db.events.insertOne({ type: 'ORDER_PLACED', orderId: 1019 });
+print(res.insertedId instanceof ObjectId, res.acknowledged);
+// findOneAndUpdate returns the document after the change: a counter in one round trip
+db.counters.drop();
+show(db.counters.findOneAndUpdate({ _id: 'invoice' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' }));
+show(db.counters.findOneAndUpdate({ _id: 'invoice' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' }));
+db.counters.drop(); db.events.drop();</code></pre>
+      </div>
+      <div class="codewrap">
+        <div class="codelabel">Output on MongoDB 8.3 · returning.js</div>
+<pre><code class="language-plaintext">true true
+{ _id: 'invoice', seq: 1 }
+{ _id: 'invoice', seq: 2 }</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead><tr><th>SQL Server function</th><th>Returns</th><th>Here</th></tr></thead>
+      <tbody>
+        <tr><td><code>SCOPE_IDENTITY()</code></td><td>The last identity generated in this session and this scope</td><td>The order's id</td></tr>
+        <tr><td><code>@@IDENTITY</code></td><td>The last identity generated in this session, in any scope, triggers included</td><td><b>501</b>: the audit row the trigger inserted</td></tr>
+        <tr><td><code>IDENT_CURRENT('orders')</code></td><td>The last identity generated for the table, by any session</td><td>Whatever another session inserted last; never use it for "my" row</td></tr>
+        <tr><td><code>OUTPUT inserted.col</code></td><td>Values from the statement itself, for every row it inserted</td><td>The best option, but a table with a trigger needs <code>OUTPUT … INTO</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">Error 334: OUTPUT and triggers</span>Adding a trigger to <code>orders</code> broke every plain <code>INSERT … OUTPUT</code> against it. Some ORMs generate exactly that statement to read back keys; Entity Framework Core 7 switched to it and broke on tables with triggers. A DBA's audit trigger can take down an application that did not change. <code>OUTPUT … INTO @table</code> still works.</div>
+    <div class="note warn"><span class="lbl">MAX(id) is not your id</span><code>SELECT MAX(order_id)</code> after an insert returns another session's row as soon as two inserts overlap. Sequences and identities are concurrency-safe precisely because each session gets its own number back.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"I get keys back from the insert: <code>RETURNING</code> on Oracle, <code>OUTPUT</code> or <code>SCOPE_IDENTITY()</code> on SQL Server, <code>getGeneratedKeys()</code> in JDBC. In MongoDB the driver generates the <code>ObjectId</code>, so the id is known before the write." The JDBC side is on <a data-deck="db" data-slide="JDBC done right">JDBC done right</a>.</div>
+  </div>
+</section>

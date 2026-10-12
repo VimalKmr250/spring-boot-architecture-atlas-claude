@@ -1,0 +1,131 @@
+<section class="slide" data-sec="SQL essentials" data-title="How a SELECT is evaluated">
+  <h2>SQL is written SELECT first but evaluated FROM first, and that order explains most "invalid column" errors</h2>
+  <p class="dek">A query's clauses are evaluated in a fixed logical order: the rows come from <code>FROM</code> and the joins, <code>WHERE</code> filters them, <code>GROUP BY</code> collapses them into groups, <code>HAVING</code> filters the groups, <code>SELECT</code> computes the output columns, and <code>ORDER BY</code> and the row limit come last. A clause can only use names that exist at its step. The optimiser may execute the query in a different physical order, but it must give the same result as this logical one.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 900 190" role="img" aria-label="The logical order of a SELECT, as eight steps from left to right: 1 FROM and JOIN build the rows; 2 WHERE filters rows; 3 GROUP BY forms groups; 4 HAVING filters groups; 5 SELECT computes expressions, aliases and window functions; 6 DISTINCT removes duplicates; 7 ORDER BY sorts, and can use aliases; 8 OFFSET and FETCH limit the rows. Aliases defined at step 5 are visible only at steps 6 to 8. Aggregates are allowed from step 4 onwards, and window functions only at steps 5 and 7.">
+        <g font-size="11" fill="currentColor">
+          <rect x="10" y="40" width="98" height="58" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="59" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">FROM</text><text x="59" y="82" text-anchor="middle" font-size="10" opacity="0.8">JOIN, ON</text>
+          <rect x="120" y="40" width="98" height="58" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="169" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">WHERE</text><text x="169" y="82" text-anchor="middle" font-size="10" opacity="0.8">filter rows</text>
+          <rect x="230" y="40" width="98" height="58" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="279" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">GROUP BY</text><text x="279" y="82" text-anchor="middle" font-size="10" opacity="0.8">form groups</text>
+          <rect x="340" y="40" width="98" height="58" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="389" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">HAVING</text><text x="389" y="82" text-anchor="middle" font-size="10" opacity="0.8">filter groups</text>
+          <rect x="450" y="40" width="98" height="58" rx="17" fill="#D26A3F" fill-opacity="0.12" stroke="#D26A3F" stroke-width="1.5"></rect>
+          <text x="499" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">SELECT</text><text x="499" y="82" text-anchor="middle" font-size="10" opacity="0.8">aliases, windows</text>
+          <rect x="560" y="40" width="98" height="58" rx="17" fill="currentColor" fill-opacity="0.05" stroke="currentColor" stroke-opacity="0.45"></rect>
+          <text x="609" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">DISTINCT</text><text x="609" y="82" text-anchor="middle" font-size="10" opacity="0.8">drop duplicates</text>
+          <rect x="670" y="40" width="98" height="58" rx="17" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="719" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">ORDER BY</text><text x="719" y="82" text-anchor="middle" font-size="10" opacity="0.8">may use aliases</text>
+          <rect x="780" y="40" width="110" height="58" rx="17" fill="#3AA79B" fill-opacity="0.10" stroke="#3AA79B" stroke-width="1.4"></rect>
+          <text x="835" y="64" text-anchor="middle" font-weight="600" font-family="IBM Plex Mono, monospace">FETCH</text><text x="835" y="82" text-anchor="middle" font-size="10" opacity="0.8">OFFSET, TOP</text>
+        </g>
+        <g stroke="#8A94A3" stroke-width="1.3">
+          <line x1="108" y1="69" x2="118" y2="69" marker-end="url(#arw)"></line><line x1="218" y1="69" x2="228" y2="69" marker-end="url(#arw)"></line>
+          <line x1="328" y1="69" x2="338" y2="69" marker-end="url(#arw)"></line><line x1="438" y1="69" x2="448" y2="69" marker-end="url(#arw)"></line>
+          <line x1="548" y1="69" x2="558" y2="69" marker-end="url(#arw)"></line><line x1="658" y1="69" x2="668" y2="69" marker-end="url(#arw)"></line>
+          <line x1="768" y1="69" x2="778" y2="69" marker-end="url(#arw)"></line>
+        </g>
+        <g font-size="10" fill="currentColor" font-family="IBM Plex Mono, monospace" opacity="0.7">
+          <text x="59" y="28" text-anchor="middle">1</text><text x="169" y="28" text-anchor="middle">2</text><text x="279" y="28" text-anchor="middle">3</text><text x="389" y="28" text-anchor="middle">4</text>
+          <text x="499" y="28" text-anchor="middle">5</text><text x="609" y="28" text-anchor="middle">6</text><text x="719" y="28" text-anchor="middle">7</text><text x="835" y="28" text-anchor="middle">8</text>
+        </g>
+        <line x1="10" y1="122" x2="438" y2="122" stroke="#D26A3F" stroke-width="1.3" stroke-dasharray="4 3"></line>
+        <text x="10" y="140" font-size="10.5" fill="currentColor">Select-list aliases do not exist yet: WHERE tax &gt; 100 fails</text>
+        <line x1="560" y1="122" x2="890" y2="122" stroke="#3AA79B" stroke-width="1.3"></line>
+        <text x="560" y="140" font-size="10.5" fill="currentColor">Aliases are visible: ORDER BY tax works</text>
+        <line x1="340" y1="164" x2="890" y2="164" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.3"></line>
+        <text x="340" y="182" font-size="10.5" fill="currentColor">Aggregates such as COUNT(*) are allowed from HAVING on; never in WHERE</text>
+      </svg>
+    </div>
+  </figure>
+
+  <div class="split">
+    <div class="codewrap">
+      <div class="codelabel">order-of-evaluation.ora.sql · Oracle 26ai</div>
+<pre><code class="language-sql">-- 1  WHERE runs before SELECT, so the alias does not exist yet
+SELECT order_id, total * 0.18 AS tax
+FROM   orders
+WHERE  tax &gt; 100;
+
+-- 2  ORDER BY runs after SELECT, so the alias is fine there
+SELECT order_id, total * 0.18 AS tax
+FROM   orders
+ORDER  BY tax DESC
+OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY;
+
+-- 3  WHERE filters rows before grouping, HAVING filters the groups after
+SELECT customer_id, COUNT(*) AS orders, SUM(total) AS spent
+FROM   orders
+WHERE  status &lt;&gt; 'CANCELLED'
+GROUP  BY customer_id
+HAVING COUNT(*) &gt;= 3
+ORDER  BY spent DESC;
+
+-- 4  an aggregate cannot appear in WHERE: the groups do not exist yet
+SELECT customer_id
+FROM   orders
+WHERE  COUNT(*) &gt;= 3
+GROUP  BY customer_id;</code></pre>
+    </div>
+    <div class="codewrap">
+      <div class="codelabel">Output on Oracle 26ai · order-of-evaluation.ora.sql</div>
+<pre><code class="language-plaintext">WHERE  tax &gt; 100
+       *
+ERROR at line 3:
+ORA-00904: "TAX": invalid identifier
+Help: https://docs.oracle.com/error-help/db/ora-00904/
+
+ORDER_ID    TAX
+-------- ------
+    1007 467.64
+    1013 357.84
+    1005 341.82
+
+3 rows selected.
+
+CUSTOMER_ID ORDERS   SPENT
+----------- ------ -------
+          3      3 3263.90
+          1      4 2274.90
+
+2 rows selected.
+
+WHERE  COUNT(*) &gt;= 3
+       *
+ERROR at line 3:
+ORA-00934: group function is not allowed here
+Help: https://docs.oracle.com/error-help/db/ora-00934/</code></pre>
+    </div>
+  </div>
+
+  <div class="codewrap">
+    <div class="codelabel">Output on SQL Server 2025 · order-of-evaluation.mss.sql: the same four queries, with GO between them</div>
+<pre><code class="language-plaintext">Msg 207, Level 16, State 1, Server mssql, Line 3
+Invalid column name 'tax'.
+order_id      tax
+-------- --------
+    1007 467.6400
+    1013 357.8400
+    1005 341.8200
+
+(3 rows affected)
+customer_id orders   spent
+----------- ------ -------
+          3      3 3263.90
+          1      4 2274.90
+
+(2 rows affected)
+Msg 147, Level 15, State 1, Server mssql, Line 4
+An aggregate may not appear in the WHERE clause unless it is in a subquery contained in a HAVING clause or a select list, and the column being aggregated is an outer reference.</code></pre>
+  </div>
+
+  <div class="grid3">
+    <div class="note bad"><span class="lbl">One error, whole batch</span>Without the <code>GO</code> lines, SQL Server reported only the two errors and ran nothing else. A compile error such as an unknown column fails the entire batch before any statement in it runs. SQL*Plus runs each statement on its own, so Oracle printed the error and carried on.</div>
+    <div class="note warn"><span class="lbl">WHERE or HAVING</span>Filter rows in <code>WHERE</code> whenever the condition does not need an aggregate. <code>HAVING status &lt;&gt; 'CANCELLED'</code> would also run, but it groups every row first and discards the cancelled ones only afterwards. Use <code>HAVING</code> for conditions on aggregates, such as <code>COUNT(*) &gt;= 3</code>.</div>
+    <div class="note tip"><span class="lbl">Say it in the interview</span>"Logical order is FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, then the row limit. That is why a select alias works in ORDER BY but not in WHERE, and why window functions, computed at SELECT, cannot be filtered in WHERE: wrap the query in a subquery and filter outside."</div>
+  </div>
+</section>
